@@ -51,8 +51,11 @@ struct AnnualRecurrenceTests {
         #expect(next == Self.date("2026-06-14 09:00"))
     }
 
-    @Test("Birthday is today after 09:00 — next year")
-    func birthdayTodayAfterTime() {
+    @Test("Birthday is today but after 09:00 — fires now, not next year (R5)")
+    func birthdayTodaySameDayLateFiresToday() {
+        // Install at 10:00 on Mom's birthday; the 09:00 slot has passed. The
+        // shipped engine rolled a full year forward; the contract fires today at
+        // the next possible moment (now).
         let now = Self.date("2026-06-14 10:00")
         let engine = ReminderEngine(
             occasionNotificationTime: TimeOfDay(hour: 9),
@@ -60,7 +63,21 @@ struct AnnualRecurrenceTests {
         let next = engine.nextOccasionOccurrence(
             monthDay: MonthDay(month: 6, day: 14),
             timezone: Self.ist)
-        #expect(next == Self.date("2027-06-14 09:00"))
+        #expect(next == now)
+    }
+
+    @Test("Feb-29 same-day-late in a non-leap year fires today on Feb 28 (R5)")
+    func feb29SameDayLateFiresToday() {
+        // 2027 is non-leap: the Feb-29 occasion resolves to Feb 28. Installing
+        // at 14:00 on Feb 28, after the 09:00 slot, must still fire today.
+        let now = Self.date("2027-02-28 14:00")
+        let engine = ReminderEngine(
+            occasionNotificationTime: TimeOfDay(hour: 9),
+            clock: { now })
+        let next = engine.nextOccasionOccurrence(
+            monthDay: MonthDay(month: 2, day: 29),
+            timezone: Self.ist)
+        #expect(next == now)
     }
 
     @Test("Feb 29 falls back to Feb 28 in non-leap years")

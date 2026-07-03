@@ -124,7 +124,11 @@ public final class UpcomingViewModel {
                 let last = contact.lastInteractedAt ?? contact.createdAt
                 let overdueAt = last.addingTimeInterval(TimeInterval(cadence) * 86_400)
                 let target = max(now, overdueAt)
-                let fires = engine.nextAllowedSlot(from: target, in: window)
+                // `nextAllowedSlot` now returns nil for a zero-capacity window
+                // (R4). This VM's `.defaultV1()` window always has capacity, so
+                // nil never happens today, but skip the row rather than crash if
+                // a future override wires a degenerate window through here.
+                guard let fires = engine.nextAllowedSlot(from: target, in: window) else { continue }
                 if fires <= horizonEnd, fires >= now {
                     rows.append(UpcomingRowState(
                         id: UUID(),
