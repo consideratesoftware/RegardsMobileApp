@@ -26,7 +26,7 @@ public extension Contact {
 
     /// The spoken label. Example:
     ///
-    ///   "Priya Raghavan, 9 days overdue, every 2 weeks, last contacted 3 weeks ago.
+    ///   "Leia Organa, 9 days overdue, every 2 weeks, last contacted 3 weeks ago.
     ///    Inner-circle."
     ///
     /// Units pluralize correctly at 0/1/many and relative-time follows
