@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Source of truth
 
-`ARCHITECTURE.md` at the repo root is the canonical design doc — vision, V1 scope, data model, channel catalog, reminder-window engine, privacy stack, phase plan. When a code change and `ARCHITECTURE.md` disagree, either the code is wrong or the doc needs a sibling PR. Read the relevant section before implementing anything non-trivial. Section cross-references in code comments (e.g. "§11", "§5") point into this file.
+`ARCHITECTURE.md` at the repo root is the canonical design doc — now at **v1.0 (2026-07-01 rebaseline)**. It contains the vision, V1 scope, data model, channel catalog, reminder-window engine, privacy stack, the rebaselined PR-level plan (§14), the current-state ground truth (§18), the remediation register (§19), and the release/maintenance playbooks (§20/§21). When a code change and `ARCHITECTURE.md` disagree, either the code is wrong or the doc needs a sibling PR. Read §18 → §19 → §14 before implementing anything non-trivial. Section cross-references in code comments (e.g. "§11", "§5") point into this file; §1–§17 numbering is stable and must never be renumbered.
 
 Regards is a **local-first, no-backend, no-network** mobile app. Privacy is a merge-gated invariant (see the privacy-grep guard below), not a marketing claim.
 
@@ -34,12 +34,14 @@ Commit both `project.yml` *and* the regenerated `Regards.xcodeproj/`. CI runs `x
 ```bash
 cd ios
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 15' build
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Full test action (both unit + accessibility suites):
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 15' test
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test
 ```
+
+(iPhone 16 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
 
 Run a single suite or test:
 
@@ -74,10 +76,10 @@ Layout inside `ios/Regards/`:
 - `App/` — `@main` app entry (`RegardsApp.swift`) and `AppEnvironment` (the repository bundle injected at the root view).
 - `Domain/` — pure-Swift entities (`Contact`, `Channel`, `TimeOfDay`, `DayOfWeek`, `ReminderWindow`, …), the `ReminderEngine`, `DuplicateDetector`, `ChannelCatalog`, `DeepLinkBuilder`. Unit-tested in isolation.
 - `Data/` — GRDB records, migrations, repositories, and `MockRepositories` (seeded with the JSX-mock cast for Phase 0).
-- `Platform/` — Apple-framework adapters (Contacts, Notifications, StoreKit, deep linking). Currently empty; populated in Phase 1+.
+- `Platform/` — Apple-framework adapters. `Contacts/` exists (`ContactsSource` CNContactStore adapter + `ContactsImporter`, landed PR #10, currently dormant — no app callers). `Notifications/`, `Calendar/`, `DeepLinks/`, `Billing/` arrive in Phases 1C–2 (ARCHITECTURE.md §12).
 - `DesignSystem/` — `RegardsDS` tokens (colors, typography, WCAG contrast helpers) and shared primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`).
 - `Features/` — one folder per screen (`Overdue`, `Upcoming`, `Contacts`, `ContactDetail`, `EditContact`, `MergeDuplicates`, `ReminderWindows`, `Onboarding`, `Settings`, `Shared`). Each screen owns its `*Screen.swift` view and a `*ViewModel.swift` where stateful.
-- `Resources/` — `Info.plist`, asset catalog, `PrivacyInfo.xcprivacy`.
+- `Resources/` — `Info.plist`, asset catalog. (`PrivacyInfo.xcprivacy` lives at `ios/Regards/PrivacyInfo.xcprivacy`, not under `Resources/` — it's added as an explicit resource in `project.yml`.)
 
 ### Phase 0 → Phase 1 dependency injection
 
@@ -89,7 +91,9 @@ Navigation uses **one `NavigationStack` per tab** with per-tab `NavigationPath` 
 
 `RegardsAccessibilityTests` runs `XCUIApplication.performAccessibilityAudit()` on every screen and fails CI on any audit finding. See `ios/docs/accessibility.md` for the standing rules (VoiceOver label completeness, Dynamic Type through `accessibility5`, WCAG AA contrast, Reduce Motion, 44×44pt touch targets, focus order). Every new screen gets a row in the "screens audited" table in that doc.
 
-PR3 landed with the **structural** audit categories gating merges (`elementDetection`, `sufficientElementDescription`, `trait`). The **sensory** categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are temporarily off for the eight-screen shell and tracked in the "PR3 follow-ups" section of `accessibility.md` — the constant to flip once those are fixed is `pr3AuditCategories` in `ScreensAccessibilityTests`.
+The **structural** audit categories gate merges today (`elementDetection`, `sufficientElementDescription`, `trait`) via the `structuralAuditCategories` constant in `ScreensAccessibilityTests`. The **sensory** categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are temporarily off and tracked in the "Sensory-audit carve-outs" section of `accessibility.md`; PR34 (ARCHITECTURE.md §14) flips the constant to all categories.
+
+UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. Run `ios/scripts/audit-stress.sh` (5 consecutive audit runs) before pushing any UI-test change.
 
 Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is expected before any UI-touching merge.
 
@@ -108,11 +112,12 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 
 ## CI map
 
-- `.github/workflows/ios-ci.yml` — xcodegen determinism → build → (unit tests + coverage) + (accessibility audit). Snapshot-tests job is declared with `if: false` as a branch-protection placeholder.
-- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, markdown link check for `ios/docs/`.
+- `.github/workflows/ios-ci.yml` — xcodegen determinism → build → (unit tests + coverage) + (accessibility audit). No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
+- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, markdown link check for `ios/docs/` (PR19 extends it to root markdown).
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
+- `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× per PR (flake detector).
 
-All four workflows gate merges.
+All four workflows gate merges; path filters were deliberately removed (PR #15) so required checks always report.
 
 ## Things to avoid
 
@@ -121,3 +126,4 @@ All four workflows gate merges.
 - Adding any networking primitive — even via an indirect wrapper — without explicitly updating ARCHITECTURE.md §11 and the privacy-grep guard first.
 - Writing back to system Contacts outside the partial-field `CNSaveRequest` pattern described in §7 (never delete, never bulk-edit, never merge system contacts — merges are virtual via the local `ContactGroup` table).
 - Adding an OAuth calendar integration. This is an explicit non-goal (§3); local EventKit only.
+- Marking a remediation item done without meeting its acceptance check — the open register is ARCHITECTURE.md §19; every fix PR cites its R-numbers.
