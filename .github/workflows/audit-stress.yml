@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  XCODE_VERSION: "16.2"
+  XCODE_VERSION: "26.6"
   SIMULATOR: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
   SCHEME: Regards
   STRESS_RUNS: "5"
