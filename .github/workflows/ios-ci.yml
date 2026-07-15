@@ -19,10 +19,10 @@ concurrency:
 env:
   XCODE_VERSION: "26.6"
   # `OS=latest` alone doesn't pick a device — xcodebuild needs a name to
-  # disambiguate. iPhone 16 Pro is the project's pinned test device and
+  # disambiguate. iPhone 17 Pro is the project's pinned test device and
   # resolves to the image's latest installed iOS runtime. Keep this device
   # pin aligned with AGENTS.md.
-  SIMULATOR: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
+  SIMULATOR: "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest"
   SCHEME: Regards
 
 jobs:

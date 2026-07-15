@@ -23,7 +23,7 @@ concurrency:
 
 env:
   XCODE_VERSION: "26.6"
-  SIMULATOR: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
+  SIMULATOR: "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest"
   SCHEME: Regards
   STRESS_RUNS: "5"
 

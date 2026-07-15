@@ -192,7 +192,7 @@ Two layer boundaries are **CI-enforced** by grep guards in `.github/workflows/gu
 - **Deep linking out:** `UIApplication.open(_:)` behind a `DeepLinker` protocol; schemes declared in `LSApplicationQueriesSchemes` only where universal links don't exist (§8).
 - **Billing:** StoreKit 2 (Phase 2).
 - **Project generation:** XcodeGen from `ios/project.yml`. **Never hand-edit `Regards.xcodeproj`** — CI enforces determinism (`xcodegen generate && git diff --exit-code`).
-- **Toolchain:** CI pins the runner's stable Xcode (currently 26.6; simulator pinned to iPhone 16 Pro with the latest installed iOS runtime). `project.yml` declares `xcodeVersion: "26.0"` for local work on Xcode 26. Before Phase 3, pin CI to the exact Xcode version used for App Store submission, run the full suite on the current iOS beta, and record the choice in the decisions log (see §21 "OS-beta season").
+- **Toolchain:** CI pins the runner's stable Xcode (currently 26.6; simulator pinned to iPhone 17 Pro with the latest installed iOS runtime). `project.yml` declares `xcodeVersion: "26.0"` for local work on Xcode 26. Before Phase 3, pin CI to the exact Xcode version used for App Store submission, run the full suite on the current iOS beta, and record the choice in the decisions log (see §21 "OS-beta season").
 - **Lint:** SwiftLint `--strict`. Custom rule `button_requires_accessibility` flags `Button { Image/Spacer/EmptyView }` without `.accessibilityLabel`.
 
 ### Android (follow-on port; `android/` does not exist yet)
