@@ -133,8 +133,13 @@ public struct ReminderEngine: Sendable {
         let anchor = effectiveLastInteractedAt ?? contact.createdAt
         let overdueAt = anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
 
+        let isAlreadyOverdue = overdueAt <= now
         let target = max(now, overdueAt)
-        guard let fires = nextAllowedSlot(from: target, in: window) else {
+        guard let fires = nextAllowedSlot(
+            from: target,
+            in: window,
+            includingContainingSlot: isAlreadyOverdue
+        ) else {
             // Zero-capacity window — never fire, never schedule at a disallowed
             // instant (R4). SchedulingPass badges this in Settings.
             return .skipped(reason: .windowHasNoCapacity)
@@ -153,8 +158,11 @@ public struct ReminderEngine: Sendable {
         let end: TimeOfDay
     }
 
-    /// Earliest instant ≥ the slot that contains or follows `date`, snapped to
-    /// that slot's **start** (decision #30). Returns `nil` when the window can
+    /// Start of the slot that contains or follows `date` (decision #30).
+    /// `includingContainingSlot` controls whether a slot already in progress
+    /// may be returned: true for already-overdue work that should fire now;
+    /// false for future cadence eligibility, which must never fire early.
+    /// Returns `nil` when the window can
     /// never fire — no allowed days, no usable ranges, or quiet hours consume
     /// every slot (R4). SchedulingPass treats `nil` as "skip + badge", never
     /// "fire anyway".
@@ -162,9 +170,9 @@ public struct ReminderEngine: Sendable {
     /// Snapping to the slot start (rather than to `date`) is deliberate: every
     /// reminder landing in the same slot shares an identical `scheduledFor`, so
     /// digest batching is exact-equality by construction (§9 contract 5). When
-    /// `date` falls inside an open slot the returned instant can therefore be
-    /// earlier than `date`; the platform layer fires such a past instant
-    /// immediately.
+    /// `date` falls inside an open slot and `includingContainingSlot` is true,
+    /// the returned instant can therefore be earlier than `date`; the platform
+    /// layer fires such a past instant immediately.
     ///
     /// All candidate instants are materialized with wall-clock calendar APIs
     /// (`date(bySettingHour:…)`), never `startOfDay + minutes` — the latter adds
@@ -174,9 +182,14 @@ public struct ReminderEngine: Sendable {
     /// the slot start doesn't exist, `date(bySettingHour:…)` yields the next
     /// existing instant, which we accept only if it still reads a wall-clock
     /// time inside the slot; otherwise the slot is skipped.
-    public func nextAllowedSlot(from date: Date, in window: ReminderWindow) -> Date? {
+    public func nextAllowedSlot(
+        from date: Date,
+        in window: ReminderWindow,
+        includingContainingSlot: Bool = true
+    ) -> Date? {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = window.timeZone
+        guard let timezone = TimeZone(identifier: window.timezoneIdentifier) else { return nil }
+        calendar.timeZone = timezone
 
         guard !window.allowedDays.isEmpty else { return nil }
         let slots = daySlots(for: window)
@@ -190,18 +203,71 @@ public struct ReminderEngine: Sendable {
             let weekday = calendar.component(.weekday, from: dayStart)
             guard window.allowedDays.contains(calendarWeekday: weekday) else { continue }
 
+            var activeSlotStarts: [Date] = []
+            var futureSlotStarts: [Date] = []
             for slot in slots {
-                guard let slotStart = materialize(slot.start, onDay: dayStart, calendar: calendar),
-                      let slotEnd = materialize(slot.end, onDay: dayStart, calendar: calendar) else { continue }
-                // Slot entirely in the past relative to `date` — walk on.
-                if slotEnd <= date { continue }
-                // Re-validate the materialized start. On a spring-forward gap
-                // `materialize` returns the next existing instant; if that
-                // instant reads past the slot end the whole slot was skipped,
-                // so keep walking (§9 contract 1).
-                if wallClock(of: slotStart, calendar: calendar) >= slot.end { continue }
-                return slotStart
+                guard let firstSlotStart = materialize(
+                    slot.start,
+                    onDay: dayStart,
+                    calendar: calendar,
+                    repeatedTimePolicy: .first
+                ), let lastSlotStart = materialize(
+                    slot.start,
+                    onDay: dayStart,
+                    calendar: calendar,
+                    repeatedTimePolicy: .last
+                ) else { continue }
+
+                // A backward transition can re-enter a range without crossing
+                // its nominal start boundary. It is a new interval only when
+                // the range is closed immediately before the transition and
+                // open immediately after it. This excludes spring-forward and
+                // a fall-back transition inside one continuous allowed range.
+                var candidateStarts = [firstSlotStart]
+                if let transition = calendar.timeZone.nextDaylightSavingTimeTransition(
+                    after: dayStart.addingTimeInterval(-1)
+                ),
+                   calendar.isDate(transition, inSameDayAs: dayStart) {
+                    let beforeTransition = wallClock(
+                        of: transition.addingTimeInterval(-1),
+                        calendar: calendar
+                    )
+                    let afterTransition = wallClock(of: transition, calendar: calendar)
+                    let movedBackward = afterTransition < beforeTransition
+                    let wasAllowed = slot.start <= beforeTransition && beforeTransition < slot.end
+                    let becomesAllowed = slot.start <= afterTransition && afterTransition < slot.end
+                    // A repeated nominal start is a new interval only when the
+                    // allowed range is not continuous across the fold.
+                    if lastSlotStart != firstSlotStart, !(wasAllowed && becomesAllowed) {
+                        candidateStarts.append(lastSlotStart)
+                    }
+                    if movedBackward, !wasAllowed, becomesAllowed {
+                        candidateStarts.append(transition)
+                    }
+                } else if lastSlotStart != firstSlotStart {
+                    candidateStarts.append(lastSlotStart)
+                }
+                candidateStarts = Array(Set(candidateStarts))
+
+                let dateWallClock = wallClock(of: date, calendar: calendar)
+                let containsDate = calendar.isDate(date, inSameDayAs: dayStart)
+                    && slot.start <= dateWallClock
+                    && dateWallClock < slot.end
+                if includingContainingSlot, containsDate,
+                   let activeSlotStart = candidateStarts.filter({ $0 <= date }).max() {
+                    activeSlotStarts.append(activeSlotStart)
+                }
+
+                futureSlotStarts.append(contentsOf: candidateStarts.filter { candidate in
+                    guard candidate >= date else { return false }
+                    // Re-validate a materialized spring-gap boundary. If the
+                    // next existing instant reads past the slot end, the slot
+                    // has no real instant on this day (§9 contract 1).
+                    return wallClock(of: candidate, calendar: calendar) < slot.end
+                })
             }
+            if let activeSlotStart = activeSlotStarts.max() { return activeSlotStart }
+            if let futureSlotStart = futureSlotStarts.min() { return futureSlotStart }
         }
         return nil
     }
@@ -274,10 +340,15 @@ public struct ReminderEngine: Sendable {
     /// substitute the DST transition instant (the gap end) on this day, so a
     /// slot start inside the gap resolves to the earliest existing instant in
     /// the range rather than jumping a day (§9 contract 1, R1).
-    private func materialize(_ time: TimeOfDay, onDay dayStart: Date, calendar: Calendar) -> Date? {
+    private func materialize(
+        _ time: TimeOfDay,
+        onDay dayStart: Date,
+        calendar: Calendar,
+        repeatedTimePolicy: Calendar.RepeatedTimePolicy
+    ) -> Date? {
         guard let candidate = calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0,
                                             of: dayStart, matchingPolicy: .nextTime,
-                                            repeatedTimePolicy: .first, direction: .forward) else {
+                                            repeatedTimePolicy: repeatedTimePolicy, direction: .forward) else {
             return nil
         }
         if calendar.isDate(candidate, inSameDayAs: dayStart) { return candidate }

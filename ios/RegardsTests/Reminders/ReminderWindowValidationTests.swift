@@ -27,7 +27,10 @@ struct ReminderWindowValidationTests {
             allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 22), end: TimeOfDay(hour: 1))],
             quietHours: nil, timezoneIdentifier: "Asia/Kolkata")
         #expect(!window.isValid)
-        #expect(throws: ReminderWindow.ValidationError.self) { try window.validate() }
+        #expect(throws: ReminderWindow.ValidationError.wrappingAllowedRange(
+            TimeRange(start: TimeOfDay(hour: 22), end: TimeOfDay(hour: 1)))) {
+            try window.validate()
+        }
     }
 
     @Test("Quiet hours may wrap midnight even though allowed ranges may not")
@@ -69,6 +72,30 @@ struct ReminderWindowValidationTests {
         #expect(throws: ReminderWindow.ValidationError.self) { try window.validate() }
     }
 
+    @Test("An unknown timezone identifier is rejected")
+    func invalidTimezoneRejected() {
+        let window = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [Self.range(18, 22)],
+            quietHours: nil,
+            timezoneIdentifier: "Not/A_Timezone")
+        #expect(throws: ReminderWindow.ValidationError.invalidTimezoneIdentifier("Not/A_Timezone")) {
+            try window.validate()
+        }
+        #expect(!window.isValid)
+    }
+
+    @Test("A persisted window with an unknown timezone is rejected at the data boundary")
+    func persistedInvalidTimezoneRejected() throws {
+        var record = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        record.timezone = "Not/A_Timezone"
+
+        #expect(throws: ReminderWindow.ValidationError.invalidTimezoneIdentifier("Not/A_Timezone")) {
+            try record.toDomain()
+        }
+    }
+
     // MARK: - TimeOfDay decode guard (R38)
 
     @Test("Valid TimeOfDay JSON round-trips")
@@ -94,6 +121,9 @@ struct ReminderWindowValidationTests {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(TimeOfDay.self, from: boundary)
         }
+        let lastValidMinute = Data(#"{"minutesSinceMidnight":1439}"#.utf8)
+        let decodedLastMinute = try? JSONDecoder().decode(TimeOfDay.self, from: lastValidMinute)
+        #expect(decodedLastMinute == TimeOfDay.endOfDay)
     }
 
     @Test("A corrupt TimeRange inside a ReminderWindow fails to decode, not traps")

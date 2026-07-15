@@ -249,12 +249,14 @@ struct ReminderWindowRecord: Codable, FetchableRecord, PersistableRecord {
         } else {
             quiet = nil
         }
-        return ReminderWindow(
+        let window = ReminderWindow(
             allowedDays: DayOfWeekMask(rawValue: allowedDaysMask),
             allowedTimeRanges: ranges,
             quietHours: quiet,
             timezoneIdentifier: timezone
         )
+        try window.validate()
+        return window
     }
 }
 

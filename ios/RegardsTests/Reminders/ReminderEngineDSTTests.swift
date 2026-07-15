@@ -96,6 +96,121 @@ struct ReminderEngineDSTTests {
         #expect(slot != firstOccurrence.addingTimeInterval(3600))
     }
 
+    @Test("Fall-back search in the second repeated hour stays inside the allowed range")
+    func fallBackSecondOccurrenceUsesSecondSlotBoundary() {
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 1, minute: 30), end: TimeOfDay(hour: 2, minute: 30))],
+            tz: "America/Los_Angeles")
+        let now = EngineFixtures.date("2026-11-01T01:15:00-08:00")
+
+        let slot = EngineFixtures.engine(now: now).nextAllowedSlot(from: now, in: window)
+
+        #expect(slot == EngineFixtures.date("2026-11-01T01:30:00-08:00"))
+    }
+
+    @Test("Fall-back times in each repeated occurrence share their concrete slot start")
+    func fallBackContainingSlotHasStableOccurrenceIdentity() {
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 1, minute: 30), end: TimeOfDay(hour: 2, minute: 30))],
+            tz: "America/Los_Angeles")
+        let firstStart = EngineFixtures.date("2026-11-01T01:30:00-07:00")
+        let secondStart = EngineFixtures.date("2026-11-01T01:30:00-08:00")
+
+        for clockString in ["2026-11-01T01:45:00-07:00", "2026-11-01T01:50:00-07:00"] {
+            let now = EngineFixtures.date(clockString)
+            #expect(EngineFixtures.engine(now: now).nextAllowedSlot(from: now, in: window) == firstStart)
+        }
+        for clockString in ["2026-11-01T01:45:00-08:00", "2026-11-01T01:50:00-08:00"] {
+            let now = EngineFixtures.date(clockString)
+            #expect(EngineFixtures.engine(now: now).nextAllowedSlot(from: now, in: window) == secondStart)
+        }
+    }
+
+    @Test("Future eligibility inside the first fold walks to the second occurrence")
+    func fallBackFutureEligibilityUsesLaterOccurrence() {
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 1, minute: 30), end: TimeOfDay(hour: 2, minute: 30))],
+            tz: "America/Los_Angeles")
+        let target = EngineFixtures.date("2026-11-01T01:45:00-07:00")
+
+        let slot = EngineFixtures.engine(now: target).nextAllowedSlot(
+            from: target,
+            in: window,
+            includingContainingSlot: false
+        )
+
+        #expect(slot == EngineFixtures.date("2026-11-01T01:30:00-08:00"))
+    }
+
+    @Test("Fall-back transition can re-enter a range whose start is not repeated")
+    func fallBackRepeatedEndReentersAtTransition() {
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 0, minute: 30), end: TimeOfDay(hour: 1, minute: 30))],
+            tz: "America/Los_Angeles")
+        let now = EngineFixtures.date("2026-11-01T01:45:00-07:00")
+
+        let slot = EngineFixtures.engine(now: now).nextAllowedSlot(from: now, in: window)
+
+        let secondIntervalStart = EngineFixtures.date("2026-11-01T01:00:00-08:00")
+        #expect(slot == secondIntervalStart)
+
+        let insideSecondInterval = EngineFixtures.date("2026-11-01T01:15:00-08:00")
+        #expect(EngineFixtures.engine(now: insideSecondInterval).nextAllowedSlot(
+            from: insideSecondInterval,
+            in: window
+        ) == secondIntervalStart)
+    }
+
+    @Test("Fall-back chooses the earliest absolute candidate across multiple ranges")
+    func fallBackMultipleRangesUseChronologicalOrder() {
+        let window = EngineFixtures.allDaysWindow(
+            [
+                TimeRange(start: TimeOfDay(hour: 1), end: TimeOfDay(hour: 1, minute: 15)),
+                TimeRange(start: TimeOfDay(hour: 1, minute: 30), end: TimeOfDay(hour: 1, minute: 45)),
+            ],
+            tz: "America/Los_Angeles")
+        let now = EngineFixtures.date("2026-11-01T01:20:00-07:00")
+
+        let slot = EngineFixtures.engine(now: now).nextAllowedSlot(from: now, in: window)
+
+        #expect(slot == EngineFixtures.date("2026-11-01T01:30:00-07:00"))
+    }
+
+    @Test("A transition inside a continuous slot does not split its batching identity")
+    func transitionInsideContinuousSlotKeepsOriginalStart() {
+        let fallBackWindow = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 0, minute: 30), end: TimeOfDay(hour: 2, minute: 30))],
+            tz: "America/Los_Angeles")
+        let fallBackNow = EngineFixtures.date("2026-11-01T01:15:00-08:00")
+        #expect(EngineFixtures.engine(now: fallBackNow).nextAllowedSlot(
+            from: fallBackNow,
+            in: fallBackWindow
+        ) == EngineFixtures.date("2026-11-01T00:30:00-07:00"))
+
+        let repeatedStartWindow = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 1), end: TimeOfDay(hour: 2, minute: 30))],
+            tz: "America/Los_Angeles")
+        #expect(EngineFixtures.engine(now: fallBackNow).nextAllowedSlot(
+            from: fallBackNow,
+            in: repeatedStartWindow
+        ) == EngineFixtures.date("2026-11-01T01:00:00-07:00"))
+        let firstFoldTarget = EngineFixtures.date("2026-11-01T01:15:00-07:00")
+        #expect(EngineFixtures.engine(now: firstFoldTarget).nextAllowedSlot(
+            from: firstFoldTarget,
+            in: repeatedStartWindow,
+            includingContainingSlot: false
+        ) == EngineFixtures.date("2026-11-02T01:00:00-08:00"))
+
+        let springWindow = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 1), end: TimeOfDay(hour: 4))],
+            tz: "America/Los_Angeles")
+        let springNow = EngineFixtures.date("2026-03-08T03:15:00-07:00")
+        #expect(EngineFixtures.engine(now: springNow).nextAllowedSlot(
+            from: springNow,
+            in: springWindow
+        ) == EngineFixtures.date("2026-03-08T01:00:00-08:00"))
+    }
+
     @Test("Evening slot ON the fall-back day (Sun Nov 1) reads the correct wall-clock time")
     func fallBackOnTransitionDayEveningSlot() {
         let window = EngineFixtures.allDaysWindow(

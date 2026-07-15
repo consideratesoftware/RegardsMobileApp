@@ -11,11 +11,17 @@ enum EngineFixtures {
         f.formatOptions = [.withInternetDateTime]
         if let d = f.date(from: iso) { return d }
         // Allow "YYYY-MM-DD HH:mm" local
+        guard let timezone = TimeZone(identifier: tz) else {
+            preconditionFailure("Unknown test timezone: \(tz)")
+        }
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: tz) ?? .current
+        calendar.timeZone = timezone
         let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.calendar = calendar
         df.dateFormat = "yyyy-MM-dd HH:mm"
-        df.timeZone = calendar.timeZone
+        df.timeZone = timezone
+        df.isLenient = false
         return df.date(from: iso)!
     }
 
@@ -248,6 +254,34 @@ struct ReminderEngineTests {
             let target = EngineFixtures.date(clockString, tz: tz)
             #expect(engine.nextAllowedSlot(from: target, in: window) == slotStart)
         }
+    }
+
+    @Test("A future cadence expiry inside a slot never fires before it is due")
+    func futureCadenceExpiryWalksToNextSlot() {
+        let timezone = "Asia/Kolkata"
+        let now = EngineFixtures.date("2026-04-15 12:00", tz: timezone)
+        let createdAt = EngineFixtures.date("2026-04-14 18:05", tz: timezone)
+        let contact = Contact(
+            systemContactRef: "future-inside-slot",
+            displayName: "Future",
+            tracked: true,
+            cadenceDays: 1,
+            createdAt: createdAt
+        )
+        let window = ReminderWindow(
+            allowedDays: [.wednesday, .thursday],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 18), end: TimeOfDay(hour: 22))],
+            timezoneIdentifier: timezone
+        )
+
+        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
+            for: contact,
+            effectiveLastInteractedAt: nil,
+            window: window
+        )
+
+        #expect(outcome == .notOverdue(
+            firesAt: EngineFixtures.date("2026-04-16 18:00", tz: timezone)))
     }
 
     @Test("Contiguous ranges collapse into one slot")
