@@ -1,9 +1,9 @@
 import Foundation
 
-/// In-memory repository fakes preloaded with the JSX-mock cast of characters
-/// (Priya, Mom, Alex, Jordan, Sam, Dad, Noor, …). PR3's SwiftUI shell renders
-/// against these so we can iterate on the screens without integrating the
-/// Contacts framework.
+/// In-memory repository fakes preloaded with a Star Wars sample cast (Leia,
+/// Padmé, Luke, Lando, Chewbacca, Anakin, Din, Shmi, Obi-Wan, Ahsoka). PR3's
+/// SwiftUI shell renders against these so we can iterate on the screens — and
+/// take demo screenshots — without integrating the Contacts framework.
 public struct MockRepositories: Sendable {
 
     public let contacts: any ContactRepository
@@ -59,81 +59,81 @@ actor MockStore {
         let day: TimeInterval = 86_400
         return [
             Contact(
-                systemContactRef: "sys-priya",
-                displayName: "Priya Raghavan",
+                systemContactRef: "sys-leia",
+                displayName: "Leia Organa",
                 tracked: true, cadenceDays: 14,
                 priorityTier: .innerCircle,
                 preferredChannel: .whatsapp,
                 preferredChannelValue: "+91 98765 43210",
                 lastInteractedAt: now.addingTimeInterval(-day * 23),
-                notes: "Kids are Aarav (6) + Asha (2). Ask about the move to Pune."),
+                notes: "Son is Ben. Ask about the diplomatic posting on Chandrila."),
             Contact(
-                systemContactRef: "sys-mom",
-                displayName: "Mom",
+                systemContactRef: "sys-padme",
+                displayName: "Padmé Amidala",
                 tracked: true, cadenceDays: 7,
                 priorityTier: .innerCircle,
                 preferredChannel: .phoneCall,
                 preferredChannelValue: "+1 415 555 0134",
                 lastInteractedAt: now.addingTimeInterval(-day * 11)),
             Contact(
-                systemContactRef: "sys-alex",
-                displayName: "Alex Chen",
+                systemContactRef: "sys-luke",
+                displayName: "Luke Skywalker",
                 tracked: true, cadenceDays: 30,
                 priorityTier: .close,
                 preferredChannel: .signal,
                 preferredChannelValue: "+1 415 555 0198",
                 lastInteractedAt: now.addingTimeInterval(-day * 36)),
             Contact(
-                systemContactRef: "sys-jordan",
-                displayName: "Jordan Park",
+                systemContactRef: "sys-lando",
+                displayName: "Lando Calrissian",
                 tracked: true, cadenceDays: 21,
                 priorityTier: .close,
                 preferredChannel: .sms,
                 preferredChannelValue: "+1 212 555 0176",
                 lastInteractedAt: now.addingTimeInterval(-day * 23)),
             Contact(
-                systemContactRef: "sys-sam",
-                displayName: "Sam Okafor",
+                systemContactRef: "sys-chewbacca",
+                displayName: "Chewbacca",
                 tracked: true, cadenceDays: 30,
                 priorityTier: .regular,
                 preferredChannel: .whatsapp,
                 preferredChannelValue: "+234 809 555 0122",
                 lastInteractedAt: now.addingTimeInterval(-day * 28)),
             Contact(
-                systemContactRef: "sys-dad",
-                displayName: "Dad",
+                systemContactRef: "sys-anakin",
+                displayName: "Anakin Skywalker",
                 tracked: true, cadenceDays: 14,
                 priorityTier: .innerCircle,
                 preferredChannel: .phoneCall,
                 preferredChannelValue: "+1 415 555 0177",
                 lastInteractedAt: now.addingTimeInterval(-day * 8)),
             Contact(
-                systemContactRef: "sys-noor",
-                displayName: "Noor Abbasi",
+                systemContactRef: "sys-din",
+                displayName: "Din Djarin",
                 tracked: true, cadenceDays: 42,
                 priorityTier: .regular,
                 preferredChannel: .signal,
                 preferredChannelValue: "+92 300 5550132",
                 lastInteractedAt: now.addingTimeInterval(-day * 42)),
             Contact(
-                systemContactRef: "sys-grandma",
-                displayName: "Grandma",
+                systemContactRef: "sys-shmi",
+                displayName: "Shmi Skywalker",
                 tracked: true, cadenceDays: 10,
                 priorityTier: .innerCircle,
                 preferredChannel: .phoneCall,
                 preferredChannelValue: "+1 415 555 0111",
                 lastInteractedAt: now.addingTimeInterval(-day * 2)),
             Contact(
-                systemContactRef: "sys-whitney",
-                displayName: "Whitney Lowe",
+                systemContactRef: "sys-obiwan",
+                displayName: "Obi-Wan Kenobi",
                 tracked: true, cadenceDays: 90,
                 priorityTier: .regular,
                 preferredChannel: .email,
-                preferredChannelValue: "whitney@lowe.co",
+                preferredChannelValue: "obiwan@jeditemple.org",
                 lastInteractedAt: now.addingTimeInterval(-day * 84)),
             Contact(
-                systemContactRef: "sys-uncle-ravi",
-                displayName: "Uncle Ravi",
+                systemContactRef: "sys-ahsoka",
+                displayName: "Ahsoka Tano",
                 tracked: true, cadenceDays: 90,
                 priorityTier: .close,
                 preferredChannel: .phoneCall,
