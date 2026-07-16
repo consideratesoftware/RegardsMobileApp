@@ -128,7 +128,11 @@ public final class UpcomingViewModel {
                 // (R4). This VM's `.defaultV1()` window always has capacity, so
                 // nil never happens today, but skip the row rather than crash if
                 // a future override wires a degenerate window through here.
-                guard let fires = engine.nextAllowedSlot(from: target, in: window) else { continue }
+                guard let fires = engine.nextAllowedSlot(
+                    from: target,
+                    in: window,
+                    includingContainingSlot: overdueAt <= now
+                ) else { continue }
                 if fires <= horizonEnd, fires >= now {
                     rows.append(UpcomingRowState(
                         id: UUID(),

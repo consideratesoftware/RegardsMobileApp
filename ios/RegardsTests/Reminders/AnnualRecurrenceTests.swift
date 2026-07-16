@@ -10,8 +10,11 @@ struct AnnualRecurrenceTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = tz
         let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.calendar = calendar
         df.dateFormat = "yyyy-MM-dd HH:mm"
         df.timeZone = tz
+        df.isLenient = false
         return df.date(from: iso)!
     }
 

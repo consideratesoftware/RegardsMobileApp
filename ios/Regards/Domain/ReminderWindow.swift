@@ -56,6 +56,7 @@ public struct ReminderWindow: Sendable, Codable, Equatable, Hashable {
         case noAllowedTimeRanges
         case zeroLengthRange(TimeRange)
         case wrappingAllowedRange(TimeRange)
+        case invalidTimezoneIdentifier(String)
     }
 
     /// Structural validity per decision #28: an allowed time range must not
@@ -70,6 +71,9 @@ public struct ReminderWindow: Sendable, Codable, Equatable, Hashable {
     /// are applied; that case surfaces as `nextAllowedSlot(...) == nil`, which
     /// the window editor also refuses to save (§9 contract 2).
     public func validate() throws {
+        guard TimeZone(identifier: timezoneIdentifier) != nil else {
+            throw ValidationError.invalidTimezoneIdentifier(timezoneIdentifier)
+        }
         guard !allowedDays.isEmpty else { throw ValidationError.noAllowedDays }
         guard !allowedTimeRanges.isEmpty else { throw ValidationError.noAllowedTimeRanges }
         for range in allowedTimeRanges {

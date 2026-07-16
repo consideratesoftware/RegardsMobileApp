@@ -17,12 +17,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  XCODE_VERSION: "16.2"
+  XCODE_VERSION: "26.6"
   # `OS=latest` alone doesn't pick a device — xcodebuild needs a name to
-  # disambiguate. iPhone 16 Pro is the current flagship in GitHub's
-  # macos-latest image (Xcode 16.2 / macOS 15) and resolves to iOS 18.6
-  # under `OS=latest`. iPhone 15 (the previous pin) is no longer shipped.
-  SIMULATOR: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
+  # disambiguate. iPhone 17 Pro is the project's pinned test device and
+  # resolves to the image's latest installed iOS runtime. Keep this device
+  # pin aligned with AGENTS.md.
+  SIMULATOR: "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest"
   SCHEME: Regards
 
 jobs:
@@ -55,11 +55,9 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
-      # GitHub's macos-latest image (Xcode 16.2 / macOS 15) installs Xcode
-      # without the iOS platform — `xcodebuild -showdestinations` reports
-      # "iOS 18.2 is not installed". Even building against the iOS
-      # Simulator SDK requires the platform; install before any xcodebuild
-      # step that targets iOS.
+      # GitHub's macos-latest image may install Xcode without the iOS
+      # platform. Even building against the iOS Simulator SDK requires the
+      # platform; install before any xcodebuild step that targets iOS.
       - name: Install iOS platform
         # Wrap in a retry loop — `xcodebuild -downloadPlatform iOS`
         # intermittently fails with "Unable to connect to simulator"
