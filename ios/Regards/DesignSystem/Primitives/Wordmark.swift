@@ -59,6 +59,13 @@ public struct SectionHeader: View {
             .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
+            // The visual `.uppercased()` is decorative typography. VoiceOver
+            // should hear the natural casing — abbreviations like "WED" or
+            // "MON" in the uppercased output get parsed as letter-by-letter
+            // acronyms or trip the audit's "Label not human-readable"
+            // check. Setting an explicit accessibilityLabel decouples
+            // presentation from spoken output.
+            .accessibilityLabel(title)
     }
 }
 
