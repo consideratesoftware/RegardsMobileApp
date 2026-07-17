@@ -7,7 +7,7 @@
 #   ios/scripts/audit-stress.sh 3         # custom run count
 #
 # Override the simulator destination via SIMULATOR_DESTINATION:
-#   SIMULATOR_DESTINATION='platform=iOS Simulator,name=iPhone 16 Pro' \
+#   SIMULATOR_DESTINATION='platform=iOS Simulator,name=iPhone 17 Pro' \
 #     ios/scripts/audit-stress.sh
 #
 # Exits non-zero on any audit failure so this is safe to wire into a
@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
 RUNS="${1:-5}"
-DESTINATION="${SIMULATOR_DESTINATION:-platform=iOS Simulator,name=iPhone 15 Pro}"
+DESTINATION="${SIMULATOR_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro}"
 SCHEME="Regards"
 PROJECT="Regards.xcodeproj"
 

@@ -7,13 +7,19 @@ public enum CadenceSchedulingOutcome: Sendable, Equatable {
     /// Contact is overdue (or becomes overdue when `now` reaches `targetFireTime`)
     /// and the engine has picked a next window to fire in.
     case scheduled(firesAt: Date)
-    /// Contact is not tracked or has no cadence set.
+    /// Contact is not tracked, has no cadence set, or its effective window can
+    /// never fire (`windowHasNoCapacity`).
     case skipped(reason: SkipReason)
 
     public enum SkipReason: String, Sendable, Equatable {
         case notTracked
         case missingCadence
         case archived
+        /// The effective window has zero firing capacity (no allowed days, no
+        /// usable ranges, or quiet hours consume every slot). SchedulingPass
+        /// surfaces this as a Settings badge rather than firing anyway
+        /// (§9 contract 2, R4).
+        case windowHasNoCapacity
     }
 }
 
@@ -119,105 +125,262 @@ public struct ReminderEngine: Sendable {
         }
 
         let now = clock()
-        let overdueAt: Date
-        if let last = effectiveLastInteractedAt {
-            overdueAt = last.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
-        } else {
-            // Never contacted — schedule the first reminder as soon as the
-            // next allowed window opens.
-            overdueAt = now
-        }
 
+        // Never-contacted anchor is `createdAt`, not `now` (decision #29, R8):
+        // a newly tracked contact becomes due one full cadence after tracking
+        // started, not instantly. This matches the Overdue/Upcoming ViewModels'
+        // `?? createdAt`; the old "due now" branch here disagreed with the UI.
+        let anchor = effectiveLastInteractedAt ?? contact.createdAt
+        let overdueAt = anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
+
+        let isAlreadyOverdue = overdueAt <= now
         let target = max(now, overdueAt)
-        let fires = nextAllowedSlot(from: target, in: window)
+        guard let fires = nextAllowedSlot(
+            from: target,
+            in: window,
+            includingContainingSlot: isAlreadyOverdue
+        ) else {
+            // Zero-capacity window — never fire, never schedule at a disallowed
+            // instant (R4). SchedulingPass badges this in Settings.
+            return .skipped(reason: .windowHasNoCapacity)
+        }
         return overdueAt > now ? .notOverdue(firesAt: fires) : .scheduled(firesAt: fires)
     }
 
     // MARK: - Window walking
 
-    /// Earliest moment ≥ `date` that falls inside one of the window's allowed
-    /// `(day, time-range)` slots and is not inside `quietHours`.
+    /// A wall-clock `[start, end)` firing slot on a single day, after merging
+    /// contiguous allowed ranges and subtracting quiet hours. Timezone- and
+    /// date-independent (pure `TimeOfDay` math); the same list applies to every
+    /// allowed day and is only materialized to an instant per-day.
+    private struct WallClockSlot: Equatable {
+        let start: TimeOfDay
+        let end: TimeOfDay
+    }
+
+    /// Start of the slot that contains or follows `date` (decision #30).
+    /// `includingContainingSlot` controls whether a slot already in progress
+    /// may be returned: true for already-overdue work that should fire now;
+    /// false for future cadence eligibility, which must never fire early.
+    /// Returns `nil` when the window can
+    /// never fire — no allowed days, no usable ranges, or quiet hours consume
+    /// every slot (R4). SchedulingPass treats `nil` as "skip + badge", never
+    /// "fire anyway".
     ///
-    /// The walk uses the window's `timeZone` for all calendar/clock math so
-    /// DST transitions are handled automatically — `Calendar.nextDate(...)` is
-    /// the same API Apple's EventKit uses.
-    public func nextAllowedSlot(from date: Date, in window: ReminderWindow) -> Date {
+    /// Snapping to the slot start (rather than to `date`) is deliberate: every
+    /// reminder landing in the same slot shares an identical `scheduledFor`, so
+    /// digest batching is exact-equality by construction (§9 contract 5). When
+    /// `date` falls inside an open slot and `includingContainingSlot` is true,
+    /// the returned instant can therefore be earlier than `date`; the platform
+    /// layer fires such a past instant immediately.
+    ///
+    /// All candidate instants are materialized with wall-clock calendar APIs
+    /// (`date(bySettingHour:…)`), never `startOfDay + minutes` — the latter adds
+    /// elapsed time and lands 60 minutes off across a DST transition, firing
+    /// outside the user's declared window (R1). After materializing, each
+    /// candidate is re-validated against the slot: on a spring-forward gap where
+    /// the slot start doesn't exist, `date(bySettingHour:…)` yields the next
+    /// existing instant, which we accept only if it still reads a wall-clock
+    /// time inside the slot; otherwise the slot is skipped.
+    public func nextAllowedSlot(
+        from date: Date,
+        in window: ReminderWindow,
+        includingContainingSlot: Bool = true
+    ) -> Date? {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = window.timeZone
+        guard let timezone = TimeZone(identifier: window.timezoneIdentifier) else { return nil }
+        calendar.timeZone = timezone
 
-        // Sort ranges once; we rely on ascending start time below.
-        let sortedRanges = window.allowedTimeRanges.sorted { $0.start < $1.start }
-        guard !sortedRanges.isEmpty, !window.allowedDays.isEmpty else {
-            // Degenerate config — return the input date unchanged; the caller
-            // should surface a UX error.
-            return date
-        }
+        guard !window.allowedDays.isEmpty else { return nil }
+        let slots = daySlots(for: window)
+        guard !slots.isEmpty else { return nil }
 
-        // Walk at most 8 days forward (guarantees we land on the next
-        // occurrence of every weekday). We inspect today first, then each
-        // following day.
-        var cursor = date
+        // 8 days guarantees we reach the next occurrence of every weekday even
+        // when today's slots are all in the past.
+        let searchDayStart = calendar.startOfDay(for: date)
         for dayOffset in 0..<8 {
-            if dayOffset > 0 {
-                cursor = calendar.date(byAdding: .day, value: 1, to: cursor)!
-            }
-
-            let weekday = calendar.component(.weekday, from: cursor)
+            guard let dayStart = calendar.date(byAdding: .day, value: dayOffset, to: searchDayStart) else { continue }
+            let weekday = calendar.component(.weekday, from: dayStart)
             guard window.allowedDays.contains(calendarWeekday: weekday) else { continue }
 
-            // Figure out the wall-clock time on this day.
-            let startOfDay = calendar.startOfDay(for: cursor)
-            let timeOfDay: TimeOfDay
-            if dayOffset == 0 {
-                let comps = calendar.dateComponents([.hour, .minute], from: cursor)
-                timeOfDay = TimeOfDay(hour: comps.hour ?? 0, minute: comps.minute ?? 0)
-            } else {
-                timeOfDay = TimeOfDay.midnight
-            }
+            var activeSlotStarts: [Date] = []
+            var futureSlotStarts: [Date] = []
+            for slot in slots {
+                guard let firstSlotStart = materialize(
+                    slot.start,
+                    onDay: dayStart,
+                    calendar: calendar,
+                    repeatedTimePolicy: .first
+                ), let lastSlotStart = materialize(
+                    slot.start,
+                    onDay: dayStart,
+                    calendar: calendar,
+                    repeatedTimePolicy: .last
+                ) else { continue }
 
-            // Find the next range on this day whose end is after the cursor's
-            // time, and advance the cursor past quiet-hours if necessary.
-            for range in sortedRanges {
-                // Range already in the past on this day — skip.
-                if range.end <= timeOfDay { continue }
-
-                // Our earliest candidate inside this range on this day.
-                var rangeCursor = max(range.start, timeOfDay)
-
-                // Quiet-hours override: step forward until we're out of it.
-                if let quiet = window.quietHours {
-                    if quiet.contains(rangeCursor) {
-                        // Shift rangeCursor to quiet.end (wrap-aware).
-                        let proposed = quiet.end
-                        // If quiet.end still falls inside the range, use it;
-                        // otherwise this range is fully consumed by quiet.
-                        if range.contains(proposed) {
-                            rangeCursor = proposed
-                        } else {
-                            continue
-                        }
+                // A backward transition can re-enter a range without crossing
+                // its nominal start boundary. It is a new interval only when
+                // the range is closed immediately before the transition and
+                // open immediately after it. This excludes spring-forward and
+                // a fall-back transition inside one continuous allowed range.
+                var candidateStarts = [firstSlotStart]
+                if let transition = calendar.timeZone.nextDaylightSavingTimeTransition(
+                    after: dayStart.addingTimeInterval(-1)
+                ),
+                   calendar.isDate(transition, inSameDayAs: dayStart) {
+                    let beforeTransition = wallClock(
+                        of: transition.addingTimeInterval(-1),
+                        calendar: calendar
+                    )
+                    let afterTransition = wallClock(of: transition, calendar: calendar)
+                    let movedBackward = afterTransition < beforeTransition
+                    let wasAllowed = slot.start <= beforeTransition && beforeTransition < slot.end
+                    let becomesAllowed = slot.start <= afterTransition && afterTransition < slot.end
+                    // A repeated nominal start is a new interval only when the
+                    // allowed range is not continuous across the fold.
+                    if lastSlotStart != firstSlotStart, !(wasAllowed && becomesAllowed) {
+                        candidateStarts.append(lastSlotStart)
                     }
+                    if movedBackward, !wasAllowed, becomesAllowed {
+                        candidateStarts.append(transition)
+                    }
+                } else if lastSlotStart != firstSlotStart {
+                    candidateStarts.append(lastSlotStart)
+                }
+                candidateStarts = Array(Set(candidateStarts))
+
+                let dateWallClock = wallClock(of: date, calendar: calendar)
+                let containsDate = calendar.isDate(date, inSameDayAs: dayStart)
+                    && slot.start <= dateWallClock
+                    && dateWallClock < slot.end
+                if includingContainingSlot, containsDate,
+                   let activeSlotStart = candidateStarts.filter({ $0 <= date }).max() {
+                    activeSlotStarts.append(activeSlotStart)
                 }
 
-                // Rebuild the Date from (startOfDay, rangeCursor).
-                let proposedDate = calendar.date(byAdding: .minute,
-                                                 value: rangeCursor.minutesSinceMidnight,
-                                                 to: startOfDay)!
-                if proposedDate >= date { return proposedDate }
+                futureSlotStarts.append(contentsOf: candidateStarts.filter { candidate in
+                    guard candidate >= date else { return false }
+                    // Re-validate a materialized spring-gap boundary. If the
+                    // next existing instant reads past the slot end, the slot
+                    // has no real instant on this day (§9 contract 1).
+                    return wallClock(of: candidate, calendar: calendar) < slot.end
+                })
+            }
+            if let activeSlotStart = activeSlotStarts.max() { return activeSlotStart }
+            if let futureSlotStart = futureSlotStarts.min() { return futureSlotStart }
+        }
+        return nil
+    }
+
+    /// Wall-clock firing slots for the window: allowed ranges with wrapping /
+    /// zero-length ranges dropped, contiguous ranges merged, quiet hours
+    /// subtracted. Empty when the window can never fire.
+    private func daySlots(for window: ReminderWindow) -> [WallClockSlot] {
+        // Validation rejects wrapping allowed ranges at save time; filter them
+        // (and zero-length ranges) defensively for corrupt persisted data.
+        let ranges = window.allowedTimeRanges
+            .filter { !$0.wrapsMidnight && $0.start != $0.end }
+            .sorted { $0.start < $1.start }
+        guard !ranges.isEmpty else { return [] }
+
+        // Merge overlapping / touching ranges — contiguous ranges collapse into
+        // one slot so their reminders batch together.
+        var merged: [WallClockSlot] = []
+        for range in ranges {
+            if let last = merged.last, range.start <= last.end {
+                merged[merged.count - 1] = WallClockSlot(start: last.start, end: max(last.end, range.end))
+            } else {
+                merged.append(WallClockSlot(start: range.start, end: range.end))
             }
         }
 
-        // Unreachable in practice — fall back to the input date if the search
-        // exhausts 8 days without finding a slot.
-        return date
+        guard let quiet = window.quietHours else { return merged }
+        return merged.flatMap { subtractQuiet(quiet, from: $0) }
+    }
+
+    /// The sub-slots of `slot` left allowed once `quiet` (wrap-aware) is
+    /// removed. Walks the boundary minutes inside the slot and keeps each
+    /// elementary interval whose midpoint is outside quiet hours — correct for
+    /// a quiet interval that clips either end of the slot or carves out its
+    /// middle.
+    private func subtractQuiet(_ quiet: TimeRange, from slot: WallClockSlot) -> [WallClockSlot] {
+        let lo = slot.start.minutesSinceMidnight
+        let hi = slot.end.minutesSinceMidnight
+        var boundaries = [lo, hi]
+        for edge in [quiet.start.minutesSinceMidnight, quiet.end.minutesSinceMidnight] where edge > lo && edge < hi {
+            boundaries.append(edge)
+        }
+        boundaries.sort()
+
+        var result: [WallClockSlot] = []
+        for index in 0..<(boundaries.count - 1) {
+            let lower = boundaries[index]
+            let upper = boundaries[index + 1]
+            if lower == upper { continue }
+            let midpoint = TimeOfDay(minutesSinceMidnight: (lower + upper) / 2)
+            guard !quiet.contains(midpoint) else { continue }
+            let sub = WallClockSlot(start: TimeOfDay(minutesSinceMidnight: lower),
+                                    end: TimeOfDay(minutesSinceMidnight: upper))
+            if let last = result.last, last.end == sub.start {
+                result[result.count - 1] = WallClockSlot(start: last.start, end: sub.end)
+            } else {
+                result.append(sub)
+            }
+        }
+        return result
+    }
+
+    /// The actual instant on `dayStart`'s calendar day whose wall clock reads
+    /// `time`, DST-aware. On a fall-back repeated hour `.first` returns the
+    /// earlier of the two occurrences. On a spring-forward gap the requested
+    /// time doesn't exist: `.nextTime` yields the next existing instant, which
+    /// for a full-hour gap is the gap end on the same day — but for a partial
+    /// gap asked at its start (e.g. Lord Howe's 30-minute shift at 02:00) it
+    /// overshoots to the next day's matching time. Detect that overshoot and
+    /// substitute the DST transition instant (the gap end) on this day, so a
+    /// slot start inside the gap resolves to the earliest existing instant in
+    /// the range rather than jumping a day (§9 contract 1, R1).
+    private func materialize(
+        _ time: TimeOfDay,
+        onDay dayStart: Date,
+        calendar: Calendar,
+        repeatedTimePolicy: Calendar.RepeatedTimePolicy
+    ) -> Date? {
+        guard let candidate = calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0,
+                                            of: dayStart, matchingPolicy: .nextTime,
+                                            repeatedTimePolicy: repeatedTimePolicy, direction: .forward) else {
+            return nil
+        }
+        if calendar.isDate(candidate, inSameDayAs: dayStart) { return candidate }
+        if let transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: dayStart),
+           calendar.isDate(transition, inSameDayAs: dayStart) {
+            return transition
+        }
+        return candidate
+    }
+
+    /// Wall-clock reading of `date` in `calendar`'s timezone.
+    private func wallClock(of date: Date, calendar: Calendar) -> TimeOfDay {
+        let comps = calendar.dateComponents([.hour, .minute], from: date)
+        return TimeOfDay(hour: comps.hour ?? 0, minute: comps.minute ?? 0)
     }
 
     // MARK: - Annual recurrence (birthdays, anniversaries)
 
     /// The next occurrence of `monthDay` at `occasionNotificationTime` in the
-    /// given timezone. Feb 29 falls back to Feb 28 in non-leap years. If today
-    /// *is* the occasion and the notification time is still in the future,
-    /// fires today; otherwise fires next year.
+    /// given timezone. Feb 29 falls back to Feb 28 in non-leap years.
+    ///
+    /// Timing (§9 contract 4):
+    /// - occasion later today or on a future day → fire at `occasionNotificationTime`;
+    /// - occasion is **today** and the notification time has already passed →
+    ///   fire at the next possible moment today (returns `now`), so someone who
+    ///   installs at noon on Mom's birthday still gets the nudge (R5);
+    /// - occasion already fully passed this year → next year.
+    ///
+    /// Occasions ignore allowed-day/range gating by design (they're morning-of
+    /// events). Quiet-hours suppression for a same-day-late occasion is applied
+    /// by SchedulingPass, which owns the effective window; the pure engine
+    /// returns the earliest today instant.
     public func nextOccasionOccurrence(
         monthDay: MonthDay,
         timezone: TimeZone
@@ -241,10 +404,13 @@ public struct ReminderEngine: Sendable {
             return calendar.date(from: comps)
         }
 
-        if let thisYearDate = resolve(year: thisYear), thisYearDate >= now {
-            return thisYearDate
+        if let thisYearDate = resolve(year: thisYear) {
+            if thisYearDate >= now { return thisYearDate }
+            // Notification time has passed. If the occasion day is still today,
+            // fire now rather than rolling a full year forward (R5).
+            if calendar.isDate(thisYearDate, inSameDayAs: now) { return now }
         }
-        // Already passed this year — roll forward.
+        // Already fully passed this year — roll forward.
         return resolve(year: thisYear + 1) ?? now
     }
 
@@ -255,12 +421,12 @@ public struct ReminderEngine: Sendable {
         var comps = DateComponents()
         comps.year = year
         comps.month = 2
-        comps.day = 29
-        if calendar.date(from: comps) != nil, calendar.range(of: .day, in: .month,
-                                                             for: calendar.date(from: comps)!)?.count == 29 {
-            return 29
+        comps.day = 1
+        guard let feb1 = calendar.date(from: comps),
+              let dayCount = calendar.range(of: .day, in: .month, for: feb1)?.count else {
+            return 28
         }
-        return 28
+        return dayCount >= 29 ? 29 : 28
     }
 
     // MARK: - Batching

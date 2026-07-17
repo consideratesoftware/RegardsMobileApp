@@ -65,7 +65,10 @@ public struct OnboardingScreen: View {
 
     private var avatarCluster: some View {
         HStack(spacing: -14) {
-            ForEach(["Mom", "Alex Chen", "Priya Raghavan", "Noor A", "Sam O"], id: \.self) { name in
+            ForEach(
+                ["Padmé Amidala", "Luke Skywalker", "Leia Organa", "Din Djarin", "Ahsoka Tano"],
+                id: \.self
+            ) { name in
                 Avatar(name: name, size: 64)
                     .overlay(Circle().stroke(RegardsDS.background, lineWidth: 3))
             }

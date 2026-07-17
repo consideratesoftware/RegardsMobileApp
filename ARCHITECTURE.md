@@ -1,11 +1,20 @@
 # Regards — Architectural Design Document
 
-**Status:** Draft v0.5 (talking-points / conversation-queue feature added to V2 candidates)
-**Last updated:** 2026-04-19
-**Audience:** Claude Code implementation agent + human reviewers
-**Scope:** Native iOS (Swift / SwiftUI) + Native Android (Kotlin / Jetpack Compose) mobile app. Local-first. No backend. No passive messaging integrations.
+**Status:** v1.0 — full rebaseline. Supersedes Draft v0.5 (2026-04-19); the v0.5 text is preserved in git history at tag-worthy commit `aa9bfa7` and earlier.
+**Last updated:** 2026-07-01
+**Audience:** Claude Code / Claude agent implementation sessions + human reviewers
+**Scope:** Native iOS (Swift/SwiftUI) first, native Android (Kotlin/Compose) second. Local-first. No backend. No network code. One-time purchase.
 
-> **Name:** Regards. The word means "warm remembrance sent to someone" — the exact feeling the app is designed to produce. Tagline candidates: *"Send your regards before it's been too long."* / *"Keep your people in your regards."*
+> **Name:** Regards. The word means "warm remembrance sent to someone" — the exact feeling the app is designed to produce. Tagline: *"Send your regards before it's been too long."*
+
+**What changed in v1.0 (read this if you knew v0.5):**
+
+1. The document now describes the code **as built through PR #15 (2026-05-06)** plus every correction needed. Where v0.5 and the code disagreed, each conflict is resolved explicitly here (see §7, §9, §16 decisions #23–#33).
+2. Three new operational sections: **§18 Current state ground truth**, **§19 Remediation register** (every known defect with file:line and acceptance criteria), **§20 Release engineering & App Store playbook**, **§21 Maintenance & operations playbook**.
+3. §14 is rebaselined to a **2026-08-31 iOS launch** with a PR-level work plan. The project was idle 2026-05-06 → 2026-07-01; the original plan had launch in late June.
+4. Section numbers **1–17 are stable against v0.5** because code comments cross-reference them (e.g. "§9", "§11"). New material is §18+. Never renumber §1–§17.
+
+**Reading order for a fresh implementation agent:** §18 (where things stand) → §19 (what's broken) → §14 (what to do next, in order) → the spec section for whatever you're implementing (§7/§8/§9/§10/§11) → §17 (working rules). Do not write code before reading §17.
 
 ---
 
@@ -29,36 +38,32 @@ The user imports their device contacts, marks the ones they actively want to sta
 6. Tap a reminder → deep-link to the preferred communication app, pre-scoped to that contact where the channel supports it. No message prefill.
 7. Manual "I talked to X" logging from the contact detail screen.
 8. Priority tiers so the user can distinguish inner circle from acquaintances.
-9. **Upcoming Reminders view** — a forward-looking list of reminders coming in the next 14 days (or the user's chosen horizon), grouped by day. Lets the user get a head start — e.g., "I'll be near Alex tomorrow, let me reach out now" — and mark someone caught up before the reminder fires. Also shows which reminders will collapse into the next digest window.
-10. **Birthday & anniversary reminders.** Annual-recurrence reminders for special occasions, read from two on-device sources:
-    - **System Contacts**: `CNContact.birthday` and `CNContact.dates` on iOS; `ContactsContract.CommonDataKinds.Event` (`TYPE_BIRTHDAY`, `TYPE_ANNIVERSARY`) on Android.
-    - **Local device Calendar** (EventKit on iOS, CalendarContract on Android) — optional user-granted permission, catches users who store birthdays in calendar-only.
+9. **Upcoming Reminders view** — a forward-looking list of reminders coming in the next 14 days (or the user's chosen horizon), grouped by day. Lets the user get a head start and mark someone caught up before the reminder fires. Also shows which reminders will collapse into the next digest window.
+10. **Birthday & anniversary reminders.** Annual-recurrence reminders read from two on-device sources:
+    - **System Contacts**: `CNContact.birthday` and `CNContact.dates` on iOS; `ContactsContract.CommonDataKinds.Event` on Android.
+    - **Local device Calendar** (EventKit on iOS, CalendarContract on Android) — optional user-granted permission.
     Fire as morning-of notifications (different default window from cadence reminders), deep-link to the contact's preferred channel. Feb 29 birthdays fall back to Feb 28 in non-leap years.
-11. **In-app contact editing (write-back to system Contacts).** Users can edit a contact's standard fields — name, phone, email, postal address, birthday, anniversary, notes — directly from Regards without leaving the app. Edits write through to the system Contacts database via `CNSaveRequest` (iOS) / `ContactsContract` batch operations (Android). System Contacts remain the source of truth; Regards doesn't maintain a private copy. This sets us up for Holiday Pack (users can fill in missing addresses in-app before export).
-12. **In-app duplicate detection & virtual merging.** Regards can detect likely duplicate contacts (same name + overlapping phone/email) and let the user group them under a single "reminder target" — so two entries for "Mom" don't produce two reminders. The merge is **virtual**: we never modify or combine the underlying system contacts. Regards stores a `ContactGroup` locally; scheduling, Upcoming, and notifications operate on the group. Users can unmerge at any time. See §7 for data model, §10 for the Merge Duplicates screen.
-13. **Home screen & Lock Screen widget.** Small widget (iOS WidgetKit, Android Glance) showing the top 3 overdue contacts with tap-to-open-contact-detail. Medium size shows 5 contacts with channel icons. iOS 16+ Lock Screen widget shows count-only ("4 overdue"). Widgets read from a shared app-group container (iOS) or direct DB read (Android) — no network, no new permissions.
+11. **In-app contact editing (write-back to system Contacts).** Edits write through via partial-field `CNSaveRequest` (iOS) / `ContactsContract` batch operations (Android). System Contacts remain the source of truth; Regards doesn't maintain a private copy. Never deletes, never bulk-edits, never merges system contacts.
+12. **In-app duplicate detection & virtual merging.** Likely duplicates are grouped under a single reminder target via a local `ContactGroup`. The merge is **virtual** — system contacts are never modified. Users can unmerge any time. See §7 for data model, §10 for the Merge Duplicates screen.
+13. **Home screen & Lock Screen widget.** Small (top-3 overdue), medium (top-5 with channel icons), Lock Screen count-only. Reads from a shared App Group container (iOS) / direct DB read (Android). No network, no new permissions.
 
 ## 3. What's explicitly out of V1
 
 - No reading of email, SMS, or messenger history. No OAuth connections.
 - No Telegram TDLib. No WhatsApp Web. No Android notification listener. No SMS content observer. No call-log scraping.
-- **No OAuth-based calendar integrations — ever.** No Google Calendar, Outlook, or Facebook birthday sync. These require network access and would break the privacy guarantee (§11). Users whose birthdays live in Google Calendar can subscribe to the Google Birthdays calendar from their device Calendar app, which we then read via the local Calendar permission — transitive coverage with no network access in our app.
-- **No destructive contact operations.** Contact editing (V1 item #11) is additive and modifies single fields by user intent. Regards never deletes a system contact, never merges them in the system contact database, and never bulk-edits. Duplicate "merges" (V1 item #12) are virtual — only Regards' internal grouping changes; system contacts are untouched.
+- **No OAuth-based calendar integrations — ever.** Users whose birthdays live in Google Calendar can subscribe to the Google Birthdays calendar from their device Calendar app, which we then read via the local Calendar permission — transitive coverage with no network access in our app.
+- **No destructive contact operations.** Contact editing is additive and modifies single fields by user intent. Duplicate "merges" are virtual.
 - No backend. No cloud sync across devices. No user account.
-- No message sending or composing from the app. Reminders deep-link out; the actual message happens in the user's existing app.
+- No message sending or composing from the app.
 - No AI suggestions for what to say.
 - No timeline of historical interactions automatically populated from external sources.
 
-These are explicit non-goals in V1 because:
-1. Messaging integrations carry high API/ToS risk and require long certification cycles (Google CASA, Play Store restricted permissions, etc.).
-2. The core value — "remind me to check in, at a reasonable time, in a way that lowers friction to actually doing it" — is fully deliverable without any of them.
-3. Shipping the reminder UX first validates the product before we invest in integration work.
-
-They remain on the roadmap (§14) as v2+ candidates.
+These are explicit non-goals in V1 because messaging integrations carry high API/ToS risk, the core value is deliverable without them, and shipping the reminder UX first validates the product. They remain on the roadmap (§14) as V2+ candidates.
 
 ## 4. Market position & business model
 
 ### Competitive landscape
+
 This space exists but is not saturated, especially at the simple / privacy-forward / friends-and-family end.
 
 | Competitor | Focus | Pricing (April 2026) | What we're not |
@@ -66,50 +71,43 @@ This space exists but is not saturated, especially at the simple / privacy-forwa
 | **Dex** | Professional networking, heavy integrations, AI | $12/month flat | Not doing networking or AI. |
 | **Covve** | Business contacts + news | Free up to 20 relationships, $9.99/mo Pro | Narrower focus; no news aggregation. |
 | **Social Compass** | Friends & family cadences | Subscription | Closest direct competitor by positioning. |
-| **Smart Contact Reminder** (Android) | Basic reminders | Free | Closest competitor feature-wise; weak reminder-window story. |
+| **Smart Contact Reminder** (Android) | Basic reminders | Free | Closest feature-wise; weak reminder-window story. |
 | **Mesh** (ex-Clay) | Network enrichment | Subscription | Different product entirely. |
-| **UpHabit** | Pivoted to sales CRM in 2022 | N/A | Not a competitor anymore; cautionary tale about scope creep. |
+| **UpHabit** | Pivoted to sales CRM in 2022 | N/A | Cautionary tale about scope creep. |
+
+> Re-verify pricing during Phase 3 listing prep (§20) — these figures are from April 2026.
 
 ### Differentiators
 
-1. **Reminder-window awareness.** None of the competitors above treat "when is it OK to bug the user" as a first-class design concern. This is our lead pitch.
+1. **Reminder-window awareness.** Nobody else treats "when is it OK to bug the user" as a first-class design concern. This is the lead pitch.
 2. **One-tap deep link into the right app.** Reminders are action-oriented, not to-do lists.
-3. **Privacy as a feature.** Local-first, no account required, no ads ever.
-4. **Native apps on both platforms.** Most competitors are web-first with thin mobile wrappers.
+3. **Privacy as a feature.** Local-first, no account, no ads ever, and — uniquely — *provable* (§11).
+4. **Native apps on both platforms.**
 
 ### Revenue model: one-time purchase, no subscriptions, optional tip jar
 
 The app is local-only with no server costs, so a subscription would be dishonest. Users pay once and get everything.
 
-**Pricing is geo-tiered** using purchasing-power-parity anchors. $4.99 in the US is affordable, but at current FX rates that's ~₹425 in India (where comparable apps price at ₹79–₹99) and ~R$25 in Brazil (vs a R$5–10 norm). Using a single USD tier would effectively cut Regards out of the global market where the privacy pitch resonates most strongly. Both Apple (App Store Connect → Pricing and Availability → auto-pricing-per-storefront) and Google (Play Console → pricing templates with per-country overrides) natively support regional pricing; this is configuration, not code.
+**Pricing is geo-tiered** using purchasing-power-parity anchors, configured via Apple/Google auto-pricing (configuration, not code):
 
-**Tier anchors (USD-equivalent, indicative — final values chosen from Apple/Google's tier tables):**
-
-| Market cluster | Anchor | Examples | Unlock price | Coffee tip | Thanks tip | Feature tip |
+| Market cluster | Anchor | Examples | Unlock | Coffee tip | Thanks tip | Feature tip |
 |---|---|---|---|---|---|---|
 | Tier A — high-income | $4.99 | US, CA, UK, AU, NZ, DE, FR, NL, SE, NO, DK, FI, IE, CH, AT, BE, JP, SG, HK, IL, AE | **$4.99** | $2.99 | $6.99 | $14.99 |
 | Tier B — upper-middle | $2.99 | PL, CZ, GR, PT, ES, IT, KR, TW, CL, UY | **~$2.99** | $1.99 | $3.99 | $8.99 |
 | Tier C — mid | $1.99 | MX, BR, AR, ZA, TR, MY, TH, SA, RO, HU | **~$1.99** | $0.99 | $2.99 | $5.99 |
 | Tier D — lower-income | $0.99 | IN, ID, PH, VN, EG, PK, NG, BD, LK, KE, MA | **~$0.99** | — | $1.99 | $3.99 |
 
-Actual storefront prices will be set using Apple/Google's nearest tier (e.g., India will land on ₹99 for unlock, ₹199 for Thanks tip; Brazil will land on R$9.90 / R$17.90). We'll anchor to these clusters and then let the auto-pricing sync feature maintain them as FX shifts.
-
 | Item | Base (Tier A / US) | Notes |
 |---|---|---|
-| **Full app unlock** | $4.99 one-time | Single non-consumable IAP. Unlocks the entire app. No feature gates. Localized to each tier above. |
-| **Free trial** | 7 days | Unlocked trial via StoreKit (iOS) / Play Billing grace mechanism (Android). Fully functional. Same duration globally. |
-| **Tip: "Coffee"** | $2.99 | Non-consumable. Shown only in Settings → Support after purchase. No functional effect. Localized. |
-| **Tip: "Thanks"** | $6.99 | Same. Localized. |
-| **Tip: "Fund the next feature"** | $14.99 | Same. Localized. |
+| **Full app unlock** | $4.99 one-time | Single non-consumable IAP. No feature gates. |
+| **Free trial** | 7 days | Fully functional. Trial state lives on `UserProfile` (`entitlementTier = trial`), written on first launch; expiry drops to a soft paywall, never deletes data. |
+| **Tip: "Coffee"** | $2.99 | Non-consumable. Settings → Support, post-purchase only. No functional effect. |
+| **Tip: "Thanks"** | $6.99 | Same. |
+| **Tip: "Fund the next feature"** | $14.99 | Same. |
 
-### Why this pricing
+**Entitlement states are exactly three: `free` (trial expired, soft-locked), `trial` (7-day window from first launch), `lifetime` (unlocked).** This supersedes the v0.5 §7 enum which still carried subscription-era tiers; the code (`ios/Regards/Domain/UserProfile.swift`) has been right since PR #2. See decision #23.
 
-- **$4.99 is the "free without being free" price in developed markets.** Below psychological friction for anyone with an iPhone or modern Android in those markets, high enough to signal real quality. After the 15% App Store Small Business Program cut: ~$4.24 net per sale.
-- **Geo-tiering reflects real purchasing power.** A $0.99 unlock in India is proportionally comparable to $4.99 in the US; charging a flat $4.99 globally is effectively a pricing-out exclusion. Indie apps (Overcast, Flighty, Halide) increasingly use PPP tiers and the data shows unit sales in emerging markets more than compensate for per-unit revenue loss.
-- **Break-even math:** at blended ~$2.50 net per sale (heavier weight on Tier A/B early), year-one dev cost (~$530) breaks even at ~215 sales globally.
-- **No free tier with contact caps.** Caps feel punitive. A trial + honest price is cleaner.
-- **Tip jar is deliberate.** Daily users of indie utilities frequently want to pay more — Overcast, Flighty, and Ivory all prove this. It's not a paywall; the tips give nothing functional. They're a way to say thanks.
-- **No ads, no analytics SDKs, no trackers of any kind, ever.** See §11 for the verification stack.
+**Why this pricing:** $4.99 is below psychological friction in Tier A while signaling quality (~$4.24 net after the App Store Small Business Program's 15% cut). Geo-tiering reflects real purchasing power. Break-even at blended ~$2.50 net is ~215 sales against ~$531 year-one costs. No free tier with contact caps — caps feel punitive; a trial + honest price is cleaner. The tip jar captures supporter goodwill (Overcast, Flighty, and Ivory prove daily users of indie utilities want to pay more). No ads, no analytics SDKs, no trackers, ever.
 
 ### Dev cost baseline
 
@@ -121,24 +119,23 @@ Actual storefront prices will be set using Apple/Google's nearest tier (e.g., In
 | Domain | $12 | annual |
 | Email (Cloudflare Email Routing) | $0 | — |
 | Landing page (GitHub/Cloudflare Pages) | $0 | — |
-| Affinity Designer v2 (icon + marketing art) | $70 | one-time |
-| Bakery (icon export for iOS + Android adaptive) | $25 | one-time |
-| Gemini (banner art — covered by existing subscription) | $0 | — |
+| Affinity Designer v2 | $70 | one-time |
+| Bakery (icon export) | $25 | one-time |
 | **Year 1 total** | **~$531** | |
 | **Year 2+ ongoing** | **~$111/yr** | |
 
 ### Monetization mechanics
 
-- **StoreKit 2 (iOS) + Play Billing Library 7 (Android)** for the unlock IAP and tip IAPs. Billing is handled entirely by platform; no developer-run server.
-- **Entitlement check is on-device.** StoreKit receipt / Play Billing query. "Restore Purchases" button in Settings.
-- **Trial handling:** StoreKit non-consumable trial on iOS; Android uses a pseudo-trial via a 7-day grace token written to the encrypted local DB on first launch. Graceful expiry UX — lock the app into a soft paywall, don't delete data.
-- **Enroll in Apple Small Business Program + Google Play's equivalent** from day one for the 15% store cut.
+- **StoreKit 2** (iOS) / **Play Billing Library 7** (Android). Billing handled entirely by platform; no developer-run server.
+- **Entitlement check is on-device.** StoreKit transaction / Play Billing query. "Restore Purchases" button in Settings.
+- **Trial:** 7-day grace recorded on `UserProfile` at first launch (iOS and Android identical mechanism — local, honest, trivially bypassable by reinstall, and we accept that; the person willing to reinstall every week was never a customer).
+- **Enroll in Apple Small Business Program + Google Play equivalent before launch** (§20 checklist).
 
 ### Revenue risks to flag
 
-1. **Contacts permission denial kills the product.** Onboarding must earn it before asking.
-2. **Niche ceiling.** "Personal CRM for friends" is real but small. Plan for a slow burn — Product Hunt, privacy-focused press (Privacy Guides, Tom's Guide, MacStories), App Store editorial pitch.
-3. **No recurring revenue.** Year 2+ income depends entirely on new acquisition. Offset by near-zero ongoing costs and the tip jar from retained users.
+1. **Contacts permission denial kills the product.** Onboarding must earn it before asking (§10 screen 8).
+2. **Niche ceiling.** Plan for a slow burn — Product Hunt, privacy-focused press (Privacy Guides, MacStories), App Store editorial pitch.
+3. **No recurring revenue.** Year 2+ income depends on new acquisition; offset by near-zero ongoing costs and the tip jar.
 
 ## 5. High-level architecture
 
@@ -152,14 +149,14 @@ Actual storefront prices will be set using Apple/Google's nearest tier (e.g., In
 |                       Domain layer                            |
 |                                                               |
 |   Contact  |  Cadence  |  ReminderEngine  |  ReminderWindow  |
-|   ChannelCatalog  |  DeepLinkBuilder                          |
+|   ChannelCatalog  |  DeepLinkBuilder  |  DuplicateDetector   |
 |                                                               |
 |  Pure Swift / pure Kotlin. No platform APIs. Unit-testable.   |
 +---------------------------------------------------------------+
 |                       Platform adapters                       |
 |                                                               |
-|   ContactsReader  |  NotificationScheduler  |  DeepLinker |   |
-|   BillingAdapter  |  ContactPhotoLoader                       |
+|   ContactsSource/Importer  |  NotificationScheduler           |
+|   CalendarSource  |  DeepLinker  |  BillingAdapter            |
 +---------------------------------------------------------------+
 |                         Data layer                            |
 |                                                               |
@@ -174,534 +171,481 @@ Actual storefront prices will be set using Apple/Google's nearest tier (e.g., In
 +---------------------------------------------------------------+
 ```
 
-Note what's absent compared to v0.1: no integration sources, no TDLib, no OAuth, no background sync scheduler. The app is dramatically simpler to build and operate.
+Two layer boundaries are **CI-enforced** by grep guards in `.github/workflows/guards.yml`:
+
+1. **Domain purity.** `ios/Regards/Domain/**` must be pure Swift — no `import UIKit | SwiftUI | Contacts | EventKit | UserNotifications | GRDB | StoreKit` (and, once R38 lands, `Network`). Platform-dependent code belongs in `Platform/` or `Data/`.
+2. **No networking anywhere in app sources.** The `privacy-grep` job scans `ios/Regards` for *call sites* of `URLSession*`, `NW{Connection,Endpoint,Listener,PathMonitor,Interface,Path}`, `URLRequest`, `URLProtocol`, `CF{Read,Write}Stream*`. The pattern matches `Foo.`/`Foo(` — not bare tokens — so those names may appear in user-facing copy (Transparency screen) without tripping the gate.
+
+**One additional architectural service, introduced in Phase 1C (not in v0.5):** the **SchedulingPass** — an app-level orchestrator that owns the write path from domain decisions to persisted `ScheduledReminder` rows to OS notifications. The ReminderEngine stays a pure function; SchedulingPass is the only component allowed to (a) compute effective inputs (group max-interaction, effective window), (b) upsert `ScheduledReminder` rows, and (c) sync the pending set to `UNUserNotificationCenter` via the NotificationScheduler adapter. Every UI surface *reads* reminders from the DB; nothing but SchedulingPass *writes* them. See §9a.
 
 ## 6. Tech stack
 
 ### iOS
-- **Language:** Swift 6 (strict concurrency)
-- **UI:** SwiftUI (iOS 17+)
-- **Persistence:** GRDB.swift
-- **Async:** Swift Concurrency
-- **Notifications:** `UNUserNotificationCenter` with time-triggered local notifications
-- **Contacts:** `Contacts.framework`
-- **Deep linking out:** `UIApplication.shared.open(url)` with schemes declared in `Info.plist` under `LSApplicationQueriesSchemes`
-- **Billing:** StoreKit 2
-- **Min target:** iOS 17.0
 
-### Android
-- **Language:** Kotlin 2.x
-- **UI:** Jetpack Compose + Material 3
-- **Architecture libs:** Jetpack (ViewModel, Navigation-Compose, Lifecycle)
-- **Persistence:** Room + SQLCipher
-- **Async:** Kotlin Coroutines + Flow
-- **Notifications:** `NotificationManagerCompat` + `AlarmManager.setExactAndAllowWhileIdle` for precise reminder-window timing (with `SCHEDULE_EXACT_ALARM` permission on Android 12+) or `WorkManager` with tight windows if exact alarms are refused
-- **Contacts:** `ContactsContract`
-- **Deep linking out:** `Intent(Intent.ACTION_VIEW, Uri.parse(...))` with `resolveActivity` fallback
-- **Billing:** Play Billing Library 7
-- **Min SDK:** 28 (Android 9). Target SDK: current stable.
+- **Language:** Swift 6, `SWIFT_STRICT_CONCURRENCY: complete`, warnings-as-errors in Debug and Release.
+- **UI:** SwiftUI, iOS 17.0 minimum target.
+- **Persistence:** GRDB.swift (SPM, currently `from: "6.29.0"` — pin via committed `Package.resolved`, R21).
+- **Async:** Swift Concurrency. ViewModels are `@MainActor @Observable`.
+- **Notifications:** `UNUserNotificationCenter`, non-repeating `UNCalendarNotificationTrigger`.
+- **Contacts:** `Contacts.framework` behind the `ContactsSource` protocol (`ios/Regards/Platform/Contacts/`).
+- **Calendar:** EventKit behind a `CalendarSource` protocol (Phase 1D).
+- **Deep linking out:** `UIApplication.open(_:)` behind a `DeepLinker` protocol; schemes declared in `LSApplicationQueriesSchemes` only where universal links don't exist (§8).
+- **Billing:** StoreKit 2 (Phase 2).
+- **Project generation:** XcodeGen from `ios/project.yml`. **Never hand-edit `Regards.xcodeproj`** — CI enforces determinism (`xcodegen generate && git diff --exit-code`).
+- **Toolchain:** CI pins the runner's stable Xcode (currently 26.6; simulator pinned to iPhone 17 Pro with the latest installed iOS runtime). `project.yml` declares `xcodeVersion: "26.0"` for local work on Xcode 26. Before Phase 3, pin CI to the exact Xcode version used for App Store submission, run the full suite on the current iOS beta, and record the choice in the decisions log (see §21 "OS-beta season").
+- **Lint:** SwiftLint `--strict`. Custom rule `button_requires_accessibility` flags `Button { Image/Spacer/EmptyView }` without `.accessibilityLabel`.
+
+### Android (follow-on port; `android/` does not exist yet)
+
+- Kotlin 2.x, Jetpack Compose + Material 3, Room + SQLCipher, Coroutines/Flow, `NotificationManagerCompat` + `AlarmManager.setExactAndAllowWhileIdle` (WorkManager fallback if exact alarms refused), ContactsContract, Play Billing 7. Min SDK 28.
+- The Swift domain layer + its test suite is the porting reference. No KMP — we port, not share (decision #2, #20).
 
 ### Shared
-- This document + a sibling `DOMAIN_MODEL.md` defining entities in platform-neutral pseudocode.
-- No KMP in V1. The domain is small and the platform specifics are the interesting part.
+
+- This document is the single source of truth. The v0.5 plan for a sibling `DOMAIN_MODEL.md` is **dropped** (decision #24): with the Swift domain layer + tests as the executable spec, a third artifact would drift. README references to `docs/DOMAIN_MODEL.md` must be removed (R19).
 
 ## 7. Data model
 
-All local SQLite. No cloud, no sync.
+All local SQLite. No cloud, no sync. **This section describes the schema as migration `v1` created it** (`ios/Regards/Data/DatabaseMigrator.swift`), plus the `v2` migration Phase 1 adds. Where v0.5 differed from the shipped `v1`, the shipped code wins and the difference is called out.
 
 ```
 Contact
   id: UUID (primary key)
-  systemContactRef: TEXT UNIQUE     -- platform-native identifier from Contacts framework / ContactsContract
+  systemContactRef: TEXT UNIQUE     -- platform-native identifier
   displayName: TEXT
   photoRef: TEXT?                   -- derived from system contact; cached locally
-  tracked: BOOLEAN                  -- false means imported-but-not-following
+  tracked: BOOLEAN
   cadenceDays: INTEGER?             -- null if tracked == false
   priorityTier: INTEGER (0-3)       -- 0 = inner circle
   preferredChannel: TEXT            -- enum, see ChannelCatalog
-  preferredChannelValue: TEXT       -- e.g., phone number, email, handle — resolved at config time
-  reminderWindowOverride: TEXT?     -- JSON blob; null means "use global"
+  preferredChannelValue: TEXT       -- resolved at config time
+  reminderWindowOverride: TEXT?     -- JSON ReminderWindow; null = use global
   lastInteractedAt: INTEGER?        -- epoch seconds. Source of truth.
-  notes: TEXT                       -- Regards-local; NOT written back to system Contacts
-  contactGroupId: UUID?             -> ContactGroup.id  -- null = ungrouped; non-null = virtually merged
+  notes: TEXT                       -- Regards-local; NEVER written back to system Contacts
+  contactGroupId: UUID?             -> ContactGroup.id (ON DELETE SET NULL)
   createdAt: INTEGER
   archivedAt: INTEGER?
+  -- v2 adds:
+  phonesJson: TEXT                  -- JSON array of all phone numbers (E.164-normalized where parseable), captured at import/reconcile
+  emailsJson: TEXT                  -- JSON array of all emails (lowercased), captured at import/reconcile
 
-ContactGroup                        -- virtual merge targets; NOT written back to system Contacts
+ContactGroup                        -- virtual merge targets; NEVER written to system Contacts
   id: UUID (primary key)
-  displayName: TEXT                 -- user-chosen group name (defaults to primary contact's name)
-  primaryContactId: UUID            -> Contact.id  -- the "face" of the group (photo, channel)
+  displayName: TEXT
+  primaryContactId: UUID            -> Contact.id (the "face": photo, channel)
   createdAt: INTEGER
-  createdBy: TEXT                   -- 'user' | 'suggestion_accepted' — for analytics on suggestion quality (stored locally, never exfiltrated)
+  createdBy: TEXT                   -- 'user' | 'suggestion_accepted' (local-only quality signal)
 
 ReminderWindow (global prefs, single row)
   id: INTEGER PRIMARY KEY CHECK (id = 1)
   allowedDaysMask: INTEGER          -- bitmask, Sun=1, Mon=2, ... Sat=64
-  allowedTimeRangesJson: TEXT       -- e.g., [{start:"18:00", end:"22:00"}, {start:"12:00", end:"13:00"}]
+  allowedTimeRangesJson: TEXT       -- e.g., [{start:"18:00", end:"22:00"}]
+  quietHoursJson: TEXT              -- absolute "never between X and Y" override; wrap-aware (22:00→07:00 legal)
   timezone: TEXT                    -- IANA, defaults to device
+  -- v2 adds:
+  occasionTime: TEXT                -- "HH:mm" morning-of time for birthday/anniversary notifications, default "09:00"
+  digestHorizonDays: INTEGER        -- Upcoming view horizon (7/14/30), default 14
 
 ScheduledReminder
   id: UUID
-  contactId: UUID -> Contact.id
+  contactId: UUID -> Contact.id (ON DELETE CASCADE)
+                                    -- for a virtually merged group this is the PRIMARY contact's id
   kind: TEXT                        -- 'cadence' | 'birthday' | 'anniversary' | 'custom_occasion'
-  occasionDate: TEXT?               -- ISO month-day (e.g., "02-29") for annual-recurrence kinds; null for cadence
-  occasionLabel: TEXT?              -- free-text label for anniversaries / custom (e.g., "Wedding", "Met on Bumble")
-  scheduledFor: INTEGER             -- epoch seconds, already snapped into an allowed window
-  osNotificationId: TEXT            -- the identifier used when we scheduled it with UNUserNotificationCenter / AlarmManager, so we can cancel/replace
+  occasionDate: TEXT?               -- ISO "MM-DD" for annual kinds; null for cadence
+  occasionLabel: TEXT?              -- free-text for anniversaries/custom
+  scheduledFor: INTEGER             -- epoch seconds, ALREADY SNAPPED to an allowed-window slot start (§9)
+  osNotificationId: TEXT            -- UNUserNotificationCenter identifier for cancel/replace
   state: TEXT                       -- pending | fired | cancelled | user_caught_up
 
-  -- Note: we do NOT persist birthdays/anniversaries ourselves. They are re-read from
-  -- system Contacts + local Calendar on each scheduling pass. This preserves the
-  -- "system contacts are the source of truth" rule and sidesteps sync drift.
+  -- We do NOT persist birthdays/anniversaries ourselves. They are re-read from
+  -- system Contacts + local Calendar on each scheduling pass ("system contacts
+  -- are the source of truth", no sync drift).
 
 InteractionLog
   id: UUID
-  contactId: UUID
+  contactId: UUID -> Contact.id (ON DELETE CASCADE)
   occurredAt: INTEGER
   source: TEXT                      -- 'manual' | 'reminder_tap' | 'reminder_caught_up'
-  channel: TEXT?                    -- channel the user said they used, if manual entry specified it
+  channel: TEXT?
 
-UserProfile
+UserProfile (single row)
   id INTEGER PRIMARY KEY CHECK (id = 1)
   onboardingCompletedAt: INTEGER?
-  entitlementTier: TEXT             -- 'free' | 'plus_monthly' | 'plus_annual' | 'lifetime'
+  entitlementTier: TEXT             -- 'free' | 'trial' | 'lifetime'   (decision #23; v0.5's plus_monthly/plus_annual are dead)
   entitlementRefreshedAt: INTEGER
+  -- v2 adds:
+  trialStartedAt: INTEGER?          -- epoch seconds; set on first launch; trial = trialStartedAt + 7d > now
 ```
 
-**Key indexes:**
-- `Contact(tracked, archivedAt)` — fast home-screen query.
-- `Contact(contactGroupId)` — fast group membership lookup for scheduling.
-- `ScheduledReminder(state, scheduledFor)` — fast "what's next?" lookup.
-- `Contact(systemContactRef)` — fast re-import reconciliation.
+**Key indexes (as built in v1):** `Contact(tracked, archivedAt)`, `Contact(contactGroupId)`, `ScheduledReminder(state, scheduledFor)`. `Contact(systemContactRef)` is covered by the implicit unique-constraint index from `.unique()` — deliberate, don't add a duplicate explicit index.
 
-**Re-import logic:** on every app launch + on Contacts change notification, we reconcile imported contacts against `systemContactRef`. New contacts are imported as `tracked=false`. Contacts that have been deleted from the device are marked archived (not deleted from our DB, since the user's cadence/log history may be valuable if they re-add the contact).
+**Foreign-key behavior (as built, keep):** `ScheduledReminder.contactId` and `InteractionLog.contactId` cascade-delete with their contact; `Contact.contactGroupId` nulls out when its group is deleted (unmerge = delete group row, members revert to ungrouped).
 
-**Write-back logic (V1 feature #11):** `CNSaveRequest` / `ContactsContract` batch-update. We only write the fields the user explicitly edited (partial updates, not full-record replacement, so we don't stomp on data we didn't read). `notes` in our Contact row is Regards-local — we deliberately keep it out of the write-back pipeline to avoid polluting the user's system contacts with app-specific annotations.
+**Migration policy:** GRDB `DatabaseMigrator`, append-only registrations, each migration named `vN`. Never edit a shipped migration. `v2` (Phase 1B, PR20–PR23) adds the columns marked above. Migration tests round-trip every table through fresh-create and v1→v2 upgrade paths (§13).
 
-**Duplicate-detection heuristic (V1 feature #12):** runs on-demand from Settings → "Find duplicate contacts". Candidate pairs are generated where any one of the following holds: (a) normalized display names match (case/diacritic-insensitive), (b) any phone number in E.164 form matches between two contacts, (c) any email (lowercased) matches. We present candidates ranked by strength (phone + name = high; name-only = low) and the user confirms each merge manually. Nothing auto-merges. The algorithm is local, deterministic, and testable without any system APIs — pure Kotlin/Swift on the normalized field set.
+**Re-import & reconciliation (Phase 1B, PR21 — spec unchanged from v0.5):** on every app launch/foreground + on `CNContactStoreDidChange`, reconcile against `systemContactRef`:
+- New system contacts → import as `tracked=false`.
+- Deleted system contacts → set `archivedAt` (never hard-delete; cadence/log history stays for potential re-add).
+- Changed contacts → refresh `displayName`, `photoRef`, `phonesJson`, `emailsJson`, birthday/dates inputs.
+- The shipped `ContactsImporter` (PR #10) is first-launch/additive only — that's the documented gap PR21 closes, not a bug in what shipped.
 
-**Scheduling under virtual merges:** the ReminderEngine treats a `ContactGroup` as the reminder target when `contactGroupId` is non-null. `lastInteractedAt` is taken as the max across group members (interacting with any grouped contact counts). Preferred channel comes from `ContactGroup.primaryContact`. Upcoming/Overdue views display one row per group. Members retain their own rows in the All Contacts screen for clarity.
+**Write-back (Phase 1D, PR27):** partial-field `CNSaveRequest` — only fields the user explicitly edited. `notes` never write back. Re-fetch after save so Regards reflects what the system store accepted.
+
+**Duplicate-detection heuristic (as built + v2 inputs):** candidate pairs where (a) normalized display names match (case/diacritic-insensitive), (b) any phone matches on the **last-10-digit key**, or (c) any lowercased email matches. **The last-10 rule is a deliberate deviation from v0.5's "E.164 match"** (decision #25): it treats `+1 (555) 123-4567` and `555.123.4567` as the same line without a phone-number parsing dependency; the false-positive window (two countries sharing 10 trailing digits *within one person's address book*) is negligible. Confidence ranking (decision #26, resolves the shipped docstring/behavior mismatch): **phone match = high** (with or without name similarity — a shared line is almost always the same person), **email match = medium** (families share emails), **name-only = low**. Nothing auto-merges; the user confirms each pair. Detector inputs come from `phonesJson`/`emailsJson` (all handles), not just `preferredChannelValue` — the shipped Phase 0 wiring that feeds only one handle per contact is gap R12.
+
+**Scheduling under virtual merges (unchanged spec, unimplemented until PR28):** the group is the reminder target when `contactGroupId` is non-null. `effectiveLastInteractedAt` = max across members (interacting with any member counts). Preferred channel and face come from `primaryContactId`. `ScheduledReminder.contactId` = the primary contact's id; SchedulingPass guarantees at most one pending cadence reminder per group. Overdue/Upcoming render one row per group; All Contacts still shows members individually with a group indicator.
 
 ## 8. Channel catalog & deep linking
 
-This is the differentiator section. V1 ships with this fixed catalog of channels. Each entry defines (a) how we ask the user for the channel value, (b) how we validate it, and (c) how we build the deep link.
+V1 ships this fixed catalog. Each entry defines (a) what the user supplies, (b) validation, (c) the link built. `ChannelCatalog` (pure domain) owns validation + metadata; `DeepLinkBuilder` (pure domain) builds URLs; the `DeepLinker` platform adapter (Phase 1C) opens them.
 
-| Channel | User supplies | Validation | iOS link | Android link | Notes |
-|---|---|---|---|---|---|
-| `phone_call` | phone | E.164 parse | `tel:+15551234567` | `tel:+15551234567` | Always works. |
-| `sms` | phone | E.164 parse | `sms:+15551234567` | `sms:+15551234567` | iOS routes to iMessage if contact is iMessage-enabled. |
-| `facetime` | phone or email | `facetime:15551234567` | N/A | iOS only. Hide on Android. |
-| `email` | email | RFC 5322 | `mailto:alex@example.com` | `mailto:alex@example.com` | |
-| `whatsapp` | phone | E.164, strip `+` | `https://wa.me/15551234567` | same | Universal link — graceful fallback to web if app missing. |
-| `telegram` | @handle | handle regex | `https://t.me/alexc` | same | |
-| `signal` | phone | E.164 | `https://signal.me/#p/+15551234567` | same | Requires the number be registered with Signal. We warn the user. |
-| `messenger` | handle or m.me link | | `https://m.me/alexc` | same | |
-| `instagram_dm` | @handle | handle regex | `https://ig.me/m/alexc` | same | |
-| `linkedin_msg` | vanity handle or profile URL | | `https://linkedin.com/in/alex-chen` | same | Opens profile; user taps Message. |
-| `discord` | username (display only) + optional user ID | | `discord://discord.com/users/USER_ID` if ID known, else `discord://` | same | Discord IDs aren't easily discoverable. If no ID, we open Discord generically and show the contact's username as a note. |
-| `in_person` | — | — | none (no deep link) | none | Used for people the user prefers to see face-to-face; reminder fires but no link. |
-| `custom` | arbitrary URL | URL parse | that URL | same | Escape hatch for anything we missed (Slack, Teams, Matrix, etc.). |
+| Channel | User supplies | Validation | Link (both platforms unless noted) | Notes |
+|---|---|---|---|---|
+| `phone_call` | phone | E.164-parseable | `tel:+15551234567` | Always works. |
+| `sms` | phone | E.164-parseable | `sms:+15551234567` | iOS routes to iMessage where enabled. |
+| `facetime` | phone **or email** | phone rule OR RFC-5322 | `facetime:+15551234567` / `facetime:alex@example.com` | iOS only; hidden on Android. **Email form must pass through verbatim — the shipped builder runs email through phone normalization and emits a broken URL (R2).** |
+| `email` | email | RFC 5322 | `mailto:alex@example.com` | |
+| `whatsapp` | phone | E.164, strip `+` | `https://wa.me/15551234567` | Universal link; graceful web fallback. |
+| `telegram` | @handle | handle regex, **leading `@` stripped before validation (R7)** | `https://t.me/alexc` | |
+| `signal` | phone | E.164 | `https://signal.me/#p/+15551234567` | Number must be registered with Signal; we warn in the picker UI. |
+| `messenger` | handle **or m.me URL** | handle regex OR `https://m.me/...` URL, **normalized to the handle (R7)** | `https://m.me/alexc` | |
+| `instagram_dm` | @handle | handle regex (strip `@`) | `https://ig.me/m/alexc` | |
+| `linkedin_msg` | vanity handle or profile URL | | `https://linkedin.com/in/alex-chen` | Opens profile; user taps Message. |
+| `discord` | username + optional user ID | | `discord://discord.com/users/USER_ID` if ID known, else `discord://` | IDs aren't discoverable; without one we open Discord generically and surface the username in the notification/detail UI. |
+| `in_person` | — | — | none | Reminder fires with no link. |
+| `custom` | arbitrary URL | **any URL with a scheme** — not just http(s) (R7) | that URL | Escape hatch (Slack `slack://`, Teams, Matrix…). The shipped http(s)-only validation contradicts the intent. |
 
-**Implementation:**
-- `ChannelCatalog` is a pure-domain enum + lookup table per platform.
-- `DeepLinkBuilder` takes a `(Channel, value)` pair and returns a platform-specific `URL` / `Uri`.
-- Actually opening the URL is a thin platform adapter (`UIApplication.shared.open` on iOS; `Intent.ACTION_VIEW` + `resolveActivity` on Android).
+**Validation contract (decision #27):** validation answers "can `DeepLinkBuilder` produce a well-formed URL from this value?" — nothing more. If validation passes, `build` must return non-nil; if it returns nil for a validated value, that's a bug (add a property test asserting `isValid(v) ⟹ build(v) != nil` per channel, R2/R7 acceptance).
 
-**iOS `Info.plist` requirement:** every custom scheme above (`whatsapp`, `telegram`, `tg`, `sgnl`, `fb-messenger`, `instagram`, `discord`) must be declared under `LSApplicationQueriesSchemes` — otherwise `canOpenURL` returns false and users on iOS 9+ see no indication the app is installed. We always prefer universal HTTPS links where available (wa.me, t.me, ig.me, etc.) because they don't require this declaration and fall back to Safari gracefully.
+**iOS `LSApplicationQueriesSchemes`:** keep the array **minimal**, populated in PR26, containing only schemes we actually pass to `canOpenURL`: `discord` (and nothing else at launch — wa.me/t.me/ig.me/m.me/signal.me are HTTPS universal links with web fallback, so we open them without querying; `tel:`/`sms:`/`mailto:`/`facetime:` we open directly without a capability query). Every addition to this array is a privacy-adjacent diff: it discloses which apps we probe for. Justify each in the PR description.
 
-**Android fallback:** `resolveActivity(packageManager, 0)` before launching; if null, show a toast "It looks like [App] isn't installed on this device — open it in the browser?" and offer the https fallback.
+**Android fallback:** `resolveActivity` before launching; on null offer the https fallback in a toast.
 
-**Adding channels in V1.1+** requires an app update because of the `LSApplicationQueriesSchemes` constraint on iOS. Acceptable.
+**Adding channels in V1.1+** requires an app update (scheme declarations are static). Acceptable.
 
 ## 9. Reminder-window engine
 
-This is the second differentiator. It gates every notification through user-defined "OK to remind me now" windows.
+The second differentiator. Everything below is the **contract**; `ios/Regards/Domain/Reminders/ReminderEngine.swift` implements it (with the P0 defects in §19 open until PR16 lands).
 
 ### Global reminder window configuration
 
 The user picks:
-- Allowed **days of the week**: e.g., Mon–Fri evenings + all day Sat/Sun.
-- Allowed **time ranges** per day: one or more ranges per day (e.g., 18:00–22:00 + 12:00–13:00). V1 uses the same ranges for every allowed day to keep the UI simple; per-day ranges are a Plus-tier upsell.
-- **Timezone:** defaults to device, honors DST automatically via platform calendar APIs.
-- **Quiet hours:** an absolute "never between X and Y, even if in-window logic says yes." Hard override.
+- Allowed **days of the week** (bitmask).
+- Allowed **time ranges**, same ranges for every allowed day in V1. **Allowed ranges must not wrap midnight** (decision #28): the editor UI never offers a wrapping range, and `ReminderWindow` validation rejects one (`start < end` strictly). Wrap support exists **only** for quiet hours, where "22:00 → 07:00" is the natural shape. The shipped walk silently skips wrapping allowed ranges — validation makes that state unrepresentable instead (R3).
+- **Timezone:** IANA id, defaults to device; all engine math runs in this zone.
+- **Quiet hours:** absolute override, wrap-aware, beats every allowed range.
 
 ### Per-contact override
 
-Any contact can override the global window (e.g., "never remind me about my boss before 9 am on a weekday"). Stored as `reminderWindowOverride` JSON. Falls back to global if null.
+`Contact.reminderWindowOverride` (full `ReminderWindow` JSON) replaces the global window when non-null. Resolution happens in **one** place — SchedulingPass computes `effectiveWindow = contact.reminderWindowOverride ?? global` and passes it down; the engine never reaches around its inputs. (Shipped gap: `UpcomingViewModel` hardcodes `.defaultV1()` and ignores both the repository and the override — R9.)
 
 ### Scheduling algorithm
 
-Given:
-- `now: Date`
-- `contact.lastInteractedAt`, `contact.cadenceDays`
-- Effective reminder window (per-contact override or global)
-- Existing `ScheduledReminder` for this contact, if any
-
-We compute:
-
 ```
-overdueAt = lastInteractedAt + cadenceDays * 86400
-targetFireTime = max(now, overdueAt)
-scheduledFor = nextAllowedSlot(window, from: targetFireTime)
+overdueAt  = (effectiveLastInteractedAt ?? contact.createdAt) + cadenceDays * 86400
+target     = max(now, overdueAt)
+slot       = nextAllowedSlot(                           // nil if window has zero capacity
+               window,
+               from: target,
+               includingContainingSlot: overdueAt <= now)
+scheduledFor = slot.start                                // snapped to slot START (see Batching)
 ```
 
-Where `nextAllowedSlot` walks forward day-by-day starting at `targetFireTime` and returns the earliest `(day, time)` that:
-1. The day is allowed by `allowedDaysMask`.
-2. The time falls inside one of `allowedTimeRanges`.
-3. The time is not inside `quietHours`.
+**Contract points, each resolving a shipped defect or ambiguity:**
 
-We then create (or replace, if a pending reminder already exists for the contact) a platform-level local notification for that time.
+1. **Wall-clock correctness (R1, the P0).** `nextAllowedSlot` must materialize candidate times with wall-clock APIs — `calendar.date(bySettingHour:minute:second:of:)` or `calendar.nextDate(after:matching:)` — never `startOfDay + N minutes`. Minute-addition is elapsed time: on spring-forward days it lands 60 min late (07:00 window → fires 08:00, *outside* the window); on fall-back days 60 min early (→ 06:00, *before* the user said it's OK). Firing outside the user's declared window is the one product promise we can't break. After materializing, **re-validate** the instant against the window and quiet hours; on a DST day where the slot start doesn't exist (02:30 in a skipped hour), take the earliest existing instant inside the range, else walk on.
+2. **Degenerate windows are unrepresentable + defensively handled (R4).** `nextAllowedSlot` returns `Date?`; nil means "this window can never fire" (no days, no ranges, or quiet hours swallow everything). The window editor refuses to save such a config (inline error), and SchedulingPass treats nil as "skip + surface a Settings badge", never "fire anyway". The shipped behavior — returning the input date unchanged, i.e. scheduling at a disallowed instant — is the worst of the options; kill it.
+3. **Never-contacted anchor (decision #29, R8).** `effectiveLastInteractedAt ?? createdAt` — a newly tracked contact becomes due one full cadence after you started tracking them, not instantly. Rationale: the user just triaged this person during import/onboarding; "overdue immediately" turns the first-run Overdue screen into a wall of red and teaches users to ignore it. The engine's shipped "never contacted = due now" branch loses to the ViewModels' `?? createdAt`; unify on the VM semantics in the engine and delete the divergence.
+4. **Occasion same-day rule (R5).** If today is the occasion and `occasionTime` has passed, fire at the next possible moment **today** (subject to quiet hours only — occasions ignore allowed-day/range gating by design, they're morning-of events). The shipped `nextOccasionOccurrence` rolls a same-day-but-late occasion a full year forward; a user who installs at noon on Mom's birthday must still get the birthday nudge.
+5. **Batching = slot-start snapping (decision #30, R6).** All reminders landing in the same window slot share the **same `scheduledFor` = slot start**, so digest grouping is exact-equality by construction and one OS notification per slot exists (`osNotificationId = "digest-{slotStartEpoch}"` for the batch; single-contact slots use `"contact-{uuid}-{kind}"`). Digest copy: *"3 people are overdue: Leia, Luke, Padmé."* Tap → Overdue view. Per-contact nags are the #1 reason this category gets silenced.
+   - An already-overdue contact may join the slot currently in progress; the past slot start represents an immediate delivery and a stable digest identity.
+   - A contact whose cadence expires later inside the current slot must walk to the next slot start. It may never fire before `overdueAt` (R48).
+6. **No double-up.** If a contact has both an overdue cadence reminder and an occasion today, the occasion wins; the cadence reminder is marked `user_caught_up` when the user acts on the occasion (a birthday call counts as staying in touch).
 
-**Batching:** within a single reminder window, multiple overdue contacts collapse into one notification: *"3 contacts are overdue: Priya, Alex, Mom. Tap to see."* Tapping opens the Overdue view. This is critical — per-contact nag notifications are the #1 reason relationship apps get silenced.
+### Re-evaluation triggers (all route through SchedulingPass, §9a)
 
-**Re-evaluation triggers:**
-- User marks a contact "Caught up" → cancel pending reminder, clear `scheduledFor`, update `lastInteractedAt`.
-- User changes cadence → cancel & reschedule.
-- User changes reminder windows → bulk-reschedule all pending reminders. (This is bounded by tracked-contact count, so it's cheap.)
-- App launch / foreground → reconcile: cancel any orphaned OS notifications, re-verify scheduled times are still in-window (timezone changes, DST).
-
-**Forward-looking queries (Upcoming view):** the engine exposes `upcomingReminders(horizonDays: Int) -> [ScheduledReminder]`. This returns all pending `ScheduledReminder` rows where `scheduledFor` falls in `[now, now + horizonDays]`, sorted ascending, joined with the `Contact` row for rendering. Since scheduled reminders are already persisted (we don't re-derive them on the fly), this is an indexed single-query read — no recomputation cost. The Upcoming screen observes this as a reactive stream (Combine publisher / Kotlin Flow) so it updates instantly when the user marks someone caught up from that view.
+- "Caught up" → log interaction, set `lastInteractedAt`, cancel pending reminder(s) for the contact/group, reschedule.
+- Snooze (1 week) → push the pending reminder's `scheduledFor` to `nextAllowedSlot(from: firedAt + 7d)`; state stays `pending`; no interaction is logged and `lastInteractedAt` does **not** move (decision #31).
+- Cadence/channel/override change → cancel & reschedule that contact.
+- Global window change → bulk-reschedule all pending (bounded by tracked count; cheap).
+- App launch/foreground → full reconcile: re-read Contacts/Calendar occasions, recompute all pending, cancel orphaned OS notifications (any `UNNotificationRequest` whose id isn't in the pending set), verify times still in-window (TZ change, DST).
+- Notification fired → mark row `fired`; when the user acts (tap/caught-up action), advance per its semantics; occasions re-schedule for next year.
 
 ### Annual recurrence (birthdays & anniversaries)
 
-Occasion reminders follow a parallel scheduling path, sharing the notification plumbing and batching logic but with different inputs:
-
-**Source aggregation.** On each scheduling pass (app launch, Contacts/Calendar change, post-occasion advance), the engine queries:
-1. System Contacts — `CNContact.birthday` + `CNContact.dates` (iOS); `ContactsContract.CommonDataKinds.Event` (Android).
-2. Local device Calendar, if permission granted — EventKit events with `EKEventKind.birthday` or titles matching birthday/anniversary patterns (iOS); CalendarContract events on the auto-generated birthdays calendar (Android).
-3. Merges by system-contact ID; Calendar is a fallback when Contacts has no date.
-
-**Scheduling.** For each occasion:
-```
-nextOccurrence = next (month, day) ≥ today for that contact
-  — special case: (Feb 29) → (Feb 28) in non-leap years
-scheduledFor = morning-of at user's "occasion notification time" (default: 09:00 local)
-```
-A separate default window is used for occasions (morning-of, not evening) because the user needs to act early in the day, not on their way to bed.
-
-**Firing.** Birthday notification copy: *"🎂 It's Priya's birthday today — open WhatsApp?"* Same deep-link targets as cadence reminders. After firing, the engine advances `nextOccurrence` by one year and re-schedules.
-
-**No double-up.** If a contact has both a cadence reminder overdue and a birthday today, the birthday wins and the cadence reminder is marked `user_caught_up` (birthday interaction counts as staying in touch).
-
-**Privacy note.** Calendar access is optional. The app works fine with just Contacts permission; Calendar permission is a gentle upsell in Settings, never a blocker.
+Sources, merged per contact (Contacts wins over Calendar): `CNContact.birthday` + `CNContact.dates` (labels → `anniversary`/`custom_occasion`); EventKit birthday-calendar events when Calendar permission granted. Feb 29 → Feb 28 in non-leap years (shipped, tested). Occasions fire at `ReminderWindow.occasionTime` (default 09:00) — a *separate* default from cadence windows because the user needs the whole day to act. Copy: *"🎂 It's Leia's birthday today — open WhatsApp?"* with the contact's deep link.
 
 ### Platform nuance
 
-**iOS:** `UNCalendarNotificationTrigger` is the right primitive. We use non-repeating triggers; the reminder engine re-schedules after each fire. iOS caps pending notifications at 64 per app — a trivial limit for us (we only schedule the next reminder per contact, so ~N contacts ≤ 64 is fine; contacts with overlapping times collapse into the batched notification anyway, one pending per window).
+**iOS:** non-repeating `UNCalendarNotificationTrigger`; re-schedule after each fire. The 64-pending cap is respected by construction: one notification per slot (digests) + occasion notifications; SchedulingPass keeps only the next fire per contact/group. If the pending set would exceed 60, schedule the nearest 60 and reconcile forward on each launch (defensive; realistic users won't hit it).
 
-**Android:** `AlarmManager.setExactAndAllowWhileIdle` with `SCHEDULE_EXACT_ALARM` permission (Android 12+). If the user denies the exact-alarm permission, we fall back to `WorkManager` with a short flex window — reminders may fire 5–15 minutes later than planned, which is acceptable. On Android 14+, the app needs to be in a role or have the exact-alarm permission granted; we request it gracefully.
+**Android (port):** `AlarmManager.setExactAndAllowWhileIdle` with `SCHEDULE_EXACT_ALARM`; graceful WorkManager fallback (5–15 min drift acceptable).
+
+## 9a. SchedulingPass — the orchestrator (new in v1.0)
+
+Single `actor SchedulingPass` (App layer, constructed in `AppEnvironment`), the only writer of `ScheduledReminder` rows and OS notifications.
+
+```
+protocol NotificationScheduling: Sendable {          // Platform/Notifications
+  func requestAuthorization() async throws -> Bool
+  func pendingIdentifiers() async -> Set<String>
+  func schedule(_ requests: [ReminderNotificationRequest]) async throws
+  func cancel(identifiers: [String]) async
+}
+
+actor SchedulingPass {
+  func runFull() async            // launch/foreground/window-change reconcile
+  func run(for contactId: UUID) async   // targeted: caught-up, cadence edit, snooze
+}
+```
+
+`runFull()` algorithm: fetch tracked+unarchived contacts, resolve groups (one target per group, `effectiveLastInteractedAt` = member max), resolve effective windows, read occasion dates from ContactsSource/CalendarSource, run the pure engine per target, snap to slots, diff against existing `pending` rows (upsert changed, cancel orphans), then diff `osNotificationId`s against `pendingIdentifiers()` and schedule/cancel the difference. Idempotent: running it twice in a row is a no-op. Unit-tested with fake repositories + fake scheduler (order-independent assertions); this is the component where most future bugs will live, so its tests are the highest-value suite after the engine's (§13).
+
+UI reads: Overdue/Upcoming ViewModels observe `ScheduledReminder` + `Contact` via GRDB `ValueObservation` (reactive, replaces Phase 0's on-the-fly derivation — R10). The Upcoming screen is then exactly what §9 promised: an indexed read of persisted rows.
 
 ## 10. UI / UX architecture
 
-Eight screens + one widget family in V1:
+Nine screens + one widget family in V1. **As-built decision (#32):** navigation is a **4-tab `TabView`** — Overdue, Upcoming, Contacts, Settings — each tab owning its own `NavigationStack` with per-tab `NavigationPath`, so a push inside Overdue never bleeds into Upcoming and tab state survives switching. v0.5's "one Home screen with a segmented control" is superseded; the segmented Overdue/Upcoming pill at the top of both list screens **stays** as a glanceable count + one-tap cross-switch (it displays live counts, which the tab bar can't). `ContactDetailScreen` is constructed by a factory (`contactDetail(for:)`) so each push gets a fresh VM — never rely on SwiftUI view identity to reset it (regression-tested).
 
-1. **Home / Overdue** — lists contacts overdue right now, sectioned by priority tier. Each row: photo, name, "2 weeks overdue", preferred-channel icon, big tap target (opens deep link), swipe to "mark caught up" or "snooze 1 week". Segmented control at top toggles between **Overdue** and **Upcoming**. Virtually-merged contacts (§7) appear as a single row using the group's primary contact as the face.
-2. **Upcoming** — forward-looking timeline of reminders scheduled in the next 14 days (user-configurable horizon: 7 / 14 / 30 days). Grouped by day ("Tomorrow — Thu Apr 16", "Fri Apr 17", etc.) with collapsed-days summary. Each row shows contact, channel icon, and the scheduled time-of-day within their reminder window. Swipe actions: **Reach out now** (opens deep link, logs interaction, advances cadence) and **Mark caught up** (skips this reminder, advances cadence). Tap row → Contact Detail. Useful for proactive catching-up: "I've got a spare 15 minutes, who's up next?"
-3. **All Contacts** — lists all tracked contacts, sectioned by priority or sorted by next-reminder date. Search. Tap to configure. Shows group-membership indicator where applicable.
-4. **Contact Detail** — photo, cadence, channel, reminder-window override, priority, **next scheduled reminder**, last interaction, recent log entries, big "Open [channel]" button, "I talked to them" manual log button, **"Edit contact" button** (opens screen #5), **"Merged with..." disclosure row** when part of a group (tap → group management).
-5. **Edit Contact** — form that mirrors system-contact fields: name, phone numbers, emails, postal addresses, birthday, anniversary dates. Save writes through to system Contacts via `CNSaveRequest` / `ContactsContract`. Partial-update semantics: only fields the user touched are written back. Regards-local `notes` field is visible but clearly labeled as "private to Regards, not saved to your address book."
-6. **Merge Duplicates** (Settings entry point) — presents ranked candidate duplicate pairs (§7 heuristic). For each pair: side-by-side preview, user picks primary face, confirms to create a `ContactGroup`. Undo is one tap. Also supports manually linking any two contacts the heuristic missed.
-7. **Settings** — global reminder windows, quiet hours, timezone, notification digest time, occasion notification time, Upcoming view horizon (7/14/30 days), "Find duplicate contacts" entry, entitlement / upgrade, export data, delete data, Transparency screen.
-8. **Onboarding** — sells the concept in 3 screens, then requests Contacts permission (read + write), then offers optional Calendar permission for birthday coverage, then walks the user through setting up their first 3–5 contacts to get immediate value.
+1. **Overdue (Home)** — overdue contacts sectioned by priority tier. Row: photo, name, "2 weeks overdue", channel icon (tap = open deep link), merged-group chip where applicable. Swipe: **Caught up** / **Snooze 1 wk**. Footer shows the live next-digest time (from persisted reminders — the shipped hardcoded "6:00 pm" strings are R11). Empty state: "All caught up."
+2. **Upcoming** — reminders in the next `digestHorizonDays` (7/14/30, user-set), grouped by day, from **persisted** `ScheduledReminder` rows via `ValueObservation` (R10). Rows show contact, channel, kind tag (birthday/anniversary), scheduled time. Swipe: **Reach out now** (opens deep link + logs interaction + advances cadence) / **Mark caught up**. Horizon picker lives in the nav bar (shipped inert button R11).
+3. **All Contacts** — every tracked contact; search (`.searchable`), sections by priority tier, group-membership indicator, tap → Contact Detail. Untracked imports reachable via a filter toggle (Phase 1B) so users can start tracking someone new.
+4. **Contact Detail** — hero (photo/name/priority), cadence card (cadence, **live** next reminder, last interaction, status), channel card with **working "Open [channel]"** button, actions: **Caught up** (logs + reschedules), **Snooze 1 wk**, **Log other channel…**; interactions list (last 8); Regards-local notes with "private to Regards" footnote; **Edit contact** (→ screen 5); reminder-window override editor entry; "Merged with…" disclosure when grouped (→ screen 6 context).
+5. **Edit Contact** — real form (`TextField`s) mirroring system-contact fields: name, phones, emails, postal addresses, birthday, anniversary. Save = partial-field `CNSaveRequest` write-back of touched fields only; Cancel/back always available (the shipped screen hides the back button with no-op Cancel/Save — the R13 nav trap). Regards-local `notes` visible but labeled not-written-back. Write-permission-denied state links to Settings.
+6. **Merge Duplicates** (Settings entry) — ranked candidate pairs (§7 heuristic) with side-by-side preview; user picks the primary face; **Confirm creates a `ContactGroup` row** (shipped gap R12: nothing persists); one-tap Undo (delete group); **Skip** dismisses a pair persistently (store dismissed pair hashes locally); manual "link two contacts…" flow for heuristic misses.
+7. **Settings** — Reminder windows (→ screen 9), quiet hours, occasion notification time, Upcoming horizon, digest preview, Find duplicate contacts, notification permission status + re-prompt, entitlement card (trial countdown / unlock / restore purchases / tip jar, Phase 2), **Export my data** (JSON to Files), **Delete everything** (wipe DB + reset first-run), Transparency screen, "Behind the App" (journal link — the app's one outbound *user-initiated* Safari link; it does not violate §11 because it's `openURL` to the system browser, no in-app networking), Contact support (mailto with prefilled diagnostics), Onboarding replay.
+8. **Onboarding** — 3 screens: (a) concept sell ("who have you been meaning to call?"), (b) Contacts permission pre-prompt → system prompt, (c) optional Calendar pre-prompt + pick-your-first-3-contacts starter (search, set cadence+channel inline). Gated by `UserProfile.onboardingCompletedAt` in the launch path (shipped gap: only reachable from Settings preview, R14). Denial paths: Contacts denied → explainer + Settings deep link + browse-only mode.
+9. **Reminder Windows** (pushed from Settings; promoted to a first-class Features folder, decision #33) — **live editor**, not the shipped display-only mock (R9): day pills toggle `allowedDaysMask`, time ranges add/edit/remove with overlap validation, quiet-hours editor (wrap allowed), zero-capacity configs refuse to save with inline error, writes through `ReminderWindowRepository` and triggers `SchedulingPass.runFull()`.
 
-**Widget family (iOS WidgetKit + Android Glance):**
+Plus **Transparency** (static, shipped) under Settings — plain-language privacy proof with links out (wire the three inert "Open" rows to `openURL`, R15).
 
-- **Small widget** (2x2): top 3 overdue contacts, photo + name + "Xd overdue". Tap opens the app to that contact's detail screen. Refreshes on `TimelineProvider` cadence (iOS) / `GlanceAppWidget` update (Android) whenever the app updates state.
-- **Medium widget** (4x2): top 5 overdue with channel icons visible, designed so tapping a channel icon deep-links directly (iOS supports per-element tap targets via `widgetURL`; Android supports per-view `setOnClickPendingIntent`).
-- **iOS Lock Screen widget** (inline + circular variants, iOS 16+): count-only — *"4 overdue"*. Tap opens the app.
-- **Data access:** widget reads from a shared App Group container on iOS (shared SQLite file opened read-only) and direct shared DB read on Android. No IPC round-trip to the main app needed, so widget rendering stays under the platform's strict time budgets.
-- **Privacy:** no new permissions, no network, no widget-specific entitlements beyond App Groups (iOS). Widget respects the "data not collected" posture.
+**Widget family (Phase 2, §14):** small (top-3 overdue), medium (top-5 + per-icon deep links via `widgetURL`), Lock Screen circular/inline count. Reads a **read-only GRDB connection** on a shared App Group container (`group.com.sdahiya.regards`); main app calls `WidgetCenter.shared.reloadAllTimelines()` after every SchedulingPass. No network, no new permissions.
 
-State shape is identical across platforms — SwiftUI `OverdueViewState` and Compose `OverdueUiState` have the same fields in the same order.
+**Design system:** `RegardsDS` tokens (colors incl. WCAG-checked pairs in `RegardsPalette.contrastPairs`, typography, spacing) + primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`, `RegardsNavBar`). Rule: **no inert interactive-looking controls in shipped UI** — Phase 0's muted-stub convention (`RegardsNavBar` renders nil-handler actions as visibly disabled) was correct for a shell and is deprecated the moment the real affordance lands; every stub is enumerated in §19 and each Phase 1 PR must wire or remove the stubs in the screens it touches.
+
+**Accessibility is merge-blocking.** `RegardsAccessibilityTests` runs `performAccessibilityAudit()` per screen; structural categories (`elementDetection`, `sufficientElementDescription`, `trait`) gate today; sensory categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are carved out until PR34 flips `structuralAuditCategories` → all categories (tracked in `ios/docs/accessibility.md` "Sensory-audit carve-outs"). Every screen gets a row in that doc's audited table — Edit Contact is currently missing its row *and* its test (R16). Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) before any UI-touching merge. Dynamic Type through `accessibility5`, Reduce Motion respected (splash already does), 44×44pt targets.
 
 ## 11. Privacy & security — verifiable, not marketing
 
-The app's privacy claim is "no data collected, no call-home, ever." We stack technical, legal, and transparency guarantees so the claim is provable, not merely written in a footer.
+The claim: **"no data collected, no call-home, ever."** Stacked technical, legal, and transparency guarantees make it provable.
 
 ### Data handling inside the app
 
-1. **Contacts access is read + scoped-write, always local.** We read name, photo, phone numbers, email addresses, postal addresses, birthday, anniversary, and system identifier. We write only when the user explicitly edits a contact from the Edit Contact screen, and only the specific fields the user changed — never bulk-writes, never deletions, never merges in the system contact database. All writes happen on-device via `CNSaveRequest` / `ContactsContract`; no network is involved. This does require the expanded `WRITE_CONTACTS` permission on Android (in addition to `READ_CONTACTS`); on iOS, the same `NSContactsUsageDescription` covers both, but the usage-description string explicitly mentions "edit contacts from within Regards" so users grant informed consent.
-2. **Minimum necessary fields imported.** Name, photo, phone numbers, email addresses, postal addresses (for Holiday Pack in V1.1), birthday, anniversary date(s), system identifier. Nothing else.
-3. **Calendar access is local-only and optional.** When granted, we read events flagged as birthdays/anniversaries from the device Calendar (EventKit / CalendarContract). We do **not** write to Calendar, sync to any remote calendar service, or use any OAuth-based calendar API. Calendar permission can be denied or revoked without breaking the app — birthdays fall back to the Contacts source.
-4. **All data at rest is encrypted.**
-   - iOS: `NSFileProtectionCompleteUntilFirstUserAuthentication` on the DB file.
-   - Android: Room + SQLCipher, key in Android Keystore.
-5. **Data export / delete.** "Export my data" produces a JSON archive to the user's Files/Storage. "Delete everything" wipes DB + Keychain/Keystore entries + resets to first-run state.
-6. **Permission transparency.** Contacts and Calendar permissions are each preceded by a pre-prompt screen explaining the exact fields we read and why.
+1. **Contacts access is read + scoped-write, always local.** Read: name, photo, phones, emails, postal addresses, birthday, anniversary dates, system identifier. Write: only user-edited fields via `CNSaveRequest`, never deletions/bulk/merges. **Before PR27 ships write-back, `NSContactsUsageDescription` must be updated to mention in-app editing** (R17) — informed consent; current copy is read-only.
+2. **Minimum necessary fields imported.** Nothing beyond the list above.
+3. **Calendar access optional, local-only, read-only.** iOS 17 key: `NSCalendarsFullAccessUsageDescription` (add with PR30; consider read-only access level if the entitlement/API surface allows — we never write). Denial/revocation never breaks the app; birthdays fall back to Contacts.
+4. **All data at rest encrypted.** iOS: `NSFileProtectionCompleteUntilFirstUserAuthentication` on the DB (shipped in `DatabaseFactory.makeDatabase()`). Android: SQLCipher + Keystore.
+5. **Data export / delete.** JSON export to Files; "Delete everything" wipes DB + resets first-run.
+6. **Permission transparency.** Pre-prompt screens before each system prompt explaining exactly what we read and why.
 
 ### Technical anti-call-home guarantees
 
-**Android — nuclear-tier guarantee:**
-- **Do not declare `android.permission.INTERNET` in `AndroidManifest.xml`.**
-- Without this permission the Linux kernel denies socket creation to the app's UID. Network access is technically impossible — not just policy-forbidden. This is the single strongest guarantee we can make on any mobile platform.
-- Play Billing runs in a separate system process and does not require our app to hold INTERNET permission.
-- This rules out any SDK that requires network: no Firebase, no Crashlytics, no analytics, no ad SDKs, no remote config. We must enforce this in code review — any new dependency that needs INTERNET breaks the guarantee.
+**Android — nuclear tier:** no `android.permission.INTERNET` in the manifest → the kernel denies socket creation to the app's UID. Rules out any networked SDK forever. Enforced in code review + a manifest CI guard when `android/` exists.
 
-**iOS — strongest-available guarantee:**
-- Do not link `URLSession` / `Network.framework` code in our own modules. StoreKit is a separate OS-provided framework and exempt.
-- `Info.plist` ATS config:
-  ```xml
-  <key>NSAppTransportSecurity</key>
-  <dict>
-      <key>NSAllowsArbitraryLoads</key><false/>
-      <key>NSAllowsArbitraryLoadsInWebContent</key><false/>
-      <key>NSAllowsLocalNetworking</key><false/>
-  </dict>
+**iOS — strongest available:**
+- No networking symbols in our modules; **CI-enforced** by privacy-grep (§5). StoreKit is OS-provided and exempt.
+- ATS pinned in `ios/project.yml` (do not loosen):
+  ```yaml
+  NSAppTransportSecurity:
+    NSAllowsArbitraryLoads: false
+    NSAllowsArbitraryLoadsInWebContent: false
+    NSAllowsLocalNetworking: false
   ```
-- No networking background modes declared in capabilities.
-- Ship a `PrivacyInfo.xcprivacy` privacy manifest declaring zero tracking domains and zero data collected.
-- Omit `AppTrackingTransparency` code entirely — we're not tracking, so we don't need the prompt.
+- No networking background modes. No `AppTrackingTransparency` code at all (nothing to track).
+- `PrivacyInfo.xcprivacy` (at `ios/Regards/PrivacyInfo.xcprivacy`): `NSPrivacyTracking=false`, zero tracking domains, zero collected data types. **Before Phase 3 submission, populate `NSPrivacyAccessedAPITypes` with required-reason entries for what we actually touch** (file-timestamp APIs via SQLite/GRDB; `UserDefaults` if Phase 2 uses it — verify the then-current category list and reason codes against Apple's documentation at submission time; R18).
+- **Committed `Package.resolved`** pinning GRDB (R21): an app whose privacy story includes "audit the source" must have reproducible dependencies. Bumps are deliberate PRs (§21).
 
 ### Legal / store declarations
 
-- **App Store privacy nutrition label:** "Data Not Collected" across every category. ("Collected" specifically means transmitted off-device; local read/write of the user's own contacts is not collection under Apple's definition.)
-- **Play Store Data Safety form:** "No data collected" and "No data shared." The form separately asks whether the app accesses sensitive user data on-device — we answer yes (contacts, calendar) and that the data stays on-device.
-- Both platforms review these declarations; false claims are a rejection offense and retroactively a policy violation.
+- **App Store nutrition label: "Data Not Collected"** across every category ("collected" = transmitted off-device; local processing of the user's own data is not collection under Apple's definition).
+- **Play Store Data Safety:** "No data collected / no data shared"; on-device sensitive-data access disclosed as staying on-device.
+- False declarations are rejection offenses — these must be exactly right, and they can be, because they're true.
 
-### Transparency artifacts (what makes the claim credible)
+### Transparency artifacts
 
-1. **Source-available on GitHub under [Polyform Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).** The code is publicly readable, auditable, and forkable for personal / educational use — but commercial use and redistribution are legally forbidden. This gives ~95% of the trust benefit of full open source (researchers, journalists, and privacy-conscious users can audit every line) while retaining legal protection against commercial cloning. We *do not* call this "open source" publicly — it's "source-available" — because that's accurate and respects the OSI definition.
-2. **Published [Exodus Privacy](https://reports.exodus-privacy.eu.org/) report** for each Android release. Free automated tracker scan; a "0 trackers, 0 permissions-beyond-Contacts" report is marketable.
-3. **Network-capture demo.** One-page writeup + short video showing Proxyman / Little Snitch running during a full usage session — zero outbound connections outside StoreKit / Play Billing.
-4. **Reproducible Android builds** documented in the repo so a third party can rebuild the APK from source and compare hashes.
-5. **In-app "Transparency" screen** in Settings. In plain language: "This app cannot connect to the internet on Android. It has no networking code on iOS. Source code: [link]. Audit reports: [link]."
-6. **Privacy Guides submission.** [privacyguides.org](https://www.privacyguides.org/) has a strict review process aligned with our posture; acceptance is high-authority social proof in the privacy-conscious community. (Note: Privacy Guides historically prefers OSI-approved licenses; we'll need to make a case for Polyform-NC eligibility.)
-7. **Optional one-time third-party audit** (e.g., Cure53, Trail of Bits) once the app has traction and revenue. Not a V1 requirement; a "once we've made $5k" stretch goal.
-
-### License rationale (decision lock-in)
-
-We publish under Polyform Noncommercial, not MIT/Apache, for three reasons:
-- **Protection against commercial cloning.** Someone who lifts our code, rebrands, and ships on the App Store is infringing and subject to DMCA takedowns.
-- **No loss of privacy credibility.** Readers can still see every line; the source-available distinction matters to purists but not to end-user trust.
-- **Flexibility to relicense later.** If the app eventually justifies a fully open-source posture, we can dual-license or switch — the Noncommercial license is a floor, not a ceiling.
-
-Contributors will be asked to sign a CLA granting us relicense rights, so we retain the option to change terms later.
+1. **Source-available on GitHub** under PolyForm Noncommercial 1.0.0 — auditable by anyone; we say "source-available," never "open source" (OSI accuracy).
+2. **Exodus Privacy report** per Android release.
+3. **Network-capture demo** — Proxyman/Little Snitch video of a full session showing zero outbound connections beyond StoreKit; refreshed per major release (§21).
+4. **Reproducible Android builds** documented in-repo.
+5. **In-app Transparency screen** (shipped) restating all of this in plain language with working links (R15).
+6. **Privacy Guides submission** post-launch (their license preference is OSI — make the case honestly, accept the outcome).
+7. **Third-party audit** (Cure53/Trail of Bits class) as a "once revenue justifies it" stretch goal.
 
 ### What we explicitly do NOT claim
 
-- We don't claim Apple / Google don't collect OS-level telemetry about the app. They do, and that's outside our control.
-- We don't claim the app is "certified" by anyone official — there's no FDA-equivalent for app privacy. Our claim is that the *artifacts above* make the promise verifiable.
+- That Apple/Google collect no OS-level telemetry about the app (outside our control).
+- Any official "certification." The artifacts above make the promise *verifiable*; that's the whole claim.
 
-## 11a. Support & feedback mechanism
+## 11a. Support & feedback
 
-All channels are backend-free and cost $0–$12/year total.
-
-1. **`support@[app-domain]` via Cloudflare Email Routing.** Forwards to the developer's inbox. In-app "Contact support" button opens `mailto:` with a pre-filled subject `[{AppName} {version} / {OS} / {device}] ` and the body prepopulated with (non-identifying) diagnostic context the user can review and edit before sending.
-2. **GitHub Issues (public).** Because source is published on GitHub (under Polyform-NC), Issues becomes the bug tracker and feature backlog at no cost. Users can file, upvote, and watch.
-3. **Public roadmap** on a GitHub Projects board: Shipped / In Progress / Considering / Not Doing.
-4. **User-initiated diagnostic report.** When the user taps "Send diagnostics" the app assembles crash history + recent-errors + OS/device metadata into a `mailto:` draft the user reads before sending. We never collect automatically. This is the privacy-compatible alternative to Sentry/Crashlytics.
-5. **App Store & Play Store review responses.** For the first year, respond to every review publicly. High-leverage word-of-mouth signal.
-6. **Community channel (optional, Phase 4+).** A subreddit or Discord, launched only once there are ~500+ active users. Before that it's a ghost town.
-
-What we explicitly do NOT use:
-- Zendesk, Intercom, or any help-desk SaaS — overkill at our volume and a privacy risk.
-- In-app chat — requires a backend.
-- Automated crash reporting — violates the privacy guarantee.
+All backend-free: `support@` via Cloudflare Email Routing with an in-app `mailto:` (pre-filled subject `[Regards {version} / {OS} / {device}]`, user-reviewed diagnostic body — the privacy-compatible alternative to Crashlytics); public GitHub Issues as bug tracker + roadmap board (Shipped / In Progress / Considering / Not Doing); respond to every store review in year 1. No help-desk SaaS, no in-app chat, no automated crash reporting — each would break the posture. Community channel only at ~500+ active users.
 
 ## 11b. Build-in-public journal
 
-We document the build on **Substack**, biweekly, from before the first line of code is written through post-launch retrospectives. The journal is a customer-acquisition channel, a transparency artifact, and a design log.
+Documented on Substack (sdahiya.substack.com), biweekly baseline plus event posts on milestones, from before the first commit through post-launch.
 
-### Why Substack (vs. alternatives)
+**State as of 2026-07-01:** 3 posts published — #1 "Why I'm building Regards in the open" (Apr 15), #2 "The apps that came before Regards" (May 5), #3 "Designing reminders that respect your time" (May 12). Silent since. Post #4 (the audit-helper story) drafted but unpublished. Posts are canonical on Substack; `journal/` is gitignored scratch space for drafts.
 
-- Free, zero-maintenance, owns the email distribution.
-- Substack Recommendations network drives compounding discovery in the indie-dev / privacy-forward niche.
-- Cross-posts cleanly to Hacker News, Indie Hackers, r/SideProject, X/Bluesky.
-- Alternatives considered: Ghost (~$9/mo, overkill), blog on app domain (no discovery), Hashnode (wrong audience).
+**The restart calendar, drafts, and per-post outlines live in `journal/SCHEDULE.md`** (local, not committed). Summary: return post Jul 7 acknowledging the gap with the replan; then biweekly Tuesdays (audit-helper Jul 21, privacy-proof Aug 4, license Aug 11 as a deliberate pre-launch insert, deep-link catalog Aug 18, pricing Sep 8, birthdays Sep 22); event posts off-cycle (TestFlight ~Aug 14, launch Aug 31, 30-day retro Sep 30, Holiday Pack with V1.1 Oct 6).
 
-### Cadence & content mix
+**Editorial voice:** what I'm building and why — never what others get wrong. Appreciative, factual comparisons only. Every post links the repo, the app (once live), and 1–2 prior posts. Writing follows Sid's WRITING RULES doc (hard bans: em dashes, negative-parallelism reframes, analogies, metaphor verbs, throat-clearing, rule-of-three padding; numerals for numbers). Realistic target: ~400 subscribers at month 12; conversion beats list size.
 
-- **Biweekly** posts. Weekly sounds good and isn't sustainable past ~6 weeks.
-- Content buckets, roughly even split: (a) progress updates with numbers, (b) technical deep-dives (reminder-window algorithm, deep-link catalog, no-INTERNET-permission setup), (c) business decisions (pricing, licensing, naming), (d) user stories post-launch.
-
-### Editorial voice
-
-The journal talks about **what I'm building and why**, not **what others get wrong**. When other apps naturally come up (Fabriq, Garden, Catchup, Friend Reminder, Socially, Cloze, Contacts Journal, etc.), the tone is appreciative and additive: these apps proved people will pay attention to their relationships, and Regards exists because I wanted a slightly different slice — one-time purchase, verifiable no-cloud, deep-link heavy. Comparisons are factual and non-pejorative; no "they get it wrong, I get it right" framing. Readers sniff out competitive resentment instantly; genuine respect reads as confidence.
-
-### First-quarter editorial calendar
-
-| # | Post | Publish |
-|---|---|---|
-| 1 | "Why I'm building Regards in the open" — origin story + thesis | Before first commit |
-| 2 | "The apps that came before Regards" — appreciative tour of Fabriq, Garden, Catchup, Friend Reminder, Socially, Cloze, Contacts Journal; what each does well, and the specific slice Regards is aiming for | Week 2 |
-| 3 | "Designing reminders that respect your time" — reminder-window differentiator | Week 4 |
-| 4 | "No servers, no ads, no call-home: how to prove it" — privacy stack deep-dive | Week 6 |
-| 5 | "Choosing a source-available license" — the Polyform decision | Week 8 |
-| 6 | "Deep-linking into 12 messaging apps" — §8 table as standalone post (SEO magnet) | Week 10 |
-| 7 | "Pricing Regards at $4.99: the math and the feeling" — one-time vs subscription economics, framed as a bet on a different customer, not a critique of subscriptions | Week 12 |
-| 8 | "First TestFlight build" | On TestFlight milestone |
-| 9 | "Launch day" | On public launch |
-| 10 | "First 30 days with Regards" — retro with real numbers | 30 days post-launch |
-| 11 | "Reading birthdays without phoning home" — how Calendar + Contacts give us annual reminders without ever touching a network | Anchor post for v1.0 birthdays feature |
-| 12 | "A holiday card list, no spreadsheet wrangling" — V1.1 Holiday Pack launch | Early October (paired with V1.1 ship) |
-
-### Integration with the app and repo
-
-- Settings → "Behind the App" opens the journal in Safari / Chrome.
-- App Store + Play Store listings link to the journal.
-- Landing page has "Follow the build journal" above the fold.
-- GitHub README header links to the journal.
-- Every journal post links to: the app download, the GitHub repo, and the previous 1–2 related posts. This is the compounding loop.
-
-### Realistic target
-
-~400 email subscribers at the 12-month mark. The journal converts readers to customers — engagement matters more than list size.
+**Integration:** Settings → "Behind the App"; store listings link the journal; README header links it; landing page above the fold.
 
 ## 12. Module / package layout
 
-### iOS (single Xcode project, SPM modules) — primary platform
+### iOS — as built today + planned additions (single Xcode project via XcodeGen)
 
 ```
-Regards/
-  App/                 — entry, DI
-  Features/
-    Overdue/
-    Upcoming/
-    Contacts/
-    ContactDetail/
-    EditContact/
-    MergeDuplicates/
-    Onboarding/
-    Settings/
-    Paywall/
-  Widget/              — WidgetKit extension target, reads from App Group shared container
-  Domain/              — Contact, ContactGroup, Cadence, ReminderWindow, ReminderEngine, ChannelCatalog, DeepLinkBuilder, DuplicateDetector
-  Data/                — GRDB schema, migrations, repositories, ContactsWriter (CNSaveRequest wrapper)
-  Platform/
-    ContactsImport/
-    CalendarImport/
-    Notifications/
-    DeepLinks/
-    Billing/           — StoreKit 2
-  RegardsTests/
-  RegardsUITests/
+ios/
+  project.yml                     — XcodeGen source of truth; NEVER hand-edit the xcodeproj
+  Regards/
+    App/                          — RegardsApp (@main), AppEnvironment (DI), tab root, screen factories
+                                    [Phase 1C adds: SchedulingPass]
+    Domain/                       — pure Swift, CI-guarded (§5)
+      Contact.swift, ContactGroup (in Contact.swift), ScheduledReminder.swift,
+      InteractionLog.swift, UserProfile.swift, ReminderWindow.swift,
+      TimeOfDay.swift, DayOfWeek.swift, Contact+Accessibility.swift
+      Channels/                   — Channel.swift, ChannelCatalog.swift, DeepLinkBuilder.swift
+      Reminders/                  — ReminderEngine.swift, DuplicateDetector.swift
+    Data/                         — DatabaseFactory, DatabaseMigrator (v1, v2…), Records, Repositories,
+                                    MockRepositories
+    Platform/
+      Contacts/                   — ContactsSource (CNContactStore adapter), ContactsImporter
+                                    [PR21 adds reconciliation; PR27 adds ContactsWriter]
+      Notifications/              — [PR24] NotificationScheduling adapter (UNUserNotificationCenter)
+      Calendar/                   — [PR30] CalendarSource (EventKit)
+      DeepLinks/                  — [PR26] DeepLinker (UIApplication.open)
+      Billing/                    — [PR32] StoreKit 2 entitlement service
+    DesignSystem/                 — RegardsDS tokens, RegardsColors (+contrastPairs), Primitives/
+    Features/
+      Overdue/  Upcoming/  Contacts/  ContactDetail/  EditContact/
+      MergeDuplicates/  ReminderWindows/  Onboarding/  Settings/ (incl. TransparencyScreen)
+      Shared/                     — RegardsNavBar etc.
+      Paywall/                    — [PR32]
+    Resources/                    — Info.plist (generated), Assets.xcassets
+    PrivacyInfo.xcprivacy         — privacy manifest (note: lives at Regards/ root, not Resources/)
+  RegardsWidget/                  — [PR31] WidgetKit extension target (App Group, read-only DB)
+  RegardsTests/                   — swift-testing unit bundle (Domain, Data, Platform fakes, VMs)
+  RegardsAccessibilityTests/      — XCUITest audit bundle (merge-gating)
+  RegardsUITests/                 — placeholder; NOT in the default test plan (repurpose or delete, R22)
+  docs/                           — accessibility.md, accessibility-smoke.md
+  scripts/                        — audit-stress.sh (5× local audit runs before UI-test pushes)
 ```
 
-### Android (multi-module Gradle, Kotlin DSL) — follow-on port after iOS launch
+Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All feature code talks to `any *Repository` protocols — never concrete GRDB types — so the mock↔production swap stays a one-line change in `RegardsApp`.
+
+### Android (follow-on; unchanged plan)
 
 ```
-:app                    — entry, Hilt, nav graph
-:feature:overdue
-:feature:upcoming
-:feature:contacts
-:feature:contact-detail
-:feature:edit-contact
-:feature:merge-duplicates
-:feature:onboarding
-:feature:settings
-:feature:paywall
-:widget                 — Glance AppWidget
-:domain                 — pure Kotlin (port of iOS Domain module; same entities, same rules, same tests)
-:data                   — Room, SQLCipher, ContactsContract writer
-:platform:contacts
-:platform:calendar
-:platform:notifications
-:platform:deeplinks
-:platform:billing       — Play Billing Library 7
+:app  :feature:{overdue,upcoming,contacts,contact-detail,edit-contact,merge-duplicates,onboarding,settings,paywall}
+:widget  :domain (pure Kotlin port of iOS Domain + same tests)  :data (Room+SQLCipher)
+:platform:{contacts,calendar,notifications,deeplinks,billing}
 ```
 
 ## 13. Testing strategy
 
-- **Domain layer: 100% unit-test coverage.** The reminder-window scheduler has real edge cases (DST, timezone changes, contiguous-range collapse, same-day cadence, midnight boundaries). A pure-function test suite pays back within a week.
-- **Platform adapters:** contract tests + fakes for the Contacts reader, notification scheduler, and deep linker. Integration test on emulator/simulator that an `SCHEDULE_EXACT_ALARM` denial gracefully falls back to WorkManager.
-- **Deep-link catalog test:** parametric test — one entry per channel — that asserts the builder produces the expected URL for a canned (channel, value) input. Catches typos in Info.plist or manifest.
-- **UI snapshot tests** for Overdue, Upcoming, Contact Detail, Edit Contact, Merge Duplicates, Onboarding, and Widget across state permutations (empty, lots-of-contacts, past-due, all-caught-up, trial-expired, post-purchase).
-- **StoreKit / Play Billing** tested with sandbox accounts + CI smoke that restore-purchases works from a fresh install.
+**Shipped suites (census 2026-07-01):** ReminderEngineTests (14), ContactsImporterTests (13), RepositoriesTests (10), AnnualRecurrenceTests (9), DuplicateDetectorTests (8), DeepLinkBuilderTests (7), DatabaseMigratorTests (5), ContactAccessibilityTests (5), OverdueViewModelTests (4, incl. solid spring-forward day-count regressions), ColorContrastTests (3), placeholder (1) — 79 tests in the unit bundle. Plus 13 XCUI audit tests (11 screen audits + 1 navigation-distinctness regression + launch), and 1 placeholder in the out-of-plan `RegardsUITests` target.
 
-## 14. Phased roadmap
+**Standing requirements:**
 
-The app ships on **iOS first, Android second**. Rationale: Apple's review cycle is longer and more variable, so starting iOS gives us earlier feedback; the domain layer developed for Swift serves as a validated reference when we port to Kotlin (same entities, same scheduling rules, same tests — a test-suite-driven port is faster than greenfield); going single-platform-at-a-time keeps the scope focused. We retain the "native on both platforms, no KMP" decision — porting is fine, shared code is not the goal.
+- **Domain: exhaustive unit coverage, CI-enforced floor.** PR19 adds a coverage gate: ≥95% line coverage on `ios/Regards/Domain/**` via `xccov` in the unit-tests job (the v0.5 "100%" aspiration meets reality at 95% + mandatory tests for every listed edge case). The floor may only go up.
+- **Engine edge cases that MUST have tests after PR16** (each currently missing and each guards a shipped or latent defect): a window **on** a DST transition day (US 2026 transitions Mar 8 / Nov 1 are Sundays — the shipped tests use weekday-only windows and dodge the bug; add Sunday-inclusive windows and a synthetic zone like `Australia/Lord_Howe` for the 30-min case), fall-back duplicated-hour disambiguation, spring-forward nonexistent slot-start, midnight-boundary walk, contiguous-range collapse, wrap-rejection validation, degenerate-window → nil, quiet-hours-consume-everything → nil, same-day-late occasion fires today, never-contacted anchor = createdAt, slot-start snapping equality.
+- **Deep-link parametric completeness:** one case per `Channel` (a test asserts the parametric list covers `Channel.allCases`), plus the property `isValid ⟹ build != nil`, plus the specific regressions: facetime-email, m.me URL, `@handle` telegram, non-http custom scheme.
+- **SchedulingPass (PR25):** fake repos + fake `NotificationScheduling`; assert idempotence, orphan cancellation, group-collapse (one reminder per group), digest identity stability, 60-cap behavior.
+- **Migrations:** fresh-create and v1→v2 upgrade round-trips for every table; migration tests may never be deleted, only added.
+- **Repositories:** contract tests run against both `MockRepositories` and GRDB implementations (shared assertions) so mocks can't drift from production semantics (R23).
+- **ViewModels:** every VM gets a unit suite (Upcoming/ContactDetail/MergeDuplicates are missing today, R24).
+- **Snapshot tests (PR34, decision #34):** adopt `pointfreeco/swift-snapshot-testing` (test-target-only dependency — it never enters app sources, so no privacy-grep implications) for the 9 screens × key states (empty / populated / all-caught-up / trial-expired / post-purchase). The `ios-ci.yml` snapshot placeholder comment becomes a real job.
+- **StoreKit (PR32):** StoreKitTest configuration file + sandbox smoke: purchase, restore-from-fresh-install, trial expiry math.
+- **Accessibility:** audit suite stays merge-blocking; `ios/scripts/audit-stress.sh` (5 consecutive runs) locally before any UI-test push; audit-stress workflow does the same per PR. Test-pattern rule (learned the hard way, PR #11/#12): don't `waitForExistence` on predicate-matched queries; plain element queries for waits, predicates for read-after-known.
+- **Manual:** VoiceOver smoke per `ios/docs/accessibility-smoke.md` before UI-touching merges; a 5k-contact synthetic address book performance pass in Phase 2 (R25).
 
-### iOS track (primary)
+## 14. Phased roadmap — rebaselined 2026-07-01
 
-**iOS Phase 0 — Domain + UI shell (2 weeks)**
-- Data model, migrations, repositories (GRDB).
-- Domain layer including ReminderEngine with full unit tests.
-- Eight-screen nav shell with mock data.
-- No system integrations yet (Contacts, Calendar, notifications, widgets are mocked).
+**History:** Phase 0 shipped on plan (PRs #1–#5, Apr 19 – May 3). Phase 1 started (PR #9 GRDB wiring, PR #10 Contacts plumbing, May 3–6) and stopped 2026-05-06. Nothing merged since. The original late-June launch is dead; this section replaces it.
 
-**iOS Phase 1 — Core integrations (3 weeks)**
-- Contacts permission (read + write) + import flow.
-- Calendar permission (optional) + birthday ingestion.
-- Reminder-window configuration UI.
-- Local notification scheduling end-to-end (cadence + annual-recurrence paths).
-- Deep-link catalog for every channel in §8.
-- Edit Contact screen with `CNSaveRequest` write-back.
-- Merge Duplicates screen with local heuristic.
-- Onboarding flow.
+**Anchor: public App Store launch Monday 2026-08-31.** Working assumption ~15–20 focused hours/week of agent-assisted development. V1.1 Holiday Pack keeps its early-October window (6–8 weeks before peak card-ordering). If any week slips ≥1 full week, cut in this order: PR35 localization scaffolding → medium widget (ship small+lock only) → snapshot breadth (keep 4 core screens). Never cut: accessibility gates, privacy invariants, the §9 contract.
 
-**iOS Phase 2 — Widget + monetization + polish (2 weeks)**
-- WidgetKit widgets (small, medium, Lock Screen) reading from App Group shared container.
-- StoreKit 2 integration with geo-tiered pricing configured in App Store Connect.
-- 7-day trial flow, paywall, tip jar.
-- Accessibility pass (Dynamic Type, VoiceOver, Reduce Motion respect).
-- Localization scaffolding (English at launch; strings wrapped for later language packs).
+### Phase 1R — Remediation (Jul 6–10) — fix what's wrong before building on it
 
-**iOS Phase 3 — Submission & launch (1–2 weeks elapsed, mostly Apple wait time)**
-- App Store Connect listing + Privacy Nutrition Label.
-- `PrivacyInfo.xcprivacy` manifest.
-- TestFlight internal → external beta.
-- Public launch: Product Hunt, indie press, Substack "launch day" post.
+| PR | Scope | Key acceptance criteria |
+|---|---|---|
+| **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
+| **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test; parametric covers `allCases` | R2, R7 closed |
+| **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R19, R20, R27–R29 closed; audit-stress 5/5 green ×3 consecutive runs |
+| **PR19** | Repo + CI hygiene: commit `Package.resolved`; `git worktree prune` + delete stale worktree/branches; root-markdown link-check job; Domain coverage floor (≥95%); guard hardening (add `Network` to domain-purity, `NSURLConnection|CFSocket` to privacy-grep); remove dead SwiftLint `function_body_length` config; seed mocks with a ContactGroup + InteractionLogs + an occasion so all UI states are reachable/auditable; delete `.git/t9FBrGy` | R21, R30–R34 closed; all 4 workflows green |
 
-**iOS total elapsed: ~8 weeks of dev + Apple review buffer.**
+### Phase 1B — Production wiring (Jul 13–17) — the mock era ends
 
-### Android track (follow-on, starts after iOS public launch)
+| PR | Scope | Key acceptance criteria |
+|---|---|---|
+| **PR20** | Flip `@main` to `AppEnvironment.makeProduction(database: DatabaseFactory.makeDatabase())`; migration `v2` (§7 columns); first-launch import flow; onboarding gate via `onboardingCompletedAt`; splash transitions on actual load completion | Fresh install on device: onboarding → Contacts permission → import → populated tabs. Mock path stays for previews/UI tests via launch argument |
+| **PR21** | Reconciliation: launch/foreground + `CNContactStoreDidChange` re-import; archive-on-delete; refresh names/photos/handles (`phonesJson`/`emailsJson`); importer per-row fault tolerance (R35) | Delete/re-add/rename a contact in the system app → Regards reflects it next foreground; history survives archive |
+| **PR22** | The core loop: Caught up / Snooze / Log-other wired everywhere (Detail buttons, Overdue+Upcoming swipe actions) → `InteractionRepository.append` + `lastInteractedAt` + targeted SchedulingPass stub (DB-only until PR25); stable row identities (R36) | Marking caught-up moves the contact out of Overdue instantly and logs an interaction; snooze pushes 7 days; VM tests |
+| **PR23** | Reminder-window persistence: ReminderWindows screen becomes a live editor (days/ranges/quiet-hours/occasion-time/horizon), writes via `ReminderWindowRepository`, zero-capacity refuses save; Upcoming/Overdue read the real global window + per-contact overrides (R9) | Edited windows survive relaunch and visibly re-shape Upcoming |
 
-**Android Phase 0 — Port domain + UI shell (1.5 weeks)**
-- Re-implement the domain layer in pure Kotlin, driven by the iOS test suite translated to JUnit. Same types, same rules, no algorithmic drift.
-- Room + SQLCipher schema matching the iOS GRDB schema.
-- Compose nav shell for the eight screens.
+### Phase 1C — Notifications end-to-end (Jul 20–24) — the product starts existing
 
-**Android Phase 1 — Core integrations (2.5 weeks)**
-- ContactsContract read + scoped-write.
-- CalendarContract (optional).
-- `AlarmManager.setExactAndAllowWhileIdle` scheduling + WorkManager fallback.
-- Deep-link catalog (intent-based where possible, HTTPS universal links where available).
-- Edit Contact + Merge Duplicates screens.
-- Onboarding.
+| PR | Scope | Key acceptance criteria |
+|---|---|---|
+| **PR24** | `Platform/Notifications` adapter (`NotificationScheduling`), permission pre-prompt + request in onboarding step (c) and Settings, notification categories/actions (Caught up / Snooze / open) | Local notification fires on device at a window boundary; actions round-trip |
+| **PR25** | `SchedulingPass` actor: full + targeted runs, digest batching (slot-start snapping, `digest-{epoch}` identity), occasion scheduling from Contacts source, no-double-up rule, orphan cancellation, launch/foreground reconcile; Upcoming switches to `ValueObservation` over persisted rows (R10); live digest labels (R11) | Idempotence + reconcile tests green; airplane-mode device test: overdue contact → digest at next window open |
+| **PR26** | Deep-link execution: `DeepLinker` adapter, channel taps wired in all 4 surfaces, notification tap-through routing (digest → Overdue; single → Contact Detail), `LSApplicationQueriesSchemes: [discord]`, `reminder_tap` interaction logging | Tapping WhatsApp row on device opens WhatsApp to the contact; R37 closed |
 
-**Android Phase 2 — Widget + monetization + polish (1.5 weeks)**
-- Glance widgets.
-- Play Billing Library 7 with geo-tiered pricing configured in Play Console.
-- Accessibility (TalkBack, large-text support).
+### Phase 1D — Editing, merging, onboarding, calendar (Jul 27–31)
 
-**Android Phase 3 — Submission & launch (1 week)**
-- Play Console listing + Data Safety form.
-- Exodus Privacy report published.
-- Internal → closed → open testing.
-- Public launch: cross-posted to Substack, r/androidapps, DroidCon communities.
+| PR | Scope | Key acceptance criteria |
+|---|---|---|
+| **PR27** | Edit Contact: real form, dirty-field tracking, partial `CNSaveRequest` write-back via `ContactsWriter`, re-fetch after save, nav trap fixed (R13), write-denied state, `NSContactsUsageDescription` reworded (R17) | Edit phone on device → visible in system Contacts app; only touched fields written; audit test added |
+| **PR28** | Merge for real: confirm→`ContactGroup` write, group-aware SchedulingPass (one reminder/group, member-max interaction), one-row-per-group in Overdue/Upcoming, unmerge, persistent skip, manual link, detector fed full handle sets (R12) | Two "Mom" entries → one reminder; unmerge restores; group chip reachable and audited |
+| **PR29** | Onboarding: 3-screen flow in launch path (R14), pre-prompts, first-3-contacts starter, denial paths | Fresh-install TestFlight-ready first-run |
+| **PR30** | Calendar birthdays: `CalendarSource` (EventKit), `NSCalendarsFullAccessUsageDescription`, source merge (Contacts wins), Settings toggle, importer maps `SystemContact.birthday` (closing the fetched-then-dropped gap) | Calendar-only birthday appears in Upcoming; revoking permission degrades gracefully |
 
-**Android total elapsed: ~6 weeks after iOS launch.**
+### Phase 2 — Widget, monetization, polish (Aug 3–14)
 
-### V1.1 — Holiday Pack (target: September drop, ahead of holiday-card season)
-- **Christmas / holiday card list export.** Generate CSV (and optionally XLSX) of tracked contacts with mailing addresses, formatted to match Shutterfly / Minted / Zola / Paper Culture address-book import schemas (First, Last, Address1, Address2, City, State, Zip, Country).
-- **Address editing UI** — surfaces the postal-address fields from system Contacts (`CNPostalAddress` / `StructuredPostal`) so users can review and fill gaps before exporting. Edits write back to system Contacts (with explicit user confirmation per record), keeping system Contacts as the source of truth.
-- **Holiday list curation** — let the user pick "this contact gets a card" as a separate flag from "tracked for reminders" (Aunt Marge gets a card every year but doesn't need a monthly check-in reminder).
-- Why September: gives users 6–8 weeks of lead time before peak Shutterfly ordering season (early-to-mid November), and gives us a clean "feature shipped for the holidays" Substack post in early October. Also avoids the November content traffic-jam from every other indie dev's holiday push.
+| PR | Scope | Key acceptance criteria |
+|---|---|---|
+| **PR31** | Widget target: `RegardsWidget` in project.yml, App Group (`group.com.sdahiya.regards`), DB relocation to group container (+ migration of existing store), read-only widget queries, small/medium/lock variants, `reloadAllTimelines()` after SchedulingPass | Widgets live on device; app-group migration preserves data across update |
+| **PR32** | StoreKit 2: entitlement service (`Platform/Billing`), trial state machine (`trialStartedAt`), Paywall screen, soft-lock on expiry (read-only + banner, never data loss), tip jar, Restore, StoreKitTest suite | Sandbox purchase/restore/expiry all pass; zero StoreKit imports outside `Platform/Billing` + Paywall |
+| **PR33** | Settings completion: export JSON, delete-everything (+ confirmation), support mailto with diagnostics, Behind-the-App link, entitlement card | Export produces valid JSON of all 6 tables; delete returns to onboarding |
+| **PR34** | Accessibility + visual hardening: fix sensory findings (ScaledMetric on fixed-size glyphs, contrast leftovers, hit regions), flip audit to **all** categories, snapshot tests (9 screens × states) + CI job, Dynamic Type pass to accessibility5 | Full-category audit green ×5 stress runs; snapshot job gating |
+| **PR35** | Localization scaffolding (String Catalog, en at launch), 5k-contact performance pass (move CNContact enumeration off the cooperative pool, R25), final copy pass | Cold start <2s with 5k contacts on an A15 device |
 
-### V2 candidates (explicitly not V1)
-- **Talking points / conversation queue.** A running list of things the user wants to bring up next time they talk to a specific contact (e.g., *"ask about her new job"*, *"share photo from the trip"*, *"follow up on his dad's surgery"*). Items can be added any time from Contact Detail, from a share-sheet action on another app ("remember to tell Priya about this article"), or via Siri/Google Assistant shortcut. When the reminder fires for that contact, the notification preview surfaces the count (*"3 things to bring up with Priya"*) and tapping it opens a talking-points list before deep-linking out to the chosen channel. After the interaction, the user can tick items off individually or bulk-clear with the "Caught up" action. Data model: new `TalkingPoint` table keyed by `contactId` (or `contactGroupId` when the contact is part of a virtual merge), with `body`, `createdAt`, `discussedAt?`, and `source` ('manual' | 'share_sheet' | 'siri'). Stored locally and encrypted at rest like the rest of the DB; private to Regards — never written to system Contacts. The **surface-at-reminder-time** behavior is the differentiator vs. competitors' static-notes implementations, and fits the app's "lower the friction to actually reaching out" thesis.
-- Email integration (Gmail + Outlook via OAuth, metadata-only).
-- Telegram integration via TDLib.
-- Android SMS + call log integration.
-- iOS Share Extension / Android Share Intent for logging from other apps.
-- iCloud / Google Drive-backed sync across devices.
-- Contact "streaks" & stats (Plus teaser).
-- ICS file import as a fallback for users with non-standard calendar setups.
-- Full localization for top-5 non-English languages (ES, PT-BR, JA, DE, FR) once we have data on which markets convert best.
-- Apple Watch / Wear OS companion app.
+### Phase 3 — Submission & launch (Aug 17–31)
+
+- **Aug 14 (Fri):** feature freeze. Internal TestFlight build 1.0.0 (bump from 0.1.0, decision #35). §20 pre-submission checklist run 1.
+- **Aug 17–28:** external TestFlight (beta review takes 1–3 days; submit the external group Aug 14). Recruit 10–20 testers (journal readers — the TestFlight post is the ask). Daily triage; only P0/P1 fixes merge during freeze.
+- **Aug 24 (Mon):** submission candidate build. Full §20 checklist run 2: listing metadata, nutrition label, PrivacyInfo required-reason entries, screenshots, review notes (include "this app has no network code by design; you will observe zero outbound traffic; source: github.com/sid78669/RegardsMobileApp").
+- **Aug 26 (Wed):** submit for review with manual release. Review historically 24–72h; rejection playbook in §20.
+- **Aug 31 (Mon):** release. Launch-day post publishes; Product Hunt same morning; press kit (§20) goes to the privacy-press list.
+
+### V1.1 — Holiday Pack (Sep 1 – Oct 6)
+
+CSV/XLSX holiday-card export matched to Shutterfly/Minted/Zola/Paper Culture address-import schemas; address-editing UI on the PR27 write-back rails; per-contact "gets a card" flag independent of tracking. Ships with journal post #14. September window preserved by the Aug 31 launch.
+
+### Android track (Q4 2026, after iOS stabilizes)
+
+Port order and estimates unchanged from v0.5 (~6 weeks: domain port driven by the Swift test suite → Compose shell → integrations → Play submission with the no-INTERNET manifest as the marquee artifact). Start gate: iOS crash-free ≥99.5% over 2 weeks and support volume < 30 min/day.
+
+### V2 candidates (unchanged, still explicitly not V1)
+
+Talking points / conversation queue (the surface-at-reminder-time twist stays the differentiator); email metadata integration; TDLib; share-sheet logging; device-sync via iCloud/Drive; streaks; ICS import; top-5 localization; watch/Wear companions.
 
 ## 15. Open questions
 
-1. **Android exact-alarm permission (Android track).** Will users grant `SCHEDULE_EXACT_ALARM`? If denial rate is high, reminder precision suffers. Measure in Android closed beta; consider a clear onboarding card explaining why the app asks.
-2. **Discord user IDs.** Without an easy way for users to obtain their contacts' Discord user IDs, deep linking into a specific DM is unreliable. V1 behavior: open Discord generically with a note showing the username. Acceptable?
-3. **Contacts WRITE permission acceptance rate.** Adding write access expands what the permission prompt says. Some users may decline. Fallback: if write is denied, Edit Contact screen shows a "this requires Contacts write permission" state with a direct link to Settings. Measure decline rates in iOS TestFlight; if high, consider splitting into separate read and write prompts.
-4. **Duplicate-detection heuristic tuning.** Starting with name + phone/email match. We need to test on real address books (contacts with shared family emails, contacts with international phone formatting) to tune false-positive vs false-negative rates. Add instrumentation (local-only counters, never exfiltrated) for how many suggestions are accepted vs dismissed so we can iterate the algorithm.
-5. **Widget refresh cadence.** iOS WidgetKit budgets timeline updates aggressively. If overdue-list changes more often than the budget allows updates, the widget lags. Mitigation: also trigger a timeline reload via `WidgetCenter.shared.reloadAllTimelines()` from the main app whenever it updates state, so the widget stays fresh while the main app is actively used.
-6. **Geo-tier reconciliation over time.** FX rates drift; Tier D markets could drift into "too cheap" or "now reasonable" territory. Decision: review Apple/Google auto-pricing quarterly for the first year, then annually. Document the review in a Substack post so the pricing stays transparent.
-7. **Android launch timing vs iOS feedback.** Rigid iOS-first means Android users wait ~3 months. Risk: Android-first would-be buyers forget or find alternatives. Mitigation: capture email on the landing page for "notify me when Android ships."
+1. **Android exact-alarm permission** — measure denial in Android beta (unchanged).
+2. **Discord user IDs** — V1 opens Discord generically without an ID; acceptable? Revisit with user feedback.
+3. **Contacts WRITE acceptance** — iOS asks read+write in one prompt; if TestFlight shows denial spikes, split the ask (read at onboarding, write on first edit).
+4. **Duplicate-heuristic tuning** — local-only accept/dismiss counters exist per §7; review after 4 weeks of real use.
+5. **Widget refresh cadence** — `reloadAllTimelines()` after each SchedulingPass should suffice; verify WidgetKit budget behavior in TestFlight.
+6. **Geo-tier drift** — quarterly pricing review year 1 (§21).
+7. **Xcode 26 / iOS 26 timing** — decide the submission toolchain at Phase 3 entry; if the fall OS ships before Aug 31, smoke-test on the GM before release (§21).
+8. ~~Android launch timing~~ → resolved into the Q4 start gate above.
 
 ## 16. Decisions log
+
+Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remain binding; #23+ added at the v1.0 rebaseline.
 
 | # | Decision | Date | Rationale |
 |---|---|---|---|
@@ -711,30 +655,228 @@ The app ships on **iOS first, Android second**. Rationale: Apple's review cycle 
 | 4 | Reminder-window gating is first-class | 2026-04-15 | Unique positioning vs. Dex/Covve/Smart Contact Reminder. |
 | 5 | Universal HTTPS deep links preferred over custom schemes | 2026-04-15 | Graceful web fallback; fewer Info.plist declarations. |
 | 6 | Batched digest notification, not per-contact | 2026-04-15 | Per-contact nags get the app silenced. |
-| 7 | One-time $4.99 + tip jar, no subscriptions, no ads ever | 2026-04-15 | Local-only app; subscription would be dishonest. Tip jar captures supporter goodwill. |
-| 8 | No free tier with contact caps; 7-day trial instead | 2026-04-15 | Caps feel punitive; trust-forward positioning requires trusting the user with the full app. |
+| 7 | One-time $4.99 + tip jar, no subscriptions, no ads ever | 2026-04-15 | Local-only app; subscription would be dishonest. |
+| 8 | No free tier with contact caps; 7-day trial instead | 2026-04-15 | Caps feel punitive; trust the user with the full app. |
 | 9 | Android: no `INTERNET` permission; iOS: ATS-deny + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; verifiable-by-source on iOS. |
-| 10 | Source-available on GitHub under Polyform Noncommercial 1.0.0 | 2026-04-15 | ~95% of the privacy-claim credibility of MIT/Apache, with legal protection against commercial cloning. |
-| 11 | Support via mailto:, GitHub Issues, manual diagnostics; no SaaS help desk | 2026-04-15 | Backend-free; preserves the zero-data-collection posture. |
-| 12 | Named the app **Regards** (working title "Stay In Touch" conflicted with Fabriq's subtitle) | 2026-04-15 | Chose from shortlist after checking App Store / Play Store / trademark collisions. Rejected: Wick (dating-app vibe), Kept (too vague standalone), Ember/Kith/Tend/Hearth/Cairn/Recall/Keepsake/Lore/Revere (all taken in adjacent categories), Sincerely (crowded by *Sincerely - Off My Chest*). Regards wins on clarity, warmth, and searchability. |
-| 13 | Document the build publicly on Substack, biweekly | 2026-04-15 | Customer-acquisition channel + transparency artifact + design log. |
-| 14 | Birthday & anniversary reminders ship in V1, not V2 | 2026-04-15 | Table-stakes for the category. Both platforms expose dates from system Contacts for free; scope increment is modest (new `kind` on ScheduledReminder + annual-recurrence path). |
-| 15 | Calendar access is local-only via EventKit / CalendarContract; OAuth calendar integrations (Google, Outlook, Facebook) are permanently out-of-scope | 2026-04-15 | OAuth calendar would require INTERNET permission on Android and break ATS-deny on iOS, collapsing the verifiable-privacy guarantee. Users whose birthdays live in Google Calendar can subscribe via their device Calendar app, which we read locally — transitive coverage, no compromise. |
-| 16 | Holiday card export shipped as V1.1 in September, not bundled into V1 | 2026-04-15 | Single-season utility, narrow use case, depends on address data most users haven't populated. Better as a focused "shipped for the holidays" drop with 6–8 weeks lead time before peak Shutterfly ordering. |
-| 17 | V1 includes in-app contact editing with write-back to system Contacts | 2026-04-15 | Needed to support address editing for V1.1 Holiday Pack; also a standalone quality-of-life win. Writes stay on-device (CNSaveRequest / ContactsContract) so privacy posture is unchanged. Adds WRITE_CONTACTS permission to Android manifest. |
-| 18 | V1 includes virtual-merge duplicate detection; system Contacts are never modified for merges | 2026-04-15 | Users with messy address books generate duplicate reminders without this. Virtual merge via a local `ContactGroup` table avoids touching the user's authoritative contacts database. |
-| 19 | V1 includes WidgetKit / Glance widget | 2026-04-15 | Moved up from V1.1 per user request. Small scope, no new permissions, reads via App Group shared container. Significant retention boost per indie-app pattern. |
-| 20 | iOS ships first; Android follows after iOS public launch | 2026-04-15 | Apple review cycle is longer and more variable; starting iOS gives earlier market feedback. Domain layer built for Swift becomes the validated reference for the Kotlin port. No KMP — we port, not share. |
-| 21 | Pricing is geo-tiered via Apple/Google auto-pricing, anchored on $4.99 US (Tier A) down to $0.99 (Tier D) | 2026-04-15 | Flat $4.99 globally prices out emerging markets where the privacy pitch resonates strongly (India, Brazil, Indonesia). PPP-adjusted tiers expand addressable market without adding operational cost (platforms handle the conversion). |
-| 22 | Talking points / conversation queue deferred to V2 | 2026-04-19 | Common feature in the category (Dex has "notes per contact", Monica has "things to remember", UpHabit pre-pivot had "talking points", Cloze surfaces notes with reminders). Meaningful value, but additive to the core reminder loop — V1 ships fine without it. Keep V1 scope tight; the Regards-specific twist worth preserving for V2 is surfacing the list *at reminder time*, which is rare in the category and reinforces the "lower friction to reaching out" thesis. |
+| 10 | Source-available under PolyForm Noncommercial 1.0.0 | 2026-04-15 | ~95% of the credibility of MIT/Apache with protection against commercial cloning. |
+| 11 | Support via mailto:, GitHub Issues, manual diagnostics | 2026-04-15 | Backend-free; preserves zero-data-collection. |
+| 12 | Named the app **Regards** | 2026-04-15 | Clarity, warmth, searchability; shortlist rejections documented in v0.5. |
+| 13 | Build documented publicly on Substack, biweekly | 2026-04-15 | Acquisition channel + transparency artifact + design log. |
+| 14 | Birthday & anniversary reminders in V1 | 2026-04-15 | Table stakes; modest scope on top of ScheduledReminder. |
+| 15 | Calendar via local EventKit/CalendarContract only; OAuth calendar permanently out | 2026-04-15 | OAuth would collapse the verifiable-privacy guarantee. |
+| 16 | Holiday card export = V1.1 (September), not V1 | 2026-04-15 | Single-season utility; better as a focused drop. |
+| 17 | V1 includes contact editing with system write-back | 2026-04-15 | Needed for Holiday Pack; quality-of-life win; on-device writes keep the posture. |
+| 18 | V1 includes virtual-merge duplicate detection; system contacts never modified | 2026-04-15 | Messy address books double-remind without it. |
+| 19 | V1 includes widgets | 2026-04-15 | Small scope, no new permissions, retention win. |
+| 20 | iOS first; Android after iOS public launch | 2026-04-15 | Apple review latency first; Swift domain becomes the port reference. |
+| 21 | Geo-tiered pricing anchored $4.99 → $0.99 | 2026-04-15 | PPP tiers expand the market at zero operational cost. |
+| 22 | Talking points / conversation queue deferred to V2 | 2026-04-19 | Additive to the core loop; the reminder-time surfacing twist is preserved for V2. |
+| 23 | Entitlement tiers are exactly `free \| trial \| lifetime` | 2026-07-01 | §7 in v0.5 still carried subscription-era tiers; code was right since PR #2. Doc aligned to code + decision #7. |
+| 24 | `DOMAIN_MODEL.md` will not exist | 2026-07-01 | The Swift domain layer + test suite is the executable spec for the Android port; a third artifact would drift. |
+| 25 | Phone duplicate-matching uses the last-10-digit key, not strict E.164 | 2026-07-01 | Matches formatting/prefix variance without a parsing dependency; false-positive window within one address book is negligible. |
+| 26 | Duplicate confidence: phone=high, email=medium, name-only=low | 2026-07-01 | Shared family emails make email weaker than a shared line. Resolves the shipped docstring/behavior mismatch in favor of behavior. |
+| 27 | Channel validation contract: `isValid(v) ⟹ build(v) != nil`, property-tested per channel | 2026-07-01 | Validation and building drifted independently (FaceTime email bug). One invariant kills the class. |
+| 28 | Allowed time ranges must not wrap midnight; quiet hours may | 2026-07-01 | The walk can't honor wrapping allowed ranges and the editor never offers them; make the state unrepresentable. |
+| 29 | Never-contacted cadence anchor = `createdAt` | 2026-07-01 | "Instantly overdue on import" floods first-run Overdue and teaches users to ignore it. Engine aligned to the ViewModels. |
+| 30 | Reminders snap to window-slot start; digest identity = `digest-{slotStartEpoch}` | 2026-07-01 | Makes batching exact-equality by construction and OS-notification dedup trivial. |
+| 31 | Snooze moves `scheduledFor` only; `lastInteractedAt` untouched, no InteractionLog row | 2026-07-01 | Snoozing is not talking to someone; cadence math must not think it is. |
+| 32 | Navigation is a 4-tab TabView; the Overdue/Upcoming count pill stays | 2026-07-01 | As built and shipped through audit; the pill carries live counts the tab bar can't. Supersedes v0.5's single-Home segmented design. |
+| 33 | Reminder Windows is a first-class screen (`Features/ReminderWindows/`), pushed from Settings | 2026-07-01 | The editor is too rich for a Settings subsection; §12 updated to match reality. |
+| 34 | Snapshot testing via pointfree swift-snapshot-testing, test targets only | 2026-07-01 | Fills the §13 commitment; test-only dependency, no privacy-grep surface. |
+| 35 | Launch rebaselined to 2026-08-31; version bumps 0.1.0 → 1.0.0 at Aug 14 feature freeze | 2026-07-01 | Two idle months; late-August keeps Holiday Pack's October window alive. |
+| 36 | `SchedulingPass` actor is the sole writer of ScheduledReminder rows and OS notifications | 2026-07-01 | One idempotent choke point; UI is read-only over persisted reminders. |
+| 37 | `Package.resolved` is committed | 2026-07-01 | Reproducible builds are part of the privacy claim; floating deps contradict it. |
 
-## 17. How to use this document with Claude Code
+## 17. Working rules for implementation agents
 
-A good opening prompt for Claude Code:
+**Reading order for any new session:** §18 → §19 → §14 (find your PR) → the spec sections your PR touches → this section. If your task contradicts this doc, stop and say so — either the task is wrong or this doc needs a sibling change in the same PR.
 
-> Read `ARCHITECTURE.md`. Start with iOS Phase 0: create the Xcode project per the iOS module layout in §12, implement the Domain entities in §7 (including `Contact`, `ContactGroup`, `ScheduledReminder`, and the duplicate-detection heuristic) with full unit tests, build the ReminderEngine in §9 — cover cadence, annual-recurrence, DST, timezone edge cases, and virtual-merge scheduling — and wire up an empty eight-screen navigation shell per §10 with mock data. Do not integrate Contacts, Calendar, widgets, or schedule real notifications yet — surface a plan for iOS Phase 0 first and wait for review.
+**The sibling-PR rule (inherited from CLAUDE.md, still absolute):** when code and this document disagree, one of them is wrong; fixing code without updating the doc (or vice versa) is an incomplete PR. Every feature PR cites the §s it implements.
 
-Subsequent phases follow §14. Every feature PR should cite the section of this doc it implements and flag any deviation.
+**Definition of done for every PR:**
+1. `cd ios && xcodegen generate` — commit `project.yml` *and* the regenerated xcodeproj (CI diffs them).
+2. `swiftlint --strict` clean.
+3. Full test action green locally: `xcodebuild -project Regards.xcodeproj -scheme Regards -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test`.
+4. UI/test-code touched → `ios/scripts/audit-stress.sh` (5×) green.
+5. New/changed screens → accessibility audit test + row in `ios/docs/accessibility.md` + VoiceOver smoke.
+6. §14 acceptance criteria for the PR demonstrably met (device test where the criteria say "on device").
+7. Doc siblings updated (this file, CLAUDE.md if commands/paths changed, accessibility.md).
+8. No new warnings (they're errors anyway), no force-unwraps in Domain, no `@unchecked Sendable` without a written justification comment.
+
+**Hard prohibitions (unchanged, CI-enforced where possible):**
+- Hand-editing `Regards.xcodeproj`.
+- Apple-framework imports in `Domain/`.
+- Any networking primitive anywhere in app sources — even wrapped — without amending §11 *first* (which should never happen; treat a failing privacy-grep as "revert my approach", not "adjust the guard").
+- Loosening ATS keys, adding background modes, adding analytics/crash SDKs (they all require network anyway).
+- Writing to system Contacts outside the partial-field `CNSaveRequest` pattern; deleting/merging system contacts under any circumstances.
+- OAuth calendar anything.
+- Renumbering §1–§17 of this document.
+
+**Commit/PR conventions:** prefix `ios:` / `ci:` / `docs:` / `chore:`; PR description cites doc sections (e.g. "Implements §9a per PR25 scope"); deviations flagged in a "Deviations" section of the PR body. Branch names: `ios/<topic>`, `ci/<topic>`, `docs/<topic>`.
+
+**Working with the guards:** privacy-grep matches call sites (`URLSession.` / `URLSession(`), so user-facing copy naming those symbols is fine; keep new copy narrow anyway. Domain-purity greps `^import X$` lines — don't try to sneak `import class Contacts.CNContact` through (PR19 hardens this; it's also just cheating).
+
+**When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
+
+## 18. Current state — ground truth as of 2026-07-01
+
+`main` = `aa9bfa7` (PR #15, 2026-05-06). 15 PRs merged. One unmerged branch: `origin/ios/section-header-accessibility-label` (+7 lines, Wordmark VoiceOver label — merge in PR18). ~7,450 lines of Swift. 3 journal posts live; #4 drafted unpublished.
+
+### What exists and works (Phase 0 complete, PRs #1–#5)
+
+- **Domain layer, pure and tested:** all §7 entities; `ReminderEngine` (cadence walk, quiet hours, annual recurrence + Feb-29, batching helper); `DuplicateDetector`; `ChannelCatalog` + `DeepLinkBuilder` for all 13 channels; `MonthDay` with round-trip validation.
+- **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
+- **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
+- **Accessibility harness that gates merges:** 13 XCUI audit tests (structural categories), audit-stress tooling (script + workflow), documented test patterns and smoke script.
+- **CI: 4 gating workflows** — ios-ci (xcodegen determinism → build → unit+coverage ∥ a11y audit), guards (privacy-grep, domain-purity, YAML, ios/docs link check), lint (`--strict`), audit-stress (5× per PR).
+- **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
+
+### What exists but is dormant (Phase 1 fragments, PRs #9–#10)
+
+- `AppEnvironment.makeProduction` + `DatabaseFactory.makeDatabase()`: **zero callers.** `@main` injects `makeMock()` (`RegardsApp.swift:7`).
+- `CNContactsSource` + `ContactsImporter` (additive first-import only): **zero app callers**; exercised by 13 unit tests. Fetches birthdays, then drops them in mapping.
+- Of 6 injected repositories the UI reads **2** (`contacts`, `interactions.fetchRecent`); `reminders`, `window`, `profile`, `groups` have no UI consumers. No interaction is ever written (`append` uncalled). No `ScheduledReminder` row is ever created. No notification is ever scheduled. No deep link is ever opened.
+
+### What is broken (fix before building — full detail in §19)
+
+Headline P0s: DST wall-clock bug in `nextAllowedSlot` (fires outside the user's window on transition days); degenerate windows schedule at disallowed instants; wrapping allowed ranges silently skipped; FaceTime-by-email builds a broken URL; Edit Contact is a navigation trap; engine and VMs disagree on never-contacted semantics; the audit-flake fix sits unmerged on a branch.
+
+### What does not exist at all
+
+SchedulingPass, notifications, deep-link execution, reconciliation/re-import, write-back, merge persistence, onboarding-in-launch-path, calendar ingestion, window persistence, widgets, StoreKit/paywall/trial, export/delete, snapshot tests, App Store listing metadata (name/bundle/SKU reserved 2026-04-15: `Regards: Stay in Touch`, `com.sdahiya.regards`, `regards-ios` — fields empty otherwise).
+
+## 19. Remediation register
+
+Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbered for cross-reference (R1…), with owner PR from §14. **P0** = wrong behavior in shipped code paths or falsified promises; **P1** = spec/doc integrity; **P2** = hygiene/hardening. An R-item is closed only when its acceptance check passes and the closing PR references it.
+
+### P0 — behavior
+
+| R | Defect | Where | Fix / acceptance | PR |
+|---|---|---|---|---|
+| R1 | **DST wall-clock bug.** Slot times built as `startOfDay + minutes` (elapsed, not wall-clock); on spring-forward a 07:00–08:00 window yields 08:00 (outside window), on fall-back 06:00 (before it). Doc comment falsely claims `Calendar.nextDate` is used. Shipped tests dodge it (2026 US transitions are Sundays; test windows are weekday-only) | `ReminderEngine.swift:141-143, 202-206` | Wall-clock materialization + post-validation per §9 contract 1; transition-day tests incl. Lord Howe 30-min zone | ✅ **closed by PR16** |
+| R2 | **FaceTime-by-email broken.** Email passes validation, then gets phone-normalized into a mangled `facetime:` URL | `DeepLinkBuilder.swift:12-21`; missing param case `DeepLinkBuilderTests.swift:19` | Pass emails through verbatim; property test §8 (decision #27) | PR17 |
+| R3 | **Wrapping allowed ranges silently skipped** (`range.end <= timeOfDay` treats 22:00→01:00 as past) while `TimeRange` documents wrap support | `ReminderEngine.swift:182`, `TimeOfDay.swift:30-32` | Decision #28: reject wrap in allowed ranges at validation; quiet hours stay wrap-aware; tests | ✅ **closed by PR16** |
+| R4 | **Degenerate window schedules at a disallowed instant** (returns input date; comment says "caller should surface a UX error"; no caller checks; a test codifies the bad behavior) | `ReminderEngine.swift:150-154, 210-212`; `ReminderEngineTests.swift:168-183` | `nextAllowedSlot → Date?`; editor refuses zero-capacity saves; SchedulingPass skips+badges on nil; rewrite the codifying test | engine semantics ✅ **closed by PR16**; editor PR23; SchedulingPass PR25 |
+| R5 | **Same-day-late occasion jumps a year.** Install at noon on the birthday → no birthday nudge until next year | `ReminderEngine.swift:244-248` | §9 contract 4: fire at next possible moment today; test | engine recurrence ✅ **closed by PR16**; quiet-hours application PR25 |
+| R6 | **Batching groups by exact Date equality**; reminders in the same window minutes apart never batch | `ReminderEngine.swift:271-275` | Decision #30 slot-start snapping; digest identity `digest-{slotStartEpoch}`; tests | ✅ **semantics closed by PR16** / PR25 (plumbing) |
+| R7 | **Channel validation contradicts §8:** telegram `@handle` rejected; messenger m.me URLs rejected; `custom` limited to http(s) killing `slack://` etc. | `ChannelCatalog.swift:48-55, 91-93, 133-138` | Normalize/strip per §8 table; any-scheme custom URLs; parametric + property tests | PR17 |
+| R8 | **Never-contacted semantics diverge:** engine says due-now; VMs say `?? createdAt` — same contact "not overdue" on screen, "scheduled" by engine | `ReminderEngine.swift:126-129` vs `OverdueViewModel.swift:82`, `UpcomingViewModel.swift:124` | Decision #29: engine adopts `?? createdAt`; divergence test | ✅ **closed by PR16** |
+| R9 | **Reminder windows are fiction in the UI:** `UpcomingViewModel` hardcodes `.defaultV1()` ignoring `env.window` AND per-contact overrides; ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `UpcomingViewModel.swift:32,127`, `ReminderWindowsScreen.swift:7,226` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | PR23 |
+| R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
+| R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; inert Horizon + "All" nav actions; no-op Caught up/Snooze/Log-other (factory passes no callbacks); no-op channel taps `{ _ in }`; inert Merge "Skip"; no-op Onboarding permission button | `ContactDetailScreen.swift:263-266` , `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift:33`, `RegardsApp.swift:102,169-177`, `MergeDuplicatesScreen.swift:108`, `OnboardingScreen.swift:4` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | PR22–PR29 |
+| R12 | **Merge never persists** (no `ContactGroup` written; `env.groups` unused) and detector sees only `preferredChannelValue` instead of full handle sets | `MergeDuplicatesViewModel.swift:44-55` | PR28 scope + `phonesJson`/`emailsJson` inputs | PR28 |
+| R13 | **Edit Contact navigation trap:** back button hidden + default no-op Cancel/Save closures at every push site → user is stuck | `EditContactScreen.swift:36, 8-14`; `RegardsApp.swift:108-110,125-127,135-137` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | PR27 (interim fix acceptable in PR18) |
+| R14 | **Onboarding not in launch path** (single screen, Settings-preview only; `onboardingCompletedAt` never consulted) | `OnboardingScreen.swift`, `RegardsApp.swift:23-40` | 3-screen flow gated at launch per §10.8 | PR29 |
+| R15 | **Transparency screen's 3 "Open" links inert**; repo URL hardcoded — verify before launch | `TransparencyScreen.swift:123, 183-187` | Wire `openURL`; confirm `github.com/sid78669/RegardsMobileApp` is the public repo URL | PR33 |
+
+### P1 — spec/doc integrity
+
+| R | Defect | Where | Fix | PR |
+|---|---|---|---|---|
+| R16 | Edit Contact missing from the audited-screens table AND the audit suite (violates accessibility.md rule 10) | `ios/docs/accessibility.md:76-89`, `ScreensAccessibilityTests.swift` | Add row + test | PR18 |
+| R17 | `NSContactsUsageDescription` is read-only copy; §11 requires the edit mention before write-back ships. `NSCalendarsFullAccessUsageDescription` absent (needed PR30) | `project.yml:84-86` | Reword with PR27; add calendar key with PR30 | PR27/PR30 |
+| R18 | `PrivacyInfo.xcprivacy` has empty `NSPrivacyAccessedAPITypes`; SQLite/GRDB file-timestamp access will need required-reason entries at submission | `ios/Regards/PrivacyInfo.xcprivacy` | Populate against Apple's current category list during Phase 3 prep | PR34/§20 |
+| R19 | README references nonexistent `docs/DOMAIN_MODEL.md` and `android/`; root markdown exempt from link check so CI can't catch it | `README.md:52,54`; `guards.yml:60-69` | Fix README (decision #24); extend link check to root `*.md` | PR18/PR19 |
+| R20 | **CLAUDE.md misroutes agents (5 stale claims):** iPhone 15 destinations (CI uses 16 Pro); "Platform/ currently empty" (has Contacts adapter); PrivacyInfo said to live in `Resources/`; `pr3AuditCategories`/"PR3 follow-ups" naming (actual: `structuralAuditCategories`, "Sensory-audit carve-outs"); "snapshot job declared `if: false`" (it's a comment, no job) | `CLAUDE.md:37,41,78,80,92,111` | Rewrite (done in the same change set as this doc v1.0); future edits follow sibling-PR rule | PR18 |
+| R21 | `Package.resolved` gitignored while GRDB floats `from: 6.29.0` — contradicts reproducible-build claim | `.gitignore:32`, `project.yml:41-44` | Decision #37: commit it | PR19 |
+| R22 | `RegardsUITests` placeholder target in no scheme/workflow; `PlaceholderTests.swift` in unit bundle | `ios/RegardsUITests/`, `RegardsTests/PlaceholderTests.swift` | Delete placeholders; keep the target only if PR34 snapshot/UI flows use it | PR19/PR34 |
+| R23 | Mock and GRDB repositories share no contract tests — mocks can drift from production semantics | `RegardsTests/Data/RepositoriesTests.swift` | Shared contract-test suite run against both | PR20 |
+| R24 | No unit tests for Upcoming/ContactDetail/MergeDuplicates VMs | `ios/RegardsTests/Features/` | Add with the PRs that touch each VM | PR22/PR25/PR28 |
+| R25 | `CNContactsSource.fetchAllContacts` blocks a cooperative-pool thread for the full enumeration (5k-contact stall); `@unchecked Sendable` justified only by comment | `ContactsSource.swift:69, 98-125` | Move enumeration off the pool; 5k-contact perf test | PR35 |
+| R26 | Force-unwrapped calendar math in the engine (`date(byAdding:)!`) | `ReminderEngine.swift:162,203-205` | Eliminated by the R1 rewrite (incl. `resolveFeb29Fallback`) | ✅ **closed by PR16** |
+| R27 | accessibility.md documents `waitForContactDetailReady` as canonical — the helper was reverted in PR #12 and doesn't exist | `ios/docs/accessibility.md:166-175` | Correct to the plain-identifier wait actually in use | PR18 |
+| R28 | Simulator name drift: iPhone 15 (CLAUDE.md, docs), 15 Pro (`audit-stress.sh:25`), 17 Pro (CI) | multiple | Standardize on iPhone 17 Pro | PR18 |
+| R29 | Unmerged `origin/ios/section-header-accessibility-label` (+7 lines) likely fixes the known ~20% "Label not human-readable" audit flake | branch | Merge; then 3× audit-stress to confirm flake death | PR18 |
+
+### P2 — hygiene / hardening
+
+| R | Item | Where | Fix | PR |
+|---|---|---|---|---|
+| R30 | Stale worktree with obsolete parallel scaffold (`generate_pbxproj.py`, old Domain, committed `.xcuserstate`) + prunable branch `claude/crazy-franklin-75fc28` + stray `.git/t9FBrGy` + ~16 merged local branches | `.claude/worktrees/`, `.git/` | `git worktree prune`, delete branches, rm temp file | PR19 |
+| R31 | Domain coverage floor absent (§13 promises near-total); coverage collected but unenforced | `ios-ci.yml:99-148` | ≥95% xccov gate on `Domain/**` | PR19 |
+| R32 | Guard gaps: domain-purity misses `@preconcurrency import` / `import class Contacts.X` / `import Network`; privacy-grep misses `NSURLConnection`, `CFSocket` | `guards.yml:33,46` | Harden patterns; add `Network` to import list | PR19 |
+| R33 | Dead SwiftLint config: `function_body_length` threshold block while the rule is disabled | `.swiftlint.yml:12-21,53-55` | Remove block or re-enable rule | PR19 |
+| R34 | Mock seeds miss ContactGroup/InteractionLog/occasion — merged chip, interactions card, occasion tags unreachable & unauditable; `UpcomingRowState.id = UUID()` per build breaks diffing (R36) | `MockRepositories.swift:47-143`, `UpcomingViewModel.swift:130` | Seed all three; stable ids `contactId+kind` | PR19/PR22 |
+| R35 | Importer aborts mid-batch on first row error | `ContactsImporter.swift:56-64` | Per-row tolerance + counts | PR21 |
+| R36 | (folded into R34) | — | — | PR22 |
+| R37 | `LSApplicationQueriesSchemes: []` while builder already emits `discord://` | `project.yml:80`, `DeepLinkBuilder.swift:43-45` | Add `discord` when deep links go live | PR26 |
+| R38 | `TimeOfDay` precondition bypassed by synthesized `Decodable` — corrupt DB JSON can materialize minute=2000 into calendar math | `TimeOfDay.swift:10-13` | Custom `init(from:)` enforcing range | ✅ **closed by PR16** |
+| R39 | Migrator seeds `Optional` top-level JSON (`jsonStringEncoded(window.quietHours)`) — inserts `"null"` / throws if the default ever ships nil quiet hours | `DatabaseMigrator.swift:106,124-129`, `Records.swift:247-248` | Encode non-optional or store SQL NULL | PR20 (with v2) |
+| R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift:9-11`, `accessibility.md:50-52` | Delete or wire; fix comments | PR19 |
+| R41 | Contrast registry incomplete vs UI reality (white-on-accentInk CTAs, accentInk-on-surface, danger-on-surface unlisted) | `RegardsColors.swift:70-83` | Extend `contrastPairs` + tests | PR34 |
+| R42 | `audit-stress.yml` header comment claims path-triggering that PR #15 removed | `audit-stress.yml:3-4` | Fix comment | PR19 |
+| R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | PR18 |
+| R44 | `LSApplicationCategoryType` = social-networking in project.yml while the listing plan says Productivity primary | `project.yml:94` | Align with §20 category decision | PR34 |
+| R45 | 8.4 MB `Substack_banner.png` sitting at repo root (ignored but clutter); `.DS_Store` files | repo root | Move banner to journal assets outside the repo; OS files stay ignored | anytime |
+| R46 | `InteractionLog` doc comment references nonexistent `ContactRepository.markCaughtUp` API; `Channel.isAvailableOnIOS` always-true dead code; `Contact.effectiveWindow` misleading zero-caller helper | `InteractionLog.swift:11-12`, `Channel.swift:44`, `Contact.swift:58` | Fix comment; keep `isAvailableOnIOS` only if Android port will flip it (document), else delete; delete or repoint `effectiveWindow` at SchedulingPass | comment ✅ **closed by PR16**; `isAvailableOnIOS`/`effectiveWindow` → PR22 |
+| R47 | Invalid persisted timezone identifiers silently fall back to the device timezone, changing reminder timing without consent | `ReminderWindow.swift`, `Records.swift` | Validate IANA identifier and reject malformed persisted windows | ✅ **closed in PR16 review** |
+| R48 | Slot-start snapping can schedule a future-due contact before `overdueAt`; repeated-hour snapping can choose a boundary from the wrong UTC occurrence | `ReminderEngine.swift` | Distinguish already-overdue from future-due targets; resolve fall-back boundaries relative to the search instant; regression tests | ✅ **closed in PR16 review** |
+
+## 20. Release engineering & App Store playbook
+
+### Versioning & branching
+
+- `main` is always releasable; feature branches → PR → squash-merge. Version `CFBundleShortVersionString` stays `0.1.0` until the Aug 14 feature freeze, then `1.0.0` (decision #35). `CFBundleVersion` increments every TestFlight upload (integer, monotonic). Tag releases `ios-v1.0.0`; release notes generated from merged PR titles.
+- Freeze rules (Aug 14–31): only P0/P1 fixes; every merge re-runs the full checklist below.
+
+### App Store Connect — record state & required fields
+
+Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken), bundle `com.sdahiya.regards`, SKU `regards-ios`, iOS platform. Everything else is empty. Fill order:
+
+**Before first TestFlight upload (Aug 14):**
+1. Subtitle (30 chars): `Private personal CRM` (fallbacks: `Local-first contact reminders`, `No cloud. No account. No ads.`).
+2. Keywords (100 chars): `stay in touch,friends,family,reminder,contacts,personal crm,relationships,keep in touch,private,offline`.
+3. Category: **Primary Productivity, Secondary Lifestyle** (final call at entry; update `LSApplicationCategoryType` to match, R44).
+4. Age rating questionnaire → 4+.
+5. **Privacy Policy URL** (required even collecting nothing) — one page on GitHub Pages: "Regards collects no data. The app has no network access by design." + contact email.
+6. App Privacy section → **"Data Not Collected"** every category. This is the centerpiece; triple-check.
+7. TestFlight beta app description + external group; export compliance: `ITSAppUsesNonExemptEncryption = false` in Info.plist (only OS-provided encryption) so uploads skip the crypto questionnaire.
+
+**Before submission (Aug 24–26):**
+8. Description (4000 chars): lead with the emotional hook from journal post #1 ("the friend from your wedding you haven't called in a year"), then reminder windows → one-tap deep links → provable privacy → what it deliberately won't do → one-time price. Mirror the post-#1 voice; don't write marketing-speak.
+9. Promotional text (170 chars, hot-editable): launch framing.
+10. Support URL: GitHub Issues. Marketing URL: the Substack.
+11. Screenshots: 6.9"/6.7" set (1320×2868 / 1290×2796), 3–10 shots: Overdue, Upcoming, Contact Detail (deep-link button visible), Reminder Windows editor, Transparency screen, widget. Frame with one-line captions; the Transparency shot is the differentiator — don't bury it.
+12. App icon 1024×1024 (no alpha/rounded corners) — export from Bakery per the asset plan.
+13. Copyright `© 2026 Siddharth Dahiya`. Trade rep info (Korea) skip unless targeting KR at launch.
+14. Pricing: Tier-A $4.99 anchor + auto-pricing per storefront per §4 tiers; verify IN/BR land ₹99-class/R$9.90-class. IAPs: `com.sdahiya.regards.unlock` (non-consumable), `.tip.coffee`, `.tip.thanks`, `.tip.feature` — created, localized, attached to the submission build. **Small Business Program enrollment confirmed before launch.**
+15. App Review notes: no account needed; no demo credentials; "This app contains no networking code by design (ATS denies all loads; source is public at github.com/sid78669/RegardsMobileApp). You will observe zero outbound traffic. Contacts write access is used only for user-initiated single-field edits."
+
+### Pre-submission verification (run at freeze AND at submission)
+
+1. Full CI green on the release SHA; audit-stress 5/5 ×3.
+2. Fresh-install device pass: onboarding → permission grants AND denials → import → windows edit → notification fires in-window → deep link opens → caught-up → digest → widget → purchase (sandbox) → restore → export → delete-everything.
+3. **Network capture session (Proxyman on device): zero outbound flows** outside StoreKit/OS. Record it — this becomes the §11 transparency video.
+4. `PrivacyInfo.xcprivacy` required-reason entries verified against Apple's current list (R18).
+5. VoiceOver full-flow smoke; Dynamic Type accessibility5 spot pass.
+6. DB migration test from a v1-schema store (simulating a Phase-0-era TestFlight install upgrading).
+7. Archive builds reproducibly from a clean checkout (`xcodegen generate && xcodebuild archive`).
+
+### Rejection playbook
+
+Most likely flags for this app: (a) **2.1 performance/completeness** — reviewer can't see reminder value quickly → the review notes include a 60-second "how to see a reminder fire" script (set cadence 1 day, window = now); (b) **5.1.1 permission purpose strings** — keep strings specific (R17); (c) **privacy label mismatch** — we collect nothing, labels say so, PrivacyInfo agrees; (d) IAP restore/trial confusion — Restore button visible in Paywall AND Settings. Respond in Resolution Center within 24h; if metadata-only, fix without re-review; never argue, clarify.
+
+### Launch-day runbook (Aug 31)
+
+Release the approved build manually at ~9am ET → verify live in 2–3 storefronts → publish journal post #10 (launch) → Product Hunt launch → press emails (MacStories, Privacy Guides forum, 9to5Mac tips, r/privacy where rules allow) with the press kit (one-pager, screenshots, network-capture video link, source link) → pin the GitHub Discussions welcome thread → watch crash/feedback channels; hotfix bar is P0-only for week 1.
+
+## 21. Maintenance & operations playbook
+
+**Weekly (steady state):** triage GitHub Issues + store reviews (respond to every review, year 1); check TestFlight/App Store crash reports (organizer); scan support inbox; merge dependabot-equivalent manual checks — GRDB releases reviewed, bumped deliberately with `Package.resolved` diff + full test pass (never auto-bump; decision #37).
+
+**Per release (any version):** the §20 pre-submission verification list, scaled to change size; sibling doc updates; refreshed Exodus report (Android, once it exists) and network-capture spot check; tag + release notes; journal post if user-visible.
+
+**Quarterly (year 1):** geo-tier pricing review vs FX drift (document in a journal post per §15.6); competitive-landscape refresh of the §4 table; accessibility re-audit with the newest Xcode audit categories; dependency + toolchain review.
+
+**OS-beta season (June–September, annually):** from WWDC beta 1, run the full suite + manual smoke on each beta of iOS N+1; fix deprecations before GM; re-verify ATS/privacy-manifest behavior changes and the Contacts/EventKit permission UX (Apple reshapes these regularly — iOS 17 did for Calendar; iOS 18 did for Contacts with the limited-access picker: **test limited-Contacts-authorization mode explicitly**, it's the likeliest silent breaker for this app; if `CNAuthorizationStatus.limited` exists in the target SDK, the importer and reconcile paths must handle a partial universe without archiving unseen contacts — add that test before the first fall-OS release).
+
+**Incident response (no telemetry by design, so signals are humans):** crash spike = App Store crash organizer + review keywords + support mail. Reproduce → hotfix branch from the release tag → expedited review request if P0 (data loss / notifications dead / launch crash). The user-initiated diagnostic mailto is the only "log" pipeline; keep its payload useful (app version, OS, device, last-migration id, counts — never contact data).
+
+**Data-integrity guarantees:** any future migration `vN` ships with an upgrade test from every prior shipped schema; export format is versioned (`"exportVersion": 1`) and import-tested (V2 sync candidate depends on it); "Delete everything" must remain instant and total.
+
+**Community/comms:** journal cadence per §11b (biweekly floor, event posts on milestones); roadmap board updated when scope decisions happen, not after shipping; V2 candidates graduate only through a decisions-log entry with a scope cut somewhere else — the UpHabit scope-creep lesson is standing policy.
+
+**Android start gate (from §14):** iOS crash-free ≥99.5% over 2 trailing weeks, support <30 min/day, and the §19 register at zero open P0/P1. Then the port begins with the domain test suite translation, not with UI.
 
 ---
 

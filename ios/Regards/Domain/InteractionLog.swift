@@ -8,8 +8,9 @@ public enum InteractionSource: String, Codable, Sendable, CaseIterable {
 }
 
 /// A single logged interaction (ARCHITECTURE.md §7 `InteractionLog`). The
-/// `ContactRepository.markCaughtUp` path writes one of these on every "caught
-/// up" action; manual "I talked to them" from Contact Detail writes another.
+/// "caught up" action writes one of these (`source: .reminderCaughtUp`) via
+/// `InteractionRepository.append`; a manual "I talked to them" from Contact
+/// Detail writes another (`source: .manual`). Wiring lands in PR22 (§14).
 public struct InteractionLog: Sendable, Codable, Equatable, Hashable, Identifiable {
     public let id: UUID
     public let contactId: UUID

@@ -16,6 +16,25 @@ public struct TimeOfDay: Sendable, Codable, Equatable, Hashable, Comparable {
         self.init(minutesSinceMidnight: hour * 60 + minute)
     }
 
+    // The memberwise `init` traps on out-of-range values, but the synthesized
+    // `Decodable` conformance bypasses it — it assigns the stored property
+    // directly. A corrupt DB row (`minutesSinceMidnight: 2000`) would then flow
+    // straight into calendar math (R38). Enforce the range on decode too, as a
+    // recoverable error rather than a trap, since decoding untrusted persisted
+    // JSON must never crash the app.
+    private enum CodingKeys: String, CodingKey { case minutesSinceMidnight }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let minutes = try container.decode(Int.self, forKey: .minutesSinceMidnight)
+        guard (0..<1440).contains(minutes) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .minutesSinceMidnight, in: container,
+                debugDescription: "TimeOfDay must be within [0, 1440) — got \(minutes)")
+        }
+        self.init(minutesSinceMidnight: minutes)
+    }
+
     public var hour: Int { minutesSinceMidnight / 60 }
     public var minute: Int { minutesSinceMidnight % 60 }
 
