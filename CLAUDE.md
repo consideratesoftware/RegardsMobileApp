@@ -34,14 +34,14 @@ Commit both `project.yml` *and* the regenerated `Regards.xcodeproj/`. CI runs `x
 ```bash
 cd ios
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 
 # Full test action (both unit + accessibility suites):
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-(iPhone 16 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
+(iPhone 17 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
 
 Run a single suite or test:
 
