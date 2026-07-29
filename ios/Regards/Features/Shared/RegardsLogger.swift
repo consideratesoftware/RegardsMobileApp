@@ -12,9 +12,9 @@ import os
 /// ```
 public enum RegardsLogger {
 
-    /// Subsystem matches the primary app bundle identifier so filtering in
-    /// Console.app is straightforward (`subsystem:com.sdahiya.regards`).
-    public static let subsystem = "com.sdahiya.regards"
+    /// Matches the app bundle identifier so Console filtering remains simple
+    /// (`subsystem:com.consideratesoftware.regards`).
+    public static let subsystem = "com.consideratesoftware.regards"
 
     public static func feature(_ name: String) -> Logger {
         Logger(subsystem: subsystem, category: name)

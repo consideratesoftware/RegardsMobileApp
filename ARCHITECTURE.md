@@ -303,19 +303,19 @@ V1 ships this fixed catalog. Each entry defines (a) what the user supplies, (b) 
 |---|---|---|---|---|
 | `phone_call` | phone | E.164-parseable | `tel:+15551234567` | Always works. |
 | `sms` | phone | E.164-parseable | `sms:+15551234567` | iOS routes to iMessage where enabled. |
-| `facetime` | phone **or email** | phone rule OR RFC-5322 | `facetime:+15551234567` / `facetime:alex@example.com` | iOS only; hidden on Android. **Email form must pass through verbatim — the shipped builder runs email through phone normalization and emits a broken URL (R2).** |
+| `facetime` | phone **or email** | phone rule OR RFC-5322 | `facetime:+15551234567` / `facetime:alex@example.com` | iOS only; hidden on Android. Email form passes through verbatim. |
 | `email` | email | RFC 5322 | `mailto:alex@example.com` | |
 | `whatsapp` | phone | E.164, strip `+` | `https://wa.me/15551234567` | Universal link; graceful web fallback. |
-| `telegram` | @handle | handle regex, **leading `@` stripped before validation (R7)** | `https://t.me/alexc` | |
+| `telegram` | @handle | handle regex, leading `@` stripped before validation | `https://t.me/alexc` | |
 | `signal` | phone | E.164 | `https://signal.me/#p/+15551234567` | Number must be registered with Signal; we warn in the picker UI. |
-| `messenger` | handle **or m.me URL** | handle regex OR `https://m.me/...` URL, **normalized to the handle (R7)** | `https://m.me/alexc` | |
+| `messenger` | handle **or m.me URL** | handle regex OR `https://m.me/...` URL, normalized to the handle | `https://m.me/alexc` | |
 | `instagram_dm` | @handle | handle regex (strip `@`) | `https://ig.me/m/alexc` | |
 | `linkedin_msg` | vanity handle or profile URL | | `https://linkedin.com/in/alex-chen` | Opens profile; user taps Message. |
 | `discord` | username + optional user ID | | `discord://discord.com/users/USER_ID` if ID known, else `discord://` | IDs aren't discoverable; without one we open Discord generically and surface the username in the notification/detail UI. |
 | `in_person` | — | — | none | Reminder fires with no link. |
-| `custom` | arbitrary URL | **any URL with a scheme** — not just http(s) (R7) | that URL | Escape hatch (Slack `slack://`, Teams, Matrix…). The shipped http(s)-only validation contradicts the intent. |
+| `custom` | arbitrary URL | any URL with a scheme | that URL | Escape hatch (Slack `slack://`, Teams, Matrix…). |
 
-**Validation contract (decision #27):** validation answers "can `DeepLinkBuilder` produce a well-formed URL from this value?" — nothing more. If validation passes, `build` must return non-nil; if it returns nil for a validated value, that's a bug (add a property test asserting `isValid(v) ⟹ build(v) != nil` per channel, R2/R7 acceptance).
+**Validation contract (decision #27):** for every link-bearing channel, validation answers "can `DeepLinkBuilder` produce a well-formed URL from this value?" — nothing more. If validation passes, `build` must return non-nil; if it returns nil for a validated value, that's a bug (add a property test asserting `isValid(v) ⟹ build(v) != nil` per link-bearing channel, R2/R7 acceptance). `in_person` is the explicit no-link exception: its empty value is valid and `build` returns nil by design.
 
 **iOS `LSApplicationQueriesSchemes`:** keep the array **minimal**, populated in PR26, containing only schemes we actually pass to `canOpenURL`: `discord` (and nothing else at launch — wa.me/t.me/ig.me/m.me/signal.me are HTTPS universal links with web fallback, so we open them without querying; `tel:`/`sms:`/`mailto:`/`facetime:` we open directly without a capability query). Every addition to this array is a privacy-adjacent diff: it discloses which apps we probe for. Justify each in the PR description.
 
@@ -419,7 +419,7 @@ Nine screens + one widget family in V1. **As-built decision (#32):** navigation 
 
 Plus **Transparency** (static, shipped) under Settings — plain-language privacy proof with links out (wire the three inert "Open" rows to `openURL`, R15).
 
-**Widget family (Phase 2, §14):** small (top-3 overdue), medium (top-5 + per-icon deep links via `widgetURL`), Lock Screen circular/inline count. Reads a **read-only GRDB connection** on a shared App Group container (`group.com.sdahiya.regards`); main app calls `WidgetCenter.shared.reloadAllTimelines()` after every SchedulingPass. No network, no new permissions.
+**Widget family (Phase 2, §14):** small (top-3 overdue), medium (top-5 + per-icon deep links via `widgetURL`), Lock Screen circular/inline count. Reads a **read-only GRDB connection** on a shared App Group container (`group.com.consideratesoftware.regards`); main app calls `WidgetCenter.shared.reloadAllTimelines()` after every SchedulingPass. No network, no new permissions.
 
 **Design system:** `RegardsDS` tokens (colors incl. WCAG-checked pairs in `RegardsPalette.contrastPairs`, typography, spacing) + primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`, `RegardsNavBar`). Rule: **no inert interactive-looking controls in shipped UI** — Phase 0's muted-stub convention (`RegardsNavBar` renders nil-handler actions as visibly disabled) was correct for a shell and is deprecated the moment the real affordance lands; every stub is enumerated in §19 and each Phase 1 PR must wire or remove the stubs in the screens it touches.
 
@@ -551,7 +551,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 - **Domain: exhaustive unit coverage, CI-enforced floor.** PR19 adds a coverage gate: ≥95% line coverage on `ios/Regards/Domain/**` via `xccov` in the unit-tests job (the v0.5 "100%" aspiration meets reality at 95% + mandatory tests for every listed edge case). The floor may only go up.
 - **Engine edge cases that MUST have tests after PR16** (each currently missing and each guards a shipped or latent defect): a window **on** a DST transition day (US 2026 transitions Mar 8 / Nov 1 are Sundays — the shipped tests use weekday-only windows and dodge the bug; add Sunday-inclusive windows and a synthetic zone like `Australia/Lord_Howe` for the 30-min case), fall-back duplicated-hour disambiguation, spring-forward nonexistent slot-start, midnight-boundary walk, contiguous-range collapse, wrap-rejection validation, degenerate-window → nil, quiet-hours-consume-everything → nil, same-day-late occasion fires today, never-contacted anchor = createdAt, slot-start snapping equality.
-- **Deep-link parametric completeness:** one case per `Channel` (a test asserts the parametric list covers `Channel.allCases`), plus the property `isValid ⟹ build != nil`, plus the specific regressions: facetime-email, m.me URL, `@handle` telegram, non-http custom scheme.
+- **Deep-link parametric completeness:** one case per `Channel` (a test asserts the parametric list covers `Channel.allCases`), plus the property `isValid ⟹ build != nil` for every link-bearing channel, plus the specific regressions: facetime-email, m.me URL, `@handle` telegram, non-http custom scheme.
 - **SchedulingPass (PR25):** fake repos + fake `NotificationScheduling`; assert idempotence, orphan cancellation, group-collapse (one reminder per group), digest identity stability, 60-cap behavior.
 - **Migrations:** fresh-create and v1→v2 upgrade round-trips for every table; migration tests may never be deleted, only added.
 - **Repositories:** contract tests run against both `MockRepositories` and GRDB implementations (shared assertions) so mocks can't drift from production semantics (R23).
@@ -572,7 +572,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 | PR | Scope | Key acceptance criteria |
 |---|---|---|
 | **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
-| **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test; parametric covers `allCases` | R2, R7 closed |
+| **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test for link-bearing channels; parametric covers `allCases` | R2, R7 closed |
 | **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R19, R20, R27–R29 closed; audit-stress 5/5 green ×3 consecutive runs |
 | **PR19** | Repo + CI hygiene: commit `Package.resolved`; `git worktree prune` + delete stale worktree/branches; root-markdown link-check job; Domain coverage floor (≥95%); guard hardening (add `Network` to domain-purity, `NSURLConnection|CFSocket` to privacy-grep); remove dead SwiftLint `function_body_length` config; seed mocks with a ContactGroup + InteractionLogs + an occasion so all UI states are reachable/auditable; delete `.git/t9FBrGy` | R21, R30–R34 closed; all 4 workflows green |
 
@@ -606,7 +606,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 | PR | Scope | Key acceptance criteria |
 |---|---|---|
-| **PR31** | Widget target: `RegardsWidget` in project.yml, App Group (`group.com.sdahiya.regards`), DB relocation to group container (+ migration of existing store), read-only widget queries, small/medium/lock variants, `reloadAllTimelines()` after SchedulingPass | Widgets live on device; app-group migration preserves data across update |
+| **PR31** | Widget target: `RegardsWidget` in project.yml, App Group (`group.com.consideratesoftware.regards`), DB relocation to group container (+ migration of existing store), read-only widget queries, small/medium/lock variants, `reloadAllTimelines()` after SchedulingPass | Widgets live on device; app-group migration preserves data across update |
 | **PR32** | StoreKit 2: entitlement service (`Platform/Billing`), trial state machine (`trialStartedAt`), Paywall screen, soft-lock on expiry (read-only + banner, never data loss), tip jar, Restore, StoreKitTest suite | Sandbox purchase/restore/expiry all pass; zero StoreKit imports outside `Platform/Billing` + Paywall |
 | **PR33** | Settings completion: export JSON, delete-everything (+ confirmation), support mailto with diagnostics, Behind-the-App link, entitlement card | Export produces valid JSON of all 6 tables; delete returns to onboarding |
 | **PR34** | Accessibility + visual hardening: fix sensory findings (ScaledMetric on fixed-size glyphs, contrast leftovers, hit regions), flip audit to **all** categories, snapshot tests (9 screens × states) + CI job, Dynamic Type pass to accessibility5 | Full-category audit green ×5 stress runs; snapshot job gating |
@@ -675,7 +675,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 24 | `DOMAIN_MODEL.md` will not exist | 2026-07-01 | The Swift domain layer + test suite is the executable spec for the Android port; a third artifact would drift. |
 | 25 | Phone duplicate-matching uses the last-10-digit key, not strict E.164 | 2026-07-01 | Matches formatting/prefix variance without a parsing dependency; false-positive window within one address book is negligible. |
 | 26 | Duplicate confidence: phone=high, email=medium, name-only=low | 2026-07-01 | Shared family emails make email weaker than a shared line. Resolves the shipped docstring/behavior mismatch in favor of behavior. |
-| 27 | Channel validation contract: `isValid(v) ⟹ build(v) != nil`, property-tested per channel | 2026-07-01 | Validation and building drifted independently (FaceTime email bug). One invariant kills the class. |
+| 27 | Channel validation contract: `isValid(v) ⟹ build(v) != nil`, property-tested per link-bearing channel; `in_person` is the explicit no-link exception | 2026-07-01 | Validation and building drifted independently (FaceTime email bug). One invariant kills the class without misrepresenting the no-link channel. |
 | 28 | Allowed time ranges must not wrap midnight; quiet hours may | 2026-07-01 | The walk can't honor wrapping allowed ranges and the editor never offers them; make the state unrepresentable. |
 | 29 | Never-contacted cadence anchor = `createdAt` | 2026-07-01 | "Instantly overdue on import" floods first-run Overdue and teaches users to ignore it. Engine aligned to the ViewModels. |
 | 30 | Reminders snap to window-slot start; digest identity = `digest-{slotStartEpoch}` | 2026-07-01 | Makes batching exact-equality by construction and OS-notification dedup trivial. |
@@ -739,11 +739,11 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 ### What is broken (fix before building — full detail in §19)
 
-Headline P0s: DST wall-clock bug in `nextAllowedSlot` (fires outside the user's window on transition days); degenerate windows schedule at disallowed instants; wrapping allowed ranges silently skipped; FaceTime-by-email builds a broken URL; Edit Contact is a navigation trap; engine and VMs disagree on never-contacted semantics; the audit-flake fix sits unmerged on a branch.
+Headline open P0s: Edit Contact is a navigation trap; Reminder Windows is display-only; Upcoming ignores persisted reminders; merge and onboarding flows do not persist.
 
 ### What does not exist at all
 
-SchedulingPass, notifications, deep-link execution, reconciliation/re-import, write-back, merge persistence, onboarding-in-launch-path, calendar ingestion, window persistence, widgets, StoreKit/paywall/trial, export/delete, snapshot tests, App Store listing metadata (name/bundle/SKU reserved 2026-04-15: `Regards: Stay in Touch`, `com.sdahiya.regards`, `regards-ios` — fields empty otherwise).
+SchedulingPass, notifications, deep-link execution, reconciliation/re-import, write-back, merge persistence, onboarding-in-launch-path, calendar ingestion, window persistence, widgets, StoreKit/paywall/trial, export/delete, snapshot tests, App Store listing metadata (name/bundle/SKU reserved 2026-04-15: `Regards: Stay in Touch`, `com.consideratesoftware.regards`, `regards-ios` — fields empty otherwise).
 
 ## 19. Remediation register
 
@@ -754,12 +754,12 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R | Defect | Where | Fix / acceptance | PR |
 |---|---|---|---|---|
 | R1 | **DST wall-clock bug.** Slot times built as `startOfDay + minutes` (elapsed, not wall-clock); on spring-forward a 07:00–08:00 window yields 08:00 (outside window), on fall-back 06:00 (before it). Doc comment falsely claims `Calendar.nextDate` is used. Shipped tests dodge it (2026 US transitions are Sundays; test windows are weekday-only) | `ReminderEngine.swift:141-143, 202-206` | Wall-clock materialization + post-validation per §9 contract 1; transition-day tests incl. Lord Howe 30-min zone | ✅ **closed by PR16** |
-| R2 | **FaceTime-by-email broken.** Email passes validation, then gets phone-normalized into a mangled `facetime:` URL | `DeepLinkBuilder.swift:12-21`; missing param case `DeepLinkBuilderTests.swift:19` | Pass emails through verbatim; property test §8 (decision #27) | PR17 |
+| R2 | **FaceTime-by-email broken.** Email passes validation, then gets phone-normalized into a mangled `facetime:` URL | `DeepLinkBuilder.swift:12-21`; missing param case `DeepLinkBuilderTests.swift:19` | Pass emails through verbatim; property test §8 (decision #27) | ✅ **closed by PR17** |
 | R3 | **Wrapping allowed ranges silently skipped** (`range.end <= timeOfDay` treats 22:00→01:00 as past) while `TimeRange` documents wrap support | `ReminderEngine.swift:182`, `TimeOfDay.swift:30-32` | Decision #28: reject wrap in allowed ranges at validation; quiet hours stay wrap-aware; tests | ✅ **closed by PR16** |
 | R4 | **Degenerate window schedules at a disallowed instant** (returns input date; comment says "caller should surface a UX error"; no caller checks; a test codifies the bad behavior) | `ReminderEngine.swift:150-154, 210-212`; `ReminderEngineTests.swift:168-183` | `nextAllowedSlot → Date?`; editor refuses zero-capacity saves; SchedulingPass skips+badges on nil; rewrite the codifying test | engine semantics ✅ **closed by PR16**; editor PR23; SchedulingPass PR25 |
 | R5 | **Same-day-late occasion jumps a year.** Install at noon on the birthday → no birthday nudge until next year | `ReminderEngine.swift:244-248` | §9 contract 4: fire at next possible moment today; test | engine recurrence ✅ **closed by PR16**; quiet-hours application PR25 |
 | R6 | **Batching groups by exact Date equality**; reminders in the same window minutes apart never batch | `ReminderEngine.swift:271-275` | Decision #30 slot-start snapping; digest identity `digest-{slotStartEpoch}`; tests | ✅ **semantics closed by PR16** / PR25 (plumbing) |
-| R7 | **Channel validation contradicts §8:** telegram `@handle` rejected; messenger m.me URLs rejected; `custom` limited to http(s) killing `slack://` etc. | `ChannelCatalog.swift:48-55, 91-93, 133-138` | Normalize/strip per §8 table; any-scheme custom URLs; parametric + property tests | PR17 |
+| R7 | **Channel validation contradicts §8:** telegram `@handle` rejected; messenger m.me URLs rejected; `custom` limited to http(s) killing `slack://` etc. | `ChannelCatalog.swift:48-55, 91-93, 133-138` | Normalize/strip per §8 table; any-scheme custom URLs; parametric + property tests | ✅ **closed by PR17** |
 | R8 | **Never-contacted semantics diverge:** engine says due-now; VMs say `?? createdAt` — same contact "not overdue" on screen, "scheduled" by engine | `ReminderEngine.swift:126-129` vs `OverdueViewModel.swift:82`, `UpcomingViewModel.swift:124` | Decision #29: engine adopts `?? createdAt`; divergence test | ✅ **closed by PR16** |
 | R9 | **Reminder windows are fiction in the UI:** `UpcomingViewModel` hardcodes `.defaultV1()` ignoring `env.window` AND per-contact overrides; ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `UpcomingViewModel.swift:32,127`, `ReminderWindowsScreen.swift:7,226` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | PR23 |
 | R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
@@ -821,7 +821,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 
 ### App Store Connect — record state & required fields
 
-Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken), bundle `com.sdahiya.regards`, SKU `regards-ios`, iOS platform. Everything else is empty. Fill order:
+Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken), bundle `com.consideratesoftware.regards`, SKU `regards-ios`, iOS platform. Everything else is empty. Fill order:
 
 **Before first TestFlight upload (Aug 14):**
 1. Subtitle (30 chars): `Private personal CRM` (fallbacks: `Local-first contact reminders`, `No cloud. No account. No ads.`).
@@ -839,7 +839,7 @@ Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken)
 11. Screenshots: 6.9"/6.7" set (1320×2868 / 1290×2796), 3–10 shots: Overdue, Upcoming, Contact Detail (deep-link button visible), Reminder Windows editor, Transparency screen, widget. Frame with one-line captions; the Transparency shot is the differentiator — don't bury it.
 12. App icon 1024×1024 (no alpha/rounded corners) — export from Bakery per the asset plan.
 13. Copyright `© 2026 Siddharth Dahiya`. Trade rep info (Korea) skip unless targeting KR at launch.
-14. Pricing: Tier-A $4.99 anchor + auto-pricing per storefront per §4 tiers; verify IN/BR land ₹99-class/R$9.90-class. IAPs: `com.sdahiya.regards.unlock` (non-consumable), `.tip.coffee`, `.tip.thanks`, `.tip.feature` — created, localized, attached to the submission build. **Small Business Program enrollment confirmed before launch.**
+14. Pricing: Tier-A $4.99 anchor + auto-pricing per storefront per §4 tiers; verify IN/BR land ₹99-class/R$9.90-class. IAPs: `com.consideratesoftware.regards.unlock` (non-consumable), `.tip.coffee`, `.tip.thanks`, `.tip.feature` — created, localized, attached to the submission build. **Small Business Program enrollment confirmed before launch.**
 15. App Review notes: no account needed; no demo credentials; "This app contains no networking code by design (ATS denies all loads; source is public at github.com/sid78669/RegardsMobileApp). You will observe zero outbound traffic. Contacts write access is used only for user-initiated single-field edits."
 
 ### Pre-submission verification (run at freeze AND at submission)

@@ -9,35 +9,43 @@ public enum DeepLinkBuilder {
     public static func build(channel: Channel, value: String) -> URL? {
         guard ChannelCatalog.validate(value: value, for: channel) else { return nil }
 
-        let phone = ChannelCatalog.normalizedPhone(value)
-        let phoneDigitsOnly = String(phone.drop(while: { $0 == "+" }))
+        let stripped = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
         switch channel {
         case .phoneCall:
+            let phone = ChannelCatalog.normalizedPhone(stripped)
             return URL(string: "tel:\(phone)")
         case .sms:
+            let phone = ChannelCatalog.normalizedPhone(stripped)
             return URL(string: "sms:\(phone)")
         case .facetime:
-            return URL(string: "facetime:\(phoneDigitsOnly)")
+            if ChannelCatalog.isEmail(stripped) {
+                return URL(string: "facetime:\(stripped)")
+            }
+            return URL(string: "facetime:\(ChannelCatalog.normalizedPhone(stripped))")
         case .email:
-            return URL(string: "mailto:\(value.trimmingCharacters(in: .whitespacesAndNewlines))")
+            return URL(string: "mailto:\(stripped)")
         case .whatsapp:
+            let phone = ChannelCatalog.normalizedPhone(stripped)
+            let phoneDigitsOnly = String(phone.drop(while: { $0 == "+" }))
             return URL(string: "https://wa.me/\(phoneDigitsOnly)")
         case .telegram:
-            return URL(string: "https://t.me/\(value.trimmingCharacters(in: .whitespacesAndNewlines))")
+            guard let handle = ChannelCatalog.normalizedHandle(stripped) else { return nil }
+            return URL(string: "https://t.me/\(handle)")
         case .signal:
+            let phone = ChannelCatalog.normalizedPhone(stripped)
             // Signal uses the full E.164 with '+' in the path.
             return URL(string: "https://signal.me/#p/\(phone)")
         case .messenger:
-            return URL(string: "https://m.me/\(value.trimmingCharacters(in: .whitespacesAndNewlines))")
+            guard let handle = ChannelCatalog.normalizedMessengerHandle(stripped) else { return nil }
+            return URL(string: "https://m.me/\(handle)")
         case .instagramDM:
-            return URL(string: "https://ig.me/m/\(value.trimmingCharacters(in: .whitespacesAndNewlines))")
+            guard let handle = ChannelCatalog.normalizedHandle(stripped) else { return nil }
+            return URL(string: "https://ig.me/m/\(handle)")
         case .linkedinMsg:
-            let stripped = value.trimmingCharacters(in: .whitespacesAndNewlines)
             if let url = URL(string: stripped), url.scheme != nil { return url }
             return URL(string: "https://linkedin.com/in/\(stripped)")
         case .discord:
-            let stripped = value.trimmingCharacters(in: .whitespacesAndNewlines)
             // If the value contains a numeric Discord ID, use the DM deep link.
             if let id = discordUserId(from: stripped) {
                 return URL(string: "discord://discord.com/users/\(id)")
@@ -46,7 +54,6 @@ public enum DeepLinkBuilder {
         case .inPerson:
             return nil
         case .custom:
-            let stripped = value.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let url = URL(string: stripped), url.scheme != nil else { return nil }
             return url
         }

@@ -787,7 +787,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.RegardsAccessibilityTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.RegardsAccessibilityTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Regards;
@@ -804,7 +804,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.RegardsAccessibilityTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.RegardsAccessibilityTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Regards;
@@ -821,7 +821,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.RegardsTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.RegardsTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Regards.app/Regards";
@@ -845,7 +845,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.regards;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.regards;
 				PRODUCT_NAME = Regards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -863,7 +863,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.RegardsUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.RegardsUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Regards;
@@ -951,7 +951,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.RegardsTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.RegardsTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Regards.app/Regards";
@@ -975,7 +975,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.regards;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.regards;
 				PRODUCT_NAME = Regards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -993,7 +993,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sdahiya.RegardsUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.consideratesoftware.RegardsUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Regards;
