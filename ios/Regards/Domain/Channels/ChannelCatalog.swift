@@ -46,16 +46,16 @@ public enum ChannelCatalog {
                          helpText: "Phone number registered with WhatsApp.")
         case .telegram:
             return .init(channel: channel, valueKind: .handle,
-                         helpText: "Username without the @ (e.g. 'alexc').")
+                         helpText: "Username, with or without the @ (e.g. '@alexc').")
         case .signal:
             return .init(channel: channel, valueKind: .phoneE164,
                          helpText: "Phone number registered with Signal.")
         case .messenger:
             return .init(channel: channel, valueKind: .handle,
-                         helpText: "Messenger handle or m.me suffix.")
+                         helpText: "Messenger username or full https://m.me/… link.")
         case .instagramDM:
             return .init(channel: channel, valueKind: .handle,
-                         helpText: "Instagram username without the @.")
+                         helpText: "Instagram username, with or without the @.")
         case .linkedinMsg:
             return .init(channel: channel, valueKind: .vanityOrURL,
                          helpText: "Vanity handle (e.g. 'alex-chen') or full profile URL.")
@@ -83,14 +83,21 @@ public enum ChannelCatalog {
         case .email:
             return isEmail(stripped)
         case .handle:
-            return isHandle(stripped)
+            switch channel {
+            case .telegram, .instagramDM:
+                return normalizedHandle(stripped) != nil
+            case .messenger:
+                return normalizedMessengerHandle(stripped) != nil
+            default:
+                return isHandle(stripped)
+            }
         case .vanityOrURL:
             return isHandle(stripped) || URL(string: stripped)?.scheme != nil
         case .usernameWithOptionalID:
             return !stripped.isEmpty
         case .arbitraryURL:
             guard let url = URL(string: stripped), let scheme = url.scheme else { return false }
-            return scheme == "https" || scheme == "http"
+            return !scheme.isEmpty
         case .none:
             return true
         }
@@ -135,5 +142,29 @@ public enum ChannelCatalog {
         let allowed = CharacterSet(charactersIn:
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-")
         return value.unicodeScalars.allSatisfy { allowed.contains($0) }
+    }
+
+    static func normalizedHandle(_ value: String) -> String? {
+        let stripped = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let handle = stripped.hasPrefix("@") ? String(stripped.dropFirst()) : stripped
+        return isHandle(handle) ? handle : nil
+    }
+
+    static func normalizedMessengerHandle(_ value: String) -> String? {
+        if let handle = normalizedHandle(value) {
+            return handle
+        }
+
+        guard let components = URLComponents(string: value),
+              components.scheme?.lowercased() == "https",
+              components.host?.lowercased() == "m.me",
+              components.query == nil,
+              components.fragment == nil else {
+            return nil
+        }
+
+        let pathComponents = components.path.split(separator: "/", omittingEmptySubsequences: true)
+        guard pathComponents.count == 1 else { return nil }
+        return normalizedHandle(String(pathComponents[0]))
     }
 }

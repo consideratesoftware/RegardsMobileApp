@@ -73,6 +73,10 @@ The gate is `ScreensAccessibilityTests.structuralAuditCategories`
 (`elementDetection + sufficientElementDescription + trait`). Sensory findings
 are documented below under *Sensory-audit carve-outs*.
 
+`ChannelMetadata.helpText` is not rendered by the current Phase 0 shell.
+When the channel form begins consuming it, that PR must include the text in its
+screen-level VoiceOver smoke and automated audit coverage.
+
 | Screen | PR | Notes |
 |---|---|---|
 | Launch / root placeholder | PR1 (`9501d57`) | One-view smoke — superseded by the Overdue landing check in PR3. |

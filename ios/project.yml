@@ -1,7 +1,7 @@
 name: Regards
 
 options:
-  bundleIdPrefix: com.sdahiya
+  bundleIdPrefix: com.consideratesoftware
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: en
@@ -86,7 +86,7 @@ targets:
           people you want to stay in touch with. Nothing leaves your device.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sdahiya.regards
+        PRODUCT_BUNDLE_IDENTIFIER: com.consideratesoftware.regards
         PRODUCT_NAME: Regards
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
@@ -113,7 +113,7 @@ targets:
       - path: RegardsTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sdahiya.RegardsTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.consideratesoftware.RegardsTests
         GENERATE_INFOPLIST_FILE: "YES"
     dependencies:
       - target: Regards
@@ -125,7 +125,7 @@ targets:
       - path: RegardsUITests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sdahiya.RegardsUITests
+        PRODUCT_BUNDLE_IDENTIFIER: com.consideratesoftware.RegardsUITests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: Regards
     dependencies:
@@ -138,7 +138,7 @@ targets:
       - path: RegardsAccessibilityTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sdahiya.RegardsAccessibilityTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.consideratesoftware.RegardsAccessibilityTests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_TARGET_NAME: Regards
     dependencies:
