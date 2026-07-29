@@ -643,9 +643,9 @@
 			projectRoot = "";
 			targets = (
 				3A97EC98ED0F252EDE9DC348 /* Regards */,
-				1038836BBA7299FF4E95D987 /* RegardsAccessibilityTests */,
 				90037649B03CD2B4D7FD8CB7 /* RegardsTests */,
 				6C7CBE37BC7EED9F9B367CC1 /* RegardsUITests */,
+				1038836BBA7299FF4E95D987 /* RegardsAccessibilityTests */,
 			);
 		};
 /* End PBXProject section */

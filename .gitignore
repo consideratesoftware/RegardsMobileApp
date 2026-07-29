@@ -84,7 +84,13 @@ keystore.properties
 journal/
 
 # ---------- Claude / tooling scratch ----------
-.claude/
+# Ignore Claude scratch (worktrees, local settings) but version the
+# review agents and commands: they are project infrastructure.
+.claude/*
+!.claude/agents/
+!.claude/agents/**
+!.claude/commands/
+!.claude/commands/**
 .auto-memory/
 
 # ---------- Large binary assets that live elsewhere ----------
