@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Source of truth
 
@@ -34,14 +34,14 @@ Commit both `project.yml` *and* the regenerated `Regards.xcodeproj/`. CI runs `x
 ```bash
 cd ios
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Full test action (both unit + accessibility suites):
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test
 ```
 
-(iPhone 17 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
+(iPhone 16 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
 
 Run a single suite or test:
 
@@ -121,17 +121,20 @@ All four workflows gate merges; path filters were deliberately removed (PR #15) 
 
 ## PR review
 
-Every PR gets the multi-agent review before merge: run `/pr-review` (defined in
-`.claude/commands/pr-review.md`). It pre-flights the mechanical gates, then
-fans out to the read-only agents in `.claude/agents/`: `pr-correctness`,
-`pr-security-privacy`, and `pr-code-quality` always; `pr-tests` for code/test
-changes; and `pr-accessibility` plus `pr-fit-finish` when their UI/docs path
-rules match. Any blocker means `REQUEST_CHANGES`. Claimed R-closures are
-verified against §19 acceptance checks.
+Every PR gets the multi-agent review before merge. In Codex, invoke
+`$regards-pr-review` (defined in
+`.codex/skills/regards-pr-review/SKILL.md`). It pre-flights the mechanical
+gates, then fans out to the read-only agents in `.codex/agents/`:
+`pr-correctness`, `pr-security-privacy`, and `pr-code-quality` always;
+`pr-tests` for code/test changes; and `pr-accessibility` plus
+`pr-fit-finish` when their UI/docs path rules match. Any blocker means
+`REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
+checks.
 
 For the local Codex-builder → Claude-reviewer loop, run
 `scripts/run-and-review.sh "<task>"`. The script requires a clean worktree,
-leaves Codex's changes uncommitted, and invokes `/pr-review worktree`.
+leaves Codex's changes uncommitted, and invokes Claude's `/pr-review worktree`
+command.
 
 ## Things to avoid
 
@@ -141,3 +144,5 @@ leaves Codex's changes uncommitted, and invokes `/pr-review worktree`.
 - Writing back to system Contacts outside the partial-field `CNSaveRequest` pattern described in §7 (never delete, never bulk-edit, never merge system contacts — merges are virtual via the local `ContactGroup` table).
 - Adding an OAuth calendar integration. This is an explicit non-goal (§3); local EventKit only.
 - Marking a remediation item done without meeting its acceptance check — the open register is ARCHITECTURE.md §19; every fix PR cites its R-numbers.
+
+## Imported Claude Cowork project instructions
