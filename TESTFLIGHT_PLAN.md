@@ -12,9 +12,10 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Active work: `TF-01` (slice 1: repository/docs/accessibility truth; `OWNER`;
   owner-directed slice 2 platform modernization is stacked on it)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #23 (`chore/tf-01-truth-a11y`, draft;
-  manual accessibility smoke pending); modernization branch
-  `ios/modern-platform-showcase` is based on PR #23 and must not merge first
+- Open pull requests: GitHub PR #23 (`chore/tf-01-truth-a11y`, draft;
+  manual accessibility smoke pending) and GitHub PR #24
+  (`ios/modern-platform-showcase`, draft; stacked on PR #23 with its manual
+  accessibility smoke pending)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -115,7 +116,7 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; adopt the latest stable iOS composition with explicit fallbacks; current-state prose and checks agree with the repository | dedicated modernization slice; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
+| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; adopt the latest stable iOS composition with explicit fallbacks; current-state prose and checks agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
 | TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
@@ -152,7 +153,8 @@ slice 1.
    add its audit coverage; remove the deleted wait-helper reference; standardize
    the manual smoke on iPhone 17 Pro; reconcile §18 and the closed
    documentation/audit R-items.
-2. Dedicated stable-platform modernization: native navigation and empty states;
+2. Dedicated stable-platform modernization (GitHub PR #24): native navigation
+   and empty states;
    iOS 18 value-based tabs, search-role destination, adaptive sidebar, and
    Reduce-Motion-aware matched transitions; iOS 26 restrained Liquid Glass,
    tab-bar minimization, and a local open-section App Shortcut; iOS 17
@@ -175,10 +177,10 @@ Current gate:
   at `accessibility5`, and Reduce Motion on/off), record the result in the pull
   request, run the hosted review, and merge only when every check approves.
   No credential or account access is needed.
-- `TF-01` slice 2: after automated review is green, run the same manual
+- `TF-01` slice 2 / PR #24: after automated review is green, run the same manual
   VoiceOver, Dynamic Type `accessibility5`, and Reduce Motion smoke against the
-  modernized UI. Merge PR #23 first, then retarget the stacked modernization PR
-  to `main` and rerun its required checks.
+  modernized UI. Merge PR #23 first, then retarget PR #24 to `main` and rerun
+  its required checks.
 
 Later gates:
 
