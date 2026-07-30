@@ -8,10 +8,10 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 ## Current checkpoint
 
 - Updated: 2026-07-29
-- Baseline: `main` at `63a4f0f` (merged GitHub PR #21)
-- Active work: `TF-00`
-- Next ready work: none (`TF-01` follows merged `TF-00`)
-- Open pull request: GitHub PR #22 (`chore/tf-00-execution-control`)
+- Baseline: `main` at `9545bca` (merged GitHub PR #22)
+- Active work: `TF-01` (slice 1: repository/docs/accessibility truth)
+- Next ready work: none (`TF-02` follows completed `TF-01`)
+- Open pull request: none
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -108,8 +108,8 @@ numbers.
 
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
-| TF-00 | ACTIVE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure |
-| TF-01 | BLOCKED | TF-00 | Truth and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; current-state prose and checks agree with the repository | PR18–PR19; R16, R19, R21–R22, R27–R34, R40, R42–R43 |
+| TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
+| TF-01 | ACTIVE | TF-00 | Truth and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; current-state prose and checks agree with the repository | PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
 | TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
@@ -131,6 +131,26 @@ numbers.
 `BLOCKED` in this queue normally means “waiting on the listed dependency,” not
 an implementation problem. Promote the next item to `READY` when its dependency
 is merged.
+
+### TF-01 serial slices
+
+TF-01 is one active queue item implemented as three pull requests so unrelated
+truth, CI, and mock-code changes remain reviewable. Do not start a later slice
+until the earlier one merges.
+
+1. Repository/docs/accessibility truth: README layout and current/future
+   language; restore a working Edit Contact route and standard Back escape;
+   add its audit coverage; remove the deleted wait-helper reference; standardize
+   the manual smoke on iPhone 17 Pro; reconcile §18 and the closed
+   documentation/audit R-items.
+2. CI/reproducibility/reviewer enforcement: commit `Package.resolved`; remove
+   placeholder tests; root Markdown links; ≥95% Domain coverage; hardened
+   privacy/domain guards; dead SwiftLint/audit comments; make the hosted review
+   fail unless it posts a verdict artifact; require review/parity contexts in
+   branch protection; reconcile the documented merge method with GitHub.
+3. Mock/code hygiene: seed group, interaction, and occasion states; stable
+   Upcoming row IDs; remove or wire dead assets and stale comments; prune
+   obsolete worktrees and merged branches after exact-target verification.
 
 ## Owner gates
 

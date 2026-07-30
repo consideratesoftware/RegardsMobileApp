@@ -21,15 +21,7 @@ public struct AllContactsScreen: View {
                 RegardsCard {
                     VStack(spacing: 0) {
                         ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, contact in
-                            NavigationLink(
-                                destination: ContactDetailScreen(
-                                    viewModel: ContactDetailViewModel(
-                                        contactId: contact.id,
-                                        contacts: env.contacts,
-                                        interactionsRepo: env.interactions
-                                    )
-                                )
-                            ) {
+                            NavigationLink(value: contact.id) {
                                 contactRow(contact)
                             }
                             .buttonStyle(.plain)

@@ -6,9 +6,10 @@ Regards is a local-first mobile app that reminds you to stay in touch with the p
 
 It answers one question: *"Who have I been meaning to talk to, but haven't?"*
 
-> **Status:** Pre-alpha. Regards is a one-person project, so the two apps are being built one platform at a time — iOS first, Android next. No public builds yet.
+> **Status:** Pre-alpha. The iOS app is the only live platform in this
+> repository. No public builds yet.
 
-## What it does
+## What V1 will do
 
 - Import your device contacts (read-only until you choose to edit).
 - Mark the people you actively want to stay in touch with. Set a cadence per contact — weekly, monthly, quarterly, yearly, or custom.
@@ -31,47 +32,46 @@ It answers one question: *"Who have I been meaning to talk to, but haven't?"*
 
 Regards makes a strong privacy claim and backs it up with technical, legal, and transparency guarantees:
 
-- **Android: no `INTERNET` permission.** The Linux kernel denies socket creation to the app's UID. Network access is technically impossible, not just policy-forbidden.
-- **iOS: no networking code in our modules.** App Transport Security is set to deny all loads. The only network-adjacent code in the app is StoreKit, which runs in a separate OS-provided framework.
-- **All data at rest is encrypted.** iOS Data Protection on the DB file; Android uses SQLCipher with a key in the Android Keystore.
-- **Contacts are read on-device only.** Writes (when you edit a contact from inside Regards) are scoped to the fields you touched and go through `CNSaveRequest` / `ContactsContract`. Regards never deletes, bulk-edits, or merges your system contacts.
+- **iOS: no networking code in our modules.** App Transport Security is set to
+  deny all loads. V1 billing will use the OS-provided StoreKit framework.
+- **Data at rest uses iOS Data Protection.** The local database is protected by the operating system.
+- **Contacts are read on-device only.** Planned V1 writes are scoped to the fields you touch and go through `CNSaveRequest`. Regards never deletes, bulk-edits, or merges your system contacts.
 - **Calendar access is optional, local-only, and read-only.** No OAuth calendar integrations — ever.
 - **Source is available for audit.** Every line of code is publicly readable under the license below.
-- **App Store and Play Store declarations:** "Data Not Collected" across the board.
+- **App Store declaration:** "Data Not Collected" across the board.
+
+The planned Android port will preserve the same posture with no `INTERNET`
+manifest permission, but no Android app exists in this repository today.
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) §11 for the full privacy stack.
 
 ## Repository layout
 
-This repo is the monorepo for both platforms. The two apps share no code at runtime — each is a native implementation of the same domain — but they share the design document, the domain specification, and this license.
+The repository contains the iOS app and its canonical design document. A native
+Android port is planned only after iOS stabilizes.
 
 ```
 .
 ├── ARCHITECTURE.md        Design doc. The source of truth for what we're building and why.
-├── docs/
-│   └── DOMAIN_MODEL.md    Platform-neutral entity + scheduling spec (shared between iOS and Android).
-├── ios/                   Swift / SwiftUI app. Xcode project, SPM modules. Being built first.
-├── android/               Kotlin / Jetpack Compose app. Multi-module Gradle. Built next.
+├── TESTFLIGHT_PLAN.md     Live execution queue and recovery checkpoint.
+├── ios/                   Swift / SwiftUI app, tests, generated Xcode project, and iOS docs.
 ├── LICENSE                PolyForm Noncommercial 1.0.0.
 └── README.md              You are here.
 ```
 
 ## Tech stack
 
-Regards is a one-person project, so the two apps are being built sequentially rather than in parallel — iOS first, Android next. Both are equally first-class once they ship; the order is a scheduling choice, not a statement of priority.
-
 **iOS (in development)**
 Swift 6 with strict concurrency, SwiftUI, GRDB.swift for persistence, StoreKit 2 for billing, WidgetKit for widgets. Minimum target: iOS 17.
 
-**Android (next up)**
-Kotlin, Jetpack Compose + Material 3, Room + SQLCipher, Play Billing Library 7, Glance for widgets. Minimum SDK: 28 (Android 9).
-
-No cross-platform runtime. No KMP. The domain layer is ported between the two, not shared — see [`ARCHITECTURE.md`](./ARCHITECTURE.md) §6 and §14 for the rationale.
+The future Android app will be a native port rather than a shared runtime. See
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §6 and §14 for the start gate and
+rationale.
 
 ## Roadmap
 
 - **V1 (in progress)** — Core reminder loop. iOS first, then Android. Contacts import, cadences, reminder windows, deep-link catalog for 12+ channels, local notifications, birthdays and anniversaries, widgets, in-app contact editing, virtual duplicate merging.
-- **V1.1 — Holiday Pack (target: September).** Christmas-card list export with address editing, formatted for Shutterfly / Minted / Zola / Paper Culture import.
+- **V1.1 — Holiday Pack.** Christmas-card list export with address editing, formatted for Shutterfly / Minted / Zola / Paper Culture import. Timing will be re-estimated after V1 stabilizes in TestFlight.
 - **V2 candidates.** Email metadata integration (OAuth, read-only), Apple Watch / Wear OS companions, full localization for top non-English markets. Explicitly *not* V1.
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) §14 for the full phased plan.
@@ -84,7 +84,7 @@ The entire build is being documented publicly, biweekly, on Substack — from be
 
 ## Contributing
 
-This is a solo-developer project in its earliest phase. The code is source-available so you can **read, audit, learn from, and fork it for personal or educational use** — that's a core part of the privacy claim. Bug reports and feature suggestions via [GitHub Issues](../../issues) are welcome.
+This is a solo-developer project in its earliest phase. The code is source-available so you can **read, audit, learn from, and fork it for personal or educational use** — that's a core part of the privacy claim. Bug reports and feature suggestions via [GitHub Issues](https://github.com/consideratesoftware/RegardsMobileApp/issues) are welcome.
 
 Pull requests are **not currently being accepted** while the architecture is still stabilizing. That will change once V1 ships. When it does, contributors will be asked to sign a CLA so the project retains the ability to relicense later if warranted.
 

@@ -5,7 +5,7 @@ under a **Manual accessibility smoke** heading.
 
 ## Setup
 
-1. Boot the iPhone 15 simulator (`xcrun simctl boot "iPhone 15"` or open from
+1. Boot the iPhone 17 Pro simulator (`xcrun simctl boot "iPhone 17 Pro"` or open from
    Xcode).
 2. Install the Debug build.
 3. Simulator → **Features → Toggle VoiceOver** (⌘+⌥+F5 on a real device, or
@@ -13,25 +13,19 @@ under a **Manual accessibility smoke** heading.
 4. Simulator → **Features → Toggle Software Keyboard** (so you can type if
    prompted, otherwise leave off).
 
-## PR1 — launch screen
+## Launch and tab shell
 
-- [ ] Launch app. VoiceOver announces a header containing the word "regards".
-- [ ] Swipe right once. Focus moves to the "Phase 0 scaffold" subtitle (or
-      remains on the combined element, depending on how the view is
-      structured).
-- [ ] No VoiceOver focus trap. You can swipe back to the top.
+- [ ] Launch app. VoiceOver announces "Regards. Loading." as a header.
+- [ ] After the splash fades, focus can reach the Overdue heading and all four
+      tab buttons.
+- [ ] No VoiceOver focus trap. You can move through the tab root and back.
 - [ ] Toggle Dynamic Type to `accessibility5`
       (Settings → Accessibility → Display & Text Size → Larger Text → slider
       all the way up). App re-renders without clipping or truncation.
 
-## PR2 — no UI changes expected
+## Screen checklist
 
-Re-run PR1's checks as a regression guard.
-
-## PR3 — eight-screen shell
-
-The script here grows one section per screen as the shell lands. Each section
-follows the template:
+Apply this checklist to every screen changed by the pull request:
 
 - [ ] VoiceOver announces the screen title as a header.
 - [ ] Each row reads as a single natural-language sentence.
@@ -52,7 +46,7 @@ In the PR description:
 
 ```
 ## Manual accessibility smoke
-Simulator: iPhone 15 · iOS 17.x
+Simulator: iPhone 17 Pro · current CI-pinned iOS runtime
 VoiceOver: on
 Dynamic Type: accessibility5
 Reduce Motion: on / off (both tested)

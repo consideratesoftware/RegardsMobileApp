@@ -21,6 +21,9 @@ final class LaunchAccessibilityTests: XCTestCase {
         let overdue = app.descendants(matching: .any)["screen.overdue"]
         XCTAssertTrue(overdue.waitForExistence(timeout: 10),
                       "Overdue tab should appear after the splash.")
+        let splash = app.descendants(matching: .any)["launch.root"]
+        XCTAssertTrue(splash.waitForNonExistence(timeout: 10),
+                      "Splash transition should finish before the audit begins.")
 
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
     }

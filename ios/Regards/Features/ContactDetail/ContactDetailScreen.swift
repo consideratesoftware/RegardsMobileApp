@@ -49,13 +49,7 @@ public struct ContactDetailScreen: View {
         .toolbar {
             if let contact = viewModel.contact {
                 ToolbarItem(placement: .topBarTrailing) {
-                    // `NavigationLink(value:)` so Edit integrates with
-                    // whichever NavigationStack is hosting this screen —
-                    // the tab root / AllContactsScreen's stack supplies a
-                    // `.navigationDestination(for: Contact.self)` that
-                    // renders `EditContactScreen`. This keeps the push
-                    // idiomatic (no closure plumbing) and the button live.
-                    NavigationLink(value: contact) {
+                    NavigationLink(destination: EditContactScreen(contact: contact)) {
                         Text("Edit")
                             .foregroundStyle(RegardsDS.accentInk)
                     }

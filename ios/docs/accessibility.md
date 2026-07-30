@@ -84,9 +84,10 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Upcoming | PR3 | |
 | All Contacts | PR3 | |
 | Settings | PR3 | |
-| Contact Detail (via Contacts → row) | PR3 | Inline `NavigationLink`. |
+| Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
 | Contact Detail (via Upcoming → row) | PR5 | Factory-built VM per push. |
+| Edit Contact (via Contacts → Contact Detail → Edit) | TF-01 | Structural audit coverage and standard Back escape route; the real form remains TF-09. |
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
 | Merge Duplicates | PR3 | Reached via Settings → Find duplicate contacts. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
@@ -162,21 +163,27 @@ timeout, even when the underlying element is visible.
 **Rule:** use predicates only for *read-after-known* (read a value when
 you already know the screen is rendered), never for *wait-until-true*.
 
-This was the underlying race behind `testContactDetailPassesAudit`
-flaking on three consecutive main runs in May 2026. The fix was to swap
-the trait-predicate header wait for `detail.staticTexts.firstMatch` —
-same load-done signal, no predicate timing dependency.
+Rapid simulator relaunches can also leave duplicate tab-button elements in the
+automation hierarchy or drop a synthesized tap. Wait on the plain tab bar,
+resolve the currently hittable button, verify the destination with its plain
+screen identifier, and allow one re-resolution retry. `navigateToTab` in
+`ScreensAccessibilityTests` is the canonical implementation.
 
-### 2. ContactDetail "settled" means a static text exists, not the screen identifier
+This was the underlying race behind `testContactDetailPassesAudit`
+flaking on three consecutive main runs in May 2026. The current tests wait on
+the plain toolbar `Edit` button, which appears only after the contact finishes
+loading and avoids both predicate timing and ScrollView descendant-query
+instability.
+
+### 2. ContactDetail "settled" means visible content exists, not only the screen identifier
 
 `screen.contact-detail` becomes findable as soon as the identifier is
 added to the tree, which can happen mid-transition. `viewModel.load()`
 is async; the screen renders a `ProgressView` (no static text) until it
-resolves. Wait for `detail.staticTexts.firstMatch` instead — it only
-resolves when the if-let-loaded body branch has rendered, which is
-when the audit can run cleanly. The helper
-`waitForContactDetailReady(_:)` in `ScreensAccessibilityTests` is the
-canonical implementation.
+resolves. Wait for the visible toolbar `Edit` button instead — it exists only
+after the if-let-loaded body branch has rendered, which is when the audit can
+run cleanly. Do not reintroduce a predicate-backed wait helper or scope the
+load signal beneath the ScrollView identifier.
 
 ### 3. Run the audit suite 5x locally before pushing UI changes
 

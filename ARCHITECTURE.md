@@ -413,7 +413,7 @@ Nine screens + one widget family in V1. **As-built decision (#32):** navigation 
 2. **Upcoming** — reminders in the next `digestHorizonDays` (7/14/30, user-set), grouped by day, from **persisted** `ScheduledReminder` rows via `ValueObservation` (R10). Rows show contact, channel, kind tag (birthday/anniversary), scheduled time. Swipe: **Reach out now** (opens deep link + logs interaction + advances cadence) / **Mark caught up**. Horizon picker lives in the nav bar (shipped inert button R11).
 3. **All Contacts** — every tracked contact; search (`.searchable`), sections by priority tier, group-membership indicator, tap → Contact Detail. Untracked imports reachable via a filter toggle (Phase 1B) so users can start tracking someone new.
 4. **Contact Detail** — hero (photo/name/priority), cadence card (cadence, **live** next reminder, last interaction, status), channel card with **working "Open [channel]"** button, actions: **Caught up** (logs + reschedules), **Snooze 1 wk**, **Log other channel…**; interactions list (last 8); Regards-local notes with "private to Regards" footnote; **Edit contact** (→ screen 5); reminder-window override editor entry; "Merged with…" disclosure when grouped (→ screen 6 context).
-5. **Edit Contact** — real form (`TextField`s) mirroring system-contact fields: name, phones, emails, postal addresses, birthday, anniversary. Save = partial-field `CNSaveRequest` write-back of touched fields only; Cancel/back always available (the shipped screen hides the back button with no-op Cancel/Save — the R13 nav trap). Regards-local `notes` visible but labeled not-written-back. Write-permission-denied state links to Settings.
+5. **Edit Contact** — real form (`TextField`s) mirroring system-contact fields: name, phones, emails, postal addresses, birthday, anniversary. Save = partial-field `CNSaveRequest` write-back of touched fields only; Cancel/back always available. The interim screen now has a standard Back escape route and no inert Save/Cancel controls; the real form remains R13. Regards-local `notes` visible but labeled not-written-back. Write-permission-denied state links to Settings.
 6. **Merge Duplicates** (Settings entry) — ranked candidate pairs (§7 heuristic) with side-by-side preview; user picks the primary face; **Confirm creates a `ContactGroup` row** (shipped gap R12: nothing persists); one-tap Undo (delete group); **Skip** dismisses a pair persistently (store dismissed pair hashes locally); manual "link two contacts…" flow for heuristic misses.
 7. **Settings** — Reminder windows (→ screen 9), quiet hours, occasion notification time, Upcoming horizon, digest preview, Find duplicate contacts, notification permission status + re-prompt, entitlement card (trial countdown / unlock / restore purchases / tip jar, Phase 2), **Export my data** (JSON to Files), **Delete everything** (wipe DB + reset first-run), Transparency screen, "Behind the App" (journal link — the app's one outbound *user-initiated* Safari link; it does not violate §11 because it's `openURL` to the system browser, no in-app networking), Contact support (mailto with prefilled diagnostics), Onboarding replay.
 8. **Onboarding** — 3 screens: (a) concept sell ("who have you been meaning to call?"), (b) Contacts permission pre-prompt → system prompt, (c) optional Calendar pre-prompt + pick-your-first-3-contacts starter (search, set cadence+channel inline). Gated by `UserProfile.onboardingCompletedAt` in the launch path (shipped gap: only reachable from Settings preview, R14). Denial paths: Contacts denied → explainer + Settings deep link + browse-only mode.
@@ -425,7 +425,7 @@ Plus **Transparency** (static, shipped) under Settings — plain-language privac
 
 **Design system:** `RegardsDS` tokens (colors incl. WCAG-checked pairs in `RegardsPalette.contrastPairs`, typography, spacing) + primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`, `RegardsNavBar`). Rule: **no inert interactive-looking controls in shipped UI** — Phase 0's muted-stub convention (`RegardsNavBar` renders nil-handler actions as visibly disabled) was correct for a shell and is deprecated the moment the real affordance lands; every stub is enumerated in §19 and each Phase 1 PR must wire or remove the stubs in the screens it touches.
 
-**Accessibility is merge-blocking.** `RegardsAccessibilityTests` runs `performAccessibilityAudit()` per screen; structural categories (`elementDetection`, `sufficientElementDescription`, `trait`) gate today; sensory categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are carved out until PR34 flips `structuralAuditCategories` → all categories (tracked in `ios/docs/accessibility.md` "Sensory-audit carve-outs"). Every screen gets a row in that doc's audited table — Edit Contact is currently missing its row *and* its test (R16). Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) before any UI-touching merge. Dynamic Type through `accessibility5`, Reduce Motion respected (splash already does), 44×44pt targets.
+**Accessibility is merge-blocking.** `RegardsAccessibilityTests` runs `performAccessibilityAudit()` per screen; structural categories (`elementDetection`, `sufficientElementDescription`, `trait`) gate today; sensory categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are carved out until PR34 flips `structuralAuditCategories` → all categories (tracked in `ios/docs/accessibility.md` "Sensory-audit carve-outs"). Every screen has a row in that doc's audited table, including Edit Contact (R16). Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) before any UI-touching merge. Dynamic Type through `accessibility5`, Reduce Motion respected (splash already does), 44×44pt targets.
 
 ## 11. Privacy & security — verifiable, not marketing
 
@@ -550,7 +550,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-07-01):** ReminderEngineTests (14), ContactsImporterTests (13), RepositoriesTests (10), AnnualRecurrenceTests (9), DuplicateDetectorTests (8), DeepLinkBuilderTests (7), DatabaseMigratorTests (5), ContactAccessibilityTests (5), OverdueViewModelTests (4, incl. solid spring-forward day-count regressions), ColorContrastTests (3), placeholder (1) — 79 tests in the unit bundle. Plus 13 XCUI audit tests (11 screen audits + 1 navigation-distinctness regression + launch), and 1 placeholder in the out-of-plan `RegardsUITests` target.
+**Shipped suites (census 2026-07-29):** ReminderEngineTests (14), ContactsImporterTests (13), RepositoriesTests (10), AnnualRecurrenceTests (9), DuplicateDetectorTests (8), DeepLinkBuilderTests (7), DatabaseMigratorTests (5), ContactAccessibilityTests (5), OverdueViewModelTests (4, incl. solid spring-forward day-count regressions), ColorContrastTests (3), placeholder (1) — 79 tests in the unit bundle. Plus 15 XCUI tests (13 structural accessibility audits + 2 navigation regressions), and 1 placeholder in the out-of-plan `RegardsUITests` target.
 
 **Standing requirements:**
 
@@ -753,18 +753,19 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 ## 18. Current state — ground truth as of 2026-07-29
 
-`main` = `63a4f0f` (GitHub PR #21, 2026-07-29). The engine contract,
+`main` = `9545bca` (GitHub PR #22, 2026-07-29). The engine contract,
 section-header accessibility fix, sample-data refresh, generic multi-agent
 review infrastructure, channel-validation contract, and bundle-namespace
-migration have landed. There are no open GitHub pull requests or issues.
-`TESTFLIGHT_PLAN.md` records the next executable work.
+migration have landed. The durable TestFlight queue and cross-provider review
+parity guard are now also on `main`. `TESTFLIGHT_PLAN.md` records the live pull
+request state and next executable work.
 
 ### What exists and works (Phase 0 complete, PRs #1–#5)
 
 - **Domain layer, pure and tested:** all §7 entities; `ReminderEngine` (cadence walk, quiet hours, annual recurrence + Feb-29, batching helper); `DuplicateDetector`; `ChannelCatalog` + `DeepLinkBuilder` for all 13 channels; `MonthDay` with round-trip validation.
 - **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
 - **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
-- **Accessibility harness that gates merges:** 13 XCUI audit tests (structural categories), audit-stress tooling (script + workflow), documented test patterns and smoke script.
+- **Accessibility harness that gates merges:** 13 XCUI audit tests (structural categories, including Edit Contact) plus 2 navigation regressions, audit-stress tooling (script + workflow), documented test patterns and smoke script.
 - **CI: 4 gating workflows** — ios-ci (xcodegen determinism → build → unit+coverage ∥ a11y audit), guards (privacy-grep, domain-purity, YAML, ios/docs link check), lint (`--strict`), audit-stress (5× per PR).
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
 
@@ -776,7 +777,9 @@ migration have landed. There are no open GitHub pull requests or issues.
 
 ### What is broken (fix before building — full detail in §19)
 
-Headline open P0s: Edit Contact is a navigation trap; Reminder Windows is display-only; Upcoming ignores persisted reminders; merge and onboarding flows do not persist.
+Headline open P0s: Edit Contact is still a read-only stub; Reminder Windows is
+display-only; Upcoming ignores persisted reminders; merge and onboarding flows
+do not persist.
 
 ### What does not exist at all
 
@@ -802,7 +805,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
 | R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; inert Horizon + "All" nav actions; no-op Caught up/Snooze/Log-other (factory passes no callbacks); no-op channel taps `{ _ in }`; inert Merge "Skip"; no-op Onboarding permission button | `ContactDetailScreen.swift:263-266` , `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift:33`, `RegardsApp.swift:102,169-177`, `MergeDuplicatesScreen.swift:108`, `OnboardingScreen.swift:4` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | PR22–PR29 |
 | R12 | **Merge never persists** (no `ContactGroup` written; `env.groups` unused) and detector sees only `preferredChannelValue` instead of full handle sets | `MergeDuplicatesViewModel.swift:44-55` | PR28 scope + `phonesJson`/`emailsJson` inputs | PR28 |
-| R13 | **Edit Contact navigation trap:** back button hidden + default no-op Cancel/Save closures at every push site → user is stuck | `EditContactScreen.swift:36, 8-14`; `RegardsApp.swift:108-110,125-127,135-137` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | PR27 (interim fix acceptable in PR18) |
+| R13 | **Edit Contact shipped as a navigation trap and remains a read-only stub:** the hidden Back button and mixed navigation APIs made Edit unreachable or inescapable; the interim screen now removes inert form actions | `EditContactScreen.swift`, `ContactDetailScreen.swift` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | escape route ✅ **closed by TF-01 slice 1**; real form PR27 |
 | R14 | **Onboarding not in launch path** (single screen, Settings-preview only; `onboardingCompletedAt` never consulted) | `OnboardingScreen.swift`, `RegardsApp.swift:23-40` | 3-screen flow gated at launch per §10.8 | PR29 |
 | R15 | **Transparency screen's 3 "Open" links inert**; repo URL hardcoded — verify before launch | `TransparencyScreen.swift:123, 183-187` | Wire `openURL`; confirm `github.com/sid78669/RegardsMobileApp` is the public repo URL | PR33 |
 
@@ -810,20 +813,20 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 
 | R | Defect | Where | Fix | PR |
 |---|---|---|---|---|
-| R16 | Edit Contact missing from the audited-screens table AND the audit suite (violates accessibility.md rule 10) | `ios/docs/accessibility.md:76-89`, `ScreensAccessibilityTests.swift` | Add row + test | PR18 |
+| R16 | Edit Contact missing from the audited-screens table AND the audit suite (violates accessibility.md rule 10) | `ios/docs/accessibility.md:76-89`, `ScreensAccessibilityTests.swift` | Add row + test | ✅ **closed by TF-01 slice 1** |
 | R17 | `NSContactsUsageDescription` is read-only copy; §11 requires the edit mention before write-back ships. `NSCalendarsFullAccessUsageDescription` absent (needed PR30) | `project.yml:84-86` | Reword with PR27; add calendar key with PR30 | PR27/PR30 |
 | R18 | `PrivacyInfo.xcprivacy` has empty `NSPrivacyAccessedAPITypes`; SQLite/GRDB file-timestamp access will need required-reason entries at submission | `ios/Regards/PrivacyInfo.xcprivacy` | Populate against Apple's current category list during Phase 3 prep | PR34/§20 |
 | R19 | README references nonexistent `docs/DOMAIN_MODEL.md` and `android/`; root markdown exempt from link check so CI can't catch it | `README.md:52,54`; `guards.yml:60-69` | Fix README (decision #24); extend link check to root `*.md` | PR18/PR19 |
-| R20 | **CLAUDE.md misroutes agents (5 stale claims):** iPhone 15 destinations (CI uses 16 Pro); "Platform/ currently empty" (has Contacts adapter); PrivacyInfo said to live in `Resources/`; `pr3AuditCategories`/"PR3 follow-ups" naming (actual: `structuralAuditCategories`, "Sensory-audit carve-outs"); "snapshot job declared `if: false`" (it's a comment, no job) | `CLAUDE.md:37,41,78,80,92,111` | Rewrite (done in the same change set as this doc v1.0); future edits follow sibling-PR rule | PR18 |
+| R20 | **CLAUDE.md misroutes agents (5 stale claims):** iPhone 15 destinations (CI uses 16 Pro); "Platform/ currently empty" (has Contacts adapter); PrivacyInfo said to live in `Resources/`; `pr3AuditCategories`/"PR3 follow-ups" naming (actual: `structuralAuditCategories`, "Sensory-audit carve-outs"); "snapshot job declared `if: false`" (it's a comment, no job) | `CLAUDE.md:37,41,78,80,92,111` | Rewrite (done in the same change set as this doc v1.0); future edits follow sibling-PR rule | ✅ **closed by TF-00** |
 | R21 | `Package.resolved` gitignored while GRDB floats `from: 6.29.0` — contradicts reproducible-build claim | `.gitignore:32`, `project.yml:41-44` | Decision #37: commit it | PR19 |
 | R22 | `RegardsUITests` placeholder target in no scheme/workflow; `PlaceholderTests.swift` in unit bundle | `ios/RegardsUITests/`, `RegardsTests/PlaceholderTests.swift` | Delete placeholders; keep the target only if PR34 snapshot/UI flows use it | PR19/PR34 |
 | R23 | Mock and GRDB repositories share no contract tests — mocks can drift from production semantics | `RegardsTests/Data/RepositoriesTests.swift` | Shared contract-test suite run against both | PR20 |
 | R24 | No unit tests for Upcoming/ContactDetail/MergeDuplicates VMs | `ios/RegardsTests/Features/` | Add with the PRs that touch each VM | PR22/PR25/PR28 |
 | R25 | `CNContactsSource.fetchAllContacts` blocks a cooperative-pool thread for the full enumeration (5k-contact stall); `@unchecked Sendable` justified only by comment | `ContactsSource.swift:69, 98-125` | Move enumeration off the pool; 5k-contact perf test | PR35 |
 | R26 | Force-unwrapped calendar math in the engine (`date(byAdding:)!`) | `ReminderEngine.swift:162,203-205` | Eliminated by the R1 rewrite (incl. `resolveFeb29Fallback`) | ✅ **closed by PR16** |
-| R27 | accessibility.md documents `waitForContactDetailReady` as canonical — the helper was reverted in PR #12 and doesn't exist | `ios/docs/accessibility.md:166-175` | Correct to the plain-identifier wait actually in use | PR18 |
-| R28 | Simulator name drift: iPhone 15 (CLAUDE.md, docs), 15 Pro (`audit-stress.sh:25`), 17 Pro (CI) | multiple | Standardize on iPhone 17 Pro | PR18 |
-| R29 | Unmerged `origin/ios/section-header-accessibility-label` (+7 lines) likely fixes the known ~20% "Label not human-readable" audit flake | branch | Merge; then 3× audit-stress to confirm flake death | PR18 |
+| R27 | accessibility.md documents `waitForContactDetailReady` as canonical — the helper was reverted in PR #12 and doesn't exist | `ios/docs/accessibility.md:166-175` | Correct to the plain-identifier wait actually in use | ✅ **closed by TF-01 slice 1** |
+| R28 | Simulator name drift: iPhone 15 (CLAUDE.md, docs), 15 Pro (`audit-stress.sh:25`), 17 Pro (CI) | multiple | Standardize on iPhone 17 Pro | ✅ **closed by TF-01 slice 1** |
+| R29 | Unmerged `origin/ios/section-header-accessibility-label` (+7 lines) likely fixes the known ~20% "Label not human-readable" audit flake | branch | Merge; then 3× audit-stress to confirm flake death | ✅ **closed: branch merged in PR16; PR20–PR22 stress runs `30427994098`, `30457303394`, and `30514794147` passed 5/5 consecutively** |
 
 ### P2 — hygiene / hardening
 
@@ -842,7 +845,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift:9-11`, `accessibility.md:50-52` | Delete or wire; fix comments | PR19 |
 | R41 | Contrast registry incomplete vs UI reality (white-on-accentInk CTAs, accentInk-on-surface, danger-on-surface unlisted) | `RegardsColors.swift:70-83` | Extend `contrastPairs` + tests | PR34 |
 | R42 | `audit-stress.yml` header comment claims path-triggering that PR #15 removed | `audit-stress.yml:3-4` | Fix comment | PR19 |
-| R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | PR18 |
+| R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | ✅ **closed by TF-01 slice 1** |
 | R44 | `LSApplicationCategoryType` = social-networking in project.yml while the listing plan says Productivity primary | `project.yml:94` | Align with §20 category decision | PR34 |
 | R45 | 8.4 MB `Substack_banner.png` sitting at repo root (ignored but clutter); `.DS_Store` files | repo root | Move banner to journal assets outside the repo; OS files stay ignored | anytime |
 | R46 | `InteractionLog` doc comment references nonexistent `ContactRepository.markCaughtUp` API; `Channel.isAvailableOnIOS` always-true dead code; `Contact.effectiveWindow` misleading zero-caller helper | `InteractionLog.swift:11-12`, `Channel.swift:44`, `Contact.swift:58` | Fix comment; keep `isAvailableOnIOS` only if Android port will flip it (document), else delete; delete or repoint `effectiveWindow` at SchedulingPass | comment ✅ **closed by PR16**; `isAvailableOnIOS`/`effectiveWindow` → PR22 |
