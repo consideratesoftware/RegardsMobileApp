@@ -10,6 +10,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  review-agent-parity:
+    name: Review agent parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compare Codex and Claude reviewer contracts
+        run: scripts/check-review-agent-parity.sh
+
   privacy-grep:
     name: No networking code (§11)
     runs-on: ubuntu-latest

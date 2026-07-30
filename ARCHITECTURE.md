@@ -11,7 +11,9 @@
 
 1. The document now describes the code **as built through PR #15 (2026-05-06)** plus every correction needed. Where v0.5 and the code disagreed, each conflict is resolved explicitly here (see §7, §9, §16 decisions #23–#33).
 2. Three new operational sections: **§18 Current state ground truth**, **§19 Remediation register** (every known defect with file:line and acceptance criteria), **§20 Release engineering & App Store playbook**, **§21 Maintenance & operations playbook**.
-3. §14 is rebaselined to a **2026-08-31 iOS launch** with a PR-level work plan. The project was idle 2026-05-06 → 2026-07-01; the original plan had launch in late June.
+3. §14 contains the rebaselined V1 work packages and acceptance criteria.
+   `TESTFLIGHT_PLAN.md` now provides stable execution IDs and gate-based timing;
+   the former 2026-08-31 launch anchor is historical.
 4. Section numbers **1–17 are stable against v0.5** because code comments cross-reference them (e.g. "§9", "§11"). New material is §18+. Never renumber §1–§17.
 
 **Reading order for a fresh implementation agent:** §18 (where things stand) → §19 (what's broken) → §14 (what to do next, in order) → the spec section for whatever you're implementing (§7/§8/§9/§10/§11) → §17 (working rules). Do not write code before reading §17.
@@ -486,7 +488,10 @@ Documented on Substack (sdahiya.substack.com), biweekly baseline plus event post
 
 **State as of 2026-07-01:** 3 posts published — #1 "Why I'm building Regards in the open" (Apr 15), #2 "The apps that came before Regards" (May 5), #3 "Designing reminders that respect your time" (May 12). Silent since. Post #4 (the audit-helper story) drafted but unpublished. Posts are canonical on Substack; `journal/` is gitignored scratch space for drafts.
 
-**The restart calendar, drafts, and per-post outlines live in `journal/SCHEDULE.md`** (local, not committed). Summary: return post Jul 7 acknowledging the gap with the replan; then biweekly Tuesdays (audit-helper Jul 21, privacy-proof Aug 4, license Aug 11 as a deliberate pre-launch insert, deep-link catalog Aug 18, pricing Sep 8, birthdays Sep 22); event posts off-cycle (TestFlight ~Aug 14, launch Aug 31, 30-day retro Sep 30, Holiday Pack with V1.1 Oct 6).
+**The restart calendar, drafts, and per-post outlines live in
+`journal/SCHEDULE.md`** (local, not committed). Its former July–October dates
+were tied to the expired launch anchor and must be rebaselined from the
+internal/external TestFlight gates before publishing new commitments.
 
 **Editorial voice:** what I'm building and why — never what others get wrong. Appreciative, factual comparisons only. Every post links the repo, the app (once live), and 1–2 prior posts. Writing follows Sid's WRITING RULES doc (hard bans: em dashes, negative-parallelism reframes, analogies, metaphor verbs, throat-clearing, rule-of-three padding; numerals for numbers). Realistic target: ~400 subscribers at month 12; conversion beats list size.
 
@@ -563,9 +568,26 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 14. Phased roadmap — rebaselined 2026-07-01
 
-**History:** Phase 0 shipped on plan (PRs #1–#5, Apr 19 – May 3). Phase 1 started (PR #9 GRDB wiring, PR #10 Contacts plumbing, May 3–6) and stopped 2026-05-06. Nothing merged since. The original late-June launch is dead; this section replaces it.
+**Execution control:** `TESTFLIGHT_PLAN.md` is the live queue and recovery
+protocol. The PR labels below are stable scope aliases, not current GitHub pull
+request numbers, and the 2026 dates below are historical planning anchors.
+`TESTFLIGHT_PLAN.md` governs ordering and status; this section continues to
+govern scope and acceptance criteria.
 
-**Anchor: public App Store launch Monday 2026-08-31.** Working assumption ~15–20 focused hours/week of agent-assisted development. V1.1 Holiday Pack keeps its early-October window (6–8 weeks before peak card-ordering). If any week slips ≥1 full week, cut in this order: PR35 localization scaffolding → medium widget (ship small+lock only) → snapshot breadth (keep 4 core screens). Never cut: accessibility gates, privacy invariants, the §9 contract.
+**History:** Phase 0 shipped on plan (PRs #1–#5, Apr 19 – May 3). Phase 1
+started with GRDB wiring and Contacts plumbing, paused on 2026-05-06, and
+resumed in July with the engine, accessibility, channel, namespace, and review
+infrastructure work now reflected in §18. The legacy PR labels below are kept
+because the remediation register cites them.
+
+**Planning anchor:** the former 2026-08-31 launch date expired before the core
+production loop existed. Do not schedule against it. `TESTFLIGHT_PLAN.md`
+defines an internal-beta gate after the core loop and an external-beta gate
+after V1 is feature-complete. Re-estimate a public launch from measured beta
+throughput. If scope must move, cut in this order: PR35 localization
+scaffolding → medium widget (ship small+lock only) → snapshot breadth (keep 4
+core screens). Never cut accessibility gates, privacy invariants, or the §9
+contract.
 
 ### Phase 1R — Remediation (Jul 6–10) — fix what's wrong before building on it
 
@@ -612,17 +634,26 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 | **PR34** | Accessibility + visual hardening: fix sensory findings (ScaledMetric on fixed-size glyphs, contrast leftovers, hit regions), flip audit to **all** categories, snapshot tests (9 screens × states) + CI job, Dynamic Type pass to accessibility5 | Full-category audit green ×5 stress runs; snapshot job gating |
 | **PR35** | Localization scaffolding (String Catalog, en at launch), 5k-contact performance pass (move CNContact enumeration off the cooperative pool, R25), final copy pass | Cold start <2s with 5k contacts on an A15 device |
 
-### Phase 3 — Submission & launch (Aug 17–31)
+### Phase 3 — Submission & launch (gate-based; legacy Aug 17–31 window retired)
 
-- **Aug 14 (Fri):** feature freeze. Internal TestFlight build 1.0.0 (bump from 0.1.0, decision #35). §20 pre-submission checklist run 1.
-- **Aug 17–28:** external TestFlight (beta review takes 1–3 days; submit the external group Aug 14). Recruit 10–20 testers (journal readers — the TestFlight post is the ask). Daily triage; only P0/P1 fixes merge during freeze.
-- **Aug 24 (Mon):** submission candidate build. Full §20 checklist run 2: listing metadata, nutrition label, PrivacyInfo required-reason entries, screenshots, review notes (include "this app has no network code by design; you will observe zero outbound traffic; source: github.com/sid78669/RegardsMobileApp").
-- **Aug 26 (Wed):** submit for review with manual release. Review historically 24–72h; rejection playbook in §20.
-- **Aug 31 (Mon):** release. Launch-day post publishes; Product Hunt same morning; press kit (§20) goes to the privacy-press list.
+- **Internal gate:** build 1.0.0 after `TESTFLIGHT_PLAN.md`'s `TF-08`; run the
+  first §20 verification pass and collect core-loop feedback.
+- **External gate:** finish `TF-09`–`TF-18`, submit the feature-complete build
+  for beta review, recruit 10–20 testers, and merge only P0/P1 fixes during the
+  freeze.
+- **Submission candidate:** run the full §20 checklist again, including
+  listing metadata, nutrition label, PrivacyInfo required-reason entries,
+  screenshots, and review notes.
+- **Review and release:** submit with manual release. Choose the public date
+  only after approval and beta exit criteria; publish launch material on that
+  date.
 
 ### V1.1 — Holiday Pack (Sep 1 – Oct 6)
 
-CSV/XLSX holiday-card export matched to Shutterfly/Minted/Zola/Paper Culture address-import schemas; address-editing UI on the PR27 write-back rails; per-contact "gets a card" flag independent of tracking. Ships with journal post #14. September window preserved by the Aug 31 launch.
+CSV/XLSX holiday-card export matched to Shutterfly/Minted/Zola/Paper Culture
+address-import schemas; address-editing UI on the PR27 write-back rails;
+per-contact "gets a card" flag independent of tracking. Re-estimate after V1
+stabilizes in external TestFlight.
 
 ### Android track (Q4 2026, after iOS stabilizes)
 
@@ -640,7 +671,8 @@ Talking points / conversation queue (the surface-at-reminder-time twist stays th
 4. **Duplicate-heuristic tuning** — local-only accept/dismiss counters exist per §7; review after 4 weeks of real use.
 5. **Widget refresh cadence** — `reloadAllTimelines()` after each SchedulingPass should suffice; verify WidgetKit budget behavior in TestFlight.
 6. **Geo-tier drift** — quarterly pricing review year 1 (§21).
-7. **Xcode 26 / iOS 26 timing** — decide the submission toolchain at Phase 3 entry; if the fall OS ships before Aug 31, smoke-test on the GM before release (§21).
+7. **Xcode 26 / iOS 26 timing** — decide the submission toolchain at Phase 3
+   entry and smoke-test on the current GM before release (§21).
 8. ~~Android launch timing~~ → resolved into the Q4 start gate above.
 
 ## 16. Decisions log
@@ -683,9 +715,10 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 32 | Navigation is a 4-tab TabView; the Overdue/Upcoming count pill stays | 2026-07-01 | As built and shipped through audit; the pill carries live counts the tab bar can't. Supersedes v0.5's single-Home segmented design. |
 | 33 | Reminder Windows is a first-class screen (`Features/ReminderWindows/`), pushed from Settings | 2026-07-01 | The editor is too rich for a Settings subsection; §12 updated to match reality. |
 | 34 | Snapshot testing via pointfree swift-snapshot-testing, test targets only | 2026-07-01 | Fills the §13 commitment; test-only dependency, no privacy-grep surface. |
-| 35 | Launch rebaselined to 2026-08-31; version bumps 0.1.0 → 1.0.0 at Aug 14 feature freeze | 2026-07-01 | Two idle months; late-August keeps Holiday Pack's October window alive. |
+| 35 | Version bumps 0.1.0 → 1.0.0 at the first TestFlight feature freeze; fixed-date timing superseded by #38 | 2026-07-01 | The version rule survives; the former Aug 14 / Aug 31 anchors do not. |
 | 36 | `SchedulingPass` actor is the sole writer of ScheduledReminder rows and OS notifications | 2026-07-01 | One idempotent choke point; UI is read-only over persisted reminders. |
 | 37 | `Package.resolved` is committed | 2026-07-01 | Reproducible builds are part of the privacy claim; floating deps contradict it. |
+| 38 | TestFlight execution uses stable `TF-##` IDs and readiness gates, not a fixed public date | 2026-07-29 | The 2026-08-31 anchor expired before the production loop existed. Durable Git/GitHub checkpoints survive agent context and capacity resets; beta throughput determines the public date. |
 
 ## 17. Working rules for implementation agents
 
@@ -718,9 +751,13 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-07-01
+## 18. Current state — ground truth as of 2026-07-29
 
-`main` = `aa9bfa7` (PR #15, 2026-05-06). 15 PRs merged. One unmerged branch: `origin/ios/section-header-accessibility-label` (+7 lines, Wordmark VoiceOver label — merge in PR18). ~7,450 lines of Swift. 3 journal posts live; #4 drafted unpublished.
+`main` = `63a4f0f` (GitHub PR #21, 2026-07-29). The engine contract,
+section-header accessibility fix, sample-data refresh, generic multi-agent
+review infrastructure, channel-validation contract, and bundle-namespace
+migration have landed. There are no open GitHub pull requests or issues.
+`TESTFLIGHT_PLAN.md` records the next executable work.
 
 ### What exists and works (Phase 0 complete, PRs #1–#5)
 
@@ -816,14 +853,20 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 
 ### Versioning & branching
 
-- `main` is always releasable; feature branches → PR → squash-merge. Version `CFBundleShortVersionString` stays `0.1.0` until the Aug 14 feature freeze, then `1.0.0` (decision #35). `CFBundleVersion` increments every TestFlight upload (integer, monotonic). Tag releases `ios-v1.0.0`; release notes generated from merged PR titles.
-- Freeze rules (Aug 14–31): only P0/P1 fixes; every merge re-runs the full checklist below.
+- `main` is always releasable; feature branches → PR → squash-merge. Version
+  `CFBundleShortVersionString` stays `0.1.0` until the internal TestFlight
+  feature freeze, then becomes `1.0.0` (decision #35's version rule survives
+  its expired date). `CFBundleVersion` increments every TestFlight upload
+  (integer, monotonic). Tag releases `ios-v1.0.0`; release notes come from
+  merged PR titles.
+- Freeze rules: after the external TestFlight candidate, only P0/P1 fixes;
+  every merge re-runs the full checklist below.
 
 ### App Store Connect — record state & required fields
 
 Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken), bundle `com.consideratesoftware.regards`, SKU `regards-ios`, iOS platform. Everything else is empty. Fill order:
 
-**Before first TestFlight upload (Aug 14):**
+**Before first TestFlight upload:**
 1. Subtitle (30 chars): `Private personal CRM` (fallbacks: `Local-first contact reminders`, `No cloud. No account. No ads.`).
 2. Keywords (100 chars): `stay in touch,friends,family,reminder,contacts,personal crm,relationships,keep in touch,private,offline`.
 3. Category: **Primary Productivity, Secondary Lifestyle** (final call at entry; update `LSApplicationCategoryType` to match, R44).
@@ -832,7 +875,7 @@ Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken)
 6. App Privacy section → **"Data Not Collected"** every category. This is the centerpiece; triple-check.
 7. TestFlight beta app description + external group; export compliance: `ITSAppUsesNonExemptEncryption = false` in Info.plist (only OS-provided encryption) so uploads skip the crypto questionnaire.
 
-**Before submission (Aug 24–26):**
+**Before App Store submission:**
 8. Description (4000 chars): lead with the emotional hook from journal post #1 ("the friend from your wedding you haven't called in a year"), then reminder windows → one-tap deep links → provable privacy → what it deliberately won't do → one-time price. Mirror the post-#1 voice; don't write marketing-speak.
 9. Promotional text (170 chars, hot-editable): launch framing.
 10. Support URL: GitHub Issues. Marketing URL: the Substack.
@@ -856,7 +899,7 @@ Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken)
 
 Most likely flags for this app: (a) **2.1 performance/completeness** — reviewer can't see reminder value quickly → the review notes include a 60-second "how to see a reminder fire" script (set cadence 1 day, window = now); (b) **5.1.1 permission purpose strings** — keep strings specific (R17); (c) **privacy label mismatch** — we collect nothing, labels say so, PrivacyInfo agrees; (d) IAP restore/trial confusion — Restore button visible in Paywall AND Settings. Respond in Resolution Center within 24h; if metadata-only, fix without re-review; never argue, clarify.
 
-### Launch-day runbook (Aug 31)
+### Launch-day runbook
 
 Release the approved build manually at ~9am ET → verify live in 2–3 storefronts → publish journal post #10 (launch) → Product Hunt launch → press emails (MacStories, Privacy Guides forum, 9to5Mac tips, r/privacy where rules allow) with the press kit (one-pager, screenshots, network-capture video link, source link) → pin the GitHub Discussions welcome thread → watch crash/feedback channels; hotfix bar is P0-only for week 1.
 

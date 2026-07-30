@@ -12,7 +12,8 @@ Treat the literal target `worktree` as all tracked and untracked changes against
 ## Pre-flight
 
 1. Read `ARCHITECTURE.md` in the order §18 → §19 → §14, then the sections cited
-   by the change.
+   by the change. Read `TESTFLIGHT_PLAN.md` when the change claims a `TF-##`
+   work item.
 2. Inventory the target:
    - Branch/ref: `git diff --stat <target>` and `git diff <target>`.
    - Worktree: `git status --short`, `git diff HEAD`, and every untracked file.
@@ -30,8 +31,9 @@ Treat the literal target `worktree` as all tracked and untracked changes against
 ## Dispatch
 
 Spawn the selected project agents in one parallel batch. Give each agent the
-exact target, the relevant §14 PR row, and any R-numbers the change claims to
-close. Do not paste the diff; agents read it locally.
+exact target, the stable `TF-##` work item when present, the relevant §14 scope
+alias and acceptance-criteria row pasted verbatim, and any R-numbers the change
+claims to close. Do not paste the diff; agents read it locally.
 
 - Always run `pr-correctness`, `pr-security-privacy`, and `pr-code-quality`.
 - Run `pr-tests` when code or tests changed.
@@ -53,11 +55,20 @@ Return one review in this shape:
 PRE-FLIGHT: determinism ✅/❌ | swiftlint ✅/❌ | guards ✅/❌
 VERDICT: APPROVE | REQUEST_CHANGES
 
-### Blockers
-### Should fix
-### Nits
+### Blockers (must fix before merge)
+- [agent] [file:line] finding → fix → ref
+
+### Should fix (before or in fast-follow, owner's call)
+
+### Nits (take or leave)
+
 ### Questions for Sid
+
 ### Audit trail
+- Invariants verified (from pr-security-privacy, verbatim)
+- Process line (from pr-accessibility, if run)
+- Docs line (from pr-fit-finish, if run)
+- Criteria map (from pr-tests, verbatim)
 ```
 
 Deduplicate identical file-and-line findings, credit all reporting agents, and
