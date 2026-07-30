@@ -185,7 +185,15 @@ Two layer boundaries are **CI-enforced** by grep guards in `.github/workflows/gu
 ### iOS
 
 - **Language:** Swift 6, `SWIFT_STRICT_CONCURRENCY: complete`, warnings-as-errors in Debug and Release.
-- **UI:** SwiftUI, iOS 17.0 minimum target.
+- **UI:** SwiftUI, iOS 17.0 minimum target. The compatibility tiers are explicit:
+  iOS 17 keeps the complete baseline experience; iOS 18 adds value-based tabs,
+  the search-role destination, adaptive sidebar tabs, and matched zoom
+  navigation; iOS 26 adds Liquid Glass to the functional control layer and
+  scroll-aware tab-bar minimization. Every newer API has an availability-gated
+  fallback in the same view hierarchy (decision #40).
+- **System experiences:** App Intents / App Shortcuts, currently limited to an
+  iOS 26 local “open section” shortcut. It routes through the same typed tab
+  router as in-app navigation and exposes no contact data.
 - **Persistence:** GRDB.swift (SPM, currently `from: "6.29.0"` — pin via committed `Package.resolved`, R21).
 - **Async:** Swift Concurrency. ViewModels are `@MainActor @Observable`.
 - **Notifications:** `UNUserNotificationCenter`, non-repeating `UNCalendarNotificationTrigger`.
@@ -407,11 +415,34 @@ UI reads: Overdue/Upcoming ViewModels observe `ScheduledReminder` + `Contact` vi
 
 ## 10. UI / UX architecture
 
-Nine screens + one widget family in V1. **As-built decision (#32):** navigation is a **4-tab `TabView`** — Overdue, Upcoming, Contacts, Settings — each tab owning its own `NavigationStack` with per-tab `NavigationPath`, so a push inside Overdue never bleeds into Upcoming and tab state survives switching. v0.5's "one Home screen with a segmented control" is superseded; the segmented Overdue/Upcoming pill at the top of both list screens **stays** as a glanceable count + one-tap cross-switch (it displays live counts, which the tab bar can't). `ContactDetailScreen` is constructed by a factory (`contactDetail(for:)`) so each push gets a fresh VM — never rely on SwiftUI view identity to reset it (regression-tested). Contact Preview is the narrow exception: its concrete-contact item destination is child-local state inside the same tab `NavigationStack`; the tab path continues to own the Contact Detail push, and the standard Back action clears the child item before returning through that path.
+Nine screens + one widget family in V1. **As-built decisions (#32, #40):**
+navigation is a **4-tab `TabView`** — Overdue, Upcoming, Contacts, Settings —
+each tab owning its own `NavigationStack` with per-tab `NavigationPath`, so a
+push inside Overdue never bleeds into Upcoming and tab state survives
+switching. On iOS 18+, Contacts is the system search-role destination and the
+tab style adapts to an iPad sidebar; iOS 17 retains the four-item tab bar.
+On iOS 26, the tab bar minimizes while scrolling. v0.5's “one Home screen with
+a segmented control” is superseded; the segmented Overdue/Upcoming pill at the
+top of both list screens **stays** as a glanceable count + one-tap cross-switch
+(it displays live counts, which the tab bar can't). Its selected state uses
+Liquid Glass only on iOS 26; the surface treatment remains on earlier systems.
+Contact rows use matched zoom navigation on iOS 18+, disabled when Reduce
+Motion is enabled. `ContactDetailScreen` is constructed by a factory
+(`contactDetail(for:)`) so each push gets a fresh VM — never rely on SwiftUI
+view identity to reset it (regression-tested). Contact Preview is the narrow
+exception: its concrete-contact item destination is child-local state inside
+the same tab `NavigationStack`; the tab path continues to own the Contact
+Detail push, and the standard Back action clears the child item before
+returning through that path.
 
 1. **Overdue (Home)** — overdue contacts sectioned by priority tier. Row: photo, name, "2 weeks overdue", channel icon (tap = open deep link), merged-group chip where applicable. Swipe: **Caught up** / **Snooze 1 wk**. Footer shows the live next-digest time (from persisted reminders — the shipped hardcoded "6:00 pm" strings are R11). Empty state: "All caught up."
 2. **Upcoming** — reminders in the next `digestHorizonDays` (7/14/30, user-set), grouped by day, from **persisted** `ScheduledReminder` rows via `ValueObservation` (R10). Rows show contact, channel, kind tag (birthday/anniversary), scheduled time. Swipe: **Reach out now** (opens deep link + logs interaction + advances cadence) / **Mark caught up**. Horizon picker lives in the nav bar (shipped inert button R11).
-3. **All Contacts** — every tracked contact; search (`.searchable`), sections by priority tier, group-membership indicator, tap → Contact Detail. Untracked imports reachable via a filter toggle (Phase 1B) so users can start tracking someone new.
+3. **All Contacts** — every tracked contact; system search-role destination on
+   iOS 18+ with `.searchable` scoped to this screen, native
+   `ContentUnavailableView` search/empty states, sections by priority tier,
+   group-membership indicator, tap → Contact Detail. Untracked imports
+   reachable via a filter toggle (Phase 1B) so users can start tracking someone
+   new.
 4. **Contact Detail** — hero (photo/name/priority), cadence card (cadence, **live** next reminder, last interaction, status), channel card with **working "Open [channel]"** button, actions: **Caught up** (logs + reschedules), **Snooze 1 wk**, **Log other channel…**; interactions list (last 8); Regards-local notes with "private to Regards" footnote; **Edit contact** (→ screen 5); reminder-window override editor entry; "Merged with…" disclosure when grouped (→ screen 6 context).
 5. **Edit Contact** — real form (`TextField`s) mirroring system-contact fields: name, phones, emails, postal addresses, birthday, anniversary. Save = partial-field `CNSaveRequest` write-back of touched fields only; Cancel/back always available. The interim screen now has a standard Back escape route and no inert Save/Cancel controls; the real form lands in TF-09 (PR27). Regards-local `notes` visible but labeled not-written-back. Write-permission-denied state links to Settings.
 6. **Merge Duplicates** (Settings entry) — ranked candidate pairs (§7 heuristic) with side-by-side preview; user picks the primary face; **Confirm creates a `ContactGroup` row** (shipped gap R12: nothing persists); one-tap Undo (delete group); **Skip** dismisses a pair persistently (store dismissed pair hashes locally); manual "link two contacts…" flow for heuristic misses.
@@ -423,7 +454,15 @@ Plus **Transparency** (static, shipped) under Settings — plain-language privac
 
 **Widget family (Phase 2, §14):** small (top-3 overdue), medium (top-5 + per-icon deep links via `widgetURL`), Lock Screen circular/inline count. Reads a **read-only GRDB connection** on a shared App Group container (`group.com.consideratesoftware.regards`); main app calls `WidgetCenter.shared.reloadAllTimelines()` after every SchedulingPass. No network, no new permissions.
 
-**Design system:** `RegardsDS` tokens (colors incl. WCAG-checked pairs in `RegardsPalette.contrastPairs`, typography, spacing) + primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`, `RegardsNavBar`). Rule: **no inert interactive-looking controls in shipped UI** — Phase 0's muted-stub convention (`RegardsNavBar` renders nil-handler actions as visibly disabled) was correct for a shell and is deprecated the moment the real affordance lands; every stub is enumerated in §19 and each Phase 1 PR must wire or remove the stubs in the screens it touches.
+**Design system:** `RegardsDS` tokens (colors incl. WCAG-checked pairs in
+`RegardsPalette.contrastPairs`, typography, spacing) + primitives (`Avatar`,
+`ChannelGlyph`, `Tag`, `Wordmark`, `RegardsSegmentedControl`) and
+availability-gated platform-effect modifiers. Native navigation titles and
+empty states replace the Phase 0 custom-nav imitation. Liquid Glass is reserved
+for the selected functional control and system chrome; content cards do not
+become glass. Rule: **no inert interactive-looking controls in shipped UI** —
+every stub is enumerated in §19 and each Phase 1 PR must wire or remove the
+stubs in the screens it touches.
 
 **Accessibility is release-blocking and reviewed on every PR.** As of 2026-08-02 the automated audits no longer run on pull requests: the 1x audit runs on merges to `main`, and the 5x stress sweep runs on merges, nightly, and on demand before a release (both were `macos-latest`, averaging 33 min a run at 10x billing, and a flake in either blocked unrelated PRs). UI pull requests require the App-authored `Regards staged review`, including `pr-accessibility`, focused tests for the affected flow, plus the manual VoiceOver smoke below. Repeated 5x local sweeps are not a routine PR gate; post-merge/nightly automation owns broad flake detection, and `ios/scripts/audit-stress.sh` is reserved for investigating a reproduced failure or validating an explicitly requested release candidate. A release requires a green 5x sweep run via `workflow_dispatch`. `RegardsAccessibilityTests` runs `performAccessibilityAudit()` per screen; structural categories (`elementDetection`, `sufficientElementDescription`, `trait`) gate today; sensory categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are carved out until PR34 flips `structuralAuditCategories` → all categories (tracked in `ios/docs/accessibility.md` "Sensory-audit carve-outs"). Every screen has a row in that doc's audited table, including Edit Contact (R16). Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is required before any UI-touching merge. Dynamic Type through `accessibility5`, Reduce Motion respected (splash already does), 44×44pt targets.
 
@@ -505,7 +544,8 @@ internal/external TestFlight gates before publishing new commitments.
 ios/
   project.yml                     — XcodeGen source of truth; NEVER hand-edit the xcodeproj
   Regards/
-    App/                          — RegardsApp (@main), AppEnvironment (DI), tab root, screen factories
+    App/                          — RegardsApp (@main), AppEnvironment (DI), typed tab/intent router,
+                                    tab root, screen factories
                                     [Phase 1C adds: SchedulingPass]
     Domain/                       — pure Swift, CI-guarded (§5)
       Contact.swift, ContactGroup (in Contact.swift), ScheduledReminder.swift,
@@ -516,17 +556,19 @@ ios/
     Data/                         — DatabaseFactory, DatabaseMigrator (v1, v2…), Records, Repositories,
                                     MockRepositories
     Platform/
+      AppIntents/                 — iOS 26 local open-section App Shortcut
       Contacts/                   — ContactsSource (CNContactStore adapter), ContactsImporter
                                     [PR21 adds reconciliation; PR27 adds ContactsWriter]
       Notifications/              — [PR24] NotificationScheduling adapter (UNUserNotificationCenter)
       Calendar/                   — [PR30] CalendarSource (EventKit)
       DeepLinks/                  — [PR26] DeepLinker (UIApplication.open)
       Billing/                    — [PR32] StoreKit 2 entitlement service
-    DesignSystem/                 — RegardsDS tokens, RegardsColors (+contrastPairs), Primitives/
+    DesignSystem/                 — RegardsDS tokens, RegardsColors (+contrastPairs), Primitives/,
+                                    availability-gated navigation-transition effects
     Features/
       Overdue/  Upcoming/  Contacts/  ContactDetail/  EditContact/
       MergeDuplicates/  ReminderWindows/  Onboarding/  Settings/ (incl. TransparencyScreen)
-      Shared/                     — RegardsNavBar etc.
+      Shared/                     — RegardsSegmentedControl etc.
       Paywall/                    — [PR32]
     Resources/                    — Info.plist (generated), Assets.xcassets
     PrivacyInfo.xcprivacy         — privacy manifest (note: lives at Regards/ root, not Resources/)
@@ -534,7 +576,7 @@ ios/
   RegardsTests/                   — swift-testing unit bundle (Domain, Data, Platform fakes, VMs)
   RegardsAccessibilityTests/      — XCUITest audit bundle (post-merge, nightly, and release-gating)
   RegardsUITests/                 — placeholder; NOT in the default test plan (repurpose or delete, R22)
-  docs/                           — accessibility.md, accessibility-smoke.md
+  docs/                           — accessibility.md, accessibility-smoke.md, modern-ios.md
   scripts/                        — audit-stress.sh (on-demand flake investigation / release helper)
 ```
 
@@ -588,6 +630,16 @@ throughput. If scope must move, cut in this order: PR35 localization
 scaffolding → medium widget (ship small+lock only) → snapshot breadth (keep 4
 core screens). Never cut accessibility gates, privacy invariants, or the §9
 contract.
+
+### Dedicated iOS platform modernization (owner-directed, Jul 30)
+
+This is a standalone refactor PR stacked on TF-01 slice 1. It changes platform
+composition, not product scope, persistence, notification behavior, or privacy
+boundaries.
+
+| Scope | Key acceptance criteria |
+|---|---|
+| Native iOS 17 baseline chrome and empty states; iOS 18 value-based tabs, search role, adaptive sidebar, and Reduce-Motion-aware zoom transitions; iOS 26 Liquid Glass control state, scroll-minimizing tab bar, and local open-section App Shortcut | Xcode 26.6 / iOS 26.5 build and metadata extraction pass; iOS 17 fallback compiles and launches; App Shortcut exposes no personal data; focused accessibility regressions, manual smoke, and staged accessibility review pass; scheduled broad audits remain green on current `main`; no iOS 27 beta API; sibling adoption matrix in `ios/docs/modern-ios.md` |
 
 ### Phase 1R — Remediation (Jul 6–10) — fix what's wrong before building on it
 
@@ -720,6 +772,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 37 | `Package.resolved` is committed | 2026-07-01 | Reproducible builds are part of the privacy claim; floating deps contradict it. |
 | 38 | TestFlight execution uses stable `TF-##` IDs and readiness gates, not a fixed public date | 2026-07-29 | The 2026-08-31 anchor expired before the production loop existed. Durable Git/GitHub checkpoints survive agent context and capacity resets; beta throughput determines the public date. |
 | 39 | Broad accessibility audits run after merge, nightly, and before release; pull requests use focused regressions, manual smoke, and staged accessibility review | 2026-08-03 | The former PR-time 1× and 5× jobs each occupied a billed macOS runner for about 33 minutes and unrelated flakes blocked feature throughput. Scheduled runs preserve broad detection; a failed current-main run must be triaged before new feature work, while `audit-stress.sh` remains available for reproduced flakes and release candidates. |
+| 40 | Showcase the latest shippable iOS platform in one dedicated compatibility-gated refactor; keep iOS 17 minimum and exclude beta-only APIs | 2026-07-30 | Xcode 26.6 / iOS 26 is the stable TestFlight baseline. iOS 18 and iOS 26 enhancements can be additive without abandoning supported users; iOS 27 beta APIs would make the release branch and CI unstable. |
 
 ## 17. Working rules for implementation agents
 
@@ -752,9 +805,9 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-08-02
+## 18. Current state — ground truth as of 2026-08-03
 
-`main` = `a8c9c01` (GitHub PR #23, 2026-08-02). The engine contract,
+`main` = `209171c` (GitHub PR #37, 2026-08-03). The engine contract,
 section-header accessibility fix, sample-data refresh, channel-validation
 contract, bundle-namespace migration, durable TestFlight queue, and
 cross-provider review parity guard have landed. The trusted staged reviewer now
@@ -768,6 +821,11 @@ state and next executable work.
 - **Domain layer, pure and tested:** all §7 entities; `ReminderEngine` (cadence walk, quiet hours, annual recurrence + Feb-29, batching helper); `DuplicateDetector`; `ChannelCatalog` + `DeepLinkBuilder` for all 13 channels; `MonthDay` with round-trip validation.
 - **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
 - **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
+- **Modern platform composition in the active PR #24 branch:** native navigation/empty-state semantics on
+  the iOS 17 baseline; iOS 18 value-based adaptive/search tabs and
+  Reduce-Motion-aware matched navigation; iOS 26 restrained Liquid Glass,
+  scroll-aware tab chrome, and a local open-section App Shortcut. The exact
+  adoption and fallback matrix lives in `ios/docs/modern-ios.md`.
 - **Accessibility harness:** 15 XCUI audit tests (structural categories, including Edit Contact through all three entry paths) plus 5 navigation, layout, and accessibility-contract regressions, audit-stress tooling (script + workflow), documented test patterns and smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
 - **CI:** pull requests require xcodegen determinism, build, unit tests with coverage, strict SwiftLint, project syntax, shared privacy and Domain-purity guards, Markdown links, review-agent parity, and the App-authored `Regards staged review`, which is pinned in branch protection to the dedicated App's identity (app id `4461672`) so a same-repository Actions job cannot forge it. That check asserts a valid review ran for the current head, not that the reviewer approved: a missing, malformed or stale-head artifact fails it, while a `REQUEST_CHANGES` verdict publishes its blockers in the check output and passes, leaving the call to the author. The 1x accessibility audit runs after merges to `main`; the 5x sweep runs after merges, nightly, and on demand before release.
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).

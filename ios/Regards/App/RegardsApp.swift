@@ -99,15 +99,14 @@ struct SplashView: View {
 /// (Contact Detail, Edit, Transparency, …) stay local to the tab.
 struct RegardsTabRoot: View {
     let env: AppEnvironment
-    @State private var selected: Tab = .overdue
+    @State private var navigation = RegardsNavigationState()
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
-    // Per-tab navigation paths so a push inside Overdue doesn't leak into
-    // Upcoming, and tab-switching preserves the stack state per tab.
-    @State private var overduePath = NavigationPath()
-    @State private var upcomingPath = NavigationPath()
-
-    enum Tab: Hashable { case overdue, upcoming, contacts, settings }
+    @State private var contactsSearchText = ""
+    @State private var intentRouter = RegardsIntentRouter.shared
+    @Namespace private var overdueContactTransition
+    @Namespace private var upcomingContactTransition
+    @Namespace private var contactsContactTransition
 
     init(env: AppEnvironment) {
         self.env = env
@@ -116,60 +115,152 @@ struct RegardsTabRoot: View {
     }
 
     var body: some View {
-        TabView(selection: $selected) {
-            NavigationStack(path: $overduePath) {
-                OverdueScreen(
-                    viewModel: overdueVM,
-                    upcomingCount: upcomingVM.totalCount,
-                    onTapContact: { contactId in overduePath.append(contactId) },
-                    onSwitchToUpcoming: { selected = .upcoming }
-                )
-                .navigationDestination(for: UUID.self) { contactId in
-                    contactDetail(for: contactId)
-                }
+        Group {
+            if #available(iOS 18.0, *) {
+                modernTabView
+            } else {
+                legacyTabView
             }
-            .tabItem { Label("Overdue", systemImage: "exclamationmark.circle") }
-            .tag(Tab.overdue)
-
-            NavigationStack(path: $upcomingPath) {
-                UpcomingScreen(
-                    viewModel: upcomingVM,
-                    overdueCount: overdueVM.overdueCount,
-                    onTapContact: { contactId in upcomingPath.append(contactId) },
-                    onSwitchToOverdue: { selected = .overdue }
-                )
-                .navigationDestination(for: UUID.self) { contactId in
-                    contactDetail(for: contactId)
-                }
-            }
-            .tabItem { Label("Upcoming", systemImage: "calendar") }
-            .tag(Tab.upcoming)
-
-            NavigationStack {
-                AllContactsScreen(env: env)
-            }
-            .tabItem { Label("Contacts", systemImage: "person.2") }
-            .tag(Tab.contacts)
-
-            NavigationStack {
-                SettingsScreen(env: env)
-            }
-            .tabItem { Label("Settings", systemImage: "gearshape") }
-            .tag(Tab.settings)
         }
+        .modifier(RegardsTabBarBehavior())
         // `accentInk` (darker warm) rather than `accent` (lighter terracotta)
         // so tab-bar icon + label contrast passes AA against the tab bar's
         // translucent system surface — `accent` on that surface measures
         // ~3.4:1, below body-text AA. `accentInk` is ~8:1.
         .tint(RegardsDS.accentInk)
+        .onChange(of: intentRouter.request) { _, request in
+            handleIntentRequest(request)
+        }
         // Kick off both VMs up-front so the cross-tab counters on the
         // segmented control (Overdue shows upcomingCount, Upcoming shows
         // overdueCount) are populated at launch — otherwise the opposite
         // tab's `.task` wouldn't fire until the user tapped it.
         .task {
+            handleIntentRequest(intentRouter.request)
             async let overdueLoad: Void = overdueVM.load()
             async let upcomingLoad: Void = upcomingVM.load()
             _ = await (overdueLoad, upcomingLoad)
+        }
+    }
+
+    @available(iOS 18.0, *)
+    private var modernTabView: some View {
+        TabView(selection: $navigation.selected) {
+            Tab("Overdue", systemImage: "exclamationmark.circle", value: RegardsTab.overdue) {
+                overdueRoot
+            }
+
+            Tab("Upcoming", systemImage: "calendar", value: RegardsTab.upcoming) {
+                upcomingRoot
+            }
+
+            Tab(
+                "Contacts",
+                systemImage: "person.2",
+                value: RegardsTab.contacts,
+                role: .search
+            ) {
+                contactsRoot
+            }
+
+            Tab("Settings", systemImage: "gearshape", value: RegardsTab.settings) {
+                settingsRoot
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+    }
+
+    private var legacyTabView: some View {
+        TabView(selection: $navigation.selected) {
+            overdueRoot
+                .tabItem { Label("Overdue", systemImage: "exclamationmark.circle") }
+                .tag(RegardsTab.overdue)
+
+            upcomingRoot
+                .tabItem { Label("Upcoming", systemImage: "calendar") }
+                .tag(RegardsTab.upcoming)
+
+            contactsRoot
+                .tabItem { Label("Contacts", systemImage: "person.2") }
+                .tag(RegardsTab.contacts)
+
+            settingsRoot
+                .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(RegardsTab.settings)
+        }
+    }
+
+    private var overdueRoot: some View {
+        NavigationStack(path: $navigation.overduePath) {
+            OverdueScreen(
+                viewModel: overdueVM,
+                upcomingCount: upcomingVM.totalCount,
+                onTapContact: { contactId in navigation.overduePath.append(contactId) },
+                onSwitchToUpcoming: { navigation.selected = .upcoming }
+            )
+            .navigationDestination(for: UUID.self) { contactId in
+                contactDetail(for: contactId)
+            }
+        }
+        .environment(\.regardsContactTransitionNamespace, overdueContactTransition)
+    }
+
+    private var upcomingRoot: some View {
+        NavigationStack(path: $navigation.upcomingPath) {
+            UpcomingScreen(
+                viewModel: upcomingVM,
+                overdueCount: overdueVM.overdueCount,
+                onTapContact: { contactId in navigation.upcomingPath.append(contactId) },
+                onSwitchToOverdue: { navigation.selected = .overdue }
+            )
+            .navigationDestination(for: UUID.self) { contactId in
+                contactDetail(for: contactId)
+            }
+        }
+        .environment(\.regardsContactTransitionNamespace, upcomingContactTransition)
+    }
+
+    private var contactsRoot: some View {
+        NavigationStack(path: $navigation.contactsPath) {
+            AllContactsScreen(
+                env: env,
+                searchText: $contactsSearchText
+            )
+            .navigationDestination(for: UUID.self) { contactId in
+                contactDetail(for: contactId)
+            }
+        }
+        .environment(\.regardsContactTransitionNamespace, contactsContactTransition)
+    }
+
+    private var settingsRoot: some View {
+        NavigationStack(path: $navigation.settingsPath) {
+            SettingsScreen()
+                .navigationDestination(for: RegardsSettingsRoute.self) { route in
+                    settingsDestination(for: route)
+                }
+        }
+    }
+
+    private func handleIntentRequest(_ request: RegardsIntentRouter.Request?) {
+        guard let request else { return }
+        navigation.openRoot(request.tab)
+        intentRouter.consume(request.id)
+    }
+
+    @ViewBuilder
+    private func settingsDestination(for route: RegardsSettingsRoute) -> some View {
+        switch route {
+        case .reminderWindows:
+            ReminderWindowsScreen()
+        case .mergeDuplicates:
+            MergeDuplicatesScreen(
+                viewModel: MergeDuplicatesViewModel(contacts: env.contacts)
+            )
+        case .transparency:
+            TransparencyScreen()
+        case .onboarding:
+            OnboardingScreen()
         }
     }
 
@@ -184,6 +275,17 @@ struct RegardsTabRoot: View {
             contacts: env.contacts,
             interactionsRepo: env.interactions
         )
+    }
+}
+
+private struct RegardsTabBarBehavior: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
+        }
     }
 }
 

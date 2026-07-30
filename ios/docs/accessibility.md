@@ -40,7 +40,9 @@ audited* table.
    screen.
 5. **Reduce Motion honored.** All transitions respect
    `@Environment(\.accessibilityReduceMotion)`. No parallax, no spring bounces,
-   no auto-advancing carousels.
+   no auto-advancing carousels. Contact-row matched zoom transitions are
+   explicitly replaced by the standard navigation push when Reduce Motion is
+   enabled.
 6. **High-contrast + Differentiate Without Color tested.** Snapshot tests
    (PR3) cover `colorSchemeContrast = .increased` and
    `accessibilityDifferentiateWithoutColor = true`. Information conveyed by
@@ -93,9 +95,9 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Screen | PR | Notes |
 |---|---|---|
 | Launch / root placeholder | PR1 (`9501d57`) | One-view smoke — superseded by the Overdue landing check in PR3. |
-| Overdue (landing after splash) | PR3 | Default tab after splash. |
-| Upcoming | PR3 | |
-| All Contacts | PR3 | |
+| Overdue (landing after splash) | PR3 / TF-01 | Default tab after splash; native large title and iOS 26 route-control glass. |
+| Upcoming | PR3 / TF-01 | Native large title and modern empty state. |
+| All Contacts | PR3 / TF-01 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. |
 | Settings | PR3 | |
 | Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
@@ -130,15 +132,16 @@ intentional:
 - **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right
-  data.
+  data. iOS 18 matched zoom is disabled under Reduce Motion.
 - **Dynamic Type on screen content**: repeated two-branch container layouts in
-  the shared nav, Overdue / Upcoming selector, digest, list rows, Contact Detail
+  the Overdue / Upcoming selector, digest, list rows, Contact Detail
   actions/interactions/cards, and Contact Preview fields use the shared
   adaptive-layout policy. Small per-control sizing choices remain inline. At
   `accessibility5`, labels, names, metadata, and CTA copy wrap without clipping
-  or mid-word truncation while the standard-size layouts remain compact. An
-  XCUI regression launches directly at `accessibility5` and verifies the nav
-  action, title, and subtitle occupy non-overlapping stacked frames.
+  or mid-word truncation while the standard-size layouts remain compact. Native
+  navigation titles inherit the system's Dynamic Type behavior. An XCUI
+  regression launches directly at `accessibility5` and verifies representative
+  adaptive content occupies non-overlapping stacked frames.
 - **Contact Preview field semantics**: each read-only field exposes one
   contextual label instead of separate key/value fragments. Email punctuation
   is spoken as “at” and “dot” so the structural audit and VoiceOver receive a

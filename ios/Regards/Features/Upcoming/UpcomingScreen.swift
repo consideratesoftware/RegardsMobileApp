@@ -20,12 +20,12 @@ public struct UpcomingScreen: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                RegardsNavBar(
-                    title: "Upcoming",
-                    subtitle: "next \(viewModel.horizonDays) days",
-                    rightAction: (text: "Horizon", handler: nil)
-                )
-                .padding(.top, 10)
+                Text("Next \(viewModel.horizonDays) days")
+                    .font(.subheadline)
+                    .foregroundStyle(RegardsDS.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
 
                 RegardsSegmentedControl(
                     selection: Binding(
@@ -51,47 +51,75 @@ public struct UpcomingScreen: View {
                     .padding(.top, 8)
                     .padding(.bottom, 14)
 
-                if viewModel.groups.isEmpty {
-                    empty
-                } else {
-                    ForEach(Array(viewModel.groups.enumerated()), id: \.offset) { _, group in
-                        SectionHeader(group.header)
-                        RegardsCard {
-                            VStack(spacing: 0) {
-                                ForEach(Array(group.rows.enumerated()), id: \.element.id) { idx, row in
-                                    UpcomingRow(row: row, onTap: { onTapContact(row.contactId) })
-                                    if idx < group.rows.count - 1 {
-                                        Hair(inset: 68)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                listContent
 
                 Color.clear.frame(height: 40)
             }
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
+        .navigationTitle("Upcoming")
+        .navigationBarTitleDisplayMode(.large)
         .accessibilityIdentifier("screen.upcoming")
         // Load is owned by `RegardsTabRoot` — see sibling note in
         // `OverdueScreen`.
     }
 
+    @ViewBuilder
+    private var listContent: some View {
+        switch viewModel.loadState {
+        case .loading:
+            ProgressView("Loading upcoming reminders")
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+        case .failed:
+            loadError
+        case .loaded where viewModel.groups.isEmpty:
+            empty
+        case .loaded:
+            ForEach(Array(viewModel.groups.enumerated()), id: \.offset) { _, group in
+                SectionHeader(group.header)
+                RegardsCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(group.rows.enumerated()), id: \.element.id) { idx, row in
+                            UpcomingRow(row: row, onTap: { onTapContact(row.contactId) })
+                            if idx < group.rows.count - 1 {
+                                Hair(inset: 68)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var empty: some View {
-        VStack(spacing: 8) {
-            Text("Nothing upcoming.")
-                .font(RegardsFont.serifItalic(.title))
+        ContentUnavailableView {
+            Label("Nothing upcoming", systemImage: "calendar")
                 .foregroundStyle(RegardsDS.ink)
+        } description: {
             Text("Reminders for the next \(viewModel.horizonDays) days will show up here.")
-                .font(.subheadline)
-                .foregroundStyle(RegardsDS.muted)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
-        .padding(.top, 60)
+        .padding(.top, 32)
+    }
+
+    private var loadError: some View {
+        ContentUnavailableView {
+            Label("Unable to load reminders", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("Your reminder data is still on this device. Try loading it again.")
+        } actions: {
+            Button("Try Again") {
+                Task { await viewModel.load() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(RegardsDS.accentInk)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
+        .padding(.top, 32)
     }
 }
 
@@ -140,6 +168,7 @@ struct UpcomingRow: View {
         // specifically (vs. nav-bar actions or segmented-control
         // buttons that also live on this screen).
         .accessibilityIdentifier("upcoming.row")
+        .regardsContactTransitionSource(id: row.contactId)
     }
 
     private var nameAndTag: some View {

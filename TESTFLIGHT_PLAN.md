@@ -8,22 +8,16 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 ## Current checkpoint
 
 - Updated: 2026-08-03
-- Baseline: `main` at `a8c9c01` (merged GitHub PR #23 repository-truth slice)
-- Active work: `TF-01` (merge GitHub PR #37, then its stacked
-  platform-modernization slice)
+- Baseline: `main` at `209171c` (merged GitHub PR #37 accessibility follow-up)
+- Active work: `TF-01` (GitHub PR #24 stable-platform modernization)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open work, in required completion order: GitHub PR #37
-  (`codex/tf-01-a11y-follow-up`, ready for review), then GitHub PR #24
-  (`ios/modern-platform-showcase`, draft; still based on merged PR #23 until
-  #37 lands)
+- Open pull request: GitHub PR #24 (`ios/modern-platform-showcase`, draft;
+  rebasing and verification in progress on current `main`)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. PR #37's final exact-head Simulator smoke is
-  an automation gate; its evidence will be bound to the immutable 40-character
-  SHA in a PR comment after the final push so documenting it cannot create a
-  different head.
+- Owner action needed now: none.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -46,8 +40,8 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; PR #23 is complete, and the current order is PR #37, then PR
-   #24. Start no additional work while this chain is open.
+   checkpoint`; PR #23 and PR #37 are complete, and PR #24 is the only current
+   implementation pull request. Start no additional work while it is open.
 5. Otherwise, fast-forward `main` and reconcile this queue against merged pull
    requests carrying a `TF-##` marker. If either scheduled accessibility run
    failed on the current `main`, triage that failure before taking new feature
@@ -126,7 +120,7 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | ACTIVE | TF-00 | Truth and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; current-state prose and checks agree with the repository | PR18–PR19; R13 escape route, R16, R19, R21–R22, R27–R34, R40, R42–R43 |
+| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; adopt the latest stable iOS composition with explicit fallbacks; current-state prose and checks agree with the repository | dedicated modernization slice; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
 | TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
@@ -160,14 +154,15 @@ slices. The order is fixed while the current pull requests remain open:
 2. DONE: GitHub PR #23 merged as `a8c9c01`, completing the repository and
    documentation truth slice. It merged before the smoke-driven responsive
    accessibility and navigation-harness changes were pushed.
-3. Merge GitHub PR #37, the TF-01 accessibility follow-up carrying those
+3. DONE: GitHub PR #37 merged as `209171c`, carrying the TF-01 accessibility
+   follow-up with those
    exact-source changes, the completed manual smoke, and their review evidence.
    This closes the remaining R13, R16, R27, R28, and R43 acceptance evidence
-   and confirms R29's earlier closure before the stack advances.
-4. GitHub PR #24 is the owner-directed platform-modernization slice. Only
-   after the accessibility follow-up merges, retarget and rebase #24 onto the
-   resulting `main`, publish it, then rerun its full checks, staged review, and
-   manual accessibility smoke.
+   and confirms R29's earlier closure.
+4. ACTIVE: GitHub PR #24 is the owner-directed platform-modernization slice.
+   Rebase it onto current `main`, publish it, then run its focused checks,
+   staged review, and manual accessibility smoke. Broad 5× sweeps remain owned
+   by post-merge, nightly, and pre-release automation.
 5. Finish the remaining PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
@@ -181,17 +176,11 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- `TF-01` slice 1 follow-up / PR #37: PR #23 merged before the smoke-driven
-  responsive layouts and navigation-harness fixes were pushed. PR #37 carries
-  those verified changes. The final exact-head Simulator smoke requires only
-  an unlocked Mac; no in-app owner decision is needed. After the final push,
-  record one PR comment naming the tested immutable 40-character SHA and the
-  VoiceOver hierarchy, Dynamic Type `accessibility5`, Reduce Motion, and
-  Increased Contrast results. Exact-source mechanical gates and all six staged
-  reviewers must be green before it merges.
-- `TF-01` slice 2 / PR #24: merge the accessibility follow-up first, then
-  retarget and rebase the child onto `main`. Rerun its checks, staged review,
-  and manual accessibility smoke before publication or auto-merge.
+- `TF-01` platform-modernization slice / PR #24: after focused automated
+  checks and staged review are green, run the manual
+  VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
+  Contrast smoke against the modernized UI, record exact-head evidence, then
+  publish it and enable guarded auto-merge only after hosted review approval.
 
 ### PR #37 accessibility evidence
 
