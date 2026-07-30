@@ -61,36 +61,44 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testReminderWindowsPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.reminder-windows"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.reminder-windows"]
-                        .waitForExistence(timeout: 10))
+        navigateToSettingsRoute(
+            identifier: "settings.reminder-windows",
+            screenIdentifier: "screen.reminder-windows",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testMergeDuplicatesPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.find-duplicate-contacts"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.merge-duplicates"]
-                        .waitForExistence(timeout: 10))
+        navigateToSettingsRoute(
+            identifier: "settings.find-duplicate-contacts",
+            screenIdentifier: "screen.merge-duplicates",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testTransparencyPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.transparency"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.transparency"]
-                        .waitForExistence(timeout: 10))
+        navigateToSettingsRoute(
+            identifier: "settings.transparency",
+            screenIdentifier: "screen.transparency",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testOnboardingPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.onboarding-preview"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.onboarding"]
-                        .waitForExistence(timeout: 10))
+        navigateToSettingsRoute(
+            identifier: "settings.onboarding-preview",
+            screenIdentifier: "screen.onboarding",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -103,26 +111,16 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testEditContactPassesAudit() throws {
         let app = launchToContactDetailFromContacts()
-        let editButton = app.navigationBars.buttons["Edit"]
-        editButton.tap()
-        XCTAssertTrue(app.staticTexts["Edit Contact"].waitForExistence(timeout: 10))
-
+        navigateToEditContact(in: app)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testEditContactBackReturnsToContactDetail() {
         let app = launchToContactDetailFromContacts()
-        let editButton = app.navigationBars.buttons["Edit"]
-        editButton.tap()
-        XCTAssertTrue(app.staticTexts["Edit Contact"].waitForExistence(timeout: 10))
-
-        let backButton = app.navigationBars.buttons["Back"]
-        XCTAssertTrue(backButton.waitForExistence(timeout: 10))
-        backButton.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.contact-detail"]
-                        .waitForExistence(timeout: 20))
-        XCTAssertTrue(editButton.waitForExistence(timeout: 20))
+        navigateToEditContact(in: app)
+        navigateBack(to: "screen.contact-detail", in: app)
+        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
     }
 
     /// Exercises the factory-built Contact Detail push from the **Overdue
@@ -195,6 +193,10 @@ final class ScreensAccessibilityTests: XCTestCase {
     private func launchToOverdue() -> XCUIApplication {
         let app = XCUIApplication()
         app.launch()
+        XCTAssertTrue(
+            app.wait(for: .runningForeground, timeout: 10),
+            "Regards should be foreground-ready before navigation begins."
+        )
         let overdue = app.descendants(matching: .any)["screen.overdue"]
         XCTAssertTrue(overdue.waitForExistence(timeout: 10),
                       "Overdue tab should appear after the splash.")
@@ -227,7 +229,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             guard firstRow.waitForExistence(timeout: 10) else {
                 continue
             }
-            firstRow.tap()
+            tapLiveCoordinate(of: firstRow)
             if detail.waitForExistence(timeout: 5) {
                 break
             }
@@ -248,8 +250,9 @@ final class ScreensAccessibilityTests: XCTestCase {
 
         // Rapid simulator relaunches can leave a stale, hittable tab-bar
         // element in the automation hierarchy. Resolve the current button
-        // for each attempt and allow one retry when the first synthesized
-        // tap is dropped. The destination wait remains a plain query.
+        // for each attempt and allow one bounded retry when a synthesized
+        // tap is dropped. The destination wait remains a plain query, and a
+        // route that ignores both taps still fails the test.
         for _ in 0..<2 {
             let tabBar = app.tabBars.firstMatch
             guard tabBar.waitForExistence(timeout: 10) else {
@@ -262,13 +265,42 @@ final class ScreensAccessibilityTests: XCTestCase {
             guard let button else {
                 continue
             }
-            button.tap()
-            if destination.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: button)
+            if destination.waitForExistence(timeout: 10) {
                 return
             }
         }
 
         XCTFail("\(name) tab should show \(screenIdentifier).")
+    }
+
+    @MainActor
+    private func navigateToSettingsRoute(
+        identifier: String,
+        screenIdentifier: String,
+        in app: XCUIApplication
+    ) {
+        let destination = app.descendants(matching: .any)[screenIdentifier]
+
+        // Resolve the current row for each attempt. Rapid test relaunches can
+        // drop one synthesized Settings-row tap just as they can a tab tap.
+        // A route that ignores both taps still fails the test.
+        for _ in 0..<2 {
+            if destination.exists {
+                return
+            }
+
+            let route = app.descendants(matching: .any)[identifier].firstMatch
+            guard route.waitForExistence(timeout: 10) else {
+                continue
+            }
+            tapLiveCoordinate(of: route)
+            if destination.waitForExistence(timeout: 10) {
+                return
+            }
+        }
+
+        XCTFail("\(identifier) should show \(screenIdentifier).")
     }
 
     @MainActor
@@ -299,8 +331,8 @@ final class ScreensAccessibilityTests: XCTestCase {
             guard row.waitForExistence(timeout: 10) else {
                 continue
             }
-            row.tap()
-            if detail.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: row)
+            if detail.waitForExistence(timeout: 10) {
                 return
             }
         }
@@ -321,12 +353,41 @@ final class ScreensAccessibilityTests: XCTestCase {
             guard backButton.waitForExistence(timeout: 10) else {
                 continue
             }
-            backButton.tap()
-            if destination.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: backButton)
+            if destination.waitForExistence(timeout: 10) {
                 return
             }
         }
 
         XCTFail("Back should show \(screenIdentifier).")
+    }
+
+    @MainActor
+    private func navigateToEditContact(in app: XCUIApplication) {
+        let destination = app.staticTexts["Edit Contact"]
+
+        for _ in 0..<2 {
+            if destination.exists {
+                return
+            }
+
+            let editButton = app.navigationBars.buttons["Edit"]
+            guard editButton.waitForExistence(timeout: 10) else {
+                continue
+            }
+            tapLiveCoordinate(of: editButton)
+            if destination.waitForExistence(timeout: 10) {
+                return
+            }
+        }
+
+        XCTFail("Edit should show Edit Contact.")
+    }
+
+    @MainActor
+    private func tapLiveCoordinate(of element: XCUIElement) {
+        element.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).tap()
     }
 }

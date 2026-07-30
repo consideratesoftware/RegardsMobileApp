@@ -29,7 +29,9 @@ audited* table at the bottom.
    screen.
 5. **Reduce Motion honored.** All transitions respect
    `@Environment(\.accessibilityReduceMotion)`. No parallax, no spring bounces,
-   no auto-advancing carousels.
+   no auto-advancing carousels. Contact-row matched zoom transitions are
+   explicitly replaced by the standard navigation push when Reduce Motion is
+   enabled.
 6. **High-contrast + Differentiate Without Color tested.** Snapshot tests
    (PR3) cover `colorSchemeContrast = .increased` and
    `accessibilityDifferentiateWithoutColor = true`. Information conveyed by
@@ -80,9 +82,9 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Screen | PR | Notes |
 |---|---|---|
 | Launch / root placeholder | PR1 (`9501d57`) | One-view smoke — superseded by the Overdue landing check in PR3. |
-| Overdue (landing after splash) | PR3 | Default tab after splash. |
-| Upcoming | PR3 | |
-| All Contacts | PR3 | |
+| Overdue (landing after splash) | PR3 / TF-01 | Default tab after splash; native large title and iOS 26 route-control glass. |
+| Upcoming | PR3 / TF-01 | Native large title and modern empty state. |
+| All Contacts | PR3 / TF-01 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. |
 | Settings | PR3 | |
 | Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
@@ -113,7 +115,7 @@ buckets, both intentional:
 - **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right
-  data.
+  data. iOS 18 matched zoom is disabled under Reduce Motion.
 
 ### Bucket 2 — design-intent trade-offs the audit flags
 

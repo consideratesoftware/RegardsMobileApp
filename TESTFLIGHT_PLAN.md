@@ -7,12 +7,14 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-07-29
+- Updated: 2026-07-30
 - Baseline: `main` at `9545bca` (merged GitHub PR #22)
-- Active work: `TF-01` (slice 1: repository/docs/accessibility truth; `OWNER`)
+- Active work: `TF-01` (slice 1: repository/docs/accessibility truth; `OWNER`;
+  owner-directed slice 2 platform modernization is stacked on it)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
 - Open pull request: GitHub PR #23 (`chore/tf-01-truth-a11y`, draft;
-  manual accessibility smoke pending)
+  manual accessibility smoke pending); modernization branch
+  `ios/modern-platform-showcase` is based on PR #23 and must not merge first
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -36,8 +38,10 @@ Every fresh or scheduled agent run follows this order:
    new work, even when the checkout is on `main` or another branch. Safely
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
-   green and no blocker remains. If more than one exists, start nothing new;
-   finish the oldest first and restore the one-item invariant.
+   green and no blocker remains. If more than one exists, start nothing new.
+   Finish the oldest/base pull request first, then rebase or retarget its
+   recorded stacked child. The only current approved stack is TF-01 slice 2 on
+   PR #23; it does not authorize any additional parallel item.
 5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
    requests carrying a `TF-##` marker, and take the first `READY` item whose
    dependencies are `DONE`.
@@ -111,7 +115,7 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | ACTIVE | TF-00 | Truth and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; current-state prose and checks agree with the repository | PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
+| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; adopt the latest stable iOS composition with explicit fallbacks; current-state prose and checks agree with the repository | dedicated modernization slice; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
 | TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
@@ -136,21 +140,29 @@ is merged.
 
 ### TF-01 serial slices
 
-TF-01 is one active queue item implemented as three pull requests so unrelated
-truth, CI, and mock-code changes remain reviewable. Do not start a later slice
-until the earlier one merges.
+TF-01 is one active queue item implemented as four pull requests so unrelated
+truth, platform, CI, and mock-code changes remain reviewable. Normally a later
+slice starts only after the earlier one merges. The owner explicitly requested
+slice 2 while slice 1 waits on a manual gate, so slice 2 is a recorded stacked
+exception: it may be implemented and reviewed, but it cannot merge before
+slice 1.
 
 1. Repository/docs/accessibility truth: README layout and current/future
    language; restore a working Edit Contact route and standard Back escape;
    add its audit coverage; remove the deleted wait-helper reference; standardize
    the manual smoke on iPhone 17 Pro; reconcile §18 and the closed
    documentation/audit R-items.
-2. CI/reproducibility/reviewer enforcement: commit `Package.resolved`; remove
+2. Dedicated stable-platform modernization: native navigation and empty states;
+   iOS 18 value-based tabs, search-role destination, adaptive sidebar, and
+   Reduce-Motion-aware matched transitions; iOS 26 restrained Liquid Glass,
+   tab-bar minimization, and a local open-section App Shortcut; iOS 17
+   fallbacks; no beta-only iOS 27 API and no new product behavior.
+3. CI/reproducibility/reviewer enforcement: commit `Package.resolved`; remove
    placeholder tests; root Markdown links; ≥95% Domain coverage; hardened
    privacy/domain guards; dead SwiftLint/audit comments; make the hosted review
    fail unless it posts a verdict artifact; require review/parity contexts in
    branch protection; reconcile the documented merge method with GitHub.
-3. Mock/code hygiene: seed group, interaction, and occasion states; stable
+4. Mock/code hygiene: seed group, interaction, and occasion states; stable
    Upcoming row IDs; remove or wire dead assets and stale comments; prune
    obsolete worktrees and merged branches after exact-target verification.
 
@@ -163,6 +175,10 @@ Current gate:
   at `accessibility5`, and Reduce Motion on/off), record the result in the pull
   request, run the hosted review, and merge only when every check approves.
   No credential or account access is needed.
+- `TF-01` slice 2: after automated review is green, run the same manual
+  VoiceOver, Dynamic Type `accessibility5`, and Reduce Motion smoke against the
+  modernized UI. Merge PR #23 first, then retarget the stacked modernization PR
+  to `main` and rerun its required checks.
 
 Later gates:
 

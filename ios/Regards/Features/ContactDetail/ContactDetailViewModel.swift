@@ -34,6 +34,10 @@ public final class ContactDetailViewModel {
         self.calendar = calendar
     }
 
+    public var contactID: UUID {
+        contactId
+    }
+
     public func load() async {
         do {
             contact = try await contacts.fetch(id: contactId)

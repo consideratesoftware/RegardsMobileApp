@@ -1,11 +1,14 @@
 import SwiftUI
 
-public struct SettingsScreen: View {
-    let env: AppEnvironment
+enum RegardsSettingsRoute: Hashable {
+    case reminderWindows
+    case mergeDuplicates
+    case transparency
+    case onboarding
+}
 
-    public init(env: AppEnvironment) {
-        self.env = env
-    }
+public struct SettingsScreen: View {
+    public init() {}
 
     public var body: some View {
         ScrollView {
@@ -18,18 +21,16 @@ public struct SettingsScreen: View {
                         navRow(
                             id: "reminder-windows",
                             title: "Reminder windows",
-                            subtitle: "when it's OK to nudge you"
-                        ) { ReminderWindowsScreen() }
+                            subtitle: "when it's OK to nudge you",
+                            route: .reminderWindows
+                        )
                         Hair(inset: 16)
                         navRow(
                             id: "find-duplicate-contacts",
                             title: "Find duplicate contacts",
-                            subtitle: "virtual merges only"
-                        ) {
-                            MergeDuplicatesScreen(
-                                viewModel: MergeDuplicatesViewModel(contacts: env.contacts)
-                            )
-                        }
+                            subtitle: "virtual merges only",
+                            route: .mergeDuplicates
+                        )
                     }
                 }
 
@@ -38,8 +39,9 @@ public struct SettingsScreen: View {
                     navRow(
                         id: "transparency",
                         title: "Transparency",
-                        subtitle: "how the privacy claim is verifiable"
-                    ) { TransparencyScreen() }
+                        subtitle: "how the privacy claim is verifiable",
+                        route: .transparency
+                    )
                 }
 
                 SectionHeader("Help")
@@ -47,8 +49,9 @@ public struct SettingsScreen: View {
                     navRow(
                         id: "onboarding-preview",
                         title: "Onboarding preview",
-                        subtitle: "revisit the permission intro"
-                    ) { OnboardingScreen() }
+                        subtitle: "revisit the permission intro",
+                        route: .onboarding
+                    )
                 }
 
                 Color.clear.frame(height: 40)
@@ -73,17 +76,15 @@ public struct SettingsScreen: View {
         .padding(.top, 8)
     }
 
-    /// Generic over the destination so we don't pay the `AnyView` identity /
-    /// diffing tax. `id` is an explicit stable accessibility identifier so the
-    /// UI tests in `ScreensAccessibilityTests` don't silently break when copy
-    /// tweaks (e.g. "Find duplicate contacts" → "Detect duplicates").
-    private func navRow<Destination: View>(
+    /// `id` is an explicit stable accessibility identifier so the UI tests in
+    /// `ScreensAccessibilityTests` don't silently break when copy tweaks.
+    private func navRow(
         id: String,
         title: String,
         subtitle: String,
-        @ViewBuilder destination: () -> Destination
+        route: RegardsSettingsRoute
     ) -> some View {
-        NavigationLink(destination: destination) {
+        NavigationLink(value: route) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
