@@ -9,7 +9,7 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 - Updated: 2026-07-29
 - Baseline: `main` at `9545bca` (merged GitHub PR #22)
-- Active work: `TF-01` (slice 1: repository/docs/accessibility truth)
+- Active work: `TF-01` (slice 1: repository/docs/accessibility truth; `OWNER`)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
 - Open pull request: GitHub PR #23 (`chore/tf-01-truth-a11y`, draft;
   manual accessibility smoke pending)
@@ -17,7 +17,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: none
+- Owner action needed now: unlock the Mac session so the documented manual
+  VoiceOver smoke can complete on PR #23
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -155,7 +156,16 @@ until the earlier one merges.
 
 ## Owner gates
 
-No owner action is required for `TF-00` through simulator-verifiable work.
+Current gate:
+
+- `TF-01` slice 1 / PR #23: unlock the Mac session. The scheduled continuation
+  will retry the iPhone 17 Pro manual smoke (VoiceOver traversal, Dynamic Type
+  at `accessibility5`, and Reduce Motion on/off), record the result in the pull
+  request, run the hosted review, and merge only when every check approves.
+  No credential or account access is needed.
+
+Later gates:
+
 These actions cannot be completed from repository automation and will be
 requested when their owning gate becomes active:
 
