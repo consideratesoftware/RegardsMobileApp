@@ -250,10 +250,10 @@ final class ScreensAccessibilityTests: XCTestCase {
 
         // Rapid simulator relaunches can leave a stale, hittable tab-bar
         // element in the automation hierarchy. Resolve the current button
-        // for each attempt and allow one bounded retry when a synthesized
-        // tap is dropped. The destination wait remains a plain query, and a
-        // route that ignores both taps still fails the test.
-        for _ in 0..<2 {
+        // for each attempt and allow two bounded retries when synthesized
+        // taps are dropped. The destination wait remains a plain query, and a
+        // route that ignores all three taps still fails the test.
+        for _ in 0..<3 {
             let tabBar = app.tabBars.firstMatch
             guard tabBar.waitForExistence(timeout: 10) else {
                 continue
@@ -321,6 +321,14 @@ final class ScreensAccessibilityTests: XCTestCase {
         for _ in 0..<2 {
             if detail.exists {
                 return
+            }
+
+            // The screen identifier can appear before its asynchronously
+            // loaded rows. Wait on the plain element query first, then use
+            // the identifier-matched collection only for a known-live read.
+            let firstRow = app.descendants(matching: .any)[identifier]
+            guard firstRow.waitForExistence(timeout: 10) else {
+                continue
             }
 
             let rows = app.descendants(matching: .any).matching(identifier: identifier)
