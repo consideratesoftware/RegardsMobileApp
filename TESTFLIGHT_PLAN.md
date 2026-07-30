@@ -11,7 +11,7 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Baseline: `main` at `63a4f0f` (merged GitHub PR #21)
 - Active work: `TF-00`
 - Next ready work: none (`TF-01` follows merged `TF-00`)
-- Open pull request: none
+- Open pull request: GitHub PR #22 (`chore/tf-00-execution-control`)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
