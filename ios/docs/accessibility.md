@@ -166,8 +166,16 @@ you already know the screen is rendered), never for *wait-until-true*.
 Rapid simulator relaunches can also leave duplicate tab-button elements in the
 automation hierarchy or drop a synthesized tap. Wait on the plain tab bar,
 resolve the currently hittable button, verify the destination with its plain
-screen identifier, and allow one re-resolution retry. `navigateToTab` in
-`ScreensAccessibilityTests` is the canonical implementation.
+screen identifier while the source screen disappears, and allow two bounded
+re-resolution retries. `navigateToTab` in `ScreensAccessibilityTests` is the
+canonical implementation.
+
+Apply the same pattern to pushed navigation: resolve the current trigger
+element for every attempt, tap its live center coordinate, and require the
+plain destination identifier to appear while the source screen identifier
+disappears. `launchToContactDetailFromContacts`, `navigateFromSettings`,
+`navigateToRow`, `navigateToEditContact`, and `navigateBack` are the canonical
+implementations.
 
 This was the underlying race behind `testContactDetailPassesAudit`
 flaking on three consecutive main runs in May 2026. The current tests wait on

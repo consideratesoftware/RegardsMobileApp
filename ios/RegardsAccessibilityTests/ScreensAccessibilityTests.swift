@@ -39,14 +39,24 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testUpcomingTabPassesAudit() throws {
         let app = launchToOverdue()
-        navigateToTab(named: "Upcoming", screenIdentifier: "screen.upcoming", in: app)
+        navigateToTab(
+            named: "Upcoming",
+            from: "screen.overdue",
+            to: "screen.upcoming",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testContactsTabPassesAudit() throws {
         let app = launchToOverdue()
-        navigateToTab(named: "Contacts", screenIdentifier: "screen.contacts", in: app)
+        navigateToTab(
+            named: "Contacts",
+            from: "screen.overdue",
+            to: "screen.contacts",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -61,36 +71,44 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testReminderWindowsPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.reminder-windows"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.reminder-windows"]
-                        .waitForExistence(timeout: 10))
+        navigateFromSettings(
+            triggerIdentifier: "settings.reminder-windows",
+            to: "screen.reminder-windows",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testMergeDuplicatesPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.find-duplicate-contacts"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.merge-duplicates"]
-                        .waitForExistence(timeout: 10))
+        navigateFromSettings(
+            triggerIdentifier: "settings.find-duplicate-contacts",
+            to: "screen.merge-duplicates",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testTransparencyPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.transparency"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.transparency"]
-                        .waitForExistence(timeout: 10))
+        navigateFromSettings(
+            triggerIdentifier: "settings.transparency",
+            to: "screen.transparency",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testOnboardingPassesAudit() throws {
         let app = launchToSettings()
-        app.descendants(matching: .any)["settings.onboarding-preview"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.onboarding"]
-                        .waitForExistence(timeout: 10))
+        navigateFromSettings(
+            triggerIdentifier: "settings.onboarding-preview",
+            to: "screen.onboarding",
+            in: app
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -103,26 +121,20 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testEditContactPassesAudit() throws {
         let app = launchToContactDetailFromContacts()
-        let editButton = app.navigationBars.buttons["Edit"]
-        editButton.tap()
-        XCTAssertTrue(app.staticTexts["Edit Contact"].waitForExistence(timeout: 10))
-
+        navigateToEditContact(in: app)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor
     func testEditContactBackReturnsToContactDetail() {
         let app = launchToContactDetailFromContacts()
-        let editButton = app.navigationBars.buttons["Edit"]
-        editButton.tap()
-        XCTAssertTrue(app.staticTexts["Edit Contact"].waitForExistence(timeout: 10))
-
-        let backButton = app.navigationBars.buttons["Back"]
-        XCTAssertTrue(backButton.waitForExistence(timeout: 10))
-        backButton.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.contact-detail"]
-                        .waitForExistence(timeout: 20))
-        XCTAssertTrue(editButton.waitForExistence(timeout: 20))
+        navigateToEditContact(in: app)
+        navigateBack(
+            from: "screen.edit-contact",
+            to: "screen.contact-detail",
+            in: app
+        )
+        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
     }
 
     /// Exercises the factory-built Contact Detail push from the **Overdue
@@ -138,7 +150,11 @@ final class ScreensAccessibilityTests: XCTestCase {
         // `.accessibilityElement(children: .ignore)` which composes a
         // synthetic element whose XCUI elementType resolves to `.other`,
         // so we search across all element types by identifier.
-        navigateToFirstRow(identifier: "overdue.row", in: app)
+        navigateToFirstRow(
+            identifier: "overdue.row",
+            sourceIdentifier: "screen.overdue",
+            in: app
+        )
         XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
@@ -147,8 +163,17 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testContactDetailFromUpcomingPassesAudit() throws {
         let app = launchToOverdue()
-        navigateToTab(named: "Upcoming", screenIdentifier: "screen.upcoming", in: app)
-        navigateToFirstRow(identifier: "upcoming.row", in: app)
+        navigateToTab(
+            named: "Upcoming",
+            from: "screen.overdue",
+            to: "screen.upcoming",
+            in: app
+        )
+        navigateToFirstRow(
+            identifier: "upcoming.row",
+            sourceIdentifier: "screen.upcoming",
+            in: app
+        )
         XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
@@ -164,19 +189,33 @@ final class ScreensAccessibilityTests: XCTestCase {
         let rows = app.descendants(matching: .any).matching(identifier: "overdue.row")
 
         // Tap first row → read the hero header → pop back.
-        navigateToRow(identifier: "overdue.row", index: 0, in: app)
+        navigateToRow(
+            identifier: "overdue.row",
+            index: 0,
+            sourceIdentifier: "screen.overdue",
+            in: app
+        )
         let firstDetail = app.descendants(matching: .any)["screen.contact-detail"]
         // The hero header text is the only `staticText` child with an
         // `.isHeader` trait on this screen.
         let firstName = firstDetail.staticTexts
             .matching(NSPredicate(format: "traits & %llu != 0", UIAccessibilityTraits.header.rawValue))
             .firstMatch.label
-        navigateBack(to: "screen.overdue", in: app)
+        navigateBack(
+            from: "screen.contact-detail",
+            to: "screen.overdue",
+            in: app
+        )
 
         // Tap second row → its hero header should differ.
         XCTAssertTrue(overdue.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(rows.count, 1)
-        navigateToRow(identifier: "overdue.row", index: 1, in: app)
+        navigateToRow(
+            identifier: "overdue.row",
+            index: 1,
+            sourceIdentifier: "screen.overdue",
+            in: app
+        )
         let secondDetail = app.descendants(matching: .any)["screen.contact-detail"]
         let secondName = secondDetail.staticTexts
             .matching(NSPredicate(format: "traits & %llu != 0", UIAccessibilityTraits.header.rawValue))
@@ -188,7 +227,9 @@ final class ScreensAccessibilityTests: XCTestCase {
             "Contact Detail must rebuild its VM per push so two consecutive taps show different contacts."
         )
     }
+}
 
+private extension ScreensAccessibilityTests {
     // MARK: - Helpers
 
     @MainActor
@@ -207,14 +248,24 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     private func launchToSettings() -> XCUIApplication {
         let app = launchToOverdue()
-        navigateToTab(named: "Settings", screenIdentifier: "screen.settings", in: app)
+        navigateToTab(
+            named: "Settings",
+            from: "screen.overdue",
+            to: "screen.settings",
+            in: app
+        )
         return app
     }
 
     @MainActor
     private func launchToContactDetailFromContacts() -> XCUIApplication {
         let app = launchToOverdue()
-        navigateToTab(named: "Contacts", screenIdentifier: "screen.contacts", in: app)
+        navigateToTab(
+            named: "Contacts",
+            from: "screen.overdue",
+            to: "screen.contacts",
+            in: app
+        )
         let contacts = app.descendants(matching: .any)["screen.contacts"]
         let detail = app.descendants(matching: .any)["screen.contact-detail"]
 
@@ -222,18 +273,26 @@ final class ScreensAccessibilityTests: XCTestCase {
         // synthetic `.other` elements used by Overdue and Upcoming.
         // Re-resolve once because rapid test relaunches can drop a
         // synthesized row tap before SwiftUI handles it.
-        for _ in 0..<2 {
+        for attempt in 0..<2 {
+            if attempt > 0, detail.exists, !contacts.exists {
+                break
+            }
+
             let firstRow = contacts.descendants(matching: .button).firstMatch
             guard firstRow.waitForExistence(timeout: 10) else {
                 continue
             }
-            firstRow.tap()
-            if detail.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: firstRow)
+            if detail.waitForExistence(timeout: 10),
+               contacts.waitForNonExistence(timeout: 10) {
                 break
             }
         }
 
-        XCTAssertTrue(detail.exists, "The first Contacts row should open Contact Detail.")
+        XCTAssertTrue(
+            detail.exists && !contacts.exists,
+            "The first Contacts row should replace Contacts with Contact Detail."
+        )
         XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
         return app
     }
@@ -241,16 +300,26 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     private func navigateToTab(
         named name: String,
-        screenIdentifier: String,
+        from sourceIdentifier: String,
+        to screenIdentifier: String,
         in app: XCUIApplication
     ) {
+        let source = app.descendants(matching: .any)[sourceIdentifier]
         let destination = app.descendants(matching: .any)[screenIdentifier]
+        XCTAssertTrue(
+            source.waitForExistence(timeout: 10),
+            "\(sourceIdentifier) should exist before selecting the \(name) tab."
+        )
 
         // Rapid simulator relaunches can leave a stale, hittable tab-bar
         // element in the automation hierarchy. Resolve the current button
-        // for each attempt and allow one retry when the first synthesized
-        // tap is dropped. The destination wait remains a plain query.
-        for _ in 0..<2 {
+        // for each attempt and allow two bounded retries when synthesized
+        // taps are dropped. The screen waits remain plain queries.
+        for attempt in 0..<3 {
+            if attempt > 0, destination.exists, !source.exists {
+                return
+            }
+
             let tabBar = app.tabBars.firstMatch
             guard tabBar.waitForExistence(timeout: 10) else {
                 continue
@@ -262,8 +331,9 @@ final class ScreensAccessibilityTests: XCTestCase {
             guard let button else {
                 continue
             }
-            button.tap()
-            if destination.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: button)
+            if destination.waitForExistence(timeout: 10),
+               source.waitForNonExistence(timeout: 10) {
                 return
             }
         }
@@ -272,35 +342,86 @@ final class ScreensAccessibilityTests: XCTestCase {
     }
 
     @MainActor
-    private func navigateToFirstRow(identifier: String, in app: XCUIApplication) {
-        navigateToRow(identifier: identifier, index: 0, in: app)
+    private func navigateToFirstRow(
+        identifier: String,
+        sourceIdentifier: String,
+        in app: XCUIApplication
+    ) {
+        navigateToRow(
+            identifier: identifier,
+            index: 0,
+            sourceIdentifier: sourceIdentifier,
+            in: app
+        )
+    }
+
+    @MainActor
+    private func navigateFromSettings(
+        triggerIdentifier: String,
+        to screenIdentifier: String,
+        in app: XCUIApplication
+    ) {
+        let source = app.descendants(matching: .any)["screen.settings"]
+        let destination = app.descendants(matching: .any)[screenIdentifier]
+        let trigger = app.descendants(matching: .any)[triggerIdentifier]
+        XCTAssertTrue(
+            source.waitForExistence(timeout: 10),
+            "Settings should exist before opening \(screenIdentifier)."
+        )
+
+        for attempt in 0..<2 {
+            if attempt > 0, destination.exists, !source.exists {
+                return
+            }
+
+            guard trigger.waitForExistence(timeout: 10), trigger.isHittable else {
+                continue
+            }
+            tapLiveCoordinate(of: trigger)
+            if destination.waitForExistence(timeout: 10),
+               source.waitForNonExistence(timeout: 10) {
+                return
+            }
+        }
+
+        XCTFail("\(triggerIdentifier) should replace Settings with \(screenIdentifier).")
     }
 
     @MainActor
     private func navigateToRow(
         identifier: String,
         index: Int,
+        sourceIdentifier: String,
         in app: XCUIApplication
     ) {
+        let source = app.descendants(matching: .any)[sourceIdentifier]
         let detail = app.descendants(matching: .any)["screen.contact-detail"]
+        let plainRow = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(
+            source.waitForExistence(timeout: 10),
+            "\(sourceIdentifier) should exist before opening Contact Detail."
+        )
 
         // Row taps can be dropped by the same rapid-relaunch automation race
-        // as tab taps. Re-resolve the row once before failing the navigation.
-        for _ in 0..<2 {
-            if detail.exists {
+        // as tab taps. Wait on the plain identifier query, then re-resolve
+        // the indexed row and its live coordinate before each attempt.
+        for attempt in 0..<2 {
+            if attempt > 0, detail.exists, !source.exists {
                 return
             }
 
-            let rows = app.descendants(matching: .any).matching(identifier: identifier)
-            guard rows.count > index else {
+            guard plainRow.waitForExistence(timeout: 10) else {
                 continue
             }
-            let row = rows.element(boundBy: index)
-            guard row.waitForExistence(timeout: 10) else {
+            let rows = app.descendants(matching: .any)
+                .matching(identifier: identifier)
+                .allElementsBoundByIndex
+            guard rows.indices.contains(index), rows[index].isHittable else {
                 continue
             }
-            row.tap()
-            if detail.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: rows[index])
+            if detail.waitForExistence(timeout: 10),
+               source.waitForNonExistence(timeout: 10) {
                 return
             }
         }
@@ -309,11 +430,20 @@ final class ScreensAccessibilityTests: XCTestCase {
     }
 
     @MainActor
-    private func navigateBack(to screenIdentifier: String, in app: XCUIApplication) {
+    private func navigateBack(
+        from sourceIdentifier: String,
+        to screenIdentifier: String,
+        in app: XCUIApplication
+    ) {
+        let source = app.descendants(matching: .any)[sourceIdentifier]
         let destination = app.descendants(matching: .any)[screenIdentifier]
+        XCTAssertTrue(
+            source.waitForExistence(timeout: 10),
+            "\(sourceIdentifier) should exist before navigating Back."
+        )
 
-        for _ in 0..<2 {
-            if destination.exists {
+        for attempt in 0..<2 {
+            if attempt > 0, destination.exists, !source.exists {
                 return
             }
 
@@ -321,12 +451,48 @@ final class ScreensAccessibilityTests: XCTestCase {
             guard backButton.waitForExistence(timeout: 10) else {
                 continue
             }
-            backButton.tap()
-            if destination.waitForExistence(timeout: 5) {
+            tapLiveCoordinate(of: backButton)
+            if destination.waitForExistence(timeout: 10),
+               source.waitForNonExistence(timeout: 10) {
                 return
             }
         }
 
         XCTFail("Back should show \(screenIdentifier).")
+    }
+
+    @MainActor
+    private func navigateToEditContact(in app: XCUIApplication) {
+        let source = app.descendants(matching: .any)["screen.contact-detail"]
+        let destination = app.descendants(matching: .any)["screen.edit-contact"]
+        XCTAssertTrue(
+            source.waitForExistence(timeout: 10),
+            "Contact Detail should exist before navigating to Edit Contact."
+        )
+
+        for attempt in 0..<2 {
+            if attempt > 0, destination.exists, !source.exists {
+                return
+            }
+
+            let editButton = app.navigationBars.buttons["Edit"]
+            guard editButton.waitForExistence(timeout: 10) else {
+                continue
+            }
+            tapLiveCoordinate(of: editButton)
+            if destination.waitForExistence(timeout: 10),
+               source.waitForNonExistence(timeout: 10) {
+                return
+            }
+        }
+
+        XCTFail("Edit should replace Contact Detail with Edit Contact.")
+    }
+
+    @MainActor
+    private func tapLiveCoordinate(of element: XCUIElement) {
+        element.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        ).tap()
     }
 }
