@@ -11,7 +11,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Baseline: `main` at `9545bca` (merged GitHub PR #22)
 - Active work: `TF-01` (slice 1: repository/docs/accessibility truth)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: none
+- Open pull request: GitHub PR #23 (`chore/tf-01-truth-a11y`, draft;
+  manual accessibility smoke pending)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
