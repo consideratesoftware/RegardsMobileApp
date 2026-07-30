@@ -36,10 +36,10 @@ Decide the agent set from the diff's touched paths:
 | pr-fit-finish | haiku | only if diff touches Features/, DesignSystem/, user-facing strings, docs, or .github/ |
 
 Launch all selected agents **in a single parallel batch**. Each agent prompt
-must contain: the resolved target, the PR's §14 PR-number and its
-acceptance-criteria row pasted verbatim, and the list of R-numbers the PR claims
-to close. Do not paste the diff itself into agent prompts; agents pull it with
-git.
+must contain: the resolved target, the stable `TF-##` work item when present,
+the §14 scope alias and acceptance-criteria row pasted verbatim, and the list
+of R-numbers the PR claims to close. Do not paste the diff itself into agent
+prompts; agents pull it with git.
 
 ## Stage 2 — cross-checks (sequential, only if needed)
 

@@ -1,10 +1,18 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to any implementation or review agent working with
+code in this repository. Provider-specific files are adapters, not independent
+sources of project law.
 
 ## Source of truth
 
-`ARCHITECTURE.md` at the repo root is the canonical design doc — now at **v1.0 (2026-07-01 rebaseline)**. It contains the vision, V1 scope, data model, channel catalog, reminder-window engine, privacy stack, the rebaselined PR-level plan (§14), the current-state ground truth (§18), the remediation register (§19), and the release/maintenance playbooks (§20/§21). When a code change and `ARCHITECTURE.md` disagree, either the code is wrong or the doc needs a sibling PR. Read §18 → §19 → §14 before implementing anything non-trivial. Section cross-references in code comments (e.g. "§11", "§5") point into this file; §1–§17 numbering is stable and must never be renumbered.
+`ARCHITECTURE.md` at the repo root is the canonical design doc — now at
+**v1.0 (2026-07-01 rebaseline)**. `TESTFLIGHT_PLAN.md` is the live execution
+queue and restart protocol. When code and `ARCHITECTURE.md` disagree, either
+the code is wrong or the doc needs a sibling change. Read §18 → §19 → §14,
+then `TESTFLIGHT_PLAN.md`, before implementing anything non-trivial. Section
+cross-references in code comments point into `ARCHITECTURE.md`; §1–§17 must
+never be renumbered.
 
 Regards is a **local-first, no-backend, no-network** mobile app. Privacy is a merge-gated invariant (see the privacy-grep guard below), not a marketing claim.
 
@@ -34,14 +42,14 @@ Commit both `project.yml` *and* the regenerated `Regards.xcodeproj/`. CI runs `x
 ```bash
 cd ios
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 
 # Full test action (both unit + accessibility suites):
 xcodebuild -project Regards.xcodeproj -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-(iPhone 16 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
+(iPhone 17 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
 
 Run a single suite or test:
 
@@ -119,22 +127,25 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 
 All four workflows gate merges; path filters were deliberately removed (PR #15) so required checks always report.
 
+## Durable execution
+
+Every autonomous run begins with the restart protocol in
+`TESTFLIGHT_PLAN.md`. Resume dirty work and open pull requests before taking a
+new item. Work on one stable `TF-##` item at a time and update its checkpoint
+in the same pull request. Git branches, the worktree, pull-request checks, and
+the plan file are the durable handoff; never depend on chat history.
+
 ## PR review
 
-Every PR gets the multi-agent review before merge. In Codex, invoke
-`$regards-pr-review` (defined in
-`.codex/skills/regards-pr-review/SKILL.md`). It pre-flights the mechanical
-gates, then fans out to the read-only agents in `.codex/agents/`:
+Every PR gets the same multi-agent review before merge. Codex invokes
+`$regards-pr-review`; Claude Code invokes `/pr-review`. Both pre-flight the
+mechanical gates, then use the mirrored read-only agents:
 `pr-correctness`, `pr-security-privacy`, and `pr-code-quality` always;
 `pr-tests` for code/test changes; and `pr-accessibility` plus
 `pr-fit-finish` when their UI/docs path rules match. Any blocker means
 `REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
-checks.
-
-For the local Codex-builder → Claude-reviewer loop, run
-`scripts/run-and-review.sh "<task>"`. The script requires a clean worktree,
-leaves Codex's changes uncommitted, and invokes Claude's `/pr-review worktree`
-command.
+checks. `.agents/README.md` describes the adapters, and
+`scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
 
 ## Things to avoid
 

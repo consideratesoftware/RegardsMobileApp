@@ -39,4 +39,4 @@ NIT: (max 3)
 HOLES CONFIRMED/CLEARED: (from correctness reviewer's list, if provided)
 ```
 
-When you name a missing test, specify it concretely enough that a Haiku-class session could write it: inputs, expected output, suggested test name. No praise, no diff summary."""
+When you name a missing test, specify it concretely enough that a lightweight agent could write it: inputs, expected output, suggested test name. No praise, no diff summary."""
