@@ -27,6 +27,7 @@ public final class OverdueViewModel {
 
     public private(set) var rows: [OverdueRowState] = []
     public private(set) var nextDigestLabel: String = "next digest at 6:00 pm"
+    private(set) var loadState: RegardsLoadState = .loading
 
     private let contacts: any ContactRepository
     private let clock: () -> Date
@@ -48,6 +49,7 @@ public final class OverdueViewModel {
     }
 
     public func load() async {
+        loadState = .loading
         do {
             let all = try await contacts.fetchTracked()
             let now = clock()
@@ -59,9 +61,11 @@ public final class OverdueViewModel {
                     }
                     return $0.overdueDays > $1.overdueDays
                 }
+            loadState = .loaded
         } catch {
             Self.log.error("failed to load tracked contacts: \(error, privacy: .public)")
             rows = []
+            loadState = .failed
         }
     }
 

@@ -54,6 +54,7 @@ public struct ContactDetailScreen: View {
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
+        .regardsContactTransitionDestination(id: viewModel.contactID)
         .accessibilityIdentifier("screen.contact-detail")
         .navigationTitle("Contact")
         .navigationBarTitleDisplayMode(.inline)

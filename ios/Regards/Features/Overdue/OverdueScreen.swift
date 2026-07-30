@@ -24,12 +24,12 @@ public struct OverdueScreen: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                RegardsNavBar(
-                    title: "Overdue",
-                    subtitle: subtitle,
-                    rightAction: (text: "All", handler: nil)
-                )
-                .padding(.top, 10)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(RegardsDS.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
 
                 RegardsSegmentedControl(
                     selection: Binding(
@@ -51,35 +51,15 @@ public struct OverdueScreen: View {
                     .padding(.top, 8)
                     .padding(.bottom, 16)
 
-                if viewModel.rows.isEmpty {
-                    emptyState
-                } else {
-                    if !viewModel.innerCircleRows.isEmpty {
-                        SectionHeader("Inner circle · overdue")
-                        RegardsCard { rowStack(for: viewModel.innerCircleRows, innerCircle: true) }
-                    }
-                    if !viewModel.closeFriendRows.isEmpty {
-                        SectionHeader("Close friends · overdue")
-                        RegardsCard { rowStack(for: viewModel.closeFriendRows) }
-                    }
-                    if !viewModel.otherRows.isEmpty {
-                        SectionHeader("Others · overdue")
-                        RegardsCard { rowStack(for: viewModel.otherRows) }
-                    }
-
-                    Text("Quiet until 6:00 pm. Reminders stay inside your chosen windows.")
-                        .font(.footnote)
-                        .foregroundStyle(RegardsDS.muted)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 22)
-                }
+                listContent
 
                 Color.clear.frame(height: 40)
             }
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
+        .navigationTitle("Overdue")
+        .navigationBarTitleDisplayMode(.large)
         .accessibilityIdentifier("screen.overdue")
         // No `.task { await viewModel.load() }` here — `RegardsTabRoot`
         // loads both tab VMs concurrently on root appear so the cross-tab
@@ -88,10 +68,47 @@ public struct OverdueScreen: View {
     }
 
     private var subtitle: String {
+        guard viewModel.loadState == .loaded else {
+            return viewModel.loadState == .loading ? "Loading…" : "Unavailable"
+        }
         switch viewModel.overdueCount {
         case 0: return "all caught up"
         case 1: return "1 person"
         default: return "\(viewModel.overdueCount) people"
+        }
+    }
+
+    @ViewBuilder
+    private var listContent: some View {
+        switch viewModel.loadState {
+        case .loading:
+            ProgressView("Loading overdue contacts")
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+        case .failed:
+            loadError
+        case .loaded where viewModel.rows.isEmpty:
+            emptyState
+        case .loaded:
+            if !viewModel.innerCircleRows.isEmpty {
+                SectionHeader("Inner circle · overdue")
+                RegardsCard { rowStack(for: viewModel.innerCircleRows, innerCircle: true) }
+            }
+            if !viewModel.closeFriendRows.isEmpty {
+                SectionHeader("Close friends · overdue")
+                RegardsCard { rowStack(for: viewModel.closeFriendRows) }
+            }
+            if !viewModel.otherRows.isEmpty {
+                SectionHeader("Others · overdue")
+                RegardsCard { rowStack(for: viewModel.otherRows) }
+            }
+
+            Text("Quiet until 6:00 pm. Reminders stay inside your chosen windows.")
+                .font(.footnote)
+                .foregroundStyle(RegardsDS.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .padding(.top, 22)
         }
     }
 
@@ -125,16 +142,30 @@ public struct OverdueScreen: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Text("All caught up.")
-                .font(RegardsFont.serifItalic(.title))
+        ContentUnavailableView {
+            Label("All caught up", systemImage: "checkmark.circle")
                 .foregroundStyle(RegardsDS.ink)
+        } description: {
             Text("Nobody's overdue right now.")
-                .font(.subheadline)
-                .foregroundStyle(RegardsDS.muted)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 60)
+        .padding(.top, 32)
+    }
+
+    private var loadError: some View {
+        ContentUnavailableView {
+            Label("Unable to load overdue contacts", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("Your contacts are still on this device. Try loading them again.")
+        } actions: {
+            Button("Try Again") {
+                Task { await viewModel.load() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(RegardsDS.accentInk)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 32)
     }
 
     @ViewBuilder
@@ -213,6 +244,7 @@ struct OverdueRow: View {
         // button or the segmented-control buttons that also
         // live on this screen).
         .accessibilityIdentifier("overdue.row")
+        .regardsContactTransitionSource(id: row.contactId)
     }
 
     private var metadataLine: some View {

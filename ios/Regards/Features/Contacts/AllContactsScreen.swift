@@ -4,32 +4,29 @@ import SwiftUI
 /// in a later phase. The main value of having it in the tab bar now is
 /// navigating into Contact Detail from the shell.
 public struct AllContactsScreen: View {
-    let env: AppEnvironment
-    @State private var contacts: [Contact] = []
-    @State private var now: Date = .distantPast
-    @State private var searchText: String = ""
+    @State private var viewModel: AllContactsViewModel
+    @Binding private var searchText: String
 
-    public init(env: AppEnvironment) {
-        self.env = env
+    public init(env: AppEnvironment,
+                searchText: Binding<String>) {
+        self._viewModel = State(
+            initialValue: AllContactsViewModel(contacts: env.contacts)
+        )
+        self._searchText = searchText
     }
 
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                header
+                Text(viewModel.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(RegardsDS.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
 
-                RegardsCard {
-                    VStack(spacing: 0) {
-                        ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, contact in
-                            NavigationLink(value: contact.id) {
-                                contactRow(contact)
-                            }
-                            .buttonStyle(.plain)
-                            if idx < filtered.count - 1 { Hair(inset: 72) }
-                        }
-                    }
-                }
-                .padding(.top, 4)
+                listContent
 
                 Color.clear.frame(height: 40)
             }
@@ -38,53 +35,77 @@ public struct AllContactsScreen: View {
         .scrollContentBackground(.hidden)
         .searchable(text: $searchText, prompt: "Search contacts")
         .accessibilityIdentifier("screen.contacts")
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: UUID.self) { contactId in
-            ContactDetailScreen(
-                contactId: contactId,
-                contacts: env.contacts,
-                interactionsRepo: env.interactions
-            )
-        }
+        .navigationTitle("Contacts")
+        .navigationBarTitleDisplayMode(.large)
         .task {
-            // Cache `now` alongside the fetched list so the "last X days ago"
-            // strings stay consistent across re-renders — Date() inline per
-            // row would recompute every update and drift across day
-            // boundaries while the user sits on the screen.
-            now = Date()
-            do {
-                contacts = try await env.contacts.fetchTracked()
-                contacts.sort { $0.priorityTier.rawValue < $1.priorityTier.rawValue }
-            } catch {
-                Self.log.error("failed to load tracked contacts: \(error, privacy: .public)")
-                contacts = []
+            await viewModel.load()
+        }
+    }
+
+    @ViewBuilder
+    private var listContent: some View {
+        switch viewModel.loadState {
+        case .loading:
+            ProgressView("Loading contacts")
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+        case .failed:
+            loadError
+        case .loaded where filteredContacts.isEmpty:
+            emptyState
+        case .loaded:
+            RegardsCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(filteredContacts.enumerated()), id: \.element.id) { idx, contact in
+                        NavigationLink(value: contact.id) {
+                            contactRow(contact)
+                        }
+                        .buttonStyle(.plain)
+                        .regardsContactTransitionSource(id: contact.id)
+                        if idx < filteredContacts.count - 1 { Hair(inset: 72) }
+                    }
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            if searchText.isEmpty {
+                Label("No contacts yet", systemImage: "person.2")
+            } else {
+                Label("No results", systemImage: "magnifyingglass")
+            }
+        } description: {
+            if searchText.isEmpty {
+                Text("Tracked contacts will appear here.")
+            } else {
+                Text("No contacts match “\(searchText)”.")
             }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 32)
     }
 
-    static let log = RegardsLogger.feature("AllContacts")
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Contacts")
-                .font(.system(.largeTitle, weight: .bold))
-                .foregroundStyle(RegardsDS.ink)
-                .accessibilityAddTraits(.isHeader)
-            Text("\(contacts.count) tracked")
-                .font(.subheadline)
-                .foregroundStyle(RegardsDS.muted)
+    private var loadError: some View {
+        ContentUnavailableView {
+            Label("Unable to load contacts", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("Your contacts are still on this device. Try loading them again.")
+        } actions: {
+            Button("Try Again") {
+                Task { await viewModel.load() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(RegardsDS.accentInk)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 32)
     }
 
-    private var filtered: [Contact] {
-        guard !searchText.isEmpty else { return contacts }
-        let q = searchText.lowercased()
-        return contacts.filter { $0.displayName.lowercased().contains(q) }
+    private var filteredContacts: [Contact] {
+        viewModel.filtered(searchText: searchText)
     }
 
     private func contactRow(_ contact: Contact) -> some View {
@@ -97,7 +118,9 @@ public struct AllContactsScreen: View {
                     .foregroundStyle(RegardsDS.ink)
                 Text(
                     [contact.cadenceDays.map { CadenceDescriptor.describe(days: $0) },
-                     contact.lastInteractedAt.flatMap { Contact.relativeDescription(for: $0, from: now) }
+                     contact.lastInteractedAt.flatMap {
+                        Contact.relativeDescription(for: $0, from: viewModel.now)
+                     }
                         .map { "last \($0)" }]
                     .compactMap { $0 }.joined(separator: " · ")
                 )

@@ -19,6 +19,7 @@ public final class UpcomingViewModel {
 
     public private(set) var groups: [(header: String, rows: [UpcomingRowState])] = []
     public private(set) var totalCount: Int = 0
+    private(set) var loadState: RegardsLoadState = .loading
 
     public var horizonDays: Int = 14
 
@@ -38,16 +39,19 @@ public final class UpcomingViewModel {
     }
 
     public func load() async {
+        loadState = .loading
         do {
             let tracked = try await contacts.fetchTracked()
             let now = clock()
             let rows = buildRows(contacts: tracked, now: now)
             totalCount = rows.count
             groups = group(rows: rows)
+            loadState = .loaded
         } catch {
             Self.log.error("failed to load upcoming reminders: \(error, privacy: .public)")
             groups = []
             totalCount = 0
+            loadState = .failed
         }
     }
 
