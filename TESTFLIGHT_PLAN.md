@@ -19,7 +19,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: none
+- Owner action needed now: unlock and sign in to the Mac desktop, then run
+  `gh auth status`; if it still fails, complete
+  `gh auth login -h github.com -p https -w` and leave the Mac signed in
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
