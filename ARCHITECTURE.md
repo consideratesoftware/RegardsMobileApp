@@ -884,7 +884,7 @@ Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken)
 10. Support URL: GitHub Issues. Marketing URL: the Substack.
 11. Screenshots: 6.9"/6.7" set (1320×2868 / 1290×2796), 3–10 shots: Overdue, Upcoming, Contact Detail (deep-link button visible), Reminder Windows editor, Transparency screen, widget. Frame with one-line captions; the Transparency shot is the differentiator — don't bury it.
 12. App icon 1024×1024 (no alpha/rounded corners) — export from Bakery per the asset plan.
-13. Copyright `© 2026 Siddharth Dahiya`. Trade rep info (Korea) skip unless targeting KR at launch.
+13. Copyright `© 2026 Considerate Software LLC`. Trade rep info (Korea) skip unless targeting KR at launch.
 14. Pricing: Tier-A $4.99 anchor + auto-pricing per storefront per §4 tiers; verify IN/BR land ₹99-class/R$9.90-class. IAPs: `com.consideratesoftware.regards.unlock` (non-consumable), `.tip.coffee`, `.tip.thanks`, `.tip.feature` — created, localized, attached to the submission build. **Small Business Program enrollment confirmed before launch.**
 15. App Review notes: no account needed; no demo credentials; "This app contains no networking code by design (ATS denies all loads; source is public at github.com/sid78669/RegardsMobileApp). You will observe zero outbound traffic. Contacts write access is used only for user-initiated single-field edits."
 

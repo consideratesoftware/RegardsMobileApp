@@ -100,4 +100,4 @@ This is "source-available," not "open source" in the OSI sense. The distinction 
 
 ---
 
-Copyright © 2026 Siddharth Dahiya. Regards is a personal project, not affiliated with any employer.
+Copyright © 2026 Considerate Software LLC.

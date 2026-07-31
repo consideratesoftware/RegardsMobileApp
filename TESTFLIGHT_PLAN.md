@@ -7,19 +7,19 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-07-30
+- Updated: 2026-07-31
 - Baseline: `main` at `9545bca` (merged GitHub PR #22)
-- Active work: `TF-01` (slice 1: repository/docs/accessibility truth; `OWNER`)
+- Active work: `TF-01` (slice 1: repository/docs/accessibility truth;
+  final review pending; owner-directed slice 2 is stacked on it)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #23 (`chore/tf-01-truth-a11y`, draft;
-  manual accessibility smoke pending)
+- Open pull requests: GitHub PR #23 (`chore/tf-01-truth-a11y`, published;
+  manual accessibility smoke complete) and GitHub PR #24
+  (`ios/modern-platform-showcase`, draft; stacked on PR #23)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: restart the Mac once, sign back in, and leave the
-  session unlocked so the documented manual VoiceOver smoke can complete on
-  PR #23
+- Owner action needed now: none
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -37,8 +37,10 @@ Every fresh or scheduled agent run follows this order:
    new work, even when the checkout is on `main` or another branch. Safely
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
-   green and no blocker remains. If more than one exists, start nothing new;
-   finish the oldest first and restore the one-item invariant.
+   green and no blocker remains. If more than one exists, start nothing new.
+   Finish the oldest or base pull request first, then rebase or retarget its
+   recorded stacked child. The only current approved stack is TF-01 slice 2 on
+   PR #23; it does not authorize another parallel item.
 5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
    requests carrying a `TF-##` marker, and take the first `READY` item whose
    dependencies are `DONE`.
@@ -137,38 +139,60 @@ is merged.
 
 ### TF-01 serial slices
 
-TF-01 is one active queue item implemented as three pull requests so unrelated
-truth, CI, and mock-code changes remain reviewable. Do not start a later slice
-until the earlier one merges.
+TF-01 is one active queue item implemented as four pull requests so unrelated
+truth, platform, CI, and mock-code changes remain reviewable. Normally a later
+slice starts only after the earlier one merges. The owner explicitly requested
+slice 2 while slice 1 waited on a manual gate, so slice 2 is a recorded stacked
+exception: it may be implemented and reviewed, but it cannot merge before
+slice 1.
 
 1. Repository/docs/accessibility truth: README layout and current/future
    language; restore a working Edit Contact route and standard Back escape;
    add its audit coverage; remove the deleted wait-helper reference; standardize
    the manual smoke on iPhone 17 Pro; reconcile §18 and the closed
    documentation/audit R-items.
-2. CI/reproducibility/reviewer enforcement: commit `Package.resolved`; remove
+2. Dedicated stable-platform modernization (GitHub PR #24): native navigation
+   and empty states; iOS 18 value-based tabs, search-role destination,
+   sidebar behavior, and Reduce-Motion-aware matched transitions; iOS 26
+   restrained Liquid Glass, tab-bar minimization, and a local open-section App
+   Shortcut; iOS 17 fallbacks; no beta-only iOS 27 API and no new product
+   behavior.
+3. CI/reproducibility/reviewer enforcement: commit `Package.resolved`; remove
    placeholder tests; root Markdown links; ≥95% Domain coverage; hardened
    privacy/domain guards; dead SwiftLint/audit comments; make the hosted review
    fail unless it posts a verdict artifact; require review/parity contexts in
    branch protection; reconcile the documented merge method with GitHub.
-3. Mock/code hygiene: seed group, interaction, and occasion states; stable
+4. Mock/code hygiene: seed group, interaction, and occasion states; stable
    Upcoming row IDs; remove or wire dead assets and stale comments; prune
    obsolete worktrees and merged branches after exact-target verification.
 
 ## Owner gates
 
-Current gate:
+Current gates:
 
-- `TF-01` slice 1 / PR #23: restart the Mac once, sign back in, and leave the
-  session unlocked. Accessibility Inspector left the iOS 26.5 runtime unable
-  to finish booting its system app; the same `Waiting on System App` stall
-  reproduces on an untouched iPhone 16 Pro after restoring the iPhone 17 Pro
-  accessibility preferences, restarting CoreSimulator, and retrying a fresh
-  disposable device. The scheduled continuation will retry the iPhone 17 Pro
-  manual smoke (VoiceOver traversal, Dynamic Type at `accessibility5`, Reduce
-  Motion on/off, and Increased Contrast on/off), record the result in the pull
-  request, run the hosted review, and merge only when every check approves. No
-  credential or account access is needed.
+- `TF-01` slice 1 / PR #23: no owner action. The post-restart iPhone 17 Pro
+  smoke completed on 2026-07-31. The remaining gate is the automated staged
+  review and a hosted verdict artifact.
+- `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
+  child onto `main`. Rerun its checks, staged review, and manual accessibility
+  smoke before publication or auto-merge.
+
+### PR #23 manual accessibility evidence
+
+- Exact source: `chore/tf-01-truth-a11y` at `6d25618` before this evidence
+  commit, built with Xcode 26.6 against the iOS 26.5 iPhone 17 Pro simulator.
+- VoiceOver: the launch label remains `Regards. Loading.` with the header
+  trait. The tab-root hierarchy exposed the Overdue heading, four tab
+  destinations, natural-language rows, button traits, and action hints. The
+  Edit Contact structural audit and Back regression both remain green.
+- Dynamic Type: `accessibility5` re-rendered the app and the Edit Contact audit
+  passed. Existing legacy root and Contact Detail compression at this size is
+  recorded for TF-16's full sensory-audit and layout pass; it is outside this
+  navigation-truth slice.
+- Reduce Motion: on and off tested. The launch uses the no-animation path when
+  enabled and the documented crossfade when disabled.
+- Increased Contrast: on and off tested. Text, icons, selection states, and
+  the inner-circle ring remained visible.
 
 Later gates:
 

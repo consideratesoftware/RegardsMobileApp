@@ -57,7 +57,7 @@ struct SplashView: View {
                     .frame(maxWidth: wordmarkWidth)
                     .accessibilityHidden(true)
                 Spacer()
-                Text("© 2026 Sid Dahiya")
+                Text("© 2026 Considerate Software LLC")
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(RegardsDS.muted)
                     .padding(.bottom, 24)
