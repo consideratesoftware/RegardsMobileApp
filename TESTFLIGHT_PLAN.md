@@ -157,11 +157,11 @@ slice 1.
    restrained Liquid Glass, tab-bar minimization, and a local open-section App
    Shortcut; iOS 17 fallbacks; no beta-only iOS 27 API and no new product
    behavior.
-3. CI/reproducibility/reviewer enforcement: commit `Package.resolved`; remove
+3. Remaining CI/reproducibility enforcement: commit `Package.resolved`; remove
    placeholder tests; root Markdown links; ≥95% Domain coverage; hardened
-   privacy/domain guards; dead SwiftLint/audit comments; make the hosted review
-   fail unless it posts a verdict artifact; require review/parity contexts in
-   branch protection; reconcile the documented merge method with GitHub.
+   privacy/domain guards; dead SwiftLint/audit comments; preserve the hosted
+   review artifact postcondition and required review/parity contexts; reconcile
+   the documented merge method with GitHub.
 4. Mock/code hygiene: seed group, interaction, and occasion states; stable
    Upcoming row IDs; remove or wire dead assets and stale comments; prune
    obsolete worktrees and merged branches after exact-target verification.
@@ -172,9 +172,10 @@ Current gates:
 
 - `TF-01` slice 1 / PR #23: no owner action. Implementation, manual smoke,
   exact-source mechanical gates, and all six staged reviewers are green
-  locally. GitHub authentication is healthy again. Push the reviewed commits,
-  update the pull-request evidence, require a hosted verdict artifact, wait
-  for every required check, and arm guarded auto-merge.
+  locally. GitHub authentication is healthy again. The hosted review now fails
+  without a current-head bot verdict, fails on `REQUEST_CHANGES`, and has both
+  review contexts required in branch protection. Wait for every required check
+  and an approving artifact, then arm guarded auto-merge.
 - `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
   child onto `main`. Rerun its checks, staged review, and manual accessibility
   smoke before publication or auto-merge.

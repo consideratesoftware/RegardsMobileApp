@@ -22,6 +22,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Record review start
+        run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/review-started-at"
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -46,6 +49,8 @@ jobs:
               project subagents in `.claude/agents/`.
             - Diff target: the PR's merge base with the base branch
               (`gh pr diff` or `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`).
+            - Artifact identity: include the exact head SHA
+              `${{ github.event.pull_request.head.sha }}` in the merged review.
 
             Post the single merged review (the exact Stage 3 structure) as one
             top-level comment via `gh pr comment`. Use
@@ -55,4 +60,42 @@ jobs:
             modify any code.
 
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*)"
+            --allowedTools "Agent,Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*)"
+
+      - name: Require approving review artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          started_at="$(cat "$RUNNER_TEMP/review-started-at")"
+          review_body="$({
+            gh api --paginate \
+              "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100"
+          } | jq -rs --arg started_at "$started_at" --arg head_sha "$HEAD_SHA" '
+            [
+              .[][]
+              | select(.user.type == "Bot")
+              | select(.created_at >= $started_at)
+              | .body
+              | select(contains($head_sha))
+              | select(test("^## PR Review"; "m"))
+              | select(test("^PRE-FLIGHT:"; "m"))
+              | select(test("^VERDICT: (APPROVE|REQUEST_CHANGES)$"; "m"))
+              | select(test("^### Audit trail$"; "m"))
+            ]
+            | last // empty
+          ')"
+
+          if [[ -z "$review_body" ]]; then
+            echo "::error::The hosted reviewer did not post a current-head verdict artifact."
+            exit 1
+          fi
+
+          if grep -q '^VERDICT: REQUEST_CHANGES$' <<< "$review_body"; then
+            echo "::error::The hosted reviewer requested changes."
+            exit 1
+          fi
+
+          echo "Hosted reviewer posted an approving current-head artifact."
