@@ -7,7 +7,7 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-07-29
+- Updated: 2026-07-30
 - Baseline: `main` at `9545bca` (merged GitHub PR #22)
 - Active work: `TF-01` (slice 1: repository/docs/accessibility truth; `OWNER`)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
@@ -17,8 +17,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: unlock the Mac session so the documented manual
-  VoiceOver smoke can complete on PR #23
+- Owner action needed now: restart the Mac once, sign back in, and leave the
+  session unlocked so the documented manual VoiceOver smoke can complete on
+  PR #23
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -158,11 +159,16 @@ until the earlier one merges.
 
 Current gate:
 
-- `TF-01` slice 1 / PR #23: unlock the Mac session. The scheduled continuation
-  will retry the iPhone 17 Pro manual smoke (VoiceOver traversal, Dynamic Type
-  at `accessibility5`, and Reduce Motion on/off), record the result in the pull
-  request, run the hosted review, and merge only when every check approves.
-  No credential or account access is needed.
+- `TF-01` slice 1 / PR #23: restart the Mac once, sign back in, and leave the
+  session unlocked. Accessibility Inspector left the iOS 26.5 runtime unable
+  to finish booting its system app; the same `Waiting on System App` stall
+  reproduces on an untouched iPhone 16 Pro after restoring the iPhone 17 Pro
+  accessibility preferences, restarting CoreSimulator, and retrying a fresh
+  disposable device. The scheduled continuation will retry the iPhone 17 Pro
+  manual smoke (VoiceOver traversal, Dynamic Type at `accessibility5`, Reduce
+  Motion on/off, and Increased Contrast on/off), record the result in the pull
+  request, run the hosted review, and merge only when every check approves. No
+  credential or account access is needed.
 
 Later gates:
 
