@@ -10,7 +10,7 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Updated: 2026-07-31
 - Baseline: `main` at `9545bca` (merged GitHub PR #22)
 - Active work: `TF-01` (slice 1: repository/docs/accessibility truth;
-  final review pending; owner-directed slice 2 is stacked on it)
+  hosted checks pending; owner-directed slice 2 is stacked on it)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
 - Open pull requests: GitHub PR #23 (`chore/tf-01-truth-a11y`, published;
   manual accessibility smoke complete) and GitHub PR #24
@@ -18,10 +18,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
-  daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: unlock and sign in to the Mac desktop, then run
-  `gh auth status`; if it still fails, complete
-  `gh auth login -h github.com -p https -w` and leave the Mac signed in
+  daily at 19:30 host-local time, targeting this persistent task
+- Owner action needed now: none
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -172,16 +170,11 @@ slice 1.
 
 Current gates:
 
-- `TF-01` slice 1 / PR #23: implementation, manual smoke, exact-source
-  mechanical gates, and all six staged reviewers are green locally. GitHub
-  publication is blocked after the Mac restart because the login Keychain
-  returned `-25293`; `gh auth status` reports the stored token unavailable,
-  and the GitHub device flow kept its final authorization control disabled.
-  One human checklist remains: (1) sign in to and unlock the Mac desktop,
-  (2) run `gh auth status` in Terminal and, only if it still fails, complete
-  `gh auth login -h github.com -p https -w`, then (3) leave the Mac signed in
-  so the next heartbeat can push the reviewed commits, update PR #23, wait for
-  its hosted verdict and required checks, and arm guarded auto-merge.
+- `TF-01` slice 1 / PR #23: no owner action. Implementation, manual smoke,
+  exact-source mechanical gates, and all six staged reviewers are green
+  locally. GitHub authentication is healthy again. Push the reviewed commits,
+  update the pull-request evidence, require a hosted verdict artifact, wait
+  for every required check, and arm guarded auto-merge.
 - `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
   child onto `main`. Rerun its checks, staged review, and manual accessibility
   smoke before publication or auto-merge.
