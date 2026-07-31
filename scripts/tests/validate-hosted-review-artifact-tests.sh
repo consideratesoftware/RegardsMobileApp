@@ -9,17 +9,31 @@ head_sha="0123456789abcdef0123456789abcdef01234567"
 
 approval_body="$(printf '%s\n' \
   '## PR Review — branch — 2026-07-31' \
-  "$head_sha" \
+  "HEAD SHA: $head_sha" \
   'PRE-FLIGHT: determinism ✅ | swiftlint ✅ | guards ✅' \
   'VERDICT: APPROVE' \
+  '' \
+  '### Blockers (must fix before merge)' \
+  'None.' \
+  '' \
+  "### Should fix (before or in fast-follow, owner's call)" \
+  'None.' \
+  '' \
+  '### Nits (take or leave)' \
+  'None.' \
+  '' \
+  '### Questions for Sid' \
+  'None.' \
   '' \
   '### Audit trail' \
   '- complete')"
 
 request_changes_body="${approval_body/VERDICT: APPROVE/VERDICT: REQUEST_CHANGES}"
+red_preflight_body="${approval_body/PRE-FLIGHT: determinism ✅ | swiftlint ✅ | guards ✅/PRE-FLIGHT: determinism ❌ | swiftlint ❌ | guards ❌}"
+missing_heading_body="$(printf '%s\n' "$approval_body" | sed '/^### Questions for Sid$/d')"
 malformed_body="$(printf '%s\n' \
   '## PR Review — branch — 2026-07-31' \
-  "$head_sha" \
+  "HEAD SHA: $head_sha" \
   'PRE-FLIGHT: determinism ✅ | swiftlint ✅ | guards ✅' \
   'VERDICT: APPROVE')"
 
@@ -65,6 +79,14 @@ expect_status \
 expect_status \
   "rejects malformed artifact" 1 \
   "$(comment_page "2026-07-31T14:31:00Z" "$malformed_body")"
+
+expect_status \
+  "rejects red preflight" 1 \
+  "$(comment_page "2026-07-31T14:31:00Z" "$red_preflight_body")"
+
+expect_status \
+  "rejects missing Stage 3 heading" 1 \
+  "$(comment_page "2026-07-31T14:31:00Z" "$missing_heading_body")"
 
 expect_status \
   "fails for request changes" 1 \

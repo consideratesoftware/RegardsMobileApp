@@ -52,8 +52,8 @@ jobs:
               project subagents in `.claude/agents/`.
             - Diff target: the PR's merge base with the base branch
               (`gh pr diff` or `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`).
-            - Artifact identity: include the exact head SHA
-              `${{ github.event.pull_request.head.sha }}` in the merged review.
+            - Artifact identity: immediately after the review heading, add the
+              line `HEAD SHA: ${{ github.event.pull_request.head.sha }}`.
 
             Post the single merged review (the exact Stage 3 structure) as one
             top-level comment via `gh pr comment`. Use
