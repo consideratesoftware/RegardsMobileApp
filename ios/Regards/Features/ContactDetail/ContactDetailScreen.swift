@@ -1,6 +1,10 @@
 import SwiftUI
 
 public struct ContactDetailScreen: View {
+    private struct EditRoute: Hashable {
+        let contact: Contact
+    }
+
     let viewModel: ContactDetailViewModel
     private let onTapOpenChannel: () -> Void
     private let onTapMarkCaughtUp: () -> Void
@@ -46,10 +50,13 @@ public struct ContactDetailScreen: View {
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("screen.contact-detail")
+        .navigationDestination(for: EditRoute.self) { route in
+            EditContactScreen(contact: route.contact)
+        }
         .toolbar {
             if let contact = viewModel.contact {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: EditContactScreen(contact: contact)) {
+                    NavigationLink(value: EditRoute(contact: contact)) {
                         Text("Edit")
                             .foregroundStyle(RegardsDS.accentInk)
                     }

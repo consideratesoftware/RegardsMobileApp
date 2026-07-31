@@ -60,6 +60,7 @@ public struct EditContactScreen: View {
                 .font(RegardsFont.mono(.caption))
                 .foregroundStyle(RegardsDS.accentInk.opacity(0.8))
                 .padding(.top, 2)
+                .accessibilityHidden(true)
             Text(
                 "Read-only preview. Contact editing is not available yet; "
                 + "your device Contacts stay unchanged."

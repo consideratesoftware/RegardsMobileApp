@@ -179,8 +179,9 @@ Current gates:
 
 ### PR #23 manual accessibility evidence
 
-- Exact source: `chore/tf-01-truth-a11y` at `6d25618` before this evidence
-  commit, built with Xcode 26.6 against the iOS 26.5 iPhone 17 Pro simulator.
+- Source lineage: `chore/tf-01-truth-a11y` at `6d25618` for the manual UI
+  smoke, followed by the review-fix tree described below. Both were built with
+  Xcode 26.6 against the iOS 26.5 iPhone 17 Pro simulator.
 - VoiceOver: the launch label remains `Regards. Loading.` with the header
   trait. The tab-root hierarchy exposed the Overdue heading, four tab
   destinations, natural-language rows, button traits, and action hints. The
@@ -193,6 +194,10 @@ Current gates:
   enabled and the documented crossfade when disabled.
 - Increased Contrast: on and off tested. Text, icons, selection states, and
   the inner-circle ring remained visible.
+- Review-fix stress evidence: `ios/scripts/audit-stress.sh 5` completed five
+  consecutive full accessibility-suite passes locally on 2026-07-31. This
+  exercised the typed Contact Detail → Edit Contact route and its Back
+  regression on every pass.
 
 Later gates:
 
