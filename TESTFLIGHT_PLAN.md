@@ -170,9 +170,16 @@ slice 1.
 
 Current gates:
 
-- `TF-01` slice 1 / PR #23: no owner action. The post-restart iPhone 17 Pro
-  smoke completed on 2026-07-31. The remaining gate is the automated staged
-  review and a hosted verdict artifact.
+- `TF-01` slice 1 / PR #23: implementation, manual smoke, exact-source
+  mechanical gates, and all six staged reviewers are green locally. GitHub
+  publication is blocked after the Mac restart because the login Keychain
+  returned `-25293`; `gh auth status` reports the stored token unavailable,
+  and the GitHub device flow kept its final authorization control disabled.
+  One human checklist remains: (1) sign in to and unlock the Mac desktop,
+  (2) run `gh auth status` in Terminal and, only if it still fails, complete
+  `gh auth login -h github.com -p https -w`, then (3) leave the Mac signed in
+  so the next heartbeat can push the reviewed commits, update PR #23, wait for
+  its hosted verdict and required checks, and arm guarded auto-merge.
 - `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
   child onto `main`. Rerun its checks, staged review, and manual accessibility
   smoke before publication or auto-merge.
