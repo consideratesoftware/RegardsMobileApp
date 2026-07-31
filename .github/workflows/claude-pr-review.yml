@@ -22,6 +22,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Test review artifact validator
+        run: scripts/tests/validate-hosted-review-artifact-tests.sh
+
       - name: Record review start
         run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/review-started-at"
 
@@ -70,32 +73,9 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           started_at="$(cat "$RUNNER_TEMP/review-started-at")"
-          review_body="$({
-            gh api --paginate \
-              "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100"
-          } | jq -rs --arg started_at "$started_at" --arg head_sha "$HEAD_SHA" '
-            [
-              .[][]
-              | select(.user.type == "Bot")
-              | select(.created_at >= $started_at)
-              | .body
-              | select(contains($head_sha))
-              | select(test("^## PR Review"; "m"))
-              | select(test("^PRE-FLIGHT:"; "m"))
-              | select(test("^VERDICT: (APPROVE|REQUEST_CHANGES)$"; "m"))
-              | select(test("^### Audit trail$"; "m"))
-            ]
-            | last // empty
-          ')"
-
-          if [[ -z "$review_body" ]]; then
-            echo "::error::The hosted reviewer did not post a current-head verdict artifact."
-            exit 1
-          fi
-
-          if grep -q '^VERDICT: REQUEST_CHANGES$' <<< "$review_body"; then
-            echo "::error::The hosted reviewer requested changes."
-            exit 1
-          fi
-
+          gh api --paginate \
+            "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+            | scripts/validate-hosted-review-artifact.sh \
+                "$started_at" "$HEAD_SHA" \
+            > "$RUNNER_TEMP/hosted-review.md"
           echo "Hosted reviewer posted an approving current-head artifact."

@@ -174,7 +174,7 @@ Apply the same pattern to pushed navigation: resolve the current trigger
 element for every attempt, tap its live center coordinate, and require the
 plain destination identifier to appear while the source screen identifier
 disappears. `launchToContactDetailFromContacts`, `navigateFromSettings`,
-`navigateToRow`, `navigateToEditContact`, and `navigateBack` are the canonical
+`navigateToRow`, and the consolidated `navigate` helper are the canonical
 implementations.
 
 This was the underlying race behind `testContactDetailPassesAudit`
