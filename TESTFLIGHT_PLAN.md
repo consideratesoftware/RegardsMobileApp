@@ -148,7 +148,9 @@ The current owner action for `TF-01` is one GitHub App setup checklist:
 3. Tell Codex the setup is complete. Codex will verify the environment is
    restricted to protected branches, exercise the App-authored `Regards staged
    review` check on the open PR, bind that context to the App's ID in branch
-   protection, then remove the spoofable GitHub Actions `review` requirement.
+   protection, remove the spoofable GitHub Actions `review` requirement, and
+   delete the one-time `bootstrap_review` compatibility job while integrating
+   PR #23.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:

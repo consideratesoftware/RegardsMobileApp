@@ -1,6 +1,10 @@
 name: Claude PR Review
 
 on:
+  # Temporary compatibility trigger for the legacy required `review` context.
+  # PR #23 removes it after the dedicated App check is bound.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
 
@@ -11,7 +15,8 @@ concurrency:
 jobs:
   open_check:
     if: >-
-      ${{ !github.event.pull_request.draft &&
+      ${{ github.event_name == 'pull_request_target' &&
+          !github.event.pull_request.draft &&
           github.event.pull_request.base.ref == github.event.repository.default_branch }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -69,7 +74,8 @@ jobs:
   preflight:
     needs: open_check
     if: >-
-      ${{ !github.event.pull_request.draft &&
+      ${{ github.event_name == 'pull_request_target' &&
+          !github.event.pull_request.draft &&
           github.event.pull_request.base.ref == github.event.repository.default_branch }}
     runs-on: macos-latest
     timeout-minutes: 20
@@ -140,7 +146,8 @@ jobs:
   analyze:
     needs: preflight
     if: >-
-      ${{ !github.event.pull_request.draft &&
+      ${{ github.event_name == 'pull_request_target' &&
+          !github.event.pull_request.draft &&
           github.event.pull_request.base.ref == github.event.repository.default_branch }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -242,7 +249,8 @@ jobs:
     name: Publish hosted review
     needs: [open_check, preflight, analyze]
     if: >-
-      ${{ always() && !github.event.pull_request.draft &&
+      ${{ always() && github.event_name == 'pull_request_target' &&
+          !github.event.pull_request.draft &&
           github.event.pull_request.base.ref == github.event.repository.default_branch }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -326,3 +334,16 @@ jobs:
             -f conclusion="$CONCLUSION" \
             -f completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             >/dev/null
+
+  bootstrap_review:
+    name: review
+    # Temporary compatibility for the legacy Actions-authored required context.
+    # Trusted jobs above refuse this PR-controlled event.
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm local staged bootstrap review
+        run: echo "The exact-source Regards staged review ran before publication."

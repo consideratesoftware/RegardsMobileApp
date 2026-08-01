@@ -19,12 +19,18 @@ open_check = jobs.fetch("open_check")
 preflight = jobs.fetch("preflight")
 analyze = jobs.fetch("analyze")
 publish = jobs.fetch("publish")
+bootstrap_review = jobs.fetch("bootstrap_review")
 
 raise "preflight must wait for the pending head check" unless preflight.fetch("needs") == "open_check"
 raise "analysis must wait for trusted preflight" unless analyze.fetch("needs") == "preflight"
 raise "head check must use the protected environment" unless open_check.fetch("environment") == "hosted-review"
 raise "publisher must use the protected environment" unless publish.fetch("environment") == "hosted-review"
 raise "publisher token permissions expanded" unless publish.fetch("permissions") == {"contents" => "read"}
+raise "bootstrap check name drifted" unless bootstrap_review.fetch("name") == "review"
+raise "bootstrap check must be pull_request-only" unless bootstrap_review.fetch("if") == "${{ github.event_name == 'pull_request' }}"
+[open_check, preflight, analyze, publish].each do |job|
+  raise "trusted job can run on a PR-controlled workflow" unless job.fetch("if").include?("github.event_name == 'pull_request_target'")
+end
 
 open_steps = open_check.fetch("steps")
 open_token_step = open_steps.find { |step| step["id"] == "review_app_token" }
@@ -52,7 +58,10 @@ raise "publisher App token permissions expanded" unless permissions_are_narrow
 
 publisher_text = publish.to_s
 raise "publisher must not use the generic Actions token" if publisher_text.include?("github.token")
-raise "publisher must not use pull-request mutation APIs" if publisher_text.include?("permission-pull-requests") || publisher_text.include?("gh pr")
+pull_request_api = %r{repos/\$REPOSITORY/pulls/}
+raise "publisher must not use pull-request mutation APIs" if publisher_text.include?("permission-pull-requests") || publisher_text.include?("gh pr") || publisher_text.match?(pull_request_api)
+malicious_pull_request_call = 'gh api --method PATCH "repos/$REPOSITORY/pulls/$PR_NUMBER"'
+raise "pull-request REST mutation regression fixture no longer matches" unless malicious_pull_request_call.match?(pull_request_api)
 raise "dedicated App token is not used" unless publisher_text.include?("steps.review_app_token.outputs.token")
 raise "publisher must complete the initial check" unless publisher_text.include?("needs.open_check.outputs.check_id")
 RUBY
