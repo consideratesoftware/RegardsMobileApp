@@ -15,8 +15,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
-  daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: none
+  daily at 19:30 host-local time, targeting this persistent task
+- Owner action needed now: create and install the dedicated Regards review
+  GitHub App listed under `Owner gates`
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -134,9 +135,23 @@ is merged.
 
 ## Owner gates
 
-No owner action is required for `TF-00` through simulator-verifiable work.
-These actions cannot be completed from repository automation and will be
-requested when their owning gate becomes active:
+The current owner action for `TF-01` is one GitHub App setup checklist:
+
+1. Create a GitHub App owned by `consideratesoftware` named `Regards Review
+   Gate`. Disable webhooks. Grant repository permissions `Checks: Read and
+   write` and `Issues: Read and write`; grant nothing else.
+2. Install it only on `consideratesoftware/RegardsMobileApp`, generate one
+   private key, then configure the repository's `hosted-review` environment:
+   set variable `REGARDS_REVIEW_APP_CLIENT_ID` to the App's client ID and secret
+   `REGARDS_REVIEW_APP_PRIVATE_KEY` to the complete PEM private key. Delete the
+   downloaded key after GitHub confirms the secret.
+3. Tell Codex the setup is complete. Codex will verify the environment is
+   restricted to protected branches, exercise the App-authored `Regards staged
+   review` check on the open PR, bind that context to the App's ID in branch
+   protection, then remove the spoofable GitHub Actions `review` requirement.
+
+The remaining owner actions cannot be completed from repository automation and
+will be requested when their owning gate becomes active:
 
 - `TF-08`: Apple Development signing access, App Store Connect role, a physical
   iPhone, a small contacts fixture, and installed target messaging apps for the

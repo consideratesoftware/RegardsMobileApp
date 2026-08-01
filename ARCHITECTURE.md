@@ -765,7 +765,7 @@ migration have landed. There are no open GitHub pull requests or issues.
 - **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
 - **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
 - **Accessibility harness that gates merges:** 13 XCUI audit tests (structural categories), audit-stress tooling (script + workflow), documented test patterns and smoke script.
-- **CI: 4 gating workflows** — ios-ci (xcodegen determinism → build → unit+coverage ∥ a11y audit), guards (privacy-grep, domain-purity, YAML, ios/docs link check), lint (`--strict`), audit-stress (5× per PR).
+- **CI: 4 active gating workflows + 1 pending gate** — ios-ci (xcodegen determinism → build → unit+coverage ∥ a11y audit), guards (privacy-grep, domain-purity, YAML, ios/docs link check), lint (`--strict`), and audit-stress (5× per PR) gate today. The trusted hosted staged-review workflow becomes the fifth gate when its pending dedicated GitHub App check is bound in branch protection as recorded in `TESTFLIGHT_PLAN.md`.
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
 
 ### What exists but is dormant (Phase 1 fragments, PRs #9–#10)

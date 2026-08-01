@@ -124,8 +124,15 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 - `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, markdown link check for `ios/docs/` (PR19 extends it to root markdown).
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
 - `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× per PR (flake detector).
+- `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from
+  default-branch policy, gives the model only sanitized regular-file review
+  data with a read-only token, then validates and publishes the typed verdict
+  from a separate trusted job.
 
-All four workflows gate merges; path filters were deliberately removed (PR #15) so required checks always report.
+Four workflows currently gate merges through required checks. The hosted
+review becomes the fifth gate after the pending dedicated GitHub App setup and
+branch-protection binding in `TESTFLIGHT_PLAN.md`. Path filters were deliberately
+removed (PR #15) so required checks always report.
 
 ## Durable execution
 
@@ -146,6 +153,11 @@ mechanical gates, then use the mirrored read-only agents:
 `REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
 checks. `.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
+The hosted review check must be bound to the dedicated Regards review GitHub
+App, not only to its context name. After that pending binding, the workflow runs
+only when a PR targets the default branch, so a stacked draft stays on its
+parent until the parent merges. Retarget and rebase the child, publish it, then
+push the rebased head to trigger the hosted review against the final base.
 
 ## Things to avoid
 
