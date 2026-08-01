@@ -101,6 +101,24 @@ expect_artifact_status \
   'rejects multiline findings' 1 \
   "$(jq '.should_fix = ["[pr-tests] [file.swift:1] first line\nsecond line"]' <<< "$approval")"
 
+publishable_boundary="$(jq '
+  .should_fix = [range(0; 30) |
+    "[pr-tests] [file.swift:1] " + ("x" * 1650)]
+  | .nits = [range(0; 10) |
+    "[pr-code-quality] [file.swift:1] " + ("x" * 950)]
+' <<< "$approval")"
+expect_artifact_status \
+  'accepts a publishable large review' 0 "$publishable_boundary"
+
+oversized_comment="$(jq '
+  .should_fix = [range(0; 30) |
+    "[pr-tests] [file.swift:1] " + ("x" * 1950)]
+  | .nits = [range(0; 10) |
+    "[pr-code-quality] [file.swift:1] " + ("x" * 1950)]
+' <<< "$approval")"
+expect_artifact_status \
+  'rejects a review above the comment boundary' 1 "$oversized_comment"
+
 request_changes_file="$(mktemp)"
 printf '%s\n' "$request_changes" > "$request_changes_file"
 set +e

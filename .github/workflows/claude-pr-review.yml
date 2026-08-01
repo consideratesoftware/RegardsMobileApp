@@ -130,16 +130,10 @@ jobs:
             --config "$GITHUB_WORKSPACE/.swiftlint.yml" \
             "$RUNNER_TEMP/pr-tree"
 
-          if grep -REn '\b(URLSession\w*|NW(Connection|Endpoint|Listener|PathMonitor|Interface|Path)\w*|URLRequest|URLProtocol)[.(]|\bCF(Read|Write)Stream(Create|Open|Read|Write|Ref|Client|Copy)' \
-            "$RUNNER_TEMP/pr-tree/ios/Regards" 2>/dev/null; then
-            echo "::error::Networking call sites found in ios/Regards."
-            exit 1
-          fi
-          if grep -RE '^import (UIKit|SwiftUI|Contacts|EventKit|UserNotifications|GRDB|StoreKit)$' \
-            "$RUNNER_TEMP/pr-tree/ios/Regards/Domain" 2>/dev/null; then
-            echo "::error::Domain layer contains a platform import."
-            exit 1
-          fi
+          scripts/check-no-network.sh \
+            "$RUNNER_TEMP/pr-tree/ios/Regards"
+          scripts/check-domain-purity.sh \
+            "$RUNNER_TEMP/pr-tree/ios/Regards/Domain"
           ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0))' \
             "$RUNNER_TEMP/pr-tree/ios/project.yml"
 
@@ -237,7 +231,8 @@ jobs:
             `[agent] [path:line]`. An approval must have no blockers. A request
             for changes must name at least one blocker. The four typed audit
             strings are always required; use the named `not dispatched` value
-            when the path rules skipped that reviewer.
+            when the path rules skipped that reviewer. Keep the complete
+            rendered review below 65,000 UTF-8 bytes.
           claude_args: >-
             --add-dir review-data
             --tools "Agent,Read,Grep,Glob"
@@ -278,6 +273,7 @@ jobs:
       - name: Test trusted validators
         run: |
           scripts/tests/hosted-review-workflow-tests.sh
+          scripts/tests/source-boundary-guard-tests.sh
           scripts/tests/prepare-hosted-review-data-tests.sh
           scripts/tests/validate-hosted-project-spec-tests.sh
           scripts/tests/validate-hosted-review-artifact-tests.sh

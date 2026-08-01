@@ -12,6 +12,7 @@ head_sha="$2"
 base_sha="$3"
 pr_number="$4"
 run_id="$5"
+max_comment_bytes=65000
 
 if [[ ! -f "$artifact_file" ]] \
   || [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]] \
@@ -94,27 +95,42 @@ print_section() {
 }
 
 verdict="$(jq -r '.verdict' "$artifact_file")"
-printf '## PR Review — #%s — %s\n' "$pr_number" "$(date -u +%Y-%m-%d)"
-printf 'HEAD SHA: %s\n' "$head_sha"
-printf 'BASE SHA: %s\n' "$base_sha"
-printf 'WORKFLOW RUN: %s\n' "$run_id"
-printf 'PRE-FLIGHT: determinism ✅ | swiftlint ✅ | guards ✅\n'
-printf 'VERDICT: %s\n' "$verdict"
-print_section 'Blockers (must fix before merge)' blockers
-print_section "Should fix (before or in fast-follow, owner's call)" should_fix
-print_section 'Nits (take or leave)' nits
-print_section 'Questions for Sid' questions_for_sid
-printf '\n### Audit trail\n\n'
-jq -r '
-  .audit_trail
-  | [
-      .security_invariants,
-      .accessibility_process,
-      .fit_finish_docs,
-      .tests_criteria_map
-    ][]
-  | "- " + .
-' "$artifact_file"
+rendered_file="$(mktemp)"
+cleanup() {
+  rm -f "$rendered_file"
+}
+trap cleanup EXIT
+
+{
+  printf '## PR Review — #%s — %s\n' "$pr_number" "$(date -u +%Y-%m-%d)"
+  printf 'HEAD SHA: %s\n' "$head_sha"
+  printf 'BASE SHA: %s\n' "$base_sha"
+  printf 'WORKFLOW RUN: %s\n' "$run_id"
+  printf 'PRE-FLIGHT: determinism ✅ | swiftlint ✅ | guards ✅\n'
+  printf 'VERDICT: %s\n' "$verdict"
+  print_section 'Blockers (must fix before merge)' blockers
+  print_section "Should fix (before or in fast-follow, owner's call)" should_fix
+  print_section 'Nits (take or leave)' nits
+  print_section 'Questions for Sid' questions_for_sid
+  printf '\n### Audit trail\n\n'
+  jq -r '
+    .audit_trail
+    | [
+        .security_invariants,
+        .accessibility_process,
+        .fit_finish_docs,
+        .tests_criteria_map
+      ][]
+    | "- " + .
+  ' "$artifact_file"
+} > "$rendered_file"
+
+if [[ $(wc -c < "$rendered_file") -gt "$max_comment_bytes" ]]; then
+  echo "::error::Rendered hosted review exceeds the GitHub comment limit." >&2
+  exit 1
+fi
+
+cat "$rendered_file"
 
 if [[ "$verdict" == "REQUEST_CHANGES" ]]; then
   exit 2

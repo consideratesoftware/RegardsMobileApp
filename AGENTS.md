@@ -76,8 +76,8 @@ Notable SwiftLint customizations in `.swiftlint.yml`: a custom rule (`button_req
 
 The app follows a strict layered design (ARCHITECTURE.md §5). Two of those layer boundaries are enforced by grep-based CI guards in `.github/workflows/guards.yml`:
 
-1. **Domain purity (§5).** `ios/Regards/Domain/**` must be pure Swift. No `import UIKit | SwiftUI | Contacts | EventKit | UserNotifications | GRDB | StoreKit`. Platform-dependent code belongs in `Regards/Platform/` or `Regards/Data/`.
-2. **No networking anywhere in app sources (§11).** The `privacy-grep` job scans `ios/Regards` for call sites of `URLSession*`, `NWConnection/Endpoint/Listener/PathMonitor/Interface/Path`, `URLRequest`, `URLProtocol`, `CF{Read,Write}Stream*`. The pattern matches `Foo.` or `Foo(` — not the bare token — so the same names may appear in user-facing copy (e.g. the Transparency screen) without tripping the gate. Narrow any new copy around these terms carefully.
+1. **Domain purity (§5).** `ios/Regards/Domain/**` must be pure Swift. No imports from `UIKit`, `SwiftUI`, `Contacts`, `EventKit`, `UserNotifications`, `GRDB`, `StoreKit`, or `Network`, including preconcurrency and selective imports. Platform-dependent code belongs in `Regards/Platform/` or `Regards/Data/`.
+2. **No networking anywhere in app sources (§11).** The shared privacy guard scans `ios/Regards` for call sites of `URLSession*`, `NWConnection/Endpoint/Listener/PathMonitor/Interface/Path`, `URLRequest`, `URLProtocol`, `NSURLConnection`, `CFSocket*`, and `CF{Read,Write}Stream*`. The pattern matches `Foo.` or `Foo(`, so the same names may appear as bare tokens in user-facing copy without tripping the gate. Narrow any new copy around these terms carefully.
 
 Layout inside `ios/Regards/`:
 

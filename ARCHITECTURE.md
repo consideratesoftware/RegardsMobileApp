@@ -175,8 +175,8 @@ The app is local-only with no server costs, so a subscription would be dishonest
 
 Two layer boundaries are **CI-enforced** by grep guards in `.github/workflows/guards.yml`:
 
-1. **Domain purity.** `ios/Regards/Domain/**` must be pure Swift — no `import UIKit | SwiftUI | Contacts | EventKit | UserNotifications | GRDB | StoreKit` (and, once R38 lands, `Network`). Platform-dependent code belongs in `Platform/` or `Data/`.
-2. **No networking anywhere in app sources.** The `privacy-grep` job scans `ios/Regards` for *call sites* of `URLSession*`, `NW{Connection,Endpoint,Listener,PathMonitor,Interface,Path}`, `URLRequest`, `URLProtocol`, `CF{Read,Write}Stream*`. The pattern matches `Foo.`/`Foo(` — not bare tokens — so those names may appear in user-facing copy (Transparency screen) without tripping the gate.
+1. **Domain purity.** `ios/Regards/Domain/**` must be pure Swift: no imports from `UIKit`, `SwiftUI`, `Contacts`, `EventKit`, `UserNotifications`, `GRDB`, `StoreKit`, or `Network`, including preconcurrency and selective imports. Platform-dependent code belongs in `Platform/` or `Data/`.
+2. **No networking anywhere in app sources.** The shared privacy guard scans `ios/Regards` for *call sites* of `URLSession*`, `NW{Connection,Endpoint,Listener,PathMonitor,Interface,Path}`, `URLRequest`, `URLProtocol`, `NSURLConnection`, `CFSocket*`, and `CF{Read,Write}Stream*`. The pattern matches `Foo.` or `Foo(`, so those names may appear as bare tokens in user-facing copy without tripping the gate.
 
 **One additional architectural service, introduced in Phase 1C (not in v0.5):** the **SchedulingPass** — an app-level orchestrator that owns the write path from domain decisions to persisted `ScheduledReminder` rows to OS notifications. The ReminderEngine stays a pure function; SchedulingPass is the only component allowed to (a) compute effective inputs (group max-interaction, effective window), (b) upsert `ScheduledReminder` rows, and (c) sync the pending set to `UNUserNotificationCenter` via the NotificationScheduler adapter. Every UI surface *reads* reminders from the DB; nothing but SchedulingPass *writes* them. See §9a.
 
@@ -596,7 +596,7 @@ contract.
 | **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
 | **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test for link-bearing channels; parametric covers `allCases` | R2, R7 closed |
 | **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R19, R20, R27–R29 closed; audit-stress 5/5 green ×3 consecutive runs |
-| **PR19** | Repo + CI hygiene: commit `Package.resolved`; `git worktree prune` + delete stale worktree/branches; root-markdown link-check job; Domain coverage floor (≥95%); guard hardening (add `Network` to domain-purity, `NSURLConnection|CFSocket` to privacy-grep); remove dead SwiftLint `function_body_length` config; seed mocks with a ContactGroup + InteractionLogs + an occasion so all UI states are reachable/auditable; delete `.git/t9FBrGy` | R21, R30–R34 closed; all 4 workflows green |
+| **PR19** | Repo + CI hygiene: commit `Package.resolved`; `git worktree prune` + delete stale worktree/branches; root-markdown link-check job; Domain coverage floor (≥95%); guard hardening (R32, completed by the TF-01 trusted-gate prerequisite); remove dead SwiftLint `function_body_length` config; seed mocks with a ContactGroup + InteractionLogs + an occasion so all UI states are reachable/auditable; delete `.git/t9FBrGy` | R21, R30–R34 closed; all 4 workflows green |
 
 ### Phase 1B — Production wiring (Jul 13–17) — the mock era ends
 
@@ -747,7 +747,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **Commit/PR conventions:** prefix `ios:` / `ci:` / `docs:` / `chore:`; PR description cites doc sections (e.g. "Implements §9a per PR25 scope"); deviations flagged in a "Deviations" section of the PR body. Branch names: `ios/<topic>`, `ci/<topic>`, `docs/<topic>`.
 
-**Working with the guards:** privacy-grep matches call sites (`URLSession.` / `URLSession(`), so user-facing copy naming those symbols is fine; keep new copy narrow anyway. Domain-purity greps `^import X$` lines — don't try to sneak `import class Contacts.CNContact` through (PR19 hardens this; it's also just cheating).
+**Working with the guards:** the shared privacy script matches networking call sites, including `NSURLConnection` and `CFSocket*`, so user-facing copy may still name those symbols as bare tokens. The shared Domain script rejects plain, preconcurrency, and selective imports from every prohibited module. R32 records the fixture-backed GitHub PR #26 closure.
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
@@ -831,7 +831,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 |---|---|---|---|---|
 | R30 | Stale worktree with obsolete parallel scaffold (`generate_pbxproj.py`, old Domain, committed `.xcuserstate`) + prunable branch `claude/crazy-franklin-75fc28` + stray `.git/t9FBrGy` + ~16 merged local branches | `.claude/worktrees/`, `.git/` | `git worktree prune`, delete branches, rm temp file | PR19 |
 | R31 | Domain coverage floor absent (§13 promises near-total); coverage collected but unenforced | `ios-ci.yml:99-148` | ≥95% xccov gate on `Domain/**` | PR19 |
-| R32 | Guard gaps: domain-purity misses `@preconcurrency import` / `import class Contacts.X` / `import Network`; privacy-grep misses `NSURLConnection`, `CFSocket` | `guards.yml:33,46` | Harden patterns; add `Network` to import list | PR19 |
+| R32 | Guard gaps: domain-purity misses `@preconcurrency import` / `import class Contacts.X` / `import Network`; privacy-grep misses `NSURLConnection`, `CFSocket` | `guards.yml:33,46` | Shared source-boundary scripts reject every listed form, and canonical plus trusted-review workflows call those scripts | ✅ **closed by TF-01 trusted gate prerequisite (GitHub PR #26)** |
 | R33 | Dead SwiftLint config: `function_body_length` threshold block while the rule is disabled | `.swiftlint.yml:12-21,53-55` | Remove block or re-enable rule | PR19 |
 | R34 | Mock seeds miss ContactGroup/InteractionLog/occasion — merged chip, interactions card, occasion tags unreachable & unauditable; `UpcomingRowState.id = UUID()` per build breaks diffing (R36) | `MockRepositories.swift:47-143`, `UpcomingViewModel.swift:130` | Seed all three; stable ids `contactId+kind` | PR19/PR22 |
 | R35 | Importer aborts mid-batch on first row error | `ContactsImporter.swift:56-64` | Per-row tolerance + counts | PR21 |

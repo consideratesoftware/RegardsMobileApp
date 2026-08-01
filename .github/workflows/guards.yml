@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Compare Codex and Claude reviewer contracts
         run: scripts/check-review-agent-parity.sh
+      - name: Verify source-boundary guard parity
+        run: scripts/tests/source-boundary-guard-tests.sh
 
   privacy-grep:
     name: No networking code (§11)
@@ -24,25 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Scan Regards/ for networking call sites
-        run: |
-          # §11 Transparency claim: the app's source has no *calls* to
-          # URLSession, NWConnection, CFReadStream, URLRequest, or
-          # similar networking primitives. The Transparency screen's
-          # public copy ends with "or similar" — this grep backs that
-          # phrase by covering the family-name variants (URLSession*,
-          # NW*, URLProtocol, CF{ReadStream,WriteStream}*) so the "or
-          # similar" tail isn't doing silent work.
-          #
-          # The patterns match actual code usage — `Foo.` (member
-          # access) or `Foo(` (constructor) — rather than the bare
-          # token, so the same names can appear in user-facing copy
-          # (e.g. the Transparency screen itself) without tripping the
-          # gate.
-          if grep -REn '\b(URLSession\w*|NW(Connection|Endpoint|Listener|PathMonitor|Interface|Path)\w*|URLRequest|URLProtocol)[.(]|\bCF(Read|Write)Stream(Create|Open|Read|Write|Ref|Client|Copy)' ios/Regards 2>/dev/null; then
-            echo "::error::Networking call sites found in ios/Regards. The app must not make network calls (§11). Move StoreKit-only code to ios/Regards/Platform/Billing if needed."
-            exit 1
-          fi
-          echo "No networking call sites found. 👍"
+        run: scripts/check-no-network.sh
 
   domain-purity-grep:
     name: Domain layer is platform-free (§5)
@@ -50,12 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Scan ios/Regards/Domain for platform imports
-        run: |
-          if [ -d ios/Regards/Domain ] && grep -RE "^import (UIKit|SwiftUI|Contacts|EventKit|UserNotifications|GRDB|StoreKit)$" ios/Regards/Domain 2>/dev/null; then
-            echo "::error::Domain layer must be pure Swift — no Apple frameworks, no GRDB. Move platform-dependent code to Regards/Platform or Regards/Data."
-            exit 1
-          fi
-          echo "Domain layer is clean. 👍"
+        run: scripts/check-domain-purity.sh
 
   yaml-lint:
     name: project.yml syntax
