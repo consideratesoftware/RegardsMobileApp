@@ -72,6 +72,7 @@ jobs:
 
           claude_args: |
             --max-turns 120
+            --add-dir /tmp
             --disallowedTools "Edit,NotebookEdit,WebFetch,WebSearch"
             --allowedTools "Task,Read,Grep,Glob,TodoWrite,Write,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*),Bash(git show:*),Bash(git fetch:*),Bash(git merge-base:*),Bash(git rev-parse:*),Bash(git ls-files:*),Bash(ls:*),Bash(cat:*),Bash(wc:*),Bash(head:*),Bash(tail:*)"
 
@@ -86,6 +87,28 @@ jobs:
                  ".github/workflows/claude-pr-review.yml, which must match the copy on the" \
                  "default branch. Land the workflow change on the default branch first."
             exit 1
+          fi
+
+      # Denials are the reviewer's failure mode: the session ends "successfully"
+      # having been blocked from the tools its protocol needs. The execution
+      # file holds the unsanitized messages, so report just the denied tool
+      # names and inputs -- never the transcript, this repository is public.
+      - name: Report permission denials
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          jq -r '
+            ([.[] | select(.type == "result")] | last | .permission_denials // [])
+            | if length == 0 then
+                "No permission denials."
+              else
+                "Denied tool calls (\(length)):",
+                (.[] | "  \(.tool_name)  \((.tool_input | tostring)[0:180])")
+              end
+          ' "${{ steps.claude.outputs.execution_file }}"
+          if [[ -f /tmp/pr-review.md ]]; then
+            echo "Review body was written: $(wc -c < /tmp/pr-review.md) bytes."
+          else
+            echo "Review body /tmp/pr-review.md was never written."
           fi
 
       - name: Assert the reviewer left the working tree untouched
