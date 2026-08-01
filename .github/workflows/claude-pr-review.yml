@@ -29,6 +29,7 @@ jobs:
         run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/review-started-at"
 
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -73,6 +74,19 @@ jobs:
             --max-turns 120
             --disallowedTools "Edit,NotebookEdit,WebFetch,WebSearch"
             --allowedTools "Task,Read,Grep,Glob,TodoWrite,Write,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*),Bash(git show:*),Bash(git fetch:*),Bash(git merge-base:*),Bash(git rev-parse:*),Bash(git ls-files:*),Bash(ls:*),Bash(cat:*),Bash(wc:*),Bash(head:*),Bash(tail:*)"
+
+      # The Claude App refuses to run when this workflow file differs from the
+      # copy on the default branch, and the action still exits 0. Without this
+      # check that skip reports green and reviews nothing.
+      - name: Assert the reviewer actually ran
+        if: always()
+        run: |
+          if [[ -z "${{ steps.claude.outputs.execution_file }}" ]]; then
+            echo "::error::The Claude App skipped this run. Almost always this PR edits" \
+                 ".github/workflows/claude-pr-review.yml, which must match the copy on the" \
+                 "default branch. Land the workflow change on the default branch first."
+            exit 1
+          fi
 
       - name: Assert the reviewer left the working tree untouched
         if: always()
