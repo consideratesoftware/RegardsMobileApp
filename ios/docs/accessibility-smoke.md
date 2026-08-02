@@ -8,8 +8,11 @@ under a **Manual accessibility smoke** heading.
 1. Boot the iPhone 17 Pro simulator (`xcrun simctl boot "iPhone 17 Pro"` or open from
    Xcode).
 2. Install the Debug build.
-3. Simulator → **Features → Toggle VoiceOver** (⌘+⌥+F5 on a real device, or
-   Accessibility Inspector on simulator).
+3. On Simulator, open **Accessibility Inspector**, select the running Regards
+   process, and use point inspection plus its narration controls to emulate
+   VoiceOver. Native VoiceOver is available only on a physical iOS device; on
+   one, enable it in Settings → Accessibility → VoiceOver or with the configured
+   Accessibility Shortcut.
 4. Simulator → **Features → Toggle Software Keyboard** (so you can type if
    prompted, otherwise leave off).
 
@@ -47,7 +50,7 @@ In the PR description:
 ```
 ## Manual accessibility smoke
 Simulator: iPhone 17 Pro · current CI-pinned iOS runtime
-VoiceOver: on
+VoiceOver: Accessibility Inspector emulation (simulator) / on (physical device)
 Dynamic Type: accessibility5
 Reduce Motion: on / off (both tested)
 Increased Contrast: on / off (both tested)
