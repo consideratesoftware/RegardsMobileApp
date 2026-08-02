@@ -216,13 +216,15 @@ Current gates:
   focused audit 5/5 before the clean full sweep. Changes after `886d03e` are
   evidence-only documentation except for the scoped formatting refinement
   recorded next.
-- 2026-08-02 hosted-review refinement: commit `cb4a9ff` makes email fields opt
-  into punctuation-to-speech formatting explicitly instead of inferring it
-  from arbitrary field contents. SwiftLint passed with zero violations, the
-  Upcoming-to-Contact-Preview regression passed 5/5, and the exact build was
-  installed and re-inspected. Its email remained visible as
-  `obiwan@jeditemple.org` and exposed the single accessibility element
-  “personal, obiwan at jeditemple dot org.”
+- 2026-08-02 hosted-review refinement: commit `40e7d95` makes email fields opt
+  into a typed punctuation-to-speech policy explicitly instead of inferring it
+  from arbitrary field contents. Unit coverage proves both email conversion
+  and literal non-email `@`/`.` preservation; all 117 unit tests passed.
+  SwiftLint passed with zero violations, the Upcoming-to-Contact-Preview
+  regression passed 5/5, and the exact implementation was installed and
+  re-inspected. Its email remained visible as `obiwan@jeditemple.org` and
+  exposed the single accessibility element “personal, obiwan at jeditemple dot
+  org.”
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
