@@ -689,7 +689,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 6 | Batched digest notification, not per-contact | 2026-04-15 | Per-contact nags get the app silenced. |
 | 7 | One-time $4.99 + tip jar, no subscriptions, no ads ever | 2026-04-15 | Local-only app; subscription would be dishonest. |
 | 8 | No free tier with contact caps; 7-day trial instead | 2026-04-15 | Caps feel punitive; trust the user with the full app. |
-| 9 | Android: no `INTERNET` permission; iOS: ATS-deny + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; verifiable-by-source on iOS. |
+| 9 | Android: no `INTERNET` permission; iOS: strict ATS defaults with no exceptions + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; verifiable-by-source on iOS. |
 | 10 | Source-available under PolyForm Noncommercial 1.0.0 | 2026-04-15 | ~95% of the credibility of MIT/Apache with protection against commercial cloning. |
 | 11 | Support via mailto:, GitHub Issues, manual diagnostics | 2026-04-15 | Backend-free; preserves zero-data-collection. |
 | 12 | Named the app **Regards** | 2026-04-15 | Clarity, warmth, searchability; shortlist rejections documented in v0.5. |
@@ -753,7 +753,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 ## 18. Current state — ground truth as of 2026-08-02
 
-`main` = `40082d1` (GitHub PR #35, 2026-08-02). The engine contract,
+`main` = `a8c9c01` (GitHub PR #23, 2026-08-02). The engine contract,
 section-header accessibility fix, sample-data refresh, channel-validation
 contract, bundle-namespace migration, durable TestFlight queue, and
 cross-provider review parity guard have landed. The trusted staged reviewer now
@@ -888,7 +888,7 @@ Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken)
 12. App icon 1024×1024 (no alpha/rounded corners) — export from Bakery per the asset plan.
 13. Copyright `© 2026 Considerate Software LLC`. Trade rep info (Korea) skip unless targeting KR at launch.
 14. Pricing: Tier-A $4.99 anchor + auto-pricing per storefront per §4 tiers; verify IN/BR land ₹99-class/R$9.90-class. IAPs: `com.consideratesoftware.regards.unlock` (non-consumable), `.tip.coffee`, `.tip.thanks`, `.tip.feature` — created, localized, attached to the submission build. **Small Business Program enrollment confirmed before launch.**
-15. App Review notes: no account needed; no demo credentials; "This app contains no networking code by design (ATS denies all loads; source is public at github.com/consideratesoftware/RegardsMobileApp). You will observe zero outbound traffic. Contacts write access is used only for user-initiated single-field edits."
+15. App Review notes: no account needed; no demo credentials; "This app contains no networking code by design (ATS uses strict defaults with every exception disabled; source is public at github.com/consideratesoftware/RegardsMobileApp). You will observe zero outbound traffic. Contacts write access is used only for user-initiated single-field edits."
 
 ### Pre-submission verification (run at freeze AND at submission)
 

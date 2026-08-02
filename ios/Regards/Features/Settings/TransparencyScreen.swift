@@ -57,9 +57,9 @@ public struct TransparencyScreen: View {
         app's source has zero call sites to URLSession, NWConnection, \
         CFReadStream, URLRequest, or similar networking primitives. \
         CI greps every PR and fails the build the moment one appears. \
-        App Transport Security is a second fence underneath, set to \
-        deny all loads. Pull the source, grep it, rebuild the binary \
-        yourself.
+        App Transport Security is a second fence underneath, kept on \
+        strict defaults with every exception disabled. Pull the source, \
+        grep it, rebuild the binary yourself.
         """
 
     private var claimCard: some View {

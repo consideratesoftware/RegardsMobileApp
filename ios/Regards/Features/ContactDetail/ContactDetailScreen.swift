@@ -339,7 +339,7 @@ private extension ContactDetailScreen {
     }
 
     private func nextReminderLabel(contact: Contact) -> String {
-        // Phase 0 placeholder — PR3 wires a real engine; for now show "Today, 6:30 pm".
+        // TF-07 replaces this placeholder with the persisted next reminder (R11).
         "Today, 6:30 pm"
     }
 

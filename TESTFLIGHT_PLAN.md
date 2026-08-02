@@ -8,17 +8,14 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 ## Current checkpoint
 
 - Updated: 2026-08-02
-- Baseline: `main` at `40082d1` (merged GitHub PR #35; trusted review,
-  accessibility-CI, and review-delivery follow-ups included)
-- Active work: `TF-01` (finish repository/docs/accessibility truth in GitHub
-  PR #23, then its stacked platform-modernization slice)
+- Baseline: `main` at `a8c9c01` (merged GitHub PR #23; repository truth and
+  current review-gate follow-ups included)
+- Active work: `TF-01` (land the smoke-driven accessibility follow-up to
+  merged PR #23, then its stacked platform-modernization slice)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull requests, in required completion order: GitHub PR #23
-  (`chore/tf-01-truth-a11y`, published), then GitHub PR #24
-  (`ios/modern-platform-showcase`, draft; stacked on PR #23)
-- Independent CI follow-up: GitHub PR #36 is open with auto-merge disabled after
-  its current-head hosted review found blockers; it is not part of the TF-01
-  stack and must not bypass that review.
+- Open work, in required completion order: this accessibility follow-up, then
+  GitHub PR #24 (`ios/modern-platform-showcase`, draft; still based on merged
+  PR #23 until the follow-up lands)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -176,15 +173,13 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- `TF-01` slice 1 / PR #23: no owner action remains. The current-source
-  VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
-  Contrast smoke is recorded below. Exact-source mechanical gates and all six
-  staged reviewers must still be green on the final head. The dedicated GitHub
-  App setup is complete and branch protection requires its `Regards staged
-  review` check.
-- `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
-  child onto `main`. Rerun its checks, staged review, and manual accessibility
-  smoke before publication or auto-merge.
+- `TF-01` slice 1 follow-up: PR #23 merged before the smoke-driven responsive
+  layouts and navigation-harness fixes were pushed. This follow-up carries
+  those verified changes. No owner action remains; exact-source mechanical
+  gates and all six staged reviewers must be green before it merges.
+- `TF-01` slice 2 / PR #24: merge the accessibility follow-up first, then
+  retarget and rebase the child onto `main`. Rerun its checks, staged review,
+  and manual accessibility smoke before publication or auto-merge.
 
 ### PR #23 accessibility evidence
 
