@@ -199,11 +199,13 @@ Current gates:
   enabled and the documented crossfade when disabled.
 - Increased Contrast: on and off tested. Text, icons, selection states, and
   the inner-circle ring remained visible.
-- Current stress evidence: `ios/scripts/audit-stress.sh 5` completed five
-  consecutive full accessibility-suite passes locally on 2026-08-02. Each
-  run executed 17 tests, including Contact Detail → Edit Contact → Back from
-  Contacts, Overdue, and Upcoming, for 85 executions with zero failures.
-- Prior stress evidence: the same five-run gate passed locally on 2026-07-31.
+- Final-code stress evidence: `ios/scripts/audit-stress.sh 5` completed five
+  consecutive full accessibility-suite passes at `324c355` on 2026-08-02.
+  Each run executed 17 tests, including Contact Detail → Edit Contact → Back
+  from Contacts, Overdue, and Upcoming, for 85 executions with zero failures.
+- Three-sweep acceptance evidence: a separate five-run sweep passed earlier
+  on 2026-08-02, and the same gate passed on 2026-07-31. Across the three
+  recorded sweeps, all 15 runs and 255 test executions passed.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:
