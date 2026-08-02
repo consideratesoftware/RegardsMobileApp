@@ -1,25 +1,45 @@
 name: Audit stress
 
-# Runs the RegardsAccessibilityTests audit suite 5 times on every PR that
-# touches UI or test code. Catches probabilistic flakes during the PR cycle
-# instead of after merge. The main `iOS CI` workflow stays single-run for
-# fast feedback; this workflow gates merges on stable audits.
+# Runs the RegardsAccessibilityTests audit suite 5 times to catch
+# probabilistic flakes. The single-run `Accessibility audit` in `iOS CI`
+# stays the per-PR gate; this is the deeper, slower sweep behind it.
 #
-# Builds once, then `test-without-building` 5x to keep total runtime around
-# 5–6 minutes per PR after the initial build + downloadPlatform install.
+# This used to run on every pull request. The header claimed "5-6 minutes
+# per PR"; six consecutive real runs took 23, 23, 29, 33, 38 and 49 minutes,
+# a 33-minute mean on `macos-latest`, which bills at 10x the Linux rate. That
+# is roughly 330 Linux-equivalent minutes per push to gate a probabilistic
+# signal, and a flake in it blocked PRs that had nothing to do with
+# accessibility.
+#
+# So it moved off the PR path:
+#   - every push to the default branch, so main always has a fresh 5x result
+#   - nightly, to accumulate flake evidence over time
+#   - workflow_dispatch, to run it on demand before cutting a release
+#
+# A failure here is triaged on main rather than blocking an unrelated PR.
+# Before a TestFlight build, run it manually and require it green -- that is
+# the release gate this now serves.
+#
+# It is no longer a required status check. If you re-add `pull_request` here,
+# re-add the context to branch protection in the same change; and if you make
+# it a required context again, do NOT add path filters, because a
+# path-filtered workflow never reports on unrelated PRs and the missing
+# required check blocks the merge.
 
 on:
-  pull_request:
-
-# Path filters were intentionally removed: this workflow is gated by
-# branch protection, and a path-filtered workflow doesn't run on
-# unrelated-paths PRs. The resulting "required check missing" status
-# blocks merge. We pay ~7 min of CI on every PR in exchange for the
-# gate always being answerable.
+  push:
+    branches: [main]
+  schedule:
+    # 09:00 UTC daily. Cron here is always UTC, never local.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: audit-stress-${{ github.ref }}
-  cancel-in-progress: true
+  # Was true, to coalesce rapid pushes to a PR branch. There are no PR pushes
+  # now, and cancelling a 30-minute run that is nearly done throws away the
+  # only signal this workflow exists to produce.
+  cancel-in-progress: false
 
 env:
   XCODE_VERSION: "26.6"
