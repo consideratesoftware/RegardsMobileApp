@@ -202,19 +202,22 @@ Current gates:
 - Increased Contrast: on and off tested. Text, icons, selection states, and
   the inner-circle ring remained visible.
 - Current implementation stress evidence: `ios/scripts/audit-stress.sh 5`
-  completed five consecutive full accessibility-suite passes at `a454313` on
+  completed five consecutive full accessibility-suite passes at `f069297` on
   2026-08-02. Each run executed 18 tests, including Contact Detail → Edit
   Contact → Back from Contacts, Overdue, and Upcoming, repeated Edit routing,
   a Contacts-tab switch away and back, and the read-only copy assertion. All
   90 test executions passed.
-- Historical regression evidence: three earlier five-run sweeps also passed,
-  including the 2026-07-31 acceptance run. Across the current and prior
-  recorded sweeps, all 20 runs and 345 test executions passed.
+- Historical regression evidence: four earlier five-run sweeps also passed,
+  including the earlier `a454313` hosted-feedback run and the 2026-07-31
+  acceptance run. Across the current and prior recorded sweeps, all 25 runs
+  and 435 test executions passed.
 - Hosted-review follow-up: the `d5449e4` App-authored review requested changes.
   Implementation commit `a454313` closes its route-fallback, tab-preservation,
   repeated-navigation, copy-coverage, contrast-registry, local-destination,
-  stale-comment, and register-truth findings. Exact-source staged review and
-  the manual smoke remain pending before push and merge.
+  stale-comment, and register-truth findings. Commit `f069297` centralizes the
+  destination initializer, corrects the canonical test census, and closes the
+  final code-quality findings. Exact-source staged review and the manual smoke
+  remain pending before push and merge.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:
