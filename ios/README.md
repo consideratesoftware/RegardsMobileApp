@@ -33,30 +33,32 @@ cd ios
 xcodebuild \
   -project Regards.xcodeproj \
   -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 15' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   build
 
 xcodebuild \
   -project Regards.xcodeproj \
   -scheme Regards \
-  -destination 'platform=iOS Simulator,name=iPhone 15' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   test
 ```
 
 The `test` action runs:
 
-- **`RegardsTests`** — `swift-testing` unit suite. Domain-layer tests land here
-  in PR2 (§13: Domain layer at 100% coverage).
+- **`RegardsTests`** — `swift-testing` unit suite for Domain, Data, Platform,
+  and feature behavior.
 - **`RegardsAccessibilityTests`** — XCUITest suite that launches the app and
-  calls `XCUIApplication.performAccessibilityAudit()`. A failing audit blocks
-  merge. See [`docs/accessibility.md`](docs/accessibility.md) for the standing
+  calls `XCUIApplication.performAccessibilityAudit()`. Automated audits run
+  after merges to `main`, nightly, and on demand. UI pull requests require the
+  staged accessibility reviewer and manual smoke; releases require a green 5x
+  sweep. See [`docs/accessibility.md`](docs/accessibility.md) for the standing
   rules.
 
 `RegardsUITests` is a separate target for general UI automation and is not
 wired into the default test plan yet.
 
-## Phase plan
+## Execution plan
 
-This app ships in three phases per ARCHITECTURE.md §14. PR1 (this scaffold)
-gets the project to green. PR2 lands domain + data. PR3 lands the eight-screen
-SwiftUI shell.
+See [`../TESTFLIGHT_PLAN.md`](../TESTFLIGHT_PLAN.md) for the live queue and
+restart checkpoint. `ARCHITECTURE.md` §14 remains the canonical scope and
+acceptance-criteria map.

@@ -7,22 +7,23 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-08-01
-- Baseline: `main` at `95936c0` (merged GitHub PR #30; reviewer diagnostics
-  and delivery fixes from GitHub PRs #27–#30 included)
-- Active work: `TF-01` (trusted hosted-review prerequisite first, then slice 1
-  and its stacked modernization slice)
+- Updated: 2026-08-02
+- Baseline: `main` at `40082d1` (merged GitHub PR #35; trusted review,
+  accessibility-CI, and review-delivery follow-ups included)
+- Active work: `TF-01` (finish repository/docs/accessibility truth in GitHub
+  PR #23, then its stacked platform-modernization slice)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull requests, in required completion order: GitHub PR #26
-  (`codex/tf-01-hosted-review-gate`, published; owner-gated), GitHub PR #23
+- Open pull requests, in required completion order: GitHub PR #23
   (`chore/tf-01-truth-a11y`, published), then GitHub PR #24
   (`ios/modern-platform-showcase`, draft; stacked on PR #23)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none; the review-gate App checklist under `Owner
-  gates` completed 2026-08-02
+- Owner action needed now: unlock the Mac login session when ready for the PR
+  #23 Simulator accessibility smoke. Automation will complete it promptly; the
+  Mac does not need to remain unlocked afterward. No Simulator or repository
+  interaction is required from the owner.
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -41,8 +42,8 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; the current order is PR #26, PR #23, then PR #24. Start no
-   additional work while this chain is open.
+   checkpoint`; the current order is PR #23, then PR #24. Start no additional
+   work while this chain is open.
 5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
    requests carrying a `TF-##` marker, and take the first `READY` item whose
    dependencies are `DONE`.
@@ -144,19 +145,18 @@ is merged.
 
 ### TF-01 serial chain
 
-TF-01 has one merge-gate prerequisite followed by four reviewable slices. The
-approved order is fixed while the current pull requests remain open:
+TF-01 has one completed merge-gate prerequisite followed by four reviewable
+slices. The order is fixed while the current pull requests remain open:
 
-1. GitHub PR #26 installs the trusted hosted-review workflow and shared,
-   regression-tested source-boundary guards. It retains the non-interactive
-   reviewer behavior proved by GitHub PRs #27–#30 and closes R32. Merge it only
-   after the dedicated App credentials exist, the remaining required checks
-   are green, and the local staged-review owner blocker is cleared.
+1. DONE: GitHub PR #26 installed the trusted hosted-review workflow, dedicated
+   App check, and shared source-boundary guards. Branch protection now binds
+   `Regards staged review` to App ID `4461672`; R32 is closed.
 2. GitHub PR #23 completes the repository, documentation, and accessibility
-   truth slice. Its manual VoiceOver, Dynamic Type `accessibility5`, Reduce
-   Motion, and Increased Contrast smoke is recorded on the branch and in its
-   consolidated review comment. It closes the R13 escape route and R16, R27,
-   R28, R29, and R43.
+   truth slice. Close its hosted-review feedback, run the current-source manual
+   VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
+   Contrast smoke, then require the App-authored review before merge. It closes
+   the R13 escape route and R16, R27, R28, and R43, and reconfirms the earlier
+   R29 closure.
 3. GitHub PR #24 is the owner-directed platform-modernization slice stacked on
    PR #23. After #23 merges, retarget and rebase it onto `main`, publish it,
    then rerun its full checks, staged review, and manual accessibility smoke.
@@ -170,6 +170,68 @@ approved order is fixed while the current pull requests remain open:
    obsolete worktrees and merged branches after exact-target verification.
 
 ## Owner gates
+
+Current gates:
+
+- `TF-01` slice 1 / PR #23: unlock the Mac login session when ready for
+  automation to record the current-source VoiceOver, Dynamic Type
+  `accessibility5`, Reduce Motion, and Increased Contrast smoke. The Mac does
+  not need to remain unlocked after that run. No Simulator interaction is
+  required from the owner. Implementation,
+  exact-source mechanical gates, and all six staged reviewers must also be
+  green on the final head. The dedicated GitHub App setup is complete and
+  branch protection requires its `Regards staged review` check.
+- `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
+  child onto `main`. Rerun its checks, staged review, and manual accessibility
+  smoke before publication or auto-merge.
+
+### PR #23 accessibility evidence
+
+- Current-source manual smoke: pending on the final review head after the
+  hosted-review fixes. The 2026-08-02 scheduled run reached the login lock and
+  could not inspect the Simulator visually. Do not merge until this line is
+  replaced with the tested commit and findings.
+- Prior source lineage: `chore/tf-01-truth-a11y` at `6d25618` was built with
+  Xcode 26.6 against the iOS 26.5 iPhone 17 Pro simulator.
+- VoiceOver: the launch label remains `Regards. Loading.` with the header
+  trait. The tab-root hierarchy exposed the Overdue heading, four tab
+  destinations, natural-language rows, button traits, and action hints. The
+  Edit Contact structural audit and Back regression both remain green.
+- Dynamic Type: `accessibility5` re-rendered the app and the Edit Contact audit
+  passed. Existing legacy root and Contact Detail compression at this size is
+  recorded for TF-16's full sensory-audit and layout pass; it is outside this
+  navigation-truth slice.
+- Reduce Motion: on and off tested. The launch uses the no-animation path when
+  enabled and the documented crossfade when disabled.
+- Increased Contrast: on and off tested. Text, icons, selection states, and
+  the inner-circle ring remained visible.
+- 2026-08-02 exact-head stress evidence: `ios/scripts/audit-stress.sh 5`
+  completed five consecutive full accessibility-suite passes on the final
+  review head containing this entry. Each run executed 18 tests, including
+  Contact Detail → Edit
+  Contact → Back from Contacts, Overdue, and Upcoming, repeated Edit routing,
+  a Contacts-tab switch away and back, and the read-only copy assertion. All
+  90 test executions passed.
+- Prior implementation stress evidence: the same command completed five full
+  passes at `f069297` on 2026-08-02, with all 90 test executions passing.
+- Historical regression evidence: four earlier five-run sweeps also passed,
+  including the earlier `a454313` hosted-feedback run and the 2026-07-31
+  acceptance run. Across the current and prior recorded sweeps, all 30 runs
+  and 525 test executions passed.
+- Hosted-review follow-up: the `d5449e4` App-authored review requested changes.
+  Implementation commit `a454313` closes its route-fallback, tab-preservation,
+  repeated-navigation, copy-coverage, contrast-registry, local-destination,
+  stale-comment, and register-truth findings. Commit `f069297` centralizes the
+  destination initializer, corrects the canonical test census, and closes the
+  navigation-helper findings. Commit `b9e88fb` removes the unused initializer
+  callback surface and corrects the final census and audit-schedule wording.
+  The App-authored review of `be215a3` then requested the current-head smoke
+  plus corrections to state ownership, navigation waits, entry-path audit
+  coverage, contrast documentation, and register truth. The final review head
+  closes each source and documentation finding. Exact-source staged review and
+  the manual smoke remain pending before merge.
+
+### Review-gate App, for the record
 
 The `TF-01` GitHub App checklist is **DONE (2026-08-02)**. No owner action
 remains for it. What was done, for the record:
@@ -192,10 +254,6 @@ The App's granted permissions are `Checks: Read and write` and
 the review is published as the check run's output rather than a comment.
 Commenting on a pull request would require `pull_requests: write`, and a token
 holding that could also approve the pull request it gates.
-
-PR #23 and PR #24 require no additional owner action.
-Their remaining work is repository automation, CI, staged review, stack
-retargeting, and the already-documented simulator accessibility smoke.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:

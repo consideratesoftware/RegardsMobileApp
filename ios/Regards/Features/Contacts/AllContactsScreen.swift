@@ -21,15 +21,7 @@ public struct AllContactsScreen: View {
                 RegardsCard {
                     VStack(spacing: 0) {
                         ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, contact in
-                            NavigationLink(
-                                destination: ContactDetailScreen(
-                                    viewModel: ContactDetailViewModel(
-                                        contactId: contact.id,
-                                        contacts: env.contacts,
-                                        interactionsRepo: env.interactions
-                                    )
-                                )
-                            ) {
+                            NavigationLink(value: contact.id) {
                                 contactRow(contact)
                             }
                             .buttonStyle(.plain)
@@ -48,6 +40,13 @@ public struct AllContactsScreen: View {
         .accessibilityIdentifier("screen.contacts")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: UUID.self) { contactId in
+            ContactDetailScreen(
+                contactId: contactId,
+                contacts: env.contacts,
+                interactionsRepo: env.interactions
+            )
+        }
         .task {
             // Cache `now` alongside the fetched list so the "last X days ago"
             // strings stay consistent across re-renders — Date() inline per

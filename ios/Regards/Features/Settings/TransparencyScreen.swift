@@ -106,7 +106,9 @@ public struct TransparencyScreen: View {
                     Hair(inset: 16)
                     proofRow(
                         label: "Encrypted at rest",
-                        status: "iOS Data Protection on the database file. Encrypted while the device is locked.",
+                        status: "iOS Data Protection keeps the database unavailable until the first "
+                              + "device unlock after a restart. After that, iOS may access it while "
+                              + "the device is locked.",
                         value: nil
                     )
                 }
@@ -120,7 +122,7 @@ public struct TransparencyScreen: View {
             RegardsCard {
                 VStack(spacing: 0) {
                     auditRow("Read the source",
-                             detail: "github.com/sid78669/RegardsMobileApp",
+                             detail: "github.com/consideratesoftware/RegardsMobileApp",
                              isAccent: true)
                     Hair(inset: 16)
                     auditRow("Rebuild the binary",

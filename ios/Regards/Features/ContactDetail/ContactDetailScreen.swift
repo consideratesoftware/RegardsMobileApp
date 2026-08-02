@@ -1,16 +1,32 @@
 import SwiftUI
 
 public struct ContactDetailScreen: View {
-    let viewModel: ContactDetailViewModel
+    private struct EditRoute: Hashable {
+        let contact: Contact
+    }
+
+    @State private var viewModel: ContactDetailViewModel
     private let onTapOpenChannel: () -> Void
     private let onTapMarkCaughtUp: () -> Void
 
     public init(viewModel: ContactDetailViewModel,
                 onTapOpenChannel: @escaping () -> Void = {},
                 onTapMarkCaughtUp: @escaping () -> Void = {}) {
-        self.viewModel = viewModel
+        self._viewModel = State(initialValue: viewModel)
         self.onTapOpenChannel = onTapOpenChannel
         self.onTapMarkCaughtUp = onTapMarkCaughtUp
+    }
+
+    public init(contactId: UUID,
+                contacts: any ContactRepository,
+                interactionsRepo: any InteractionRepository) {
+        self.init(
+            viewModel: ContactDetailViewModel(
+                contactId: contactId,
+                contacts: contacts,
+                interactionsRepo: interactionsRepo
+            )
+        )
     }
 
     public var body: some View {
@@ -46,16 +62,15 @@ public struct ContactDetailScreen: View {
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("screen.contact-detail")
+        .navigationTitle("Contact")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: EditRoute.self) { route in
+            EditContactScreen(contact: route.contact)
+        }
         .toolbar {
             if let contact = viewModel.contact {
                 ToolbarItem(placement: .topBarTrailing) {
-                    // `NavigationLink(value:)` so Edit integrates with
-                    // whichever NavigationStack is hosting this screen —
-                    // the tab root / AllContactsScreen's stack supplies a
-                    // `.navigationDestination(for: Contact.self)` that
-                    // renders `EditContactScreen`. This keeps the push
-                    // idiomatic (no closure plumbing) and the button live.
-                    NavigationLink(value: contact) {
+                    NavigationLink(value: EditRoute(contact: contact)) {
                         Text("Edit")
                             .foregroundStyle(RegardsDS.accentInk)
                     }

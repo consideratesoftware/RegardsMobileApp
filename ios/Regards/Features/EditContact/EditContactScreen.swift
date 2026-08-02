@@ -2,15 +2,9 @@ import SwiftUI
 
 public struct EditContactScreen: View {
     let contact: Contact
-    let onCancel: () -> Void
-    let onSave: () -> Void
 
-    public init(contact: Contact,
-                onCancel: @escaping () -> Void = {},
-                onSave: @escaping () -> Void = {}) {
+    public init(contact: Contact) {
         self.contact = contact
-        self.onCancel = onCancel
-        self.onSave = onSave
     }
 
     public var body: some View {
@@ -18,7 +12,7 @@ public struct EditContactScreen: View {
             VStack(spacing: 0) {
                 header
                 heroAvatar
-                consentBanner
+                readOnlyBanner
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 nameSection
@@ -33,26 +27,19 @@ public struct EditContactScreen: View {
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
-        .navigationBarBackButtonHidden(true)
         .accessibilityIdentifier("screen.edit-contact")
+        .navigationTitle("Contact Preview")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var header: some View {
-        HStack {
-            Button("Cancel", action: onCancel)
-                .foregroundStyle(RegardsDS.accentInk)
-            Spacer()
-            Text("Edit Contact")
-                .font(.headline)
-                .foregroundStyle(RegardsDS.ink)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button("Save", action: onSave)
-                .foregroundStyle(RegardsDS.accentInk)
-                .font(.body.weight(.semibold))
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        Text("Contact Preview")
+            .font(.headline)
+            .foregroundStyle(RegardsDS.ink)
+            .frame(maxWidth: .infinity)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
     }
 
     private var heroAvatar: some View {
@@ -69,19 +56,21 @@ public struct EditContactScreen: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var consentBanner: some View {
+    private var readOnlyBanner: some View {
         HStack(alignment: .top, spacing: 10) {
             Text("↪")
                 .font(RegardsFont.mono(.caption))
                 .foregroundStyle(RegardsDS.accentInk.opacity(0.8))
                 .padding(.top, 2)
+                .accessibilityHidden(true)
             Text(
-                "Saved changes write back to your device Contacts — only the fields you touch. "
-                + "Never deletes, never merges."
+                "Read-only preview. Contact editing is not available yet; "
+                + "your device Contacts stay unchanged."
             )
             .font(.footnote)
             .foregroundStyle(RegardsDS.accentInk)
             .lineSpacing(2)
+            .accessibilityIdentifier("edit-contact.read-only-banner")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

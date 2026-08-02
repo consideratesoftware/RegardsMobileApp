@@ -12,16 +12,17 @@ smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
 `main` rather than on the pull request that caused it, run
 `ios/scripts/audit-stress.sh` locally before any UI-touching push.
 
-Keep this file up to date — every new screen gets a line in the *screens
-audited* table at the bottom.
+Keep this file up to date. Every new screen gets a line in the *screens
+audited* table.
 
-## Standing rules (every PR)
+## Standing rules (every UI change)
 
 1. **Automated audit.** `XCUIApplication.performAccessibilityAudit()` runs in
-   `RegardsAccessibilityTests` on every build. It catches missing labels,
-   contrast failures, too-small touch targets (<44×44pt), elements trapped from
-   VoiceOver focus, duplicate traits, and dynamic-type clipping. A failing
-   audit blocks merge.
+   `RegardsAccessibilityTests` after merges to `main`, nightly, and on demand
+   before release. It catches missing labels, contrast failures, too-small
+   touch targets (<44×44pt), elements trapped from VoiceOver focus, duplicate
+   traits, and dynamic-type clipping. A failing sweep blocks release and must
+   be repaired before the next TestFlight build.
 2. **VoiceOver label completeness.** Every interactive element has an
    `.accessibilityLabel`. Decorative glyphs (channel icons inside labeled rows)
    are `.accessibilityHidden(true)` so they don't pollute the rotor. Compound
@@ -63,6 +64,7 @@ LaunchBackground). Ratios computed from the sRGB values in
 |---|---|---|---|---|---|
 | Ink | Background | ~13.5:1 | ~15.2:1 | 4.5:1 | ✅ |
 | Muted | Background | ~5.6:1 | ~5.8:1 | 4.5:1 | ✅ |
+| Accent Ink | Accent Soft | ~6.9:1 | ~6.6:1 | 4.5:1 | ✅ |
 | White | AccentColor | ~3.4:1 | ~3.1:1 | 3:1 (large/icon) | ✅ |
 
 PR2 adds `ColorContrastTests` so these ratios are asserted automatically; the
@@ -92,9 +94,10 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Upcoming | PR3 | |
 | All Contacts | PR3 | |
 | Settings | PR3 | |
-| Contact Detail (via Contacts → row) | PR3 | Inline `NavigationLink`. |
+| Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
 | Contact Detail (via Upcoming → row) | PR5 | Factory-built VM per push. |
+| Contact Preview (via Contacts → Contact Detail → Edit) | TF-01 / GitHub PR #23 | Structural audit coverage and standard Back escape route; the real form remains TF-09. |
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
 | Merge Duplicates | PR3 | Reached via Settings → Find duplicate contacts. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
@@ -102,11 +105,12 @@ screen-level VoiceOver smoke and automated audit coverage.
 
 ## Sensory-audit carve-outs
 
-The suite gates merges on the **structural** audit categories
-(`elementDetection`, `sufficientElementDescription`, `trait`). The **sensory**
-categories — `contrast`, `hitRegion`, `dynamicType`, `textClipped` — are not
-part of the gate. The residual findings after PR4's sweep fall into two
-buckets, both intentional:
+The enabled automated audit set uses the **structural** categories
+(`elementDetection`, `sufficientElementDescription`, `trait`) after merges,
+nightly, and before release. The **sensory** categories — `contrast`,
+`hitRegion`, `dynamicType`, `textClipped` — are not part of that release gate.
+The residual findings after PR4's sweep fall into two buckets, both
+intentional:
 
 ### Bucket 1 — fixed
 
@@ -116,7 +120,7 @@ buckets, both intentional:
   `.tint`, Transparency hero claim card, Overdue channel pill, Contact
   Detail primary CTA, Merge Duplicates "Merge virtually" button, Reminder
   Windows active day pill, Onboarding "Allow contacts access" button,
-  and every in-card nav-link text / toolbar "Edit|Cancel|Save" label.
+  and every in-card nav-link text / toolbar "Edit" label.
 - **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right
@@ -170,21 +174,39 @@ timeout, even when the underlying element is visible.
 **Rule:** use predicates only for *read-after-known* (read a value when
 you already know the screen is rendered), never for *wait-until-true*.
 
-This was the underlying race behind `testContactDetailPassesAudit`
-flaking on three consecutive main runs in May 2026. The fix was to swap
-the trait-predicate header wait for `detail.staticTexts.firstMatch` —
-same load-done signal, no predicate timing dependency.
+Rapid simulator relaunches can also leave duplicate tab-button elements in the
+automation hierarchy or drop a synthesized tap. Wait on the plain tab bar,
+resolve the currently hittable button, verify the destination with its plain
+screen identifier while the source screen disappears, and allow two bounded
+re-resolution retries. `navigateToTab` in `ScreensAccessibilityTests` is the
+canonical implementation.
 
-### 2. ContactDetail "settled" means a static text exists, not the screen identifier
+Apply the same pattern to pushed navigation: resolve the current trigger
+element for every attempt, tap its live center coordinate, and require the
+plain destination identifier to appear while the source screen identifier
+disappears. `launchToContactDetailFromContacts`, `navigateFromSettings`,
+`navigateToRow`, and the consolidated `navigate` helper are the canonical
+implementations.
+
+The live-center tap is a synchronization workaround for dropped Simulator
+taps. It does not replace hit-region coverage: the sensory audit owns that
+check when its temporary carve-out is removed.
+
+This was the underlying race behind `testContactDetailPassesAudit`
+flaking on three consecutive main runs in May 2026. The current tests wait on
+the plain toolbar `Edit` button, which appears only after the contact finishes
+loading and avoids both predicate timing and ScrollView descendant-query
+instability.
+
+### 2. ContactDetail "settled" means visible content exists, not only the screen identifier
 
 `screen.contact-detail` becomes findable as soon as the identifier is
 added to the tree, which can happen mid-transition. `viewModel.load()`
 is async; the screen renders a `ProgressView` (no static text) until it
-resolves. Wait for `detail.staticTexts.firstMatch` instead — it only
-resolves when the if-let-loaded body branch has rendered, which is
-when the audit can run cleanly. The helper
-`waitForContactDetailReady(_:)` in `ScreensAccessibilityTests` is the
-canonical implementation.
+resolves. Wait for the visible toolbar `Edit` button instead — it exists only
+after the if-let-loaded body branch has rendered, which is when the audit can
+run cleanly. Do not reintroduce a predicate-backed wait helper or scope the
+load signal beneath the ScrollView identifier.
 
 ### 3. Run the audit suite 5x locally before pushing UI changes
 
@@ -200,7 +222,7 @@ The script builds once and runs the audit suite N times via
 `test-without-building`, exits non-zero on any failure. Total runtime
 on a recent Mac: ~3 min.
 
-CI also runs the audit 5x on every PR via
-`.github/workflows/audit-stress.yml`. That workflow is the merge gate
-for audit reliability; the local script is the cheap pre-push check
-that saves you from waiting for CI to surface a flake.
+CI runs the audit 5x after merges to `main`, nightly, and through
+`workflow_dispatch` in `.github/workflows/audit-stress.yml`. The local script
+is the required pre-push check for UI changes and saves you from waiting for CI
+to surface a flake.
