@@ -48,8 +48,10 @@ The `test` action runs:
 - **`RegardsTests`** — `swift-testing` unit suite for Domain, Data, Platform,
   and feature behavior.
 - **`RegardsAccessibilityTests`** — XCUITest suite that launches the app and
-  calls `XCUIApplication.performAccessibilityAudit()`. A failing audit blocks
-  merge. See [`docs/accessibility.md`](docs/accessibility.md) for the standing
+  calls `XCUIApplication.performAccessibilityAudit()`. Automated audits run
+  after merges to `main`, nightly, and on demand. UI pull requests require the
+  staged accessibility reviewer and manual smoke; releases require a green 5x
+  sweep. See [`docs/accessibility.md`](docs/accessibility.md) for the standing
   rules.
 
 `RegardsUITests` is a separate target for general UI automation and is not
