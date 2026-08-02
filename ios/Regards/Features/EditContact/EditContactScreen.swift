@@ -116,7 +116,8 @@ public struct EditContactScreen: View {
                 field("personal",
                       value: isEmail ? contact.preferredChannelValue : "",
                       placeholder: "Add email",
-                      touched: isEmail)
+                      touched: isEmail,
+                      speaksEmailPunctuation: true)
             }
         }
     }
@@ -168,7 +169,8 @@ public struct EditContactScreen: View {
     private func field(_ label: String,
                        value: String = "",
                        placeholder: String = "",
-                       touched: Bool = false) -> some View {
+                       touched: Bool = false,
+                       speaksEmailPunctuation: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(label)
                 .font(.footnote.weight(.medium))
@@ -190,17 +192,23 @@ public struct EditContactScreen: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            accessibilityFieldLabel(label, value: value, placeholder: placeholder)
+            accessibilityFieldLabel(
+                label,
+                value: value,
+                placeholder: placeholder,
+                speaksEmailPunctuation: speaksEmailPunctuation
+            )
         )
     }
 
     private func accessibilityFieldLabel(
         _ label: String,
         value: String,
-        placeholder: String
+        placeholder: String,
+        speaksEmailPunctuation: Bool
     ) -> String {
         let displayedValue = value.isEmpty ? placeholder : value
-        let spokenValue = displayedValue.contains("@")
+        let spokenValue = speaksEmailPunctuation
             ? displayedValue
                 .replacingOccurrences(of: "@", with: " at ")
                 .replacingOccurrences(of: ".", with: " dot ")
