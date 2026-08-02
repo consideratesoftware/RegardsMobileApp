@@ -550,7 +550,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-01):** ReminderEngineTests (14), ContactsImporterTests (13), RepositoriesTests (10), AnnualRecurrenceTests (9), DuplicateDetectorTests (8), DeepLinkBuilderTests (7), DatabaseMigratorTests (5), ContactAccessibilityTests (5), OverdueViewModelTests (4, incl. solid spring-forward day-count regressions), ColorContrastTests (3), placeholder (1) — 79 tests in the unit bundle. Plus 17 XCUI tests (13 structural accessibility audits + 4 navigation regressions), and 1 placeholder in the out-of-plan `RegardsUITests` target.
+**Shipped suites (census 2026-08-02):** the unit target has 115 declared tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior, plus one placeholder. The accessibility target has 18 XCUI tests: 13 structural accessibility audits and 5 navigation regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 
@@ -767,7 +767,7 @@ state and next executable work.
 - **Domain layer, pure and tested:** all §7 entities; `ReminderEngine` (cadence walk, quiet hours, annual recurrence + Feb-29, batching helper); `DuplicateDetector`; `ChannelCatalog` + `DeepLinkBuilder` for all 13 channels; `MonthDay` with round-trip validation.
 - **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
 - **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
-- **Accessibility harness:** 13 XCUI audit tests (structural categories, including Edit Contact) plus 4 navigation regressions, audit-stress tooling (script + workflow), documented test patterns and smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
+- **Accessibility harness:** 13 XCUI audit tests (structural categories, including Edit Contact) plus 5 navigation regressions, audit-stress tooling (script + workflow), documented test patterns and smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
 - **CI:** pull requests require xcodegen determinism, build, unit tests with coverage, strict SwiftLint, project syntax, shared privacy and Domain-purity guards, Markdown links, review-agent parity, and the App-authored `Regards staged review`. The 1x accessibility audit runs after merges to `main`; the 5x sweep runs after merges, nightly, and on demand before release.
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
 

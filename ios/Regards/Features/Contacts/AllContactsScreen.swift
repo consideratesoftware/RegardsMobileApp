@@ -42,11 +42,9 @@ public struct AllContactsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: UUID.self) { contactId in
             ContactDetailScreen(
-                viewModel: ContactDetailViewModel(
-                    contactId: contactId,
-                    contacts: env.contacts,
-                    interactionsRepo: env.interactions
-                )
+                contactId: contactId,
+                contacts: env.contacts,
+                interactionsRepo: env.interactions
             )
         }
         .task {

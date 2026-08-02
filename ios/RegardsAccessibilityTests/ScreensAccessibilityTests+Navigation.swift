@@ -222,14 +222,6 @@ extension ScreensAccessibilityTests {
 
     @MainActor
     func assertEditRoundTrip(in app: XCUIApplication) {
-        navigateToEditContact(in: app)
-        assertReadOnlyBanner(in: app)
-        navigateBackToContactDetail(in: app)
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
-    }
-
-    @MainActor
-    func navigateToEditContact(in app: XCUIApplication) {
         navigate(
             from: "screen.contact-detail",
             to: "screen.edit-contact",
@@ -238,10 +230,7 @@ extension ScreensAccessibilityTests {
         ) {
             app.navigationBars.buttons["Edit"]
         }
-    }
-
-    @MainActor
-    func navigateBackToContactDetail(in app: XCUIApplication) {
+        assertReadOnlyBanner(in: app)
         navigate(
             from: "screen.edit-contact",
             to: "screen.contact-detail",
@@ -250,6 +239,7 @@ extension ScreensAccessibilityTests {
         ) {
             app.navigationBars.buttons.element(boundBy: 0)
         }
+        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
     }
 
     @MainActor

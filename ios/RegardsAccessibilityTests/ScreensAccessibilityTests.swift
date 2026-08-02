@@ -199,7 +199,14 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testEditContactSurvivesContactsTabRoundTripAndRepeats() {
         let app = launchToContactDetailFromContacts()
-        navigateToEditContact(in: app)
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.edit-contact",
+            triggerDescription: "Edit",
+            in: app
+        ) {
+            app.navigationBars.buttons["Edit"]
+        }
         assertReadOnlyBanner(in: app)
 
         navigateToTab(
@@ -216,7 +223,14 @@ final class ScreensAccessibilityTests: XCTestCase {
         )
         assertReadOnlyBanner(in: app)
 
-        navigateBackToContactDetail(in: app)
+        navigate(
+            from: "screen.edit-contact",
+            to: "screen.contact-detail",
+            triggerDescription: "Back",
+            in: app
+        ) {
+            app.navigationBars.buttons.element(boundBy: 0)
+        }
         assertEditRoundTrip(in: app)
     }
 

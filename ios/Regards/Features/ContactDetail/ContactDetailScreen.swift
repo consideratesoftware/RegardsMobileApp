@@ -17,6 +17,22 @@ public struct ContactDetailScreen: View {
         self.onTapMarkCaughtUp = onTapMarkCaughtUp
     }
 
+    public init(contactId: UUID,
+                contacts: any ContactRepository,
+                interactionsRepo: any InteractionRepository,
+                onTapOpenChannel: @escaping () -> Void = {},
+                onTapMarkCaughtUp: @escaping () -> Void = {}) {
+        self.init(
+            viewModel: ContactDetailViewModel(
+                contactId: contactId,
+                contacts: contacts,
+                interactionsRepo: interactionsRepo
+            ),
+            onTapOpenChannel: onTapOpenChannel,
+            onTapMarkCaughtUp: onTapMarkCaughtUp
+        )
+    }
+
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {

@@ -158,11 +158,9 @@ struct RegardsTabRoot: View {
     @ViewBuilder
     private func contactDetail(for contactId: UUID) -> some View {
         ContactDetailScreen(
-            viewModel: ContactDetailViewModel(
-                contactId: contactId,
-                contacts: env.contacts,
-                interactionsRepo: env.interactions
-            )
+            contactId: contactId,
+            contacts: env.contacts,
+            interactionsRepo: env.interactions
         )
     }
 }
