@@ -20,7 +20,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none
+- Owner action needed now: unlock the Mac login session once and leave it
+  available for the PR #23 Simulator accessibility smoke. No Simulator or
+  repository interaction is required from the owner.
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -166,10 +168,13 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- `TF-01` slice 1 / PR #23: no owner action. Implementation, manual smoke,
-  exact-source mechanical gates, and all six staged reviewers must be green on
-  the final head. The dedicated GitHub App setup is complete and branch
-  protection requires its `Regards staged review` check.
+- `TF-01` slice 1 / PR #23: unlock the Mac login session once, then leave the
+  session available until automation records the current-source VoiceOver,
+  Dynamic Type `accessibility5`, Reduce Motion, and Increased Contrast smoke.
+  No Simulator interaction is required from the owner. Implementation,
+  exact-source mechanical gates, and all six staged reviewers must also be
+  green on the final head. The dedicated GitHub App setup is complete and
+  branch protection requires its `Regards staged review` check.
 - `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
   child onto `main`. Rerun its checks, staged review, and manual accessibility
   smoke before publication or auto-merge.
@@ -177,8 +182,9 @@ Current gates:
 ### PR #23 accessibility evidence
 
 - Current-source manual smoke: pending on the final review head after the
-  current `main` integration. Do not merge until this line is replaced with
-  the tested commit and findings.
+  current `main` integration. The 2026-08-02 scheduled run reached the login
+  lock and could not inspect the Simulator visually. Do not merge until this
+  line is replaced with the tested commit and findings.
 - Prior source lineage: `chore/tf-01-truth-a11y` at `6d25618` was built with
   Xcode 26.6 against the iOS 26.5 iPhone 17 Pro simulator.
 - VoiceOver: the launch label remains `Regards. Loading.` with the header
@@ -193,10 +199,11 @@ Current gates:
   enabled and the documented crossfade when disabled.
 - Increased Contrast: on and off tested. Text, icons, selection states, and
   the inner-circle ring remained visible.
-- Review-fix stress evidence: `ios/scripts/audit-stress.sh 5` completed five
-  consecutive full accessibility-suite passes locally on 2026-07-31. This
-  exercised the typed Contact Detail → Edit Contact route and its Back
-  regression on every pass.
+- Current stress evidence: `ios/scripts/audit-stress.sh 5` completed five
+  consecutive full accessibility-suite passes locally on 2026-08-02. Each
+  run executed 17 tests, including Contact Detail → Edit Contact → Back from
+  Contacts, Overdue, and Upcoming, for 85 executions with zero failures.
+- Prior stress evidence: the same five-run gate passed locally on 2026-07-31.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:

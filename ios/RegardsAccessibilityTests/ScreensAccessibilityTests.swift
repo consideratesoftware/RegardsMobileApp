@@ -1,23 +1,13 @@
 import XCTest
 
-/// Per-screen `XCUIApplication.performAccessibilityAudit()` pass for every
-/// major SwiftUI screen in the current app shell. Each test launches the app once,
-/// navigates to the target screen via real tab / push interactions, and
-/// runs the audit at that point.
-///
-/// Follows the standing accessibility-baseline rule from
-/// `ios/docs/accessibility.md`: a failing audit blocks merge.
+/// Audits each major screen through real tab and push interactions.
+/// The merge policy and sensory carve-outs live in
+/// `ios/docs/accessibility.md`.
 final class ScreensAccessibilityTests: XCTestCase {
 
-    /// Audit categories the suite gates on. Structural checks (labels,
-    /// traits, element detection) are merge-blocking. Sensory checks
-    /// (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are
-    /// documented design-intent trade-offs covered in
-    /// `ios/docs/accessibility.md` §"Sensory-audit carve-outs" — the
-    /// remaining findings are on decorative brand elements
-    /// (Avatar initials, Wordmark) and specific accent-color pairings
-    /// we've deliberately kept at current brightness for the mock's
-    /// visual identity.
+    /// Structural checks are merge-blocking. The sensory categories
+    /// (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) and their
+    /// current carve-outs are documented in `ios/docs/accessibility.md`.
     static let structuralAuditCategories: XCUIAccessibilityAuditType = [
         .elementDetection,
         .sufficientElementDescription,
@@ -138,19 +128,12 @@ final class ScreensAccessibilityTests: XCTestCase {
         assertEditRoundTrip(in: app)
     }
 
-    /// Exercises the factory-built Contact Detail push from the **Overdue
-    /// tab**. The previous ContactDetail test covers the same stable-ID
-    /// destination flow from `AllContactsScreen`.
+    /// Exercises the stable-ID Contact Detail push from Overdue. The
+    /// Contacts test covers the same destination flow from All Contacts.
     @MainActor
     func testContactDetailFromOverduePassesAudit() throws {
         let app = launchToOverdue()
-        // Target contact-row elements specifically. `screen.overdue` also
-        // hosts the nav-bar "All" button and the segmented-control
-        // buttons, so plain `.descendants(matching: .button).firstMatch`
-        // catches those first instead of a row. The row button applies
-        // `.accessibilityElement(children: .ignore)` which composes a
-        // synthetic element whose XCUI elementType resolves to `.other`,
-        // so we search across all element types by identifier.
+        // Rows are synthetic `.other` elements, so select by identifier.
         navigateToRow(
             identifier: "overdue.row",
             index: 0,
@@ -161,7 +144,6 @@ final class ScreensAccessibilityTests: XCTestCase {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
-    /// Same path, Upcoming tab.
     @MainActor
     func testContactDetailFromUpcomingPassesAudit() throws {
         let app = launchToOverdue()
