@@ -1,5 +1,30 @@
 import SwiftUI
 
+enum EditContactAccessibility {
+    enum ValueSpeech {
+        case verbatim
+        case email
+    }
+
+    static func fieldLabel(
+        _ label: String,
+        value: String,
+        placeholder: String,
+        speech: ValueSpeech
+    ) -> String {
+        let displayedValue = value.isEmpty ? placeholder : value
+        let spokenValue = switch speech {
+        case .verbatim:
+            displayedValue
+        case .email:
+            displayedValue
+                .replacingOccurrences(of: "@", with: " at ")
+                .replacingOccurrences(of: ".", with: " dot ")
+        }
+        return "\(label), \(spokenValue)"
+    }
+}
+
 public struct EditContactScreen: View {
     let contact: Contact
 
@@ -117,7 +142,7 @@ public struct EditContactScreen: View {
                       value: isEmail ? contact.preferredChannelValue : "",
                       placeholder: "Add email",
                       touched: isEmail,
-                      speaksEmailPunctuation: true)
+                      speech: .email)
             }
         }
     }
@@ -170,7 +195,7 @@ public struct EditContactScreen: View {
                        value: String = "",
                        placeholder: String = "",
                        touched: Bool = false,
-                       speaksEmailPunctuation: Bool = false) -> some View {
+                       speech: EditContactAccessibility.ValueSpeech = .verbatim) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(label)
                 .font(.footnote.weight(.medium))
@@ -192,28 +217,13 @@ public struct EditContactScreen: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            accessibilityFieldLabel(
+            EditContactAccessibility.fieldLabel(
                 label,
                 value: value,
                 placeholder: placeholder,
-                speaksEmailPunctuation: speaksEmailPunctuation
+                speech: speech
             )
         )
-    }
-
-    private func accessibilityFieldLabel(
-        _ label: String,
-        value: String,
-        placeholder: String,
-        speaksEmailPunctuation: Bool
-    ) -> String {
-        let displayedValue = value.isEmpty ? placeholder : value
-        let spokenValue = speaksEmailPunctuation
-            ? displayedValue
-                .replacingOccurrences(of: "@", with: " at ")
-                .replacingOccurrences(of: ".", with: " dot ")
-            : displayedValue
-        return "\(label), \(spokenValue)"
     }
 
     private var firstName: String {
