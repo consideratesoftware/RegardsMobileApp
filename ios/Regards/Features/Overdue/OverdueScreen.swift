@@ -1,6 +1,8 @@
 import SwiftUI
 
 public struct OverdueScreen: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let viewModel: OverdueViewModel
     // View-local segment state + callback — same pattern as
     // `UpcomingScreen`. The tab root owns which actual `TabView` tab is
@@ -99,15 +101,32 @@ public struct OverdueScreen: View {
     }
 
     private var digestRow: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("Send your regards —")
-                .font(RegardsFont.serifItalic(.title2))
-                .foregroundStyle(RegardsDS.ink)
-            Text(viewModel.nextDigestLabel)
-                .font(.subheadline)
-                .foregroundStyle(RegardsDS.muted)
-            Spacer(minLength: 0)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 2) {
+                    digestLead
+                    digestTime
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    digestLead
+                    digestTime
+                    Spacer(minLength: 0)
+                }
+            }
         }
+    }
+
+    private var digestLead: some View {
+        Text("Send your regards —")
+            .font(RegardsFont.serifItalic(.title2))
+            .foregroundStyle(RegardsDS.ink)
+    }
+
+    private var digestTime: some View {
+        Text(viewModel.nextDigestLabel)
+            .font(.subheadline)
+            .foregroundStyle(RegardsDS.muted)
     }
 
     private var emptyState: some View {
@@ -142,59 +161,73 @@ public struct OverdueScreen: View {
 }
 
 struct OverdueRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let row: OverdueRowState
     let isInnerCircle: Bool
     let onTapContact: () -> Void
     let onTapChannel: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button(action: onTapContact) {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    contactButton
+                    channelPill
+                }
+            } else {
                 HStack(spacing: 10) {
-                    Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(row.name)
-                                .font(RegardsFont.rowTitle())
-                                .foregroundStyle(RegardsDS.ink)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                            if row.isVirtualMerged {
-                                Text("merged")
-                                    .font(.caption2)
-                                    .foregroundStyle(RegardsDS.muted)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 1)
-                                    .background(Capsule().fill(RegardsDS.hairSoft))
-                            }
-                        }
-                        metadataLine
-                    }
-                    Spacer(minLength: 8)
+                    contactButton
+                    channelPill
                 }
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(row.accessibilityLabel)
-            .accessibilityHint("Double-tap to open contact detail.")
-            // Stable identifier for UI tests that need to target a
-            // contact-row tap specifically (vs. the nav-bar "All"
-            // button or the segmented-control buttons that also
-            // live on this screen).
-            .accessibilityIdentifier("overdue.row")
-
-            channelPill
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
 
+    private var contactButton: some View {
+        Button(action: onTapContact) {
+            HStack(spacing: 10) {
+                Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(row.name)
+                            .font(RegardsFont.rowTitle())
+                            .foregroundStyle(RegardsDS.ink)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                            .minimumScaleFactor(0.85)
+                        if row.isVirtualMerged {
+                            Text("merged")
+                                .font(.caption2)
+                                .foregroundStyle(RegardsDS.muted)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(RegardsDS.hairSoft))
+                        }
+                    }
+                    metadataLine
+                }
+                Spacer(minLength: 8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.accessibilityLabel)
+        .accessibilityHint("Double-tap to open contact detail.")
+        // Stable identifier for UI tests that need to target a
+        // contact-row tap specifically (vs. the nav-bar "All"
+        // button or the segmented-control buttons that also
+        // live on this screen).
+        .accessibilityIdentifier("overdue.row")
+    }
+
     private var metadataLine: some View {
         Text(metadataString)
             .font(.footnote)
             .foregroundStyle(RegardsDS.muted)
-            .lineLimit(1)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
             .truncationMode(.tail)
     }
 
