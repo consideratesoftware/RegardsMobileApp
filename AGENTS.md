@@ -123,16 +123,21 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 - `.github/workflows/ios-ci.yml` — xcodegen determinism → build → (unit tests + coverage) + (accessibility audit). No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
 - `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, markdown link check for `ios/docs/` (PR19 extends it to root markdown).
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
-- `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× per PR (flake detector).
+- `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× (flake detector). Since 2026-08-02 it runs on merges to `main`, nightly, and `workflow_dispatch`, not on pull requests; dispatch it and require green before cutting a release.
 - `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from
   default-branch policy, gives the model only sanitized regular-file review
   data with a read-only token, then validates and publishes the typed verdict
   from a separate trusted job.
 
-Four workflows currently gate merges through required checks. The hosted
-review becomes the fifth gate after the pending dedicated GitHub App setup and
-branch-protection binding in `TESTFLIGHT_PLAN.md`. Path filters were deliberately
-removed (PR #15) so required checks always report.
+Three workflows gate merges through required checks. The hosted staged review
+is bound as a fourth required context (`Regards staged review`, pinned to the
+dedicated App's identity), but it gates on *evidence, not agreement*: it fails
+when no valid review ran for the current head, and passes when a review ran,
+including one that requests changes. The blockers are published in the check
+summary and output; acting on them is the author's call. Path filters were
+deliberately removed (PR #15) so required checks always report. The
+accessibility audits moved off the PR path on 2026-08-02 and are
+release-blocking rather than merge-blocking (ARCHITECTURE.md §10).
 
 ## Durable execution
 

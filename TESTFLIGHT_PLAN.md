@@ -70,8 +70,11 @@ from this contract. Do not add a GitHub Actions implementation that would
 require a hosted coding credential.
 
 The recurring task may create branches, edit files, run tests, commit, push,
-open pull requests, address reviews, and merge a pull request after every
-required check and the staged review approve it. It must not:
+open pull requests, address reviews, and merge a pull request once every
+required check is green. The `Regards staged review` check passes whenever a
+valid review ran for the current head, including one that requests changes, so
+green is not the same as approved: read the check output and clear or
+consciously defer every blocker before merging. It must not:
 
 - weaken the privacy, accessibility, data-integrity, or layer-purity gates;
 - discard user work or use destructive Git operations;

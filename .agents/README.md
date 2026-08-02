@@ -36,8 +36,12 @@ GitHub, and returns a typed JSON artifact. A separate trusted job runs XcodeGen
 determinism, SwiftLint, and the privacy/Domain guards directly from
 default-branch workflow code. Analysis depends on that preflight. The publisher
 requires both jobs, validates the artifact against the event's head, base, PR,
-and run identity, posts it through the dedicated App bot, and fails on
-`REQUEST_CHANGES`. The publisher uses that App credential from the
+and run identity, and publishes it through the dedicated App bot. The check
+asserts that a valid review ran for the current head, not that the reviewer
+agreed: a missing, malformed or stale-head artifact fails it, while a
+`REQUEST_CHANGES` verdict publishes the findings and passes, with the verdict
+and blocker count in the check summary. Acting on a blocker is the author's
+call. The publisher uses that App credential from the
 `hosted-review` environment to create the head-bound `Regards staged review`
 check. Branch protection binds that context to the dedicated App's identity, so
 a same-repository PR cannot satisfy it with an identically named Actions job.

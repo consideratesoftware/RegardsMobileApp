@@ -346,20 +346,28 @@ jobs:
           # rendered review at 65,000 bytes; truncate anyway rather than let a
           # long review fail the PATCH and lose the whole verdict.
           review="$RUNNER_TEMP/hosted-review.md"
+          artifact="$RUNNER_TEMP/hosted-review.json"
           if [[ -s "$review" ]]; then
             # The check passes whenever a valid review was produced, so the
             # summary has to carry the verdict: a green check must never be
-            # mistaken for "no findings".
-            verdict="$(grep -m1 '^VERDICT:' "$review" | cut -d' ' -f2- || true)"
-            blockers="$(sed -n '/^### Blockers/,/^### /p' "$review" | grep -c '^- \[' || true)"
-            case "$verdict" in
-              REQUEST_CHANGES)
-                summary="Changes requested — $blockers blocker(s). The review ran and its findings are below; the gate does not block on the verdict." ;;
-              APPROVE)
-                summary="Approved — no blockers." ;;
-              *)
-                summary="Staged review completed." ;;
-            esac
+            # mistaken for "no findings". Read the counts from the artifact the
+            # validator already accepted, not by re-parsing the rendered
+            # markdown -- a heading rename must not silently report zero.
+            summary="$(jq -r '
+              (.blockers | length) as $b
+              | (.should_fix | length) as $s
+              | (.nits | length) as $n
+              | if .verdict == "REQUEST_CHANGES" then
+                  "Changes requested: \($b) blocker\(if $b == 1 then "" else "s" end)"
+                  + ", \($s) should-fix, \($n) nit\(if $n == 1 then "" else "s" end)."
+                  + " The review ran; the gate does not block on the verdict."
+                elif .verdict == "APPROVE" then
+                  "Approved: no blockers"
+                  + ", \($s) should-fix, \($n) nit\(if $n == 1 then "" else "s" end)."
+                else
+                  "Unrecognized verdict \(.verdict | tostring); see the review below."
+                end
+            ' "$artifact")"
             text="$(head -c 65000 "$review")"
           else
             summary='No verified review artifact was produced. The review did not run — see the run log.'
