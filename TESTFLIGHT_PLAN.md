@@ -185,10 +185,10 @@ Current gates:
 
 ### PR #23 accessibility evidence
 
-- Current-source manual smoke: exact source `11cf095` was built, installed,
-  launched, and inspected with Xcode 26.6 on the pinned iOS 26.5 iPhone 17 Pro
-  simulator. Responsive-layout implementation commit `ddbb80d` and speakable
-  email-label implementation commit `886d03e` are both present in that source.
+- Full manual smoke source `11cf095` was built, installed, launched, and
+  inspected with Xcode 26.6 on the pinned iOS 26.5 iPhone 17 Pro simulator.
+  Responsive-layout implementation commit `ddbb80d` and speakable email-label
+  implementation commit `886d03e` are both present in that source.
 - VoiceOver: Accessibility Inspector and the Simulator accessibility hierarchy
   exposed the launch heading, screen headings, all four tab destinations,
   natural-language rows, button traits, action hints, and logical reading
@@ -213,8 +213,16 @@ Current gates:
   executed 18 tests; all 90 test executions passed. The prior sweep exposed a
   raw email address that the structural audit could not recognize as a
   human-readable label; the contextual, speakable label fix then passed its
-  focused audit 5/5 before the clean full sweep. Source changes after
-  `886d03e` are evidence-only documentation.
+  focused audit 5/5 before the clean full sweep. Changes after `886d03e` are
+  evidence-only documentation except for the scoped formatting refinement
+  recorded next.
+- 2026-08-02 hosted-review refinement: commit `cb4a9ff` makes email fields opt
+  into punctuation-to-speech formatting explicitly instead of inferring it
+  from arbitrary field contents. SwiftLint passed with zero violations, the
+  Upcoming-to-Contact-Preview regression passed 5/5, and the exact build was
+  installed and re-inspected. Its email remained visible as
+  `obiwan@jeditemple.org` and exposed the single accessibility element
+  “personal, obiwan at jeditemple dot org.”
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
