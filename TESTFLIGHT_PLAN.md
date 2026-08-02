@@ -42,8 +42,9 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; the current order is PR #23, then PR #24. Start no additional
-   work while this chain is open.
+   checkpoint`; PR #23 is complete, and the current order is the TF-01
+   accessibility follow-up, then PR #24. Start no additional work while this
+   chain is open.
 5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
    requests carrying a `TF-##` marker, and take the first `READY` item whose
    dependencies are `DONE`.
@@ -151,21 +152,23 @@ slices. The order is fixed while the current pull requests remain open:
 1. DONE: GitHub PR #26 installed the trusted hosted-review workflow, dedicated
    App check, and shared source-boundary guards. Branch protection now binds
    `Regards staged review` to App ID `4461672`; R32 is closed.
-2. GitHub PR #23 completes the repository, documentation, and accessibility
-   truth slice. Close its hosted-review feedback, run the current-source manual
-   VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
-   Contrast smoke, then require the App-authored review before merge. It closes
-   the R13 escape route and R16, R27, R28, and R43, and reconfirms the earlier
-   R29 closure.
-3. GitHub PR #24 is the owner-directed platform-modernization slice stacked on
-   PR #23. After #23 merges, retarget and rebase it onto `main`, publish it,
-   then rerun its full checks, staged review, and manual accessibility smoke.
-4. Finish the remaining PR19 CI and reproducibility scope: commit
+2. DONE: GitHub PR #23 merged as `a8c9c01`, completing the repository and
+   documentation truth slice. It merged before the smoke-driven responsive
+   accessibility and navigation-harness changes were pushed.
+3. Merge the TF-01 accessibility follow-up carrying those exact-source
+   changes, the completed manual smoke, and their review evidence. This closes
+   the remaining R13, R16, R27, R28, R29, and R43 acceptance evidence before
+   the stack advances.
+4. GitHub PR #24 is the owner-directed platform-modernization slice. Only
+   after the accessibility follow-up merges, retarget and rebase #24 onto the
+   resulting `main`, publish it, then rerun its full checks, staged review, and
+   manual accessibility smoke.
+5. Finish the remaining PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
    configuration and stale audit-stress comment, and reconcile merge-method
    documentation.
-5. Finish mock and code hygiene: seed group, interaction, and occasion states;
+6. Finish mock and code hygiene: seed group, interaction, and occasion states;
    use stable Upcoming row IDs; remove or wire dead assets and comments; prune
    obsolete worktrees and merged branches after exact-target verification.
 
@@ -183,15 +186,18 @@ Current gates:
 
 ### PR #23 accessibility evidence
 
-- Current-source manual smoke: implementation commit `ddbb80d` was built,
-  installed, launched, and inspected with Xcode 26.6 on the pinned iOS 26.5
-  iPhone 17 Pro simulator. The responsive-layout implementation remains
-  unchanged; later source changes correct review-identified prose and copy.
+- Current-source manual smoke: exact source `11cf095` was built, installed,
+  launched, and inspected with Xcode 26.6 on the pinned iOS 26.5 iPhone 17 Pro
+  simulator. Responsive-layout implementation commit `ddbb80d` and speakable
+  email-label implementation commit `886d03e` are both present in that source.
 - VoiceOver: Accessibility Inspector and the Simulator accessibility hierarchy
   exposed the launch heading, screen headings, all four tab destinations,
   natural-language rows, button traits, action hints, and logical reading
   order. Overdue, Contacts, and Upcoming each reached Contact Detail, Contact
-  Preview, and the standard labeled Back escape route.
+  Preview, and the standard labeled Back escape route. The exact-source rerun
+  reached Obi-Wan Kenobi's Contact Preview and exposed its email field as one
+  element spoken as “personal, obiwan at jeditemple dot org”; the visible
+  address remained `obiwan@jeditemple.org`.
 - Dynamic Type: the first `accessibility5` pass found truncated selector text,
   compressed nav and digest copy, clipped list metadata, and narrow Contact
   Detail actions. Commit `ddbb80d` makes those layouts stack at accessibility
