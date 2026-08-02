@@ -44,7 +44,7 @@ extension ScreensAccessibilityTests {
         // synthetic `.other` elements used by Overdue and Upcoming.
         // Re-resolve for two bounded retries because rapid test relaunches can
         // drop synthesized row taps before SwiftUI handles them.
-        for _ in 0..<3 {
+        for attempt in 0..<3 {
             if detail.exists, !contacts.exists {
                 break
             }
@@ -53,7 +53,7 @@ extension ScreensAccessibilityTests {
             guard waitUntilLiveAndHittable(firstRow, timeout: 10) else {
                 continue
             }
-            tapLiveCoordinate(of: firstRow)
+            activate(firstRow, attempt: attempt)
             if detail.waitForExistence(timeout: 10),
                contacts.waitForNonExistence(timeout: 10) {
                 break
@@ -88,7 +88,7 @@ extension ScreensAccessibilityTests {
         // The screen waits remain plain queries. The bounded hittability poll
         // below returns false without recording an XCTest failure while a
         // transient element has no activation frame.
-        for _ in 0..<3 {
+        for attempt in 0..<3 {
             if destination.exists, !source.exists {
                 return
             }
@@ -102,7 +102,7 @@ extension ScreensAccessibilityTests {
             guard waitUntilLiveAndHittable(button) else {
                 continue
             }
-            tapLiveCoordinate(of: button)
+            activate(button, attempt: attempt)
             if destination.waitForExistence(timeout: 10),
                source.waitForNonExistence(timeout: 10) {
                 return
@@ -125,7 +125,7 @@ extension ScreensAccessibilityTests {
             "Settings should exist before opening \(screenIdentifier)."
         )
 
-        for _ in 0..<3 {
+        for attempt in 0..<3 {
             if destination.exists, !source.exists {
                 return
             }
@@ -134,7 +134,7 @@ extension ScreensAccessibilityTests {
             guard waitUntilLiveAndHittable(trigger) else {
                 continue
             }
-            tapLiveCoordinate(of: trigger)
+            activate(trigger, attempt: attempt)
             if destination.waitForExistence(timeout: 10),
                source.waitForNonExistence(timeout: 10) {
                 return
@@ -162,7 +162,7 @@ extension ScreensAccessibilityTests {
         // Row taps can be dropped by the same rapid-relaunch automation race
         // as tab taps. Wait on the plain identifier query, then re-resolve
         // the indexed row and its live coordinate before each attempt.
-        for _ in 0..<3 {
+        for attempt in 0..<3 {
             if detail.exists, !source.exists {
                 return
             }
@@ -177,7 +177,7 @@ extension ScreensAccessibilityTests {
                   waitUntilLiveAndHittable(rows[index]) else {
                 continue
             }
-            tapLiveCoordinate(of: rows[index])
+            activate(rows[index], attempt: attempt)
             if detail.waitForExistence(timeout: 10),
                source.waitForNonExistence(timeout: 10) {
                 return
@@ -202,7 +202,7 @@ extension ScreensAccessibilityTests {
             "\(sourceIdentifier) should exist before activating \(triggerDescription)."
         )
 
-        for _ in 0..<3 {
+        for attempt in 0..<3 {
             if destination.exists, !source.exists {
                 return
             }
@@ -211,7 +211,7 @@ extension ScreensAccessibilityTests {
             guard waitUntilLiveAndHittable(liveTrigger) else {
                 continue
             }
-            tapLiveCoordinate(of: liveTrigger)
+            activate(liveTrigger, attempt: attempt)
             if destination.waitForExistence(timeout: 10),
                source.waitForNonExistence(timeout: 10) {
                 return
@@ -254,13 +254,22 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
-    func tapLiveCoordinate(of element: XCUIElement) {
-        // Center-coordinate taps work around the simulator's dropped-tap
-        // race. They are navigation synchronization only; the audit still
-        // owns hit-region verification when sensory categories are enabled.
-        element.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
-        ).tap()
+    func activate(_ element: XCUIElement, attempt: Int) {
+        // Simulator automation can drop one activation style repeatedly for a
+        // live element. Bounded retries vary the synthesis path, while the
+        // caller verifies the source/destination state after every attempt.
+        // These are navigation synchronization only; the audit still owns
+        // hit-region verification when sensory categories are enabled.
+        switch attempt {
+        case 0:
+            element.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+            ).tap()
+        case 1:
+            element.tap()
+        default:
+            element.press(forDuration: 0.1)
+        }
     }
 
     @MainActor
