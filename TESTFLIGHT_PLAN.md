@@ -8,14 +8,14 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 ## Current checkpoint
 
 - Updated: 2026-08-02
-- Baseline: `main` at `a8c9c01` (merged GitHub PR #23; repository truth and
-  current review-gate follow-ups included)
-- Active work: `TF-01` (land the smoke-driven accessibility follow-up to
-  merged PR #23, then its stacked platform-modernization slice)
+- Baseline: `main` at `a8c9c01` (merged GitHub PR #23 repository-truth slice)
+- Active work: `TF-01` (merge GitHub PR #37, then its stacked
+  platform-modernization slice)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open work, in required completion order: this accessibility follow-up, then
-  GitHub PR #24 (`ios/modern-platform-showcase`, draft; still based on merged
-  PR #23 until the follow-up lands)
+- Open work, in required completion order: GitHub PR #37
+  (`codex/tf-01-a11y-follow-up`, ready for review), then GitHub PR #24
+  (`ios/modern-platform-showcase`, draft; still based on merged PR #23 until
+  #37 lands)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -42,9 +42,8 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; PR #23 is complete, and the current order is the TF-01
-   accessibility follow-up, then PR #24. Start no additional work while this
-   chain is open.
+   checkpoint`; PR #23 is complete, and the current order is PR #37, then PR
+   #24. Start no additional work while this chain is open.
 5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
    requests carrying a `TF-##` marker, and take the first `READY` item whose
    dependencies are `DONE`.
@@ -155,10 +154,10 @@ slices. The order is fixed while the current pull requests remain open:
 2. DONE: GitHub PR #23 merged as `a8c9c01`, completing the repository and
    documentation truth slice. It merged before the smoke-driven responsive
    accessibility and navigation-harness changes were pushed.
-3. Merge the TF-01 accessibility follow-up carrying those exact-source
-   changes, the completed manual smoke, and their review evidence. This closes
-   the remaining R13, R16, R27, R28, R29, and R43 acceptance evidence before
-   the stack advances.
+3. Merge GitHub PR #37, the TF-01 accessibility follow-up carrying those
+   exact-source changes, the completed manual smoke, and their review evidence.
+   This closes the remaining R13, R16, R27, R28, R29, and R43 acceptance
+   evidence before the stack advances.
 4. GitHub PR #24 is the owner-directed platform-modernization slice. Only
    after the accessibility follow-up merges, retarget and rebase #24 onto the
    resulting `main`, publish it, then rerun its full checks, staged review, and
@@ -176,8 +175,8 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- `TF-01` slice 1 follow-up: PR #23 merged before the smoke-driven responsive
-  layouts and navigation-harness fixes were pushed. This follow-up carries
+- `TF-01` slice 1 follow-up / PR #37: PR #23 merged before the smoke-driven
+  responsive layouts and navigation-harness fixes were pushed. PR #37 carries
   those verified changes. No owner action remains; exact-source mechanical
   gates and all six staged reviewers must be green before it merges.
 - `TF-01` slice 2 / PR #24: merge the accessibility follow-up first, then
