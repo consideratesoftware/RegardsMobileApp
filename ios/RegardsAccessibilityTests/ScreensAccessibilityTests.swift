@@ -135,23 +135,7 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testEditContactBackReturnsToContactDetail() {
         let app = launchToContactDetailFromContacts()
-        navigate(
-            from: "screen.contact-detail",
-            to: "screen.edit-contact",
-            triggerDescription: "Edit",
-            in: app
-        ) {
-            app.navigationBars.buttons["Edit"]
-        }
-        navigate(
-            from: "screen.edit-contact",
-            to: "screen.contact-detail",
-            triggerDescription: "Back",
-            in: app
-        ) {
-            app.navigationBars.buttons.element(boundBy: 0)
-        }
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
+        assertEditRoundTrip(in: app)
     }
 
     /// Exercises the factory-built Contact Detail push from the **Overdue
@@ -195,6 +179,36 @@ final class ScreensAccessibilityTests: XCTestCase {
         )
         XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    @MainActor
+    func testEditContactBackReturnsToOverdueContactDetail() {
+        let app = launchToOverdue()
+        navigateToRow(
+            identifier: "overdue.row",
+            index: 0,
+            sourceIdentifier: "screen.overdue",
+            in: app
+        )
+        assertEditRoundTrip(in: app)
+    }
+
+    @MainActor
+    func testEditContactBackReturnsToUpcomingContactDetail() {
+        let app = launchToOverdue()
+        navigateToTab(
+            named: "Upcoming",
+            from: "screen.overdue",
+            to: "screen.upcoming",
+            in: app
+        )
+        navigateToRow(
+            identifier: "upcoming.row",
+            index: 0,
+            sourceIdentifier: "screen.upcoming",
+            in: app
+        )
+        assertEditRoundTrip(in: app)
     }
 
     /// Regression guard for the per-push VM factory: tapping two different
@@ -297,8 +311,8 @@ private extension ScreensAccessibilityTests {
         // synthetic `.other` elements used by Overdue and Upcoming.
         // Re-resolve once because rapid test relaunches can drop a
         // synthesized row tap before SwiftUI handles it.
-        for attempt in 0..<2 {
-            if attempt > 0, detail.exists, !contacts.exists {
+        for _ in 0..<2 {
+            if detail.exists, !contacts.exists {
                 break
             }
 
@@ -339,8 +353,8 @@ private extension ScreensAccessibilityTests {
         // element in the automation hierarchy. Resolve the current button
         // for each attempt and allow two bounded retries when synthesized
         // taps are dropped. The screen waits remain plain queries.
-        for attempt in 0..<3 {
-            if attempt > 0, destination.exists, !source.exists {
+        for _ in 0..<3 {
+            if destination.exists, !source.exists {
                 return
             }
 
@@ -379,8 +393,8 @@ private extension ScreensAccessibilityTests {
             "Settings should exist before opening \(screenIdentifier)."
         )
 
-        for attempt in 0..<2 {
-            if attempt > 0, destination.exists, !source.exists {
+        for _ in 0..<2 {
+            if destination.exists, !source.exists {
                 return
             }
 
@@ -415,8 +429,8 @@ private extension ScreensAccessibilityTests {
         // Row taps can be dropped by the same rapid-relaunch automation race
         // as tab taps. Wait on the plain identifier query, then re-resolve
         // the indexed row and its live coordinate before each attempt.
-        for attempt in 0..<2 {
-            if attempt > 0, detail.exists, !source.exists {
+        for _ in 0..<2 {
+            if detail.exists, !source.exists {
                 return
             }
 
@@ -454,8 +468,8 @@ private extension ScreensAccessibilityTests {
             "\(sourceIdentifier) should exist before activating \(triggerDescription)."
         )
 
-        for attempt in 0..<2 {
-            if attempt > 0, destination.exists, !source.exists {
+        for _ in 0..<2 {
+            if destination.exists, !source.exists {
                 return
             }
 
@@ -471,6 +485,27 @@ private extension ScreensAccessibilityTests {
         }
 
         XCTFail("\(triggerDescription) should show \(destinationIdentifier).")
+    }
+
+    @MainActor
+    private func assertEditRoundTrip(in app: XCUIApplication) {
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.edit-contact",
+            triggerDescription: "Edit",
+            in: app
+        ) {
+            app.navigationBars.buttons["Edit"]
+        }
+        navigate(
+            from: "screen.edit-contact",
+            to: "screen.contact-detail",
+            triggerDescription: "Back",
+            in: app
+        ) {
+            app.navigationBars.buttons.element(boundBy: 0)
+        }
+        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 20))
     }
 
     @MainActor

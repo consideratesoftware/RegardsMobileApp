@@ -2,7 +2,7 @@ import SwiftUI
 
 public struct ContactDetailScreen: View {
     private struct EditRoute: Hashable {
-        let contact: Contact
+        let contactId: UUID
     }
 
     let viewModel: ContactDetailViewModel
@@ -51,12 +51,12 @@ public struct ContactDetailScreen: View {
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("screen.contact-detail")
         .navigationDestination(for: EditRoute.self) { route in
-            EditContactScreen(contact: route.contact)
+            editContact(for: route.contactId)
         }
         .toolbar {
             if let contact = viewModel.contact {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(value: EditRoute(contact: contact)) {
+                    NavigationLink(value: EditRoute(contactId: contact.id)) {
                         Text("Edit")
                             .foregroundStyle(RegardsDS.accentInk)
                     }
@@ -64,6 +64,18 @@ public struct ContactDetailScreen: View {
             }
         }
         .task { await viewModel.load() }
+    }
+
+    @ViewBuilder
+    private func editContact(for contactId: UUID) -> some View {
+        if let contact = viewModel.contact, contact.id == contactId {
+            EditContactScreen(contact: contact)
+        } else {
+            ContentUnavailableView(
+                "Contact unavailable",
+                systemImage: "person.crop.circle.badge.questionmark"
+            )
+        }
     }
 
     // MARK: - Sections

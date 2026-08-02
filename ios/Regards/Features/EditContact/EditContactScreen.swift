@@ -36,8 +36,8 @@ public struct EditContactScreen: View {
             .foregroundStyle(RegardsDS.ink)
             .frame(maxWidth: .infinity)
             .accessibilityAddTraits(.isHeader)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
     }
 
     private var heroAvatar: some View {

@@ -35,7 +35,8 @@ Regards makes a strong privacy claim and backs it up with technical, legal, and 
 - **iOS: no networking code in our modules.** CI rejects networking call sites,
   and App Transport Security stays on strict defaults with every exception
   disabled. V1 billing will use the OS-provided StoreKit framework.
-- **Data at rest uses iOS Data Protection.** The local database is protected by the operating system.
+- **Data at rest uses iOS Data Protection.** The local database uses
+  `NSFileProtectionCompleteUntilFirstUserAuthentication`.
 - **Contacts are read on-device only.** Planned V1 writes are scoped to the fields you touch and go through `CNSaveRequest`. Regards never deletes, bulk-edits, or merges your system contacts.
 - **Calendar access is optional, local-only, and read-only.** No OAuth calendar integrations — ever.
 - **Source is available for audit.** Every line of code is publicly readable under the license below.

@@ -120,7 +120,7 @@ public struct TransparencyScreen: View {
             RegardsCard {
                 VStack(spacing: 0) {
                     auditRow("Read the source",
-                             detail: "github.com/sid78669/RegardsMobileApp",
+                             detail: "github.com/consideratesoftware/RegardsMobileApp",
                              isAccent: true)
                     Hair(inset: 16)
                     auditRow("Rebuild the binary",
