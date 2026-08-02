@@ -42,9 +42,9 @@ extension ScreensAccessibilityTests {
 
         // Contacts rows currently resolve as buttons rather than the
         // synthetic `.other` elements used by Overdue and Upcoming.
-        // Re-resolve once because rapid test relaunches can drop a
-        // synthesized row tap before SwiftUI handles it.
-        for _ in 0..<2 {
+        // Re-resolve for two bounded retries because rapid test relaunches can
+        // drop synthesized row taps before SwiftUI handles them.
+        for _ in 0..<3 {
             if detail.exists, !contacts.exists {
                 break
             }
@@ -82,10 +82,12 @@ extension ScreensAccessibilityTests {
             "\(sourceIdentifier) should exist before selecting the \(name) tab."
         )
 
-        // Rapid simulator relaunches can leave a stale, hittable tab-bar
-        // element in the automation hierarchy. Resolve the current button
-        // for each attempt and allow two bounded retries when synthesized
-        // taps are dropped. The screen waits remain plain queries.
+        // Rapid simulator relaunches can leave a stale tab-bar element in the
+        // automation hierarchy. Resolve the current button for each attempt
+        // and allow two bounded retries when synthesized taps are dropped.
+        // The screen waits remain plain queries; polling `hittable` can itself
+        // record an XCTest failure while a transient element has no activation
+        // frame, even when the next bounded attempt succeeds.
         for _ in 0..<3 {
             if destination.exists, !source.exists {
                 return
@@ -97,7 +99,7 @@ extension ScreensAccessibilityTests {
             }
 
             let button = app.tabBars.buttons[name]
-            guard waitUntilHittable(button) else {
+            guard button.waitForExistence(timeout: 2) else {
                 continue
             }
             tapLiveCoordinate(of: button)
@@ -124,13 +126,12 @@ extension ScreensAccessibilityTests {
             "Settings should exist before opening \(screenIdentifier)."
         )
 
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             if destination.exists, !source.exists {
                 return
             }
 
-            guard trigger.waitForExistence(timeout: 10),
-                  waitUntilHittable(trigger) else {
+            guard trigger.waitForExistence(timeout: 10) else {
                 continue
             }
             tapLiveCoordinate(of: trigger)
@@ -161,7 +162,7 @@ extension ScreensAccessibilityTests {
         // Row taps can be dropped by the same rapid-relaunch automation race
         // as tab taps. Wait on the plain identifier query, then re-resolve
         // the indexed row and its live coordinate before each attempt.
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             if detail.exists, !source.exists {
                 return
             }
@@ -172,8 +173,7 @@ extension ScreensAccessibilityTests {
             let rows = app.descendants(matching: .any)
                 .matching(identifier: identifier)
                 .allElementsBoundByIndex
-            guard rows.indices.contains(index),
-                  waitUntilHittable(rows[index]) else {
+            guard rows.indices.contains(index), rows[index].exists else {
                 continue
             }
             tapLiveCoordinate(of: rows[index])
@@ -201,14 +201,13 @@ extension ScreensAccessibilityTests {
             "\(sourceIdentifier) should exist before activating \(triggerDescription)."
         )
 
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             if destination.exists, !source.exists {
                 return
             }
 
             let liveTrigger = trigger()
-            guard liveTrigger.waitForExistence(timeout: 10),
-                  waitUntilHittable(liveTrigger) else {
+            guard liveTrigger.waitForExistence(timeout: 10) else {
                 continue
             }
             tapLiveCoordinate(of: liveTrigger)
@@ -263,15 +262,4 @@ extension ScreensAccessibilityTests {
         ).tap()
     }
 
-    @MainActor
-    func waitUntilHittable(
-        _ element: XCUIElement,
-        timeout: TimeInterval = 2
-    ) -> Bool {
-        let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == true AND hittable == true"),
-            object: element
-        )
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
-    }
 }

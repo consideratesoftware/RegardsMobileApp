@@ -125,6 +125,11 @@ intentional:
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right
   data.
+- **Dynamic Type on screen content**: at accessibility sizes the shared nav
+  title and subtitle, Overdue / Upcoming selector, digest, list rows, and
+  Contact Detail actions and detail cards use stacked variants. At
+  `accessibility5`, labels, names, metadata, and CTA copy wrap without clipping
+  or mid-word truncation while the standard-size layouts remain compact.
 
 ### Bucket 2 — design-intent trade-offs the audit flags
 

@@ -16,14 +16,17 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Open pull requests, in required completion order: GitHub PR #23
   (`chore/tf-01-truth-a11y`, published), then GitHub PR #24
   (`ios/modern-platform-showcase`, draft; stacked on PR #23)
+- Independent CI follow-up: GitHub PR #36 is open with auto-merge disabled after
+  its current-head hosted review found blockers; it is not part of the TF-01
+  stack and must not bypass that review.
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: unlock the Mac login session when ready for the PR
-  #23 Simulator accessibility smoke. Automation will complete it promptly; the
-  Mac does not need to remain unlocked afterward. No Simulator or repository
-  interaction is required from the owner.
+- Owner action needed now: none. The PR #23 Simulator accessibility smoke and
+  the dedicated GitHub App setup are complete.
+- Copyright owner: repository, product, and App Store references use
+  `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -173,51 +176,53 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- `TF-01` slice 1 / PR #23: unlock the Mac login session when ready for
-  automation to record the current-source VoiceOver, Dynamic Type
-  `accessibility5`, Reduce Motion, and Increased Contrast smoke. The Mac does
-  not need to remain unlocked after that run. No Simulator interaction is
-  required from the owner. Implementation,
-  exact-source mechanical gates, and all six staged reviewers must also be
-  green on the final head. The dedicated GitHub App setup is complete and
-  branch protection requires its `Regards staged review` check.
+- `TF-01` slice 1 / PR #23: no owner action remains. The current-source
+  VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
+  Contrast smoke is recorded below. Exact-source mechanical gates and all six
+  staged reviewers must still be green on the final head. The dedicated GitHub
+  App setup is complete and branch protection requires its `Regards staged
+  review` check.
 - `TF-01` slice 2 / PR #24: merge PR #23 first, then retarget and rebase the
   child onto `main`. Rerun its checks, staged review, and manual accessibility
   smoke before publication or auto-merge.
 
 ### PR #23 accessibility evidence
 
-- Current-source manual smoke: pending on the final review head after the
-  hosted-review fixes. The 2026-08-02 scheduled run reached the login lock and
-  could not inspect the Simulator visually. Do not merge until this line is
-  replaced with the tested commit and findings.
-- Prior source lineage: `chore/tf-01-truth-a11y` at `6d25618` was built with
-  Xcode 26.6 against the iOS 26.5 iPhone 17 Pro simulator.
-- VoiceOver: the launch label remains `Regards. Loading.` with the header
-  trait. The tab-root hierarchy exposed the Overdue heading, four tab
-  destinations, natural-language rows, button traits, and action hints. The
-  Edit Contact structural audit and Back regression both remain green.
-- Dynamic Type: `accessibility5` re-rendered the app and the Edit Contact audit
-  passed. Existing legacy root and Contact Detail compression at this size is
-  recorded for TF-16's full sensory-audit and layout pass; it is outside this
-  navigation-truth slice.
-- Reduce Motion: on and off tested. The launch uses the no-animation path when
-  enabled and the documented crossfade when disabled.
-- Increased Contrast: on and off tested. Text, icons, selection states, and
+- Current-source manual smoke: implementation commit `c3bdbf1` was built,
+  installed, launched, and inspected with Xcode 26.6 on the pinned iOS 26.5
+  iPhone 17 Pro simulator. The final source changes after that commit are
+  evidence-only documentation.
+- VoiceOver: Accessibility Inspector and the Simulator accessibility hierarchy
+  exposed the launch heading, screen headings, all four tab destinations,
+  natural-language rows, button traits, action hints, and logical reading
+  order. Overdue, Contacts, and Upcoming each reached Contact Detail, Contact
+  Preview, and the standard labeled Back escape route.
+- Dynamic Type: the first `accessibility5` pass found truncated selector text,
+  compressed nav and digest copy, clipped list metadata, and narrow Contact
+  Detail actions. Commit `c3bdbf1` makes those layouts stack at accessibility
+  sizes. The repeated pass showed complete selector labels, names, metadata,
+  CTA copy, secondary actions, and detail rows across all three entry paths;
+  the normal `large` text-size layout remained compact.
+- Reduce Motion: on and off tested. Navigation remained coherent through the
+  documented reduced-motion and standard-transition paths.
+- Increased Contrast: on and off tested. Text, icons, segmented selection, and
   the inner-circle ring remained visible.
-- 2026-08-02 exact-head stress evidence: `ios/scripts/audit-stress.sh 5`
-  completed five consecutive full accessibility-suite passes on the final
-  review head containing this entry. Each run executed 18 tests, including
-  Contact Detail → Edit
-  Contact → Back from Contacts, Overdue, and Upcoming, repeated Edit routing,
-  a Contacts-tab switch away and back, and the read-only copy assertion. All
-  90 test executions passed.
+- 2026-08-02 exact-head stress status: pending after integrating the current
+  helper fix with `main`. Two diagnostic sweeps each completed four of five
+  full accessibility suites: the first observed one dropped Overdue row tap;
+  the second observed two dropped repeated-Edit taps. The failures did not
+  repeat on the other 18 full runs, but the gate requires one clean five-run
+  sweep. The helper now avoids XCUI's transient `hittable` failure and gives
+  row and in-stack navigation two bounded retries, matching tab navigation.
+  Do not merge until `ios/scripts/audit-stress.sh 5` passes 5/5 on the
+  integrated final source and this entry records that result.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
-- Historical regression evidence: four earlier five-run sweeps also passed,
+- Historical regression evidence before the `c3bdbf1` smoke fixes: four
+  earlier five-run sweeps also passed,
   including the earlier `a454313` hosted-feedback run and the 2026-07-31
-  acceptance run. Across the current and prior recorded sweeps, all 30 runs
-  and 525 test executions passed.
+  acceptance run. Across those previously recorded sweeps, all 30 runs and
+  525 test executions passed.
 - Hosted-review follow-up: the `d5449e4` App-authored review requested changes.
   Implementation commit `a454313` closes its route-fallback, tab-preservation,
   repeated-navigation, copy-coverage, contrast-registry, local-destination,
@@ -227,9 +232,10 @@ Current gates:
   callback surface and corrects the final census and audit-schedule wording.
   The App-authored review of `be215a3` then requested the current-head smoke
   plus corrections to state ownership, navigation waits, entry-path audit
-  coverage, contrast documentation, and register truth. The final review head
-  closes each source and documentation finding. Exact-source staged review and
-  the manual smoke remain pending before merge.
+  coverage, contrast documentation, and register truth. Commit `36f86e2`
+  closes those source and documentation findings; the smoke then exposed the
+  accessibility-size layout defects fixed by `c3bdbf1`. Exact-source staged
+  review remains pending before merge.
 
 ### Review-gate App, for the record
 
