@@ -216,8 +216,10 @@ Current gates:
   repeated-navigation, copy-coverage, contrast-registry, local-destination,
   stale-comment, and register-truth findings. Commit `f069297` centralizes the
   destination initializer, corrects the canonical test census, and closes the
-  final code-quality findings. Exact-source staged review and the manual smoke
-  remain pending before push and merge.
+  navigation-helper findings. Commit `b9e88fb` removes the unused initializer
+  callback surface and corrects the final census and audit-schedule wording.
+  Exact-source staged review and the manual smoke remain pending before push
+  and merge.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:
