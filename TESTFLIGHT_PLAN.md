@@ -7,16 +7,22 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-07-29
-- Baseline: `main` at `63a4f0f` (merged GitHub PR #21)
-- Active work: `TF-00`
-- Next ready work: none (`TF-01` follows merged `TF-00`)
-- Open pull request: GitHub PR #22 (`chore/tf-00-execution-control`)
+- Updated: 2026-08-01
+- Baseline: `main` at `95936c0` (merged GitHub PR #30; reviewer diagnostics
+  and delivery fixes from GitHub PRs #27–#30 included)
+- Active work: `TF-01` (trusted hosted-review prerequisite first, then slice 1
+  and its stacked modernization slice)
+- Next ready work: none (`TF-02` follows completed `TF-01`)
+- Open pull requests, in required completion order: GitHub PR #26
+  (`codex/tf-01-hosted-review-gate`, published; owner-gated), GitHub PR #23
+  (`chore/tf-01-truth-a11y`, published), then GitHub PR #24
+  (`ios/modern-platform-showcase`, draft; stacked on PR #23)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
-  daily at 06:00 host-local time, targeting this persistent task
-- Owner action needed now: none
+  every 3 hours, targeting this persistent task
+- Owner action needed now: create and install the dedicated Regards review
+  GitHub App listed under `Owner gates`
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -34,8 +40,9 @@ Every fresh or scheduled agent run follows this order:
    new work, even when the checkout is on `main` or another branch. Safely
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
-   green and no blocker remains. If more than one exists, start nothing new;
-   finish the oldest first and restore the one-item invariant.
+   green and no blocker remains. Follow the dependency order in `Current
+   checkpoint`; the current order is PR #26, PR #23, then PR #24. Start no
+   additional work while this chain is open.
 5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
    requests carrying a `TF-##` marker, and take the first `READY` item whose
    dependencies are `DONE`.
@@ -58,9 +65,9 @@ The schedule is owner-managed Codex app state, not a repository workflow:
 It is active and targets the persistent TestFlight task. The self-contained
 prompt tells each run to start with this file, so a token or context reset does
 not erase execution state. If that local automation is removed or the workspace
-moves to another machine, recreate one daily heartbeat from this contract;
-do not add a GitHub Actions implementation that would require a hosted coding
-credential.
+moves to another machine, recreate one heartbeat at the owner's current cadence
+from this contract. Do not add a GitHub Actions implementation that would
+require a hosted coding credential.
 
 The recurring task may create branches, edit files, run tests, commit, push,
 open pull requests, address reviews, and merge a pull request after every
@@ -108,8 +115,8 @@ numbers.
 
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
-| TF-00 | ACTIVE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure |
-| TF-01 | BLOCKED | TF-00 | Truth and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; current-state prose and checks agree with the repository | PR18–PR19; R16, R19, R21–R22, R27–R34, R40, R42–R43 |
+| TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
+| TF-01 | ACTIVE | TF-00 | Truth and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; current-state prose and checks agree with the repository | PR18–PR19; R13 escape route, R16, R19, R21–R22, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
 | TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
@@ -132,11 +139,58 @@ numbers.
 an implementation problem. Promote the next item to `READY` when its dependency
 is merged.
 
+### TF-01 serial chain
+
+TF-01 has one merge-gate prerequisite followed by four reviewable slices. The
+approved order is fixed while the current pull requests remain open:
+
+1. GitHub PR #26 installs the trusted hosted-review workflow and shared,
+   regression-tested source-boundary guards. It retains the non-interactive
+   reviewer behavior proved by GitHub PRs #27–#30 and closes R32. Merge it only
+   after the dedicated App credentials exist, the remaining required checks
+   are green, and the local staged-review owner blocker is cleared.
+2. GitHub PR #23 completes the repository, documentation, and accessibility
+   truth slice. Its manual VoiceOver, Dynamic Type `accessibility5`, Reduce
+   Motion, and Increased Contrast smoke is recorded on the branch and in its
+   consolidated review comment. It closes the R13 escape route and R16, R27,
+   R28, R29, and R43.
+3. GitHub PR #24 is the owner-directed platform-modernization slice stacked on
+   PR #23. After #23 merges, retarget and rebase it onto `main`, publish it,
+   then rerun its full checks, staged review, and manual accessibility smoke.
+4. Finish the remaining PR19 CI and reproducibility scope: commit
+   `Package.resolved`, remove placeholders, extend root Markdown checks, add
+   the Domain coverage floor, remove the dead SwiftLint `function_body_length`
+   configuration and stale audit-stress comment, and reconcile merge-method
+   documentation.
+5. Finish mock and code hygiene: seed group, interaction, and occasion states;
+   use stable Upcoming row IDs; remove or wire dead assets and comments; prune
+   obsolete worktrees and merged branches after exact-target verification.
+
 ## Owner gates
 
-No owner action is required for `TF-00` through simulator-verifiable work.
-These actions cannot be completed from repository automation and will be
-requested when their owning gate becomes active:
+The current owner action for `TF-01` is one GitHub App setup checklist:
+
+1. Create a GitHub App owned by `consideratesoftware` named `Regards Review
+   Gate`. Disable webhooks. Grant repository permissions `Checks: Read and
+   write` and `Issues: Read and write`; grant nothing else.
+2. Install it only on `consideratesoftware/RegardsMobileApp`, generate one
+   private key, then configure the repository's `hosted-review` environment:
+   set variable `REGARDS_REVIEW_APP_CLIENT_ID` to the App's client ID and secret
+   `REGARDS_REVIEW_APP_PRIVATE_KEY` to the complete PEM private key. Delete the
+   downloaded key after GitHub confirms the secret.
+3. Tell Codex the setup is complete. Codex will verify the environment is
+   restricted to protected branches, exercise the App-authored `Regards staged
+   review` check on the open PR, bind that context to the App's ID in branch
+   protection, remove the spoofable GitHub Actions `review` requirement, and
+   delete the one-time `bootstrap_review` compatibility job while integrating
+   PR #23.
+
+After that checklist, PR #23 and PR #24 require no additional owner action.
+Their remaining work is repository automation, CI, staged review, stack
+retargeting, and the already-documented simulator accessibility smoke.
+
+The remaining owner actions cannot be completed from repository automation and
+will be requested when their owning gate becomes active:
 
 - `TF-08`: Apple Development signing access, App Store Connect role, a physical
   iPhone, a small contacts fixture, and installed target messaging apps for the
