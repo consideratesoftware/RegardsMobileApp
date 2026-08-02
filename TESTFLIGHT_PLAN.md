@@ -188,7 +188,7 @@ Current gates:
 
 ### PR #23 accessibility evidence
 
-- Current-source manual smoke: implementation commit `c3bdbf1` was built,
+- Current-source manual smoke: implementation commit `58bb935` was built,
   installed, launched, and inspected with Xcode 26.6 on the pinned iOS 26.5
   iPhone 17 Pro simulator. The final source changes after that commit are
   evidence-only documentation.
@@ -199,7 +199,7 @@ Current gates:
   Preview, and the standard labeled Back escape route.
 - Dynamic Type: the first `accessibility5` pass found truncated selector text,
   compressed nav and digest copy, clipped list metadata, and narrow Contact
-  Detail actions. Commit `c3bdbf1` makes those layouts stack at accessibility
+  Detail actions. Commit `58bb935` makes those layouts stack at accessibility
   sizes. The repeated pass showed complete selector labels, names, metadata,
   CTA copy, secondary actions, and detail rows across all three entry paths;
   the normal `large` text-size layout remained compact.
@@ -207,18 +207,18 @@ Current gates:
   documented reduced-motion and standard-transition paths.
 - Increased Contrast: on and off tested. Text, icons, segmented selection, and
   the inner-circle ring remained visible.
-- 2026-08-02 exact-head stress status: pending after integrating the current
-  helper fix with `main`. Two diagnostic sweeps each completed four of five
-  full accessibility suites: the first observed one dropped Overdue row tap;
-  the second observed two dropped repeated-Edit taps. The failures did not
-  repeat on the other 18 full runs, but the gate requires one clean five-run
-  sweep. The helper now avoids XCUI's transient `hittable` failure and gives
-  row and in-stack navigation two bounded retries, matching tab navigation.
-  Do not merge until `ios/scripts/audit-stress.sh 5` passes 5/5 on the
-  integrated final source and this entry records that result.
+- 2026-08-02 integrated exact-source stress evidence: at `5440b8f`,
+  `ios/scripts/audit-stress.sh 5` completed five consecutive full
+  accessibility-suite passes after rebasing onto the PR #23 head containing
+  `main` at `8c5e68f`. Each run executed 18 tests; all 90 test executions
+  passed. Source changes after `5440b8f` are evidence-only documentation.
+  Before the helper fix, two diagnostic sweeps each completed four of five
+  suites and exposed unrelated dropped taps. The final helper avoids XCUI's
+  transient `hittable` failure and gives row and in-stack navigation two
+  bounded retries, matching tab navigation.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
-- Historical regression evidence before the `c3bdbf1` smoke fixes: four
+- Historical regression evidence before the `58bb935` smoke fixes: four
   earlier five-run sweeps also passed,
   including the earlier `a454313` hosted-feedback run and the 2026-07-31
   acceptance run. Across those previously recorded sweeps, all 30 runs and
@@ -234,8 +234,8 @@ Current gates:
   plus corrections to state ownership, navigation waits, entry-path audit
   coverage, contrast documentation, and register truth. Commit `36f86e2`
   closes those source and documentation findings; the smoke then exposed the
-  accessibility-size layout defects fixed by `c3bdbf1`. Exact-source staged
-  review remains pending before merge.
+  accessibility-size layout defects fixed by `58bb935`. The integrated branch
+  is sent through exact-source staged review before merge.
 
 ### Review-gate App, for the record
 
