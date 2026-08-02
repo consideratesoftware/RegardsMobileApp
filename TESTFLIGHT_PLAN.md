@@ -8,7 +8,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 ## Current checkpoint
 
 - Updated: 2026-08-01
-- Baseline: `main` at `9545bca` (merged GitHub PR #22)
+- Baseline: `main` at `95936c0` (merged GitHub PR #30; reviewer diagnostics
+  and delivery fixes from GitHub PRs #27–#30 included)
 - Active work: `TF-01` (trusted hosted-review prerequisite first, then slice 1
   and its stacked modernization slice)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
@@ -19,7 +20,7 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
-  daily at 19:30 host-local time, targeting this persistent task
+  every 3 hours, targeting this persistent task
 - Owner action needed now: create and install the dedicated Regards review
   GitHub App listed under `Owner gates`
 
@@ -64,9 +65,9 @@ The schedule is owner-managed Codex app state, not a repository workflow:
 It is active and targets the persistent TestFlight task. The self-contained
 prompt tells each run to start with this file, so a token or context reset does
 not erase execution state. If that local automation is removed or the workspace
-moves to another machine, recreate one daily heartbeat from this contract;
-do not add a GitHub Actions implementation that would require a hosted coding
-credential.
+moves to another machine, recreate one heartbeat at the owner's current cadence
+from this contract. Do not add a GitHub Actions implementation that would
+require a hosted coding credential.
 
 The recurring task may create branches, edit files, run tests, commit, push,
 open pull requests, address reviews, and merge a pull request after every
@@ -144,9 +145,10 @@ TF-01 has one merge-gate prerequisite followed by four reviewable slices. The
 approved order is fixed while the current pull requests remain open:
 
 1. GitHub PR #26 installs the trusted hosted-review workflow and shared,
-   regression-tested source-boundary guards. It closes R32. Merge it only after
-   the dedicated App credentials exist, the remaining required checks are
-   green, and the local staged-review owner blocker is cleared.
+   regression-tested source-boundary guards. It retains the non-interactive
+   reviewer behavior proved by GitHub PRs #27–#30 and closes R32. Merge it only
+   after the dedicated App credentials exist, the remaining required checks
+   are green, and the local staged-review owner blocker is cleared.
 2. GitHub PR #23 completes the repository, documentation, and accessibility
    truth slice. Its manual VoiceOver, Dynamic Type `accessibility5`, Reduce
    Motion, and Increased Contrast smoke is recorded on the branch and in its

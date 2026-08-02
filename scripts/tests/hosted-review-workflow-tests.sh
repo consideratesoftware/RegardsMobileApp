@@ -42,6 +42,22 @@ open_check_text = open_check.to_s
 raise "dedicated check name missing" unless open_check_text.include?("Regards staged review")
 raise "head check must use the dedicated App token" unless open_check_text.include?("steps.review_app_token.outputs.token")
 
+reviewer_step = analyze.fetch("steps").find { |step| step["id"] == "reviewer" }
+raise "hosted reviewer step missing" unless reviewer_step
+reviewer_inputs = reviewer_step.fetch("with")
+reviewer_prompt = reviewer_inputs.fetch("prompt")
+reviewer_args = reviewer_inputs.fetch("claude_args")
+same_turn_directives = [
+  "This run is non-interactive",
+  "Wait for every Stage 1 agent in this same turn",
+  "Consolidate their results, and return the required JSON before stopping",
+  "nothing resumes this session"
+]
+same_turn_directives.each do |directive|
+  raise "reviewer same-turn directive missing: #{directive}" unless reviewer_prompt.include?(directive)
+end
+raise "review turn budget regressed" unless reviewer_args.include?("--max-turns 120")
+
 steps = publish.fetch("steps")
 token_step = steps.find { |step| step["id"] == "review_app_token" }
 raise "dedicated App token step missing" unless token_step
