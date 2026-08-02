@@ -1,8 +1,16 @@
 # Regards iOS — accessibility rules
 
 The app must be fully usable by someone who relies on VoiceOver, larger text,
-reduced motion, or high-contrast modes. This is a **merge-blocking** concern,
+reduced motion, or high-contrast modes. This is a **release-blocking** concern,
 not a polish-phase one.
+
+As of 2026-08-02 the automated audits run on merges to `main`, nightly, and on
+demand, not on pull requests (ARCHITECTURE.md §10 has the reasoning). On a pull
+request the gate is the `pr-accessibility` reviewer plus the manual VoiceOver
+smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
+`Audit stress` and require it green. Because a regression now surfaces on
+`main` rather than on the pull request that caused it, run
+`ios/scripts/audit-stress.sh` locally before any UI-touching push.
 
 Keep this file up to date — every new screen gets a line in the *screens
 audited* table at the bottom.
