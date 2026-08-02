@@ -104,11 +104,12 @@ screen-level VoiceOver smoke and automated audit coverage.
 
 ## Sensory-audit carve-outs
 
-The suite gates merges on the **structural** audit categories
-(`elementDetection`, `sufficientElementDescription`, `trait`). The **sensory**
-categories — `contrast`, `hitRegion`, `dynamicType`, `textClipped` — are not
-part of the gate. The residual findings after PR4's sweep fall into two
-buckets, both intentional:
+The enabled automated audit set uses the **structural** categories
+(`elementDetection`, `sufficientElementDescription`, `trait`) after merges,
+nightly, and before release. The **sensory** categories — `contrast`,
+`hitRegion`, `dynamicType`, `textClipped` — are not part of that release gate.
+The residual findings after PR4's sweep fall into two buckets, both
+intentional:
 
 ### Bucket 1 — fixed
 

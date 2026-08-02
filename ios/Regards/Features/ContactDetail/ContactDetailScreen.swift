@@ -19,17 +19,13 @@ public struct ContactDetailScreen: View {
 
     public init(contactId: UUID,
                 contacts: any ContactRepository,
-                interactionsRepo: any InteractionRepository,
-                onTapOpenChannel: @escaping () -> Void = {},
-                onTapMarkCaughtUp: @escaping () -> Void = {}) {
+                interactionsRepo: any InteractionRepository) {
         self.init(
             viewModel: ContactDetailViewModel(
                 contactId: contactId,
                 contacts: contacts,
                 interactionsRepo: interactionsRepo
-            ),
-            onTapOpenChannel: onTapOpenChannel,
-            onTapMarkCaughtUp: onTapMarkCaughtUp
+            )
         )
     }
 

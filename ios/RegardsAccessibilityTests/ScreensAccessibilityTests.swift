@@ -5,7 +5,7 @@ import XCTest
 /// `ios/docs/accessibility.md`.
 final class ScreensAccessibilityTests: XCTestCase {
 
-    /// Structural checks are merge-blocking. The sensory categories
+    /// Structural checks are the enabled automated audit set. The sensory categories
     /// (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) and their
     /// current carve-outs are documented in `ios/docs/accessibility.md`.
     static let structuralAuditCategories: XCUIAccessibilityAuditType = [
