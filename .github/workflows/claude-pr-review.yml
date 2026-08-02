@@ -271,8 +271,10 @@ jobs:
         with:
           client-id: ${{ vars.REGARDS_REVIEW_APP_CLIENT_ID }}
           private-key: ${{ secrets.REGARDS_REVIEW_APP_PRIVATE_KEY }}
+          # checks:write is the whole permission set now. The review rides on
+          # the check run's output, so nothing here posts a comment, and
+          # issues:write was dropped rather than left granted unused.
           permission-checks: write
-          permission-issues: write
 
       - name: Test trusted validators
         run: |
@@ -311,14 +313,11 @@ jobs:
             > "$RUNNER_TEMP/hosted-review.md"
           status=$?
           set -e
-          if [[ -s "$RUNNER_TEMP/hosted-review.md" ]]; then
-            jq -n --rawfile body "$RUNNER_TEMP/hosted-review.md" \
-              '{body: $body}' > "$RUNNER_TEMP/hosted-review-comment.json"
-            gh api --method POST \
-              "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
-              --input "$RUNNER_TEMP/hosted-review-comment.json" \
-              >/dev/null
-          fi
+          # The rendered review is delivered as the check run's output by the
+          # next step, which always runs. Posting it as a pull-request comment
+          # would need pull_requests:write, and a token that can comment on a
+          # pull request can also submit and approve reviews on it -- exactly
+          # what this job must never be able to do.
           exit "$status"
 
       - name: Complete head review check
@@ -329,11 +328,38 @@ jobs:
           GH_TOKEN: ${{ steps.review_app_token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
+          # The review itself rides on the check run. GitHub caps output.text
+          # at 65535 characters, which is why the analysis schema caps the
+          # rendered review at 65,000 bytes; truncate anyway rather than let a
+          # long review fail the PATCH and lose the whole verdict.
+          review="$RUNNER_TEMP/hosted-review.md"
+          if [[ -s "$review" ]]; then
+            summary="$(grep -m1 '^VERDICT:' "$review" || echo 'Staged review completed.')"
+            text="$(head -c 65000 "$review")"
+          else
+            summary='No verified review artifact was produced. See the run log.'
+            text=''
+          fi
+
+          jq -n \
+            --arg conclusion "$CONCLUSION" \
+            --arg completed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg summary "$summary" \
+            --arg text "$text" \
+            '{
+              status: "completed",
+              conclusion: $conclusion,
+              completed_at: $completed_at,
+              output: {
+                title: "Regards staged review",
+                summary: $summary,
+                text: $text
+              }
+            }' > "$RUNNER_TEMP/check-completion.json"
+
           gh api --method PATCH \
             "repos/$REPOSITORY/check-runs/$CHECK_ID" \
-            -f status=completed \
-            -f conclusion="$CONCLUSION" \
-            -f completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --input "$RUNNER_TEMP/check-completion.json" \
             >/dev/null
 
   bootstrap_review:

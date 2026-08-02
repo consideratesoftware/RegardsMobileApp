@@ -68,8 +68,7 @@ raise "App client ID must come from environment configuration" unless token_inpu
 raise "App key must come from the protected environment" unless token_inputs.fetch("private-key") == "${{ secrets.REGARDS_REVIEW_APP_PRIVATE_KEY }}"
 permission_keys = token_inputs.keys.grep(/^permission-/).sort
 permissions_are_narrow = token_inputs.fetch("permission-checks") == "write" &&
-  token_inputs.fetch("permission-issues") == "write" &&
-  permission_keys == %w[permission-checks permission-issues]
+  permission_keys == %w[permission-checks]
 raise "publisher App token permissions expanded" unless permissions_are_narrow
 
 publisher_text = publish.to_s
@@ -80,6 +79,18 @@ malicious_pull_request_call = 'gh api --method PATCH "repos/$REPOSITORY/pulls/$P
 raise "pull-request REST mutation regression fixture no longer matches" unless malicious_pull_request_call.match?(pull_request_api)
 raise "dedicated App token is not used" unless publisher_text.include?("steps.review_app_token.outputs.token")
 raise "publisher must complete the initial check" unless publisher_text.include?("needs.open_check.outputs.check_id")
+
+# The review is delivered as the check run's output, never as a pull-request
+# comment. Commenting on a pull request requires pull_requests:write, and a
+# token holding that can also submit and approve reviews on the same pull
+# request. Posting via the issue-comments endpoint is the shape that tempts
+# someone back into needing it -- issues:write does not authorize it on a pull
+# request, which is what the 403 on run 30736565965 was.
+issue_comment_api = %r{repos/\$REPOSITORY/issues/\$PR_NUMBER/comments}
+raise "publisher must not post pull-request comments" if publisher_text.match?(issue_comment_api)
+malicious_comment_call = 'gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments"'
+raise "issue-comment regression fixture no longer matches" unless malicious_comment_call.match?(issue_comment_api)
+raise "publisher must deliver the review as check output" unless publisher_text.include?("hosted-review.md") && publisher_text.include?("output")
 RUBY
 
 echo "PASS: hosted review trust wiring is pinned"
