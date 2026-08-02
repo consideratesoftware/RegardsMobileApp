@@ -93,4 +93,28 @@ struct ContactAccessibilityTests {
         #expect(Self.makeContact().statusChip(context: overdue) == "9d overdue")
         #expect(Self.makeContact().statusChip(context: onTime) == nil)
     }
+
+    @Test("Contact Preview speaks email punctuation")
+    func contactPreviewEmailSpeech() {
+        let label = EditContactAccessibility.fieldLabel(
+            "personal",
+            value: "obiwan@jeditemple.org",
+            placeholder: "Add email",
+            speech: .email
+        )
+
+        #expect(label == "personal, obiwan at jeditemple dot org")
+    }
+
+    @Test("Contact Preview preserves non-email punctuation")
+    func contactPreviewVerbatimSpeech() {
+        let label = EditContactAccessibility.fieldLabel(
+            "Handle",
+            value: "@jedi.temple",
+            placeholder: "Add handle",
+            speech: .verbatim
+        )
+
+        #expect(label == "Handle, @jedi.temple")
+    }
 }
