@@ -1,19 +1,28 @@
 # Regards iOS — accessibility rules
 
 The app must be fully usable by someone who relies on VoiceOver, larger text,
-reduced motion, or high-contrast modes. This is a **merge-blocking** concern,
+reduced motion, or high-contrast modes. This is a **release-blocking** concern,
 not a polish-phase one.
 
-Keep this file up to date — every new screen gets a line in the *screens
-audited* table at the bottom.
+As of 2026-08-02 the automated audits run on merges to `main`, nightly, and on
+demand, not on pull requests (ARCHITECTURE.md §10 has the reasoning). On a pull
+request the gate is the `pr-accessibility` reviewer plus the manual VoiceOver
+smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
+`Audit stress` and require it green. Because a regression now surfaces on
+`main` rather than on the pull request that caused it, run
+`ios/scripts/audit-stress.sh` locally before any UI-touching push.
+
+Keep this file up to date. Every new screen gets a line in the *screens
+audited* table.
 
 ## Standing rules (every PR)
 
 1. **Automated audit.** `XCUIApplication.performAccessibilityAudit()` runs in
-   `RegardsAccessibilityTests` on every build. It catches missing labels,
-   contrast failures, too-small touch targets (<44×44pt), elements trapped from
-   VoiceOver focus, duplicate traits, and dynamic-type clipping. A failing
-   audit blocks merge.
+   `RegardsAccessibilityTests` after merges to `main`, nightly, and on demand
+   before release. It catches missing labels, contrast failures, too-small
+   touch targets (<44×44pt), elements trapped from VoiceOver focus, duplicate
+   traits, and dynamic-type clipping. A failing sweep blocks release and must
+   be repaired before the next TestFlight build.
 2. **VoiceOver label completeness.** Every interactive element has an
    `.accessibilityLabel`. Decorative glyphs (channel icons inside labeled rows)
    are `.accessibilityHidden(true)` so they don't pollute the rotor. Compound
@@ -207,7 +216,7 @@ The script builds once and runs the audit suite N times via
 `test-without-building`, exits non-zero on any failure. Total runtime
 on a recent Mac: ~3 min.
 
-CI also runs the audit 5x on every PR via
-`.github/workflows/audit-stress.yml`. That workflow is the merge gate
-for audit reliability; the local script is the cheap pre-push check
-that saves you from waiting for CI to surface a flake.
+CI runs the audit 5x after merges to `main`, nightly, and through
+`workflow_dispatch` in `.github/workflows/audit-stress.yml`. The local script
+is the required pre-push check for UI changes and saves you from waiting for CI
+to surface a flake.

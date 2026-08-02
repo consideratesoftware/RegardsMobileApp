@@ -76,8 +76,8 @@ Notable SwiftLint customizations in `.swiftlint.yml`: a custom rule (`button_req
 
 The app follows a strict layered design (ARCHITECTURE.md §5). Two of those layer boundaries are enforced by grep-based CI guards in `.github/workflows/guards.yml`:
 
-1. **Domain purity (§5).** `ios/Regards/Domain/**` must be pure Swift. No `import UIKit | SwiftUI | Contacts | EventKit | UserNotifications | GRDB | StoreKit`. Platform-dependent code belongs in `Regards/Platform/` or `Regards/Data/`.
-2. **No networking anywhere in app sources (§11).** The `privacy-grep` job scans `ios/Regards` for call sites of `URLSession*`, `NWConnection/Endpoint/Listener/PathMonitor/Interface/Path`, `URLRequest`, `URLProtocol`, `CF{Read,Write}Stream*`. The pattern matches `Foo.` or `Foo(` — not the bare token — so the same names may appear in user-facing copy (e.g. the Transparency screen) without tripping the gate. Narrow any new copy around these terms carefully.
+1. **Domain purity (§5).** `ios/Regards/Domain/**` must be pure Swift. No imports from `UIKit`, `SwiftUI`, `Contacts`, `EventKit`, `UserNotifications`, `GRDB`, `StoreKit`, or `Network`, including preconcurrency and selective imports. Platform-dependent code belongs in `Regards/Platform/` or `Regards/Data/`.
+2. **No networking anywhere in app sources (§11).** The shared privacy guard scans `ios/Regards` for call sites of `URLSession*`, `NWConnection/Endpoint/Listener/PathMonitor/Interface/Path`, `URLRequest`, `URLProtocol`, `NSURLConnection`, `CFSocket*`, and `CF{Read,Write}Stream*`. The pattern matches `Foo.` or `Foo(`, so the same names may appear as bare tokens in user-facing copy without tripping the gate. Narrow any new copy around these terms carefully.
 
 Layout inside `ios/Regards/`:
 
@@ -124,8 +124,15 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 - `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, markdown link check for `ios/docs/` (PR19 extends it to root markdown).
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
 - `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× per PR (flake detector).
+- `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from
+  default-branch policy, gives the model only sanitized regular-file review
+  data with a read-only token, then validates and publishes the typed verdict
+  from a separate trusted job.
 
-All four workflows gate merges; path filters were deliberately removed (PR #15) so required checks always report.
+Four workflows currently gate merges through required checks. The hosted
+review becomes the fifth gate after the pending dedicated GitHub App setup and
+branch-protection binding in `TESTFLIGHT_PLAN.md`. Path filters were deliberately
+removed (PR #15) so required checks always report.
 
 ## Durable execution
 
@@ -146,6 +153,11 @@ mechanical gates, then use the mirrored read-only agents:
 `REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
 checks. `.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
+The hosted review check must be bound to the dedicated Regards review GitHub
+App, not only to its context name. After that pending binding, the workflow runs
+only when a PR targets the default branch, so a stacked draft stays on its
+parent until the parent merges. Retarget and rebase the child, publish it, then
+push the rebased head to trigger the hosted review against the final base.
 
 ## Things to avoid
 

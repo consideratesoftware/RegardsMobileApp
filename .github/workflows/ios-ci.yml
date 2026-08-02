@@ -147,6 +147,12 @@ jobs:
 
   accessibility-audit:
     name: Accessibility audit
+    # Off the pull-request path, same as the 5x stress sweep. Both audits are
+    # macos-latest and bill at 10x Linux; between them they were the dominant
+    # cost of every push. This job still runs on merges to main; the deeper 5x
+    # sweep in audit-stress.yml adds nightly and on-demand runs. See that
+    # workflow's header for the numbers and the release-gate procedure.
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: macos-latest
     needs: build
     steps:
