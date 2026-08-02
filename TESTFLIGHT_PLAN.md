@@ -21,8 +21,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: create and install the dedicated Regards review
-  GitHub App listed under `Owner gates`
+- Owner action needed now: none; the review-gate App checklist under `Owner
+  gates` completed 2026-08-02
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -171,24 +171,29 @@ approved order is fixed while the current pull requests remain open:
 
 ## Owner gates
 
-The current owner action for `TF-01` is one GitHub App setup checklist:
+The `TF-01` GitHub App checklist is **DONE (2026-08-02)**. No owner action
+remains for it. What was done, for the record:
 
-1. Create a GitHub App owned by `consideratesoftware` named `Regards Review
-   Gate`. Disable webhooks. Grant repository permissions `Checks: Read and
-   write` and `Issues: Read and write`; grant nothing else.
-2. Install it only on `consideratesoftware/RegardsMobileApp`, generate one
-   private key, then configure the repository's `hosted-review` environment:
-   set variable `REGARDS_REVIEW_APP_CLIENT_ID` to the App's client ID and secret
-   `REGARDS_REVIEW_APP_PRIVATE_KEY` to the complete PEM private key. Delete the
-   downloaded key after GitHub confirms the secret.
-3. Tell Codex the setup is complete. Codex will verify the environment is
-   restricted to protected branches, exercise the App-authored `Regards staged
-   review` check on the open PR, bind that context to the App's ID in branch
-   protection, remove the spoofable GitHub Actions `review` requirement, and
-   delete the one-time `bootstrap_review` compatibility job while integrating
-   PR #23.
+1. App `regards-staged-review` (app id `4461672`) created under
+   `consideratesoftware`, webhooks disabled, installed on
+   `consideratesoftware/RegardsMobileApp` only.
+2. `hosted-review` environment holds variable `REGARDS_REVIEW_APP_CLIENT_ID`
+   and secret `REGARDS_REVIEW_APP_PRIVATE_KEY`; the environment is restricted
+   to protected branches.
+3. The App-authored `Regards staged review` check was exercised end to end
+   (run `30737416020`) and bound in branch protection pinned to app id
+   `4461672`, so a same-repository Actions job cannot satisfy it. The spoofable
+   Actions `review` requirement was removed at the same time, along with the
+   `Accessibility audit` and `Accessibility audit stress (5x)` contexts, which
+   moved off the pull-request path the same day.
 
-After that checklist, PR #23 and PR #24 require no additional owner action.
+The App's granted permissions are `Checks: Read and write` and
+`Issues: Read and write`; the workflow requests only `checks: write`, because
+the review is published as the check run's output rather than a comment.
+Commenting on a pull request would require `pull_requests: write`, and a token
+holding that could also approve the pull request it gates.
+
+PR #23 and PR #24 require no additional owner action.
 Their remaining work is repository automation, CI, staged review, stack
 retargeting, and the already-documented simulator accessibility smoke.
 

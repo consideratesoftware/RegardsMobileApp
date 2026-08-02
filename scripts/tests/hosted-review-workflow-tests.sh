@@ -19,15 +19,20 @@ open_check = jobs.fetch("open_check")
 preflight = jobs.fetch("preflight")
 analyze = jobs.fetch("analyze")
 publish = jobs.fetch("publish")
-bootstrap_review = jobs.fetch("bootstrap_review")
+# bootstrap_review was a one-time compatibility job named `review` whose body
+# was an echo, kept only so the legacy Actions-authored required context still
+# resolved while the dedicated App check was being bound. Binding completed
+# 2026-08-02 and `review` was removed from branch protection, so the job is
+# gone. A required context satisfied by `echo` is the exact silent-green hole
+# this workflow exists to close; it must not come back.
+raise "the echo-only bootstrap review job must stay deleted" if jobs.key?("bootstrap_review")
+raise "workflow must not run on the PR-controlled pull_request event" if workflow.fetch(true).key?("pull_request")
 
 raise "preflight must wait for the pending head check" unless preflight.fetch("needs") == "open_check"
 raise "analysis must wait for trusted preflight" unless analyze.fetch("needs") == "preflight"
 raise "head check must use the protected environment" unless open_check.fetch("environment") == "hosted-review"
 raise "publisher must use the protected environment" unless publish.fetch("environment") == "hosted-review"
 raise "publisher token permissions expanded" unless publish.fetch("permissions") == {"contents" => "read"}
-raise "bootstrap check name drifted" unless bootstrap_review.fetch("name") == "review"
-raise "bootstrap check must be pull_request-only" unless bootstrap_review.fetch("if") == "${{ github.event_name == 'pull_request' }}"
 [open_check, preflight, analyze, publish].each do |job|
   raise "trusted job can run on a PR-controlled workflow" unless job.fetch("if").include?("github.event_name == 'pull_request_target'")
 end
