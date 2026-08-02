@@ -181,10 +181,12 @@ you already know the screen is rendered), never for *wait-until-true*.
 
 Rapid simulator relaunches can also leave duplicate tab-button elements in the
 automation hierarchy or drop a synthesized tap. Wait on the plain tab bar,
-resolve the currently hittable button, verify the destination with its plain
-screen identifier while the source screen disappears, and allow two bounded
-re-resolution retries. `navigateToTab` in `ScreensAccessibilityTests` is the
-canonical implementation.
+resolve the named button again for every attempt, and tap its live center
+coordinate. Do not poll `hittable`: XCUI can record a test failure while a
+transient element has no activation frame. Verify the destination with its
+plain screen identifier while the source screen disappears, and allow two
+bounded re-resolution retries. `navigateToTab` in
+`ScreensAccessibilityTests` is the canonical implementation.
 
 Apply the same pattern to pushed navigation: resolve the current trigger
 element for every attempt, tap its live center coordinate, and require the
