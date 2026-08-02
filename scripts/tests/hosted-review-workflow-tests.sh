@@ -91,6 +91,17 @@ raise "publisher must not post pull-request comments" if publisher_text.match?(i
 malicious_comment_call = 'gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments"'
 raise "issue-comment regression fixture no longer matches" unless malicious_comment_call.match?(issue_comment_api)
 raise "publisher must deliver the review as check output" unless publisher_text.include?("hosted-review.md") && publisher_text.include?("output")
+
+# The gate asserts that a review RAN, not that the reviewer agreed.
+# validate-hosted-review-artifact.sh exits 1 for a missing, malformed or
+# stale-head artifact (the review did not happen -> fail the check) and 2 for a
+# valid current-head review requesting changes (it did happen -> publish the
+# findings and pass). Conflating them means a reviewer's opinion blocks the
+# merge queue, and the author loses the ability to take a finding as a
+# fast-follow. Keep the two exit codes distinguished here.
+# publisher_text comes from Hash#to_s, so embedded quotes arrive escaped;
+# match the shape rather than a literal quoted string.
+raise "publisher must not fail the gate on a REQUEST_CHANGES verdict" unless publisher_text.match?(/\$status\S* -eq 2/)
 RUBY
 
 echo "PASS: hosted review trust wiring is pinned"

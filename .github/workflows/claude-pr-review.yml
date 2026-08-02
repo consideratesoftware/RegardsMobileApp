@@ -318,6 +318,19 @@ jobs:
           # would need pull_requests:write, and a token that can comment on a
           # pull request can also submit and approve reviews on it -- exactly
           # what this job must never be able to do.
+          #
+          # The validator separates two things this job used to conflate:
+          #   1 -> the artifact is missing, malformed, or not for this head.
+          #        The review did not happen. That is a real failure.
+          #   2 -> a valid, current-head review that requests changes. The
+          #        review DID happen and its findings are published below.
+          # Only the first is a gate failure. A reviewer disagreeing with a
+          # change is information for the author, not a broken pipeline, and
+          # the author decides what to do about it.
+          if [[ "$status" -eq 2 ]]; then
+            echo "::warning::The staged review requested changes. Findings are published on the check; the gate is not failed on the verdict."
+            status=0
+          fi
           exit "$status"
 
       - name: Complete head review check
@@ -334,10 +347,22 @@ jobs:
           # long review fail the PATCH and lose the whole verdict.
           review="$RUNNER_TEMP/hosted-review.md"
           if [[ -s "$review" ]]; then
-            summary="$(grep -m1 '^VERDICT:' "$review" || echo 'Staged review completed.')"
+            # The check passes whenever a valid review was produced, so the
+            # summary has to carry the verdict: a green check must never be
+            # mistaken for "no findings".
+            verdict="$(grep -m1 '^VERDICT:' "$review" | cut -d' ' -f2- || true)"
+            blockers="$(sed -n '/^### Blockers/,/^### /p' "$review" | grep -c '^- \[' || true)"
+            case "$verdict" in
+              REQUEST_CHANGES)
+                summary="Changes requested — $blockers blocker(s). The review ran and its findings are below; the gate does not block on the verdict." ;;
+              APPROVE)
+                summary="Approved — no blockers." ;;
+              *)
+                summary="Staged review completed." ;;
+            esac
             text="$(head -c 65000 "$review")"
           else
-            summary='No verified review artifact was produced. See the run log.'
+            summary='No verified review artifact was produced. The review did not run — see the run log.'
             text=''
           fi
 
