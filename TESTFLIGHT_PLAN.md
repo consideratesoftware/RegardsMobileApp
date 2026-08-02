@@ -152,7 +152,8 @@ slices. The order is fixed while the current pull requests remain open:
    truth slice. Close its hosted-review feedback, run the current-source manual
    VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
    Contrast smoke, then require the App-authored review before merge. It closes
-   the R13 escape route and R16, R27, R28, R29, and R43.
+   the R13 escape route and R16, R27, R28, and R43, and reconfirms the earlier
+   R29 closure.
 3. GitHub PR #24 is the owner-directed platform-modernization slice stacked on
    PR #23. After #23 merges, retarget and rebase it onto `main`, publish it,
    then rerun its full checks, staged review, and manual accessibility smoke.
@@ -201,16 +202,19 @@ Current gates:
   enabled and the documented crossfade when disabled.
 - Increased Contrast: on and off tested. Text, icons, selection states, and
   the inner-circle ring remained visible.
-- Current implementation stress evidence: `ios/scripts/audit-stress.sh 5`
-  completed five consecutive full accessibility-suite passes at `f069297` on
-  2026-08-02. Each run executed 18 tests, including Contact Detail → Edit
+- 2026-08-02 exact-head stress evidence: `ios/scripts/audit-stress.sh 5`
+  completed five consecutive full accessibility-suite passes on the final
+  review head containing this entry. Each run executed 18 tests, including
+  Contact Detail → Edit
   Contact → Back from Contacts, Overdue, and Upcoming, repeated Edit routing,
   a Contacts-tab switch away and back, and the read-only copy assertion. All
   90 test executions passed.
+- Prior implementation stress evidence: the same command completed five full
+  passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence: four earlier five-run sweeps also passed,
   including the earlier `a454313` hosted-feedback run and the 2026-07-31
-  acceptance run. Across the current and prior recorded sweeps, all 25 runs
-  and 435 test executions passed.
+  acceptance run. Across the current and prior recorded sweeps, all 30 runs
+  and 525 test executions passed.
 - Hosted-review follow-up: the `d5449e4` App-authored review requested changes.
   Implementation commit `a454313` closes its route-fallback, tab-preservation,
   repeated-navigation, copy-coverage, contrast-registry, local-destination,
@@ -218,8 +222,11 @@ Current gates:
   destination initializer, corrects the canonical test census, and closes the
   navigation-helper findings. Commit `b9e88fb` removes the unused initializer
   callback surface and corrects the final census and audit-schedule wording.
-  Exact-source staged review and the manual smoke remain pending before push
-  and merge.
+  The App-authored review of `be215a3` then requested the current-head smoke
+  plus corrections to state ownership, navigation waits, entry-path audit
+  coverage, contrast documentation, and register truth. The final review head
+  closes each source and documentation finding. Exact-source staged review and
+  the manual smoke remain pending before merge.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:

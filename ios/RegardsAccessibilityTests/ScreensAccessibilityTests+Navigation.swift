@@ -96,10 +96,8 @@ extension ScreensAccessibilityTests {
                 continue
             }
 
-            let button = app.tabBars.buttons.allElementsBoundByIndex.first {
-                $0.label == name && $0.isHittable
-            }
-            guard let button else {
+            let button = app.tabBars.buttons[name]
+            guard waitUntilHittable(button) else {
                 continue
             }
             tapLiveCoordinate(of: button)
@@ -131,7 +129,8 @@ extension ScreensAccessibilityTests {
                 return
             }
 
-            guard trigger.waitForExistence(timeout: 10), trigger.isHittable else {
+            guard trigger.waitForExistence(timeout: 10),
+                  waitUntilHittable(trigger) else {
                 continue
             }
             tapLiveCoordinate(of: trigger)
@@ -173,7 +172,8 @@ extension ScreensAccessibilityTests {
             let rows = app.descendants(matching: .any)
                 .matching(identifier: identifier)
                 .allElementsBoundByIndex
-            guard rows.indices.contains(index), rows[index].isHittable else {
+            guard rows.indices.contains(index),
+                  waitUntilHittable(rows[index]) else {
                 continue
             }
             tapLiveCoordinate(of: rows[index])
@@ -207,7 +207,8 @@ extension ScreensAccessibilityTests {
             }
 
             let liveTrigger = trigger()
-            guard liveTrigger.waitForExistence(timeout: 10), liveTrigger.isHittable else {
+            guard liveTrigger.waitForExistence(timeout: 10),
+                  waitUntilHittable(liveTrigger) else {
                 continue
             }
             tapLiveCoordinate(of: liveTrigger)
@@ -234,10 +235,10 @@ extension ScreensAccessibilityTests {
         navigate(
             from: "screen.edit-contact",
             to: "screen.contact-detail",
-            triggerDescription: "Back",
+            triggerDescription: "Contact back button",
             in: app
         ) {
-            app.navigationBars.buttons.element(boundBy: 0)
+            app.navigationBars.buttons["Contact"]
         }
         XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
     }
@@ -260,5 +261,17 @@ extension ScreensAccessibilityTests {
         element.coordinate(
             withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
         ).tap()
+    }
+
+    @MainActor
+    func waitUntilHittable(
+        _ element: XCUIElement,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"),
+            object: element
+        )
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }

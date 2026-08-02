@@ -5,14 +5,14 @@ public struct ContactDetailScreen: View {
         let contact: Contact
     }
 
-    let viewModel: ContactDetailViewModel
+    @State private var viewModel: ContactDetailViewModel
     private let onTapOpenChannel: () -> Void
     private let onTapMarkCaughtUp: () -> Void
 
     public init(viewModel: ContactDetailViewModel,
                 onTapOpenChannel: @escaping () -> Void = {},
                 onTapMarkCaughtUp: @escaping () -> Void = {}) {
-        self.viewModel = viewModel
+        self._viewModel = State(initialValue: viewModel)
         self.onTapOpenChannel = onTapOpenChannel
         self.onTapMarkCaughtUp = onTapMarkCaughtUp
     }
@@ -62,6 +62,8 @@ public struct ContactDetailScreen: View {
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("screen.contact-detail")
+        .navigationTitle("Contact")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: EditRoute.self) { route in
             EditContactScreen(contact: route.contact)
         }

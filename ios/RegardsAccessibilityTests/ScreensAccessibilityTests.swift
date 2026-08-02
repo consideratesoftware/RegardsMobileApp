@@ -165,7 +165,7 @@ final class ScreensAccessibilityTests: XCTestCase {
     }
 
     @MainActor
-    func testEditContactBackReturnsToOverdueContactDetail() {
+    func testEditContactBackReturnsToOverdueContactDetail() throws {
         let app = launchToOverdue()
         navigateToRow(
             identifier: "overdue.row",
@@ -173,11 +173,28 @@ final class ScreensAccessibilityTests: XCTestCase {
             sourceIdentifier: "screen.overdue",
             in: app
         )
-        assertEditRoundTrip(in: app)
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.edit-contact",
+            triggerDescription: "Edit",
+            in: app
+        ) {
+            app.navigationBars.buttons["Edit"]
+        }
+        assertReadOnlyBanner(in: app)
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+        navigate(
+            from: "screen.edit-contact",
+            to: "screen.contact-detail",
+            triggerDescription: "Contact back button",
+            in: app
+        ) {
+            app.navigationBars.buttons["Contact"]
+        }
     }
 
     @MainActor
-    func testEditContactBackReturnsToUpcomingContactDetail() {
+    func testEditContactBackReturnsToUpcomingContactDetail() throws {
         let app = launchToOverdue()
         navigateToTab(
             named: "Upcoming",
@@ -191,7 +208,24 @@ final class ScreensAccessibilityTests: XCTestCase {
             sourceIdentifier: "screen.upcoming",
             in: app
         )
-        assertEditRoundTrip(in: app)
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.edit-contact",
+            triggerDescription: "Edit",
+            in: app
+        ) {
+            app.navigationBars.buttons["Edit"]
+        }
+        assertReadOnlyBanner(in: app)
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+        navigate(
+            from: "screen.edit-contact",
+            to: "screen.contact-detail",
+            triggerDescription: "Contact back button",
+            in: app
+        ) {
+            app.navigationBars.buttons["Contact"]
+        }
     }
 
     /// The Contacts stack must preserve Edit Contact across a tab switch,
@@ -226,10 +260,10 @@ final class ScreensAccessibilityTests: XCTestCase {
         navigate(
             from: "screen.edit-contact",
             to: "screen.contact-detail",
-            triggerDescription: "Back",
+            triggerDescription: "Contact back button",
             in: app
         ) {
-            app.navigationBars.buttons.element(boundBy: 0)
+            app.navigationBars.buttons["Contact"]
         }
         assertEditRoundTrip(in: app)
     }

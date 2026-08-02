@@ -15,7 +15,7 @@ smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
 Keep this file up to date. Every new screen gets a line in the *screens
 audited* table.
 
-## Standing rules (every PR)
+## Standing rules (every UI change)
 
 1. **Automated audit.** `XCUIApplication.performAccessibilityAudit()` runs in
    `RegardsAccessibilityTests` after merges to `main`, nightly, and on demand
@@ -64,6 +64,7 @@ LaunchBackground). Ratios computed from the sRGB values in
 |---|---|---|---|---|---|
 | Ink | Background | ~13.5:1 | ~15.2:1 | 4.5:1 | ✅ |
 | Muted | Background | ~5.6:1 | ~5.8:1 | 4.5:1 | ✅ |
+| Accent Ink | Accent Soft | ~6.9:1 | ~6.6:1 | 4.5:1 | ✅ |
 | White | AccentColor | ~3.4:1 | ~3.1:1 | 3:1 (large/icon) | ✅ |
 
 PR2 adds `ColorContrastTests` so these ratios are asserted automatically; the
@@ -96,7 +97,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
 | Contact Detail (via Upcoming → row) | PR5 | Factory-built VM per push. |
-| Edit Contact (via Contacts → Contact Detail → Edit) | TF-01 | Structural audit coverage and standard Back escape route; the real form remains TF-09. |
+| Contact Preview (via Contacts → Contact Detail → Edit) | TF-01 / GitHub PR #23 | Structural audit coverage and standard Back escape route; the real form remains TF-09. |
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
 | Merge Duplicates | PR3 | Reached via Settings → Find duplicate contacts. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
@@ -119,7 +120,7 @@ intentional:
   `.tint`, Transparency hero claim card, Overdue channel pill, Contact
   Detail primary CTA, Merge Duplicates "Merge virtually" button, Reminder
   Windows active day pill, Onboarding "Allow contacts access" button,
-  and every in-card nav-link text / toolbar "Edit|Cancel|Save" label.
+  and every in-card nav-link text / toolbar "Edit" label.
 - **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right

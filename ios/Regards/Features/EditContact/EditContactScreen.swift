@@ -28,10 +28,12 @@ public struct EditContactScreen: View {
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
         .accessibilityIdentifier("screen.edit-contact")
+        .navigationTitle("Contact Preview")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var header: some View {
-        Text("Edit Contact")
+        Text("Contact Preview")
             .font(.headline)
             .foregroundStyle(RegardsDS.ink)
             .frame(maxWidth: .infinity)
