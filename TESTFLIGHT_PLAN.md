@@ -202,16 +202,14 @@ Current gates:
   documented reduced-motion and standard-transition paths.
 - Increased Contrast: on and off tested. Text, icons, segmented selection, and
   the inner-circle ring remained visible.
-- 2026-08-02 integrated exact-source stress evidence: the source tree now at
-  `3ae6564` is byte-for-byte identical to the exercised pre-merge tree at
-  `5440b8f`; `ios/scripts/audit-stress.sh 5` completed five consecutive full
-  accessibility-suite passes after rebasing onto the PR #23 head containing
-  `main` at `8c5e68f`. Each run executed 18 tests; all 90 test executions
-  passed. The later rebase moved the unchanged tree onto merged PR #23.
-  Before the helper fix, two diagnostic sweeps each completed four of five
-  suites and exposed unrelated dropped taps. The final helper avoids XCUI's
-  transient `hittable` failure and gives row and in-stack navigation two
-  bounded retries, matching tab navigation.
+- 2026-08-02 follow-up exact-source stress evidence: at `886d03e`,
+  `ios/scripts/audit-stress.sh 5` completed five consecutive full
+  accessibility-suite passes on the branch based on merged PR #23. Each run
+  executed 18 tests; all 90 test executions passed. The prior sweep exposed a
+  raw email address that the structural audit could not recognize as a
+  human-readable label; the contextual, speakable label fix then passed its
+  focused audit 5/5 before the clean full sweep. Source changes after
+  `886d03e` are evidence-only documentation.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
