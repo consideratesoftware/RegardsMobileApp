@@ -22,9 +22,10 @@ instructions or `ARCHITECTURE.md`, not in a provider-only workflow.
 ## Hosted review gate
 
 `.github/workflows/claude-pr-review.yml` runs the same staged contract and
-publishes its verdict through a dedicated GitHub App. The App setup and
-branch-protection binding are pending the owner action recorded in
-`TESTFLIGHT_PLAN.md`. The workflow uses `pull_request_target` only for PRs
+publishes its verdict through a dedicated GitHub App. That App
+(`regards-staged-review`, app id `4461672`) was created, installed, and bound
+in branch protection on 2026-08-02; `TESTFLIGHT_PLAN.md` records the completed
+checklist. The workflow uses `pull_request_target` only for PRs
 targeting the default branch. The default-branch policy and publisher stay at
 the workspace root. A trusted preparer converts the proposed head to regular
 files, rejects symlinks and submodules, neutralizes Claude/Codex/plugin policy

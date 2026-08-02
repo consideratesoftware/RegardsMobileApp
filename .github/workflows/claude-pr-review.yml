@@ -276,6 +276,7 @@ jobs:
         run: |
           scripts/tests/hosted-review-workflow-tests.sh
           scripts/tests/hosted-review-schema-tests.sh
+          scripts/tests/render-review-check-summary-tests.sh
           scripts/tests/source-boundary-guard-tests.sh
           scripts/tests/prepare-hosted-review-data-tests.sh
           scripts/tests/validate-hosted-project-spec-tests.sh
@@ -343,30 +344,16 @@ jobs:
           # long review fail the PATCH and lose the whole verdict.
           review="$RUNNER_TEMP/hosted-review.md"
           artifact="$RUNNER_TEMP/hosted-review.json"
+          # The check passes whenever a valid review was produced, so the
+          # summary has to carry the verdict: a green check must never be
+          # mistaken for "no findings". It is rendered by a script with
+          # fixture tests asserting its exact strings, because wording drift
+          # here quietly empties the gate of meaning.
           if [[ -s "$review" ]]; then
-            # The check passes whenever a valid review was produced, so the
-            # summary has to carry the verdict: a green check must never be
-            # mistaken for "no findings". Read the counts from the artifact the
-            # validator already accepted, not by re-parsing the rendered
-            # markdown -- a heading rename must not silently report zero.
-            summary="$(jq -r '
-              (.blockers | length) as $b
-              | (.should_fix | length) as $s
-              | (.nits | length) as $n
-              | if .verdict == "REQUEST_CHANGES" then
-                  "Changes requested: \($b) blocker\(if $b == 1 then "" else "s" end)"
-                  + ", \($s) should-fix, \($n) nit\(if $n == 1 then "" else "s" end)."
-                  + " The review ran; the gate does not block on the verdict."
-                elif .verdict == "APPROVE" then
-                  "Approved: no blockers"
-                  + ", \($s) should-fix, \($n) nit\(if $n == 1 then "" else "s" end)."
-                else
-                  "Unrecognized verdict \(.verdict | tostring); see the review below."
-                end
-            ' "$artifact")"
+            summary="$(scripts/render-review-check-summary.sh "$artifact")"
             text="$(head -c 65000 "$review")"
           else
-            summary='No verified review artifact was produced. The review did not run — see the run log.'
+            summary="$(scripts/render-review-check-summary.sh --missing)"
             text=''
           fi
 

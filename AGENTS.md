@@ -158,9 +158,12 @@ mechanical gates, then use the mirrored read-only agents:
 `REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
 checks. `.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
-The hosted review check must be bound to the dedicated Regards review GitHub
-App, not only to its context name. After that pending binding, the workflow runs
-only when a PR targets the default branch, so a stacked draft stays on its
+The hosted review check is bound to the dedicated Regards review GitHub App
+(app id `4461672`), not only to its context name, so a same-repository Actions
+job cannot satisfy it. A blocker still means `REQUEST_CHANGES`, but the check
+reports whether a valid review ran, not whether it approved; read the check
+output and clear or consciously defer each blocker before merging. The workflow
+runs only when a PR targets the default branch, so a stacked draft stays on its
 parent until the parent merges. Retarget and rebase the child, publish it, then
 push the rebased head to trigger the hosted review against the final base.
 
