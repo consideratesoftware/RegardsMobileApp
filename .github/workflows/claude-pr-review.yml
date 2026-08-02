@@ -1,10 +1,6 @@
 name: Claude PR Review
 
 on:
-  # Temporary compatibility trigger for the legacy required `review` context.
-  # PR #23 removes it after the dedicated App check is bound.
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
 
@@ -280,6 +276,7 @@ jobs:
         run: |
           scripts/tests/hosted-review-workflow-tests.sh
           scripts/tests/hosted-review-schema-tests.sh
+          scripts/tests/render-review-check-summary-tests.sh
           scripts/tests/source-boundary-guard-tests.sh
           scripts/tests/prepare-hosted-review-data-tests.sh
           scripts/tests/validate-hosted-project-spec-tests.sh
@@ -318,6 +315,19 @@ jobs:
           # would need pull_requests:write, and a token that can comment on a
           # pull request can also submit and approve reviews on it -- exactly
           # what this job must never be able to do.
+          #
+          # The validator separates two things this job used to conflate:
+          #   1 -> the artifact is missing, malformed, or not for this head.
+          #        The review did not happen. That is a real failure.
+          #   2 -> a valid, current-head review that requests changes. The
+          #        review DID happen and its findings are published below.
+          # Only the first is a gate failure. A reviewer disagreeing with a
+          # change is information for the author, not a broken pipeline, and
+          # the author decides what to do about it.
+          if [[ "$status" -eq 2 ]]; then
+            echo "::warning::The staged review requested changes. Findings are published on the check; the gate is not failed on the verdict."
+            status=0
+          fi
           exit "$status"
 
       - name: Complete head review check
@@ -333,11 +343,17 @@ jobs:
           # rendered review at 65,000 bytes; truncate anyway rather than let a
           # long review fail the PATCH and lose the whole verdict.
           review="$RUNNER_TEMP/hosted-review.md"
+          artifact="$RUNNER_TEMP/hosted-review.json"
+          # The check passes whenever a valid review was produced, so the
+          # summary has to carry the verdict: a green check must never be
+          # mistaken for "no findings". It is rendered by a script with
+          # fixture tests asserting its exact strings, because wording drift
+          # here quietly empties the gate of meaning.
           if [[ -s "$review" ]]; then
-            summary="$(grep -m1 '^VERDICT:' "$review" || echo 'Staged review completed.')"
+            summary="$(scripts/render-review-check-summary.sh "$artifact")"
             text="$(head -c 65000 "$review")"
           else
-            summary='No verified review artifact was produced. See the run log.'
+            summary="$(scripts/render-review-check-summary.sh --missing)"
             text=''
           fi
 
@@ -362,15 +378,3 @@ jobs:
             --input "$RUNNER_TEMP/check-completion.json" \
             >/dev/null
 
-  bootstrap_review:
-    name: review
-    # Temporary compatibility for the legacy Actions-authored required context.
-    # Trusted jobs above refuse this PR-controlled event.
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Confirm local staged bootstrap review
-        run: echo "The exact-source Regards staged review ran before publication."

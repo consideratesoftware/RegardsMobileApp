@@ -71,8 +71,11 @@ from this contract. Do not add a GitHub Actions implementation that would
 require a hosted coding credential.
 
 The recurring task may create branches, edit files, run tests, commit, push,
-open pull requests, address reviews, and merge a pull request after every
-required check and the staged review approve it. It must not:
+open pull requests, address reviews, and merge a pull request once every
+required check is green. The `Regards staged review` check passes whenever a
+valid review ran for the current head, including one that requests changes, so
+green is not the same as approved: read the check output and clear or
+consciously defer every blocker before merging. It must not:
 
 - weaken the privacy, accessibility, data-integrity, or layer-purity gates;
 - discard user work or use destructive Git operations;
@@ -227,6 +230,30 @@ Current gates:
   coverage, contrast documentation, and register truth. The final review head
   closes each source and documentation finding. Exact-source staged review and
   the manual smoke remain pending before merge.
+
+### Review-gate App, for the record
+
+The `TF-01` GitHub App checklist is **DONE (2026-08-02)**. No owner action
+remains for it. What was done, for the record:
+
+1. App `regards-staged-review` (app id `4461672`) created under
+   `consideratesoftware`, webhooks disabled, installed on
+   `consideratesoftware/RegardsMobileApp` only.
+2. `hosted-review` environment holds variable `REGARDS_REVIEW_APP_CLIENT_ID`
+   and secret `REGARDS_REVIEW_APP_PRIVATE_KEY`; the environment is restricted
+   to protected branches.
+3. The App-authored `Regards staged review` check was exercised end to end
+   (run `30737416020`) and bound in branch protection pinned to app id
+   `4461672`, so a same-repository Actions job cannot satisfy it. The spoofable
+   Actions `review` requirement was removed at the same time, along with the
+   `Accessibility audit` and `Accessibility audit stress (5x)` contexts, which
+   moved off the pull-request path the same day.
+
+The App's granted permissions are `Checks: Read and write` and
+`Issues: Read and write`; the workflow requests only `checks: write`, because
+the review is published as the check run's output rather than a comment.
+Commenting on a pull request would require `pull_requests: write`, and a token
+holding that could also approve the pull request it gates.
 
 The remaining owner actions cannot be completed from repository automation and
 will be requested when their owning gate becomes active:

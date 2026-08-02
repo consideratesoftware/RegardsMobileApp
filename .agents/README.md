@@ -22,9 +22,10 @@ instructions or `ARCHITECTURE.md`, not in a provider-only workflow.
 ## Hosted review gate
 
 `.github/workflows/claude-pr-review.yml` runs the same staged contract and
-publishes its verdict through a dedicated GitHub App. The App setup and
-branch-protection binding are pending the owner action recorded in
-`TESTFLIGHT_PLAN.md`. The workflow uses `pull_request_target` only for PRs
+publishes its verdict through a dedicated GitHub App. That App
+(`regards-staged-review`, app id `4461672`) was created, installed, and bound
+in branch protection on 2026-08-02; `TESTFLIGHT_PLAN.md` records the completed
+checklist. The workflow uses `pull_request_target` only for PRs
 targeting the default branch. The default-branch policy and publisher stay at
 the workspace root. A trusted preparer converts the proposed head to regular
 files, rejects symlinks and submodules, neutralizes Claude/Codex/plugin policy
@@ -36,8 +37,12 @@ GitHub, and returns a typed JSON artifact. A separate trusted job runs XcodeGen
 determinism, SwiftLint, and the privacy/Domain guards directly from
 default-branch workflow code. Analysis depends on that preflight. The publisher
 requires both jobs, validates the artifact against the event's head, base, PR,
-and run identity, posts it through the dedicated App bot, and fails on
-`REQUEST_CHANGES`. The publisher uses that App credential from the
+and run identity, and publishes it through the dedicated App bot. The check
+asserts that a valid review ran for the current head, not that the reviewer
+agreed: a missing, malformed or stale-head artifact fails it, while a
+`REQUEST_CHANGES` verdict publishes the findings and passes, with the verdict
+and blocker count in the check summary. Acting on a blocker is the author's
+call. The publisher uses that App credential from the
 `hosted-review` environment to create the head-bound `Regards staged review`
 check. Branch protection binds that context to the dedicated App's identity, so
 a same-repository PR cannot satisfy it with an identically named Actions job.
