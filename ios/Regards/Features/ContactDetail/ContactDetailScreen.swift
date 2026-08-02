@@ -280,13 +280,14 @@ public struct ContactDetailScreen: View {
 }
 
 private extension ContactDetailScreen {
+
     // MARK: - Helpers
 
-    private func detailRow(label: String,
-                           value: String,
-                           action: String? = nil,
-                           isAccent: Bool = false,
-                           isDanger: Bool = false) -> some View {
+    func detailRow(label: String,
+                   value: String,
+                   action: String? = nil,
+                   isAccent: Bool = false,
+                   isDanger: Bool = false) -> some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
@@ -306,10 +307,10 @@ private extension ContactDetailScreen {
         .padding(.vertical, 14)
     }
 
-    private func detailValue(label: String,
-                             value: String,
-                             isAccent: Bool,
-                             isDanger: Bool) -> some View {
+    func detailValue(label: String,
+                     value: String,
+                     isAccent: Bool,
+                     isDanger: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.caption2)
@@ -322,7 +323,7 @@ private extension ContactDetailScreen {
     }
 
     @ViewBuilder
-    private func stubAction(_ action: String?) -> some View {
+    func stubAction(_ action: String?) -> some View {
         // Stub label — Phase 1 wires each of these to a real editor. For
         // now we render muted so it doesn't look tap-affordable.
         if let action {
@@ -332,18 +333,18 @@ private extension ContactDetailScreen {
         }
     }
 
-    private func valueColor(isAccent: Bool, isDanger: Bool) -> Color {
+    func valueColor(isAccent: Bool, isDanger: Bool) -> Color {
         if isDanger { return RegardsDS.danger }
         if isAccent { return RegardsDS.accentInk }
         return RegardsDS.ink
     }
 
-    private func nextReminderLabel(contact: Contact) -> String {
+    func nextReminderLabel(contact: Contact) -> String {
         // TF-07 replaces this placeholder with the persisted next reminder (R11).
         "Today, 6:30 pm"
     }
 
-    private var statusValue: String {
+    var statusValue: String {
         let (days, overdue) = viewModel.overdueSummary
         return overdue ? "\(days) days overdue" : "on track"
     }

@@ -211,6 +211,7 @@ struct OverdueRow: View {
                 }
                 Spacer(minLength: 8)
             }
+            .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)

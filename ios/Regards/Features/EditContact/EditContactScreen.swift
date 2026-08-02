@@ -6,13 +6,17 @@ enum EditContactAccessibility {
         case email
     }
 
+    static func displayedValue(value: String, placeholder: String) -> String {
+        value.isEmpty ? placeholder : value
+    }
+
     static func fieldLabel(
         _ label: String,
-        value: String,
-        placeholder: String,
+        displayedValue: String,
         speech: ValueSpeech
     ) -> String {
-        let displayedValue = value.isEmpty ? placeholder : value
+        guard !displayedValue.isEmpty else { return label }
+
         let spokenValue = switch speech {
         case .verbatim:
             displayedValue
@@ -20,6 +24,8 @@ enum EditContactAccessibility {
             displayedValue
                 .replacingOccurrences(of: "@", with: " at ")
                 .replacingOccurrences(of: ".", with: " dot ")
+                .split(whereSeparator: { $0.isWhitespace })
+                .joined(separator: " ")
         }
         return "\(label), \(spokenValue)"
     }
@@ -196,13 +202,17 @@ public struct EditContactScreen: View {
                        placeholder: String = "",
                        touched: Bool = false,
                        speech: EditContactAccessibility.ValueSpeech = .verbatim) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
+        let displayedValue = EditContactAccessibility.displayedValue(
+            value: value,
+            placeholder: placeholder
+        )
+        return HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(label)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(RegardsDS.muted)
                 .frame(width: 84, alignment: .leading)
             HStack(spacing: 6) {
-                Text(value.isEmpty ? placeholder : value)
+                Text(displayedValue)
                     .font(.body)
                     .foregroundStyle(value.isEmpty ? RegardsDS.muted : RegardsDS.ink)
                 if touched {
@@ -219,8 +229,7 @@ public struct EditContactScreen: View {
         .accessibilityLabel(
             EditContactAccessibility.fieldLabel(
                 label,
-                value: value,
-                placeholder: placeholder,
+                displayedValue: displayedValue,
                 speech: speech
             )
         )

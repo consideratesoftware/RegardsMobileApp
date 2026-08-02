@@ -110,9 +110,13 @@ struct UpcomingRow: View {
                         VStack(alignment: .leading, spacing: 4) {
                             nameAndTag
                             occasion
-                            timeAndChannel
+                            HStack(spacing: 6) {
+                                time
+                                ChannelGlyph(channel: row.channel, size: 14)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     HStack(spacing: 12) {
                         Avatar(name: row.name, size: 40)
@@ -166,13 +170,6 @@ struct UpcomingRow: View {
             .font(.subheadline.weight(.medium))
             .foregroundStyle(RegardsDS.ink)
             .monospacedDigit()
-    }
-
-    private var timeAndChannel: some View {
-        HStack(spacing: 6) {
-            time
-            ChannelGlyph(channel: row.channel, size: 14)
-        }
     }
 
     private var accessibilityLabel: String {

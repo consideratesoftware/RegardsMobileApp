@@ -10,9 +10,10 @@ under a **Manual accessibility smoke** heading.
 2. Install the Debug build.
 3. On Simulator, open **Accessibility Inspector**, select the running Regards
    process, and use point inspection plus its narration controls to emulate
-   VoiceOver. Native VoiceOver is available only on a physical iOS device; on
-   one, enable it in Settings → Accessibility → VoiceOver or with the configured
-   Accessibility Shortcut.
+   VoiceOver. Simulator can expose a VoiceOver toggle through its Settings app,
+   but it is not reliable for gesture testing; use a physical device for native
+   VoiceOver validation. On device, enable it in Settings → Accessibility →
+   VoiceOver or with the configured Accessibility Shortcut.
 4. Simulator → **Features → Toggle Software Keyboard** (so you can type if
    prompted, otherwise leave off).
 

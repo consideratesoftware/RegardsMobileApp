@@ -50,7 +50,7 @@ extension ScreensAccessibilityTests {
             }
 
             let firstRow = contacts.descendants(matching: .button).firstMatch
-            guard firstRow.waitForExistence(timeout: 10) else {
+            guard waitUntilLiveAndHittable(firstRow, timeout: 10) else {
                 continue
             }
             tapLiveCoordinate(of: firstRow)
@@ -85,9 +85,9 @@ extension ScreensAccessibilityTests {
         // Rapid simulator relaunches can leave a stale tab-bar element in the
         // automation hierarchy. Resolve the current button for each attempt
         // and allow two bounded retries when synthesized taps are dropped.
-        // The screen waits remain plain queries; polling `hittable` can itself
-        // record an XCTest failure while a transient element has no activation
-        // frame, even when the next bounded attempt succeeds.
+        // The screen waits remain plain queries. The bounded hittability poll
+        // below returns false without recording an XCTest failure while a
+        // transient element has no activation frame.
         for _ in 0..<3 {
             if destination.exists, !source.exists {
                 return
@@ -99,7 +99,7 @@ extension ScreensAccessibilityTests {
             }
 
             let button = app.tabBars.buttons[name]
-            guard button.waitForExistence(timeout: 2) else {
+            guard waitUntilLiveAndHittable(button) else {
                 continue
             }
             tapLiveCoordinate(of: button)
@@ -120,7 +120,6 @@ extension ScreensAccessibilityTests {
     ) {
         let source = app.descendants(matching: .any)["screen.settings"]
         let destination = app.descendants(matching: .any)[screenIdentifier]
-        let trigger = app.descendants(matching: .any)[triggerIdentifier]
         XCTAssertTrue(
             source.waitForExistence(timeout: 10),
             "Settings should exist before opening \(screenIdentifier)."
@@ -131,7 +130,8 @@ extension ScreensAccessibilityTests {
                 return
             }
 
-            guard trigger.waitForExistence(timeout: 10) else {
+            let trigger = app.descendants(matching: .any)[triggerIdentifier]
+            guard waitUntilLiveAndHittable(trigger) else {
                 continue
             }
             tapLiveCoordinate(of: trigger)
@@ -173,7 +173,8 @@ extension ScreensAccessibilityTests {
             let rows = app.descendants(matching: .any)
                 .matching(identifier: identifier)
                 .allElementsBoundByIndex
-            guard rows.indices.contains(index), rows[index].exists else {
+            guard rows.indices.contains(index),
+                  waitUntilLiveAndHittable(rows[index]) else {
                 continue
             }
             tapLiveCoordinate(of: rows[index])
@@ -207,7 +208,7 @@ extension ScreensAccessibilityTests {
             }
 
             let liveTrigger = trigger()
-            guard liveTrigger.waitForExistence(timeout: 10) else {
+            guard waitUntilLiveAndHittable(liveTrigger) else {
                 continue
             }
             tapLiveCoordinate(of: liveTrigger)
@@ -260,6 +261,22 @@ extension ScreensAccessibilityTests {
         element.coordinate(
             withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
         ).tap()
+    }
+
+    @MainActor
+    func waitUntilLiveAndHittable(
+        _ element: XCUIElement,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists, element.isHittable {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        } while Date() < deadline
+
+        return element.exists && element.isHittable
     }
 
 }
