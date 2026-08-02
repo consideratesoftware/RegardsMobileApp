@@ -40,6 +40,15 @@ public struct AllContactsScreen: View {
         .accessibilityIdentifier("screen.contacts")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: UUID.self) { contactId in
+            ContactDetailScreen(
+                viewModel: ContactDetailViewModel(
+                    contactId: contactId,
+                    contacts: env.contacts,
+                    interactionsRepo: env.interactions
+                )
+            )
+        }
         .task {
             // Cache `now` alongside the fetched list so the "last X days ago"
             // strings stay consistent across re-renders — Date() inline per

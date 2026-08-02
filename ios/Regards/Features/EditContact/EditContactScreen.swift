@@ -68,6 +68,7 @@ public struct EditContactScreen: View {
             .font(.footnote)
             .foregroundStyle(RegardsDS.accentInk)
             .lineSpacing(2)
+            .accessibilityIdentifier("edit-contact.read-only-banner")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

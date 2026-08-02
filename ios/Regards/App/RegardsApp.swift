@@ -125,9 +125,6 @@ struct RegardsTabRoot: View {
 
             NavigationStack {
                 AllContactsScreen(env: env)
-                    .navigationDestination(for: UUID.self) { contactId in
-                        contactDetail(for: contactId)
-                    }
             }
             .tabItem { Label("Contacts", systemImage: "person.2") }
             .tag(Tab.contacts)

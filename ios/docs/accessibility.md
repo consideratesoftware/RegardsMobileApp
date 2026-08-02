@@ -186,6 +186,10 @@ disappears. `launchToContactDetailFromContacts`, `navigateFromSettings`,
 `navigateToRow`, and the consolidated `navigate` helper are the canonical
 implementations.
 
+The live-center tap is a synchronization workaround for dropped Simulator
+taps. It does not replace hit-region coverage: the sensory audit owns that
+check when its temporary carve-out is removed.
+
 This was the underlying race behind `testContactDetailPassesAudit`
 flaking on three consecutive main runs in May 2026. The current tests wait on
 the plain toolbar `Edit` button, which appears only after the contact finishes
