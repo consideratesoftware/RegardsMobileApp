@@ -130,6 +130,10 @@ intentional:
   Contact Detail actions and detail cards use stacked variants. At
   `accessibility5`, labels, names, metadata, and CTA copy wrap without clipping
   or mid-word truncation while the standard-size layouts remain compact.
+- **Contact Preview field semantics**: each read-only field exposes one
+  contextual label instead of separate key/value fragments. Email punctuation
+  is spoken as “at” and “dot” so the structural audit and VoiceOver receive a
+  human-readable label while the visible address stays unchanged.
 
 ### Bucket 2 — design-intent trade-offs the audit flags
 

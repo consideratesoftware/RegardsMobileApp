@@ -188,6 +188,24 @@ public struct EditContactScreen: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            accessibilityFieldLabel(label, value: value, placeholder: placeholder)
+        )
+    }
+
+    private func accessibilityFieldLabel(
+        _ label: String,
+        value: String,
+        placeholder: String
+    ) -> String {
+        let displayedValue = value.isEmpty ? placeholder : value
+        let spokenValue = displayedValue.contains("@")
+            ? displayedValue
+                .replacingOccurrences(of: "@", with: " at ")
+                .replacingOccurrences(of: ".", with: " dot ")
+            : displayedValue
+        return "\(label), \(spokenValue)"
     }
 
     private var firstName: String {
