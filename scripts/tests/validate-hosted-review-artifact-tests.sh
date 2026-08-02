@@ -62,7 +62,7 @@ request_changes="$(jq '
 ' <<< "$approval")"
 
 expect_artifact_status 'accepts bound approval' 0 "$approval"
-expect_artifact_status 'publishes and fails request changes' 2 "$request_changes"
+expect_artifact_status 'publishes request changes for the publisher to pass through' 2 "$request_changes"
 expect_artifact_status 'rejects malformed JSON' 1 '{'
 expect_artifact_status \
   'rejects wrong head identity' 1 \
@@ -133,7 +133,7 @@ grep -q '^VERDICT: REQUEST_CHANGES$' "$request_changes_file.out"
 grep -q 'unsafe token' "$request_changes_file.out"
 grep -q '^### Audit trail$' "$request_changes_file.out"
 rm -f "$request_changes_file" "$request_changes_file.out"
-echo 'PASS: renders request changes before failing'
+echo 'PASS: renders request changes and signals it with exit 2'
 
 output_file="$(mktemp)"
 printf '%s\n' "$approval" > "$output_file"
