@@ -13,6 +13,7 @@ jobs:
     # Skip drafts; review when a PR opens, updates, or leaves draft
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     permissions:
       contents: read
       pull-requests: write
@@ -24,6 +25,19 @@ jobs:
 
       - name: Test review artifact validator
         run: scripts/tests/validate-hosted-review-artifact-tests.sh
+
+      - name: Test mechanical gate waiter
+        run: scripts/tests/wait-for-mechanical-gates-tests.sh
+
+      # pr-review.md Stage 0: never dispatch agents against a red baseline. This
+      # job runs alongside ios-ci, lint and guards, so without this the reviewer
+      # reads them mid-flight and honestly writes "pending" into PRE-FLIGHT --
+      # which the artifact validator then rejects. Wait them out, stop on red.
+      - name: Wait for the mechanical gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: scripts/wait-for-mechanical-gates.sh "$PR_NUMBER"
 
       - name: Record review start
         run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/review-started-at"
@@ -43,9 +57,12 @@ jobs:
             `.claude/commands/pr-review.md`, with these CI adaptations:
 
             - Skip the Stage 0 mechanical gates (xcodegen determinism,
-              swiftlint, privacy greps) — they run in the ios-ci, lint, and
-              guards workflows on this PR. Instead, check their status with
-              `gh pr checks` and report it in the PRE-FLIGHT line.
+              swiftlint, privacy greps). They run in the ios-ci, lint and
+              guards workflows, and this job already blocked until every one of
+              them finished green — a red one would have stopped the run before
+              you started. So do not re-check them and do not report anything as
+              pending. Write the PRE-FLIGHT line exactly as:
+              `PRE-FLIGHT: determinism ✅ | swiftlint ✅ | guards ✅`
             - Read `ARCHITECTURE.md` §18 → §19 → §14 first, then the sections
               the diff touches. The dispatch table, merge rules, register
               hygiene (R-closure verification), and output format in
