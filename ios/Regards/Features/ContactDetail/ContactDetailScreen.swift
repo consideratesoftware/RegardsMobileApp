@@ -1,6 +1,8 @@
 import SwiftUI
 
 public struct ContactDetailScreen: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     private struct EditRoute: Hashable {
         let contact: Contact
     }
@@ -105,9 +107,12 @@ public struct ContactDetailScreen: View {
                 Text("Open \(contact.preferredChannel.displayName)")
                     .font(.headline)
                     .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minHeight: 54)
+            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 10 : 0)
             // `accentInk` so the white headline passes AA body contrast.
             .background(RegardsDS.accentInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
@@ -117,11 +122,24 @@ public struct ContactDetailScreen: View {
     }
 
     private var secondaryActions: some View {
-        HStack(spacing: 8) {
-            secondaryButton("Caught up", action: onTapMarkCaughtUp)
-            secondaryButton("Snooze 1 wk", action: {})
-            secondaryButton("Log other", action: {})
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 8) {
+                    secondaryButtons
+                }
+            } else {
+                HStack(spacing: 8) {
+                    secondaryButtons
+                }
+            }
         }
+    }
+
+    @ViewBuilder
+    private var secondaryButtons: some View {
+        secondaryButton("Caught up", action: onTapMarkCaughtUp)
+        secondaryButton("Snooze 1 wk", action: {})
+        secondaryButton("Log other", action: {})
     }
 
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -129,8 +147,11 @@ public struct ContactDetailScreen: View {
             Text(title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(RegardsDS.ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)
+                .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
                 .background(RegardsDS.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
         }
@@ -162,28 +183,46 @@ public struct ContactDetailScreen: View {
         VStack(spacing: 0) {
             SectionHeader("Preferred channel")
             RegardsCard {
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(RegardsDS.accentSoft)
-                            .frame(width: 36, height: 36)
-                        ChannelGlyph(channel: contact.preferredChannel, size: 18, color: RegardsDS.accentInk)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(contact.preferredChannel.displayName)
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(RegardsDS.ink)
-                        Text(contact.preferredChannelValue)
-                            .font(RegardsFont.mono(.footnote))
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        channelSummary(contact: contact)
+                        Text("Change")
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(RegardsDS.muted)
                     }
-                    Spacer()
-                    Text("Change")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(RegardsDS.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                } else {
+                    HStack(spacing: 12) {
+                        channelSummary(contact: contact)
+                        Spacer()
+                        Text("Change")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(RegardsDS.muted)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+            }
+        }
+    }
+
+    private func channelSummary(contact: Contact) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(RegardsDS.accentSoft)
+                    .frame(width: 36, height: 36)
+                ChannelGlyph(channel: contact.preferredChannel, size: 18, color: RegardsDS.accentInk)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(contact.preferredChannel.displayName)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(RegardsDS.ink)
+                Text(contact.preferredChannelValue)
+                    .font(RegardsFont.mono(.footnote))
+                    .foregroundStyle(RegardsDS.muted)
             }
         }
     }
@@ -238,7 +277,9 @@ public struct ContactDetailScreen: View {
             }
         }
     }
+}
 
+private extension ContactDetailScreen {
     // MARK: - Helpers
 
     private func detailRow(label: String,
@@ -246,27 +287,49 @@ public struct ContactDetailScreen: View {
                            action: String? = nil,
                            isAccent: Bool = false,
                            isDanger: Bool = false) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label.uppercased())
-                    .font(.caption2)
-                    .kerning(0.5)
-                    .foregroundStyle(RegardsDS.muted)
-                Text(value)
-                    .font(.body.weight(isAccent ? .semibold : .medium))
-                    .foregroundStyle(valueColor(isAccent: isAccent, isDanger: isDanger))
-            }
-            Spacer()
-            // Stub label — Phase 1 wires each of these to a real editor. For
-            // now we render muted so it doesn't look tap-affordable.
-            if let action {
-                Text(action)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(RegardsDS.muted)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
+                    stubAction(action)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(spacing: 12) {
+                    detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
+                    Spacer()
+                    stubAction(action)
+                }
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+    }
+
+    private func detailValue(label: String,
+                             value: String,
+                             isAccent: Bool,
+                             isDanger: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.caption2)
+                .kerning(0.5)
+                .foregroundStyle(RegardsDS.muted)
+            Text(value)
+                .font(.body.weight(isAccent ? .semibold : .medium))
+                .foregroundStyle(valueColor(isAccent: isAccent, isDanger: isDanger))
+        }
+    }
+
+    @ViewBuilder
+    private func stubAction(_ action: String?) -> some View {
+        // Stub label — Phase 1 wires each of these to a real editor. For
+        // now we render muted so it doesn't look tap-affordable.
+        if let action {
+            Text(action)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(RegardsDS.muted)
+        }
     }
 
     private func valueColor(isAccent: Bool, isDanger: Bool) -> Color {

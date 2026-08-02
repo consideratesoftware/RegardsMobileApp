@@ -5,6 +5,8 @@ import SwiftUI
 /// muted subtitle ("4 people"). Slightly simpler than SwiftUI's native
 /// `.navigationTitle(...)` styling so we can land the mock pixel-faithful.
 public struct RegardsNavBar: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     public let title: String
     public let subtitle: String?
     public let rightAction: (text: String, handler: (() -> Void)?)?
@@ -52,25 +54,43 @@ public struct RegardsNavBar: View {
             }
             .frame(height: 24)
 
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(title)
-                    .font(RegardsFont.largeTitle())
-                    .foregroundStyle(RegardsDS.ink)
-                    .accessibilityAddTraits(.isHeader)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.body)
-                        .foregroundStyle(RegardsDS.muted)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 2) {
+                    titleText
+                    subtitleText
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    titleText
+                    subtitleText
                 }
             }
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
     }
+
+    private var titleText: some View {
+        Text(title)
+            .font(RegardsFont.largeTitle())
+            .foregroundStyle(RegardsDS.ink)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private var subtitleText: some View {
+        if let subtitle {
+            Text(subtitle)
+                .font(.body)
+                .foregroundStyle(RegardsDS.muted)
+        }
+    }
 }
 
 /// Two-option segmented control used for the Overdue / Upcoming toggle.
 public struct RegardsSegmentedControl<Tab: Hashable>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     public struct Option: Identifiable {
         public let id: Tab
         public let label: String
@@ -92,49 +112,72 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
     }
 
     public var body: some View {
-        HStack(spacing: 2) {
-            ForEach(options) { opt in
-                Button {
-                    selection = opt.id
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(opt.label)
-                            .font(.subheadline.weight(selection == opt.id ? .semibold : .medium))
-                            .foregroundStyle(RegardsDS.ink)
-                        if let count = opt.count {
-                            Text("\(count)")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 1)
-                                .background(
-                                    Capsule().fill(
-                                        selection == opt.id
-                                            ? RegardsDS.accentSoft
-                                            : RegardsDS.hairSoft
-                                    )
-                                )
-                                .foregroundStyle(
-                                    selection == opt.id ? RegardsDS.accentInk : RegardsDS.muted
-                                )
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(selection == opt.id ? RegardsDS.surface : Color.clear)
-                            .shadow(color: selection == opt.id ? .black.opacity(0.06) : .clear,
-                                    radius: 1, y: 1)
-                    )
-                    .contentShape(Rectangle())
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 2) {
+                    optionButtons
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(opt.label)\(opt.count.map { ", \($0)" } ?? "")")
-                .accessibilityAddTraits(selection == opt.id ? .isSelected : [])
+            } else {
+                HStack(spacing: 2) {
+                    optionButtons
+                }
             }
         }
         .padding(3)
         .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .padding(.horizontal, 20)
+    }
+
+    @ViewBuilder
+    private var optionButtons: some View {
+        ForEach(options) { option in
+            Button {
+                selection = option.id
+            } label: {
+                HStack(spacing: 6) {
+                    optionLabel(option)
+                    optionCount(option)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(selection == option.id ? RegardsDS.surface : Color.clear)
+                        .shadow(color: selection == option.id ? .black.opacity(0.06) : .clear,
+                                radius: 1, y: 1)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(option.label)\(option.count.map { ", \($0)" } ?? "")")
+            .accessibilityAddTraits(selection == option.id ? .isSelected : [])
+        }
+    }
+
+    private func optionLabel(_ option: Option) -> some View {
+        Text(option.label)
+            .font(.subheadline.weight(selection == option.id ? .semibold : .medium))
+            .foregroundStyle(RegardsDS.ink)
+            .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private func optionCount(_ option: Option) -> some View {
+        if let count = option.count {
+            Text("\(count)")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(
+                    Capsule().fill(
+                        selection == option.id
+                            ? RegardsDS.accentSoft
+                            : RegardsDS.hairSoft
+                    )
+                )
+                .foregroundStyle(
+                    selection == option.id ? RegardsDS.accentInk : RegardsDS.muted
+                )
+        }
     }
 }

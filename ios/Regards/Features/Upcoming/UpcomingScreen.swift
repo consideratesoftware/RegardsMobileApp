@@ -96,35 +96,36 @@ public struct UpcomingScreen: View {
 }
 
 struct UpcomingRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let row: UpcomingRowState
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                Avatar(name: row.name, size: 40)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(row.name)
-                            .font(RegardsFont.rowTitle())
-                            .foregroundStyle(RegardsDS.ink)
-                        if row.kind == .birthday {
-                            RegardsTag("birthday", tone: .accent)
-                        } else if row.kind == .anniversary {
-                            RegardsTag("anniversary", tone: .accent)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    HStack(alignment: .top, spacing: 12) {
+                        Avatar(name: row.name, size: 40)
+                        VStack(alignment: .leading, spacing: 4) {
+                            nameAndTag
+                            occasion
+                            timeAndChannel
                         }
                     }
-                    Text(row.occasionText ?? row.cadenceText ?? "")
-                        .font(.footnote)
-                        .foregroundStyle(RegardsDS.muted)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(row.timeOfDayText)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(RegardsDS.ink)
-                        .monospacedDigit()
-                    ChannelGlyph(channel: row.channel, size: 14)
+                } else {
+                    HStack(spacing: 12) {
+                        Avatar(name: row.name, size: 40)
+                        VStack(alignment: .leading, spacing: 2) {
+                            nameAndTag
+                            occasion
+                        }
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 4) {
+                            time
+                            ChannelGlyph(channel: row.channel, size: 14)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -139,6 +140,39 @@ struct UpcomingRow: View {
         // specifically (vs. nav-bar actions or segmented-control
         // buttons that also live on this screen).
         .accessibilityIdentifier("upcoming.row")
+    }
+
+    private var nameAndTag: some View {
+        HStack(spacing: 6) {
+            Text(row.name)
+                .font(RegardsFont.rowTitle())
+                .foregroundStyle(RegardsDS.ink)
+            if row.kind == .birthday {
+                RegardsTag("birthday", tone: .accent)
+            } else if row.kind == .anniversary {
+                RegardsTag("anniversary", tone: .accent)
+            }
+        }
+    }
+
+    private var occasion: some View {
+        Text(row.occasionText ?? row.cadenceText ?? "")
+            .font(.footnote)
+            .foregroundStyle(RegardsDS.muted)
+    }
+
+    private var time: some View {
+        Text(row.timeOfDayText)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(RegardsDS.ink)
+            .monospacedDigit()
+    }
+
+    private var timeAndChannel: some View {
+        HStack(spacing: 6) {
+            time
+            ChannelGlyph(channel: row.channel, size: 14)
+        }
     }
 
     private var accessibilityLabel: String {
