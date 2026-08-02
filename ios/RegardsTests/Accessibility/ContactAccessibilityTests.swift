@@ -98,8 +98,7 @@ struct ContactAccessibilityTests {
     func contactPreviewEmailSpeech() {
         let label = EditContactAccessibility.fieldLabel(
             "personal",
-            value: "obiwan@jeditemple.org",
-            placeholder: "Add email",
+            displayedValue: "obiwan@jeditemple.org",
             speech: .email
         )
 
@@ -110,11 +109,49 @@ struct ContactAccessibilityTests {
     func contactPreviewVerbatimSpeech() {
         let label = EditContactAccessibility.fieldLabel(
             "Handle",
-            value: "@jedi.temple",
-            placeholder: "Add handle",
+            displayedValue: "@jedi.temple",
             speech: .verbatim
         )
 
         #expect(label == "Handle, @jedi.temple")
+    }
+
+    @Test("Contact Preview omits punctuation for an empty field")
+    func contactPreviewEmptyFieldSpeech() {
+        #expect(
+            EditContactAccessibility.displayedValue(
+                value: "",
+                placeholder: "Add phone"
+            ) == "Add phone"
+        )
+        let label = EditContactAccessibility.fieldLabel(
+            "mobile",
+            displayedValue: "",
+            speech: .verbatim
+        )
+
+        #expect(label == "mobile")
+    }
+
+    @Test("Contact Preview speaks multi-dot email punctuation")
+    func contactPreviewMultiDotEmailSpeech() {
+        let label = EditContactAccessibility.fieldLabel(
+            "work",
+            displayedValue: "a.b@sub.jeditemple.org",
+            speech: .email
+        )
+
+        #expect(label == "work, a dot b at sub dot jeditemple dot org")
+    }
+
+    @Test("Contact Preview preserves plus addressing and case")
+    func contactPreviewPlusAddressSpeech() {
+        let label = EditContactAccessibility.fieldLabel(
+            "work",
+            displayedValue: "Leia+ALDERAAN@JEDI.TEMPLE",
+            speech: .email
+        )
+
+        #expect(label == "work, Leia+ALDERAAN at JEDI dot TEMPLE")
     }
 }

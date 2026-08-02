@@ -156,8 +156,8 @@ slices. The order is fixed while the current pull requests remain open:
    accessibility and navigation-harness changes were pushed.
 3. Merge GitHub PR #37, the TF-01 accessibility follow-up carrying those
    exact-source changes, the completed manual smoke, and their review evidence.
-   This closes the remaining R13, R16, R27, R28, R29, and R43 acceptance
-   evidence before the stack advances.
+   This closes the remaining R13, R16, R27, R28, and R43 acceptance evidence
+   and confirms R29's earlier closure before the stack advances.
 4. GitHub PR #24 is the owner-directed platform-modernization slice. Only
    after the accessibility follow-up merges, retarget and rebase #24 onto the
    resulting `main`, publish it, then rerun its full checks, staged review, and
@@ -183,7 +183,7 @@ Current gates:
   retarget and rebase the child onto `main`. Rerun its checks, staged review,
   and manual accessibility smoke before publication or auto-merge.
 
-### PR #23 accessibility evidence
+### PR #37 accessibility evidence
 
 - Full manual smoke source `11cf095` was built, installed, launched, and
   inspected with Xcode 26.6 on the pinned iOS 26.5 iPhone 17 Pro simulator.
@@ -219,7 +219,8 @@ Current gates:
 - 2026-08-02 hosted-review refinement: commit `40e7d95` makes email fields opt
   into a typed punctuation-to-speech policy explicitly instead of inferring it
   from arbitrary field contents. Unit coverage proves both email conversion
-  and literal non-email `@`/`.` preservation; all 117 unit tests passed.
+  and literal non-email `@`/`.` preservation; all 120 unit tests passed after
+  the hosted review added empty-field, multi-dot, and plus-address coverage.
   SwiftLint passed with zero violations, the Upcoming-to-Contact-Preview
   regression passed 5/5, and the exact implementation was installed and
   re-inspected. Its email remained visible as `obiwan@jeditemple.org` and

@@ -550,7 +550,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-02):** the unit target has 117 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior. The accessibility target has 18 XCUI tests: 15 structural accessibility audits and 3 navigation-only regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-02):** the unit target has 120 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior. The accessibility target has 18 XCUI tests: 15 structural accessibility audits and 3 navigation-only regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 
@@ -689,7 +689,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 6 | Batched digest notification, not per-contact | 2026-04-15 | Per-contact nags get the app silenced. |
 | 7 | One-time $4.99 + tip jar, no subscriptions, no ads ever | 2026-04-15 | Local-only app; subscription would be dishonest. |
 | 8 | No free tier with contact caps; 7-day trial instead | 2026-04-15 | Caps feel punitive; trust the user with the full app. |
-| 9 | Android: no `INTERNET` permission; iOS: strict ATS defaults with no exceptions + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; verifiable-by-source on iOS. |
+| 9 | Android: no `INTERNET` permission; iOS: ATS-deny + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; verifiable-by-source on iOS. |
 | 10 | Source-available under PolyForm Noncommercial 1.0.0 | 2026-04-15 | ~95% of the credibility of MIT/Apache with protection against commercial cloning. |
 | 11 | Support via mailto:, GitHub Issues, manual diagnostics | 2026-04-15 | Backend-free; preserves zero-data-collection. |
 | 12 | Named the app **Regards** | 2026-04-15 | Clarity, warmth, searchability; shortlist rejections documented in v0.5. |
@@ -719,6 +719,10 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 36 | `SchedulingPass` actor is the sole writer of ScheduledReminder rows and OS notifications | 2026-07-01 | One idempotent choke point; UI is read-only over persisted reminders. |
 | 37 | `Package.resolved` is committed | 2026-07-01 | Reproducible builds are part of the privacy claim; floating deps contradict it. |
 | 38 | TestFlight execution uses stable `TF-##` IDs and readiness gates, not a fixed public date | 2026-07-29 | The 2026-08-31 anchor expired before the production loop existed. Durable Git/GitHub checkpoints survive agent context and capacity resets; beta throughput determines the public date. |
+
+**2026-08-02 amendment to decision #9:** “ATS-deny” means strict ATS defaults
+with every exception disabled; ATS is not claimed as a kernel-enforced denial.
+The no-network source guard remains the verifiable iOS enforcement.
 
 ## 17. Working rules for implementation agents
 

@@ -135,8 +135,25 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
                 selection = option.id
             } label: {
                 HStack(spacing: 6) {
-                    optionLabel(option)
-                    optionCount(option)
+                    Text(option.label)
+                        .font(.subheadline.weight(selection == option.id ? .semibold : .medium))
+                        .foregroundStyle(RegardsDS.ink)
+                    if let count = option.count {
+                        Text("\(count)")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(
+                                Capsule().fill(
+                                    selection == option.id
+                                        ? RegardsDS.accentSoft
+                                        : RegardsDS.hairSoft
+                                )
+                            )
+                            .foregroundStyle(
+                                selection == option.id ? RegardsDS.accentInk : RegardsDS.muted
+                            )
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)
@@ -154,30 +171,4 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
         }
     }
 
-    private func optionLabel(_ option: Option) -> some View {
-        Text(option.label)
-            .font(.subheadline.weight(selection == option.id ? .semibold : .medium))
-            .foregroundStyle(RegardsDS.ink)
-            .lineLimit(1)
-    }
-
-    @ViewBuilder
-    private func optionCount(_ option: Option) -> some View {
-        if let count = option.count {
-            Text("\(count)")
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 1)
-                .background(
-                    Capsule().fill(
-                        selection == option.id
-                            ? RegardsDS.accentSoft
-                            : RegardsDS.hairSoft
-                    )
-                )
-                .foregroundStyle(
-                    selection == option.id ? RegardsDS.accentInk : RegardsDS.muted
-                )
-        }
-    }
 }
