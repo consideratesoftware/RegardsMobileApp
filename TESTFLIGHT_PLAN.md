@@ -240,7 +240,9 @@ Current gates:
   reload in-progress choices. A DEBUG-only duplicate fixture and focused XCUI
   regression verify the visible phone remains in the VoiceOver label, change
   both selection and primary contact, switch tabs, return to the pushed
-  screen, and prove both choices survive.
+  screen, and prove both choices survive. Two isolated unit regressions prove
+  a repeated load preserves those choices without refetching and a failed
+  initial load remains retryable.
 
 ### PR #37 accessibility evidence
 
