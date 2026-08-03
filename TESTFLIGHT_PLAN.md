@@ -285,6 +285,15 @@ Current gates:
   Preview audits passed. The installed exact-source hierarchy exposed the
   unavailable actions without button traits. Only the final staged-review
   verdict remains before merge.
+- 2026-08-02 App-hosted review closure: implementation `4ab305b` removes the
+  last stale local-sweep requirement from the PR18 acceptance row; makes
+  navigation retries coordinate-only and bounded; derives phone/email field
+  placement from `ChannelCatalog`; covers every channel branch plus malformed
+  email speech; labels Change stubs unavailable; and registers Muted on Hair
+  Soft contrast. All 126 unit tests passed, as did the focused Overdue, Contact
+  Detail, Contact Preview, and Overdue → Preview → Back tests. No repeated
+  local sweep was run; scheduled post-merge/nightly/pre-release workflows own
+  that evidence. The new exact-head staged verdict remains before merge.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
