@@ -216,9 +216,21 @@ Current gates:
 - The first hosted semantic review found that overlapping initial-load and
   retry tasks could complete out of order. Overdue, Upcoming, and Contacts now
   generation-gate every completion so a stale failure cannot overwrite newer
-  loaded data. Four focused unit tests deterministically interleave requests
-  across all three ViewModels and verify that Contacts keeps existing content
-  visible during a refresh.
+  loaded data. Six focused unit tests deterministically interleave requests
+  across all three ViewModels and verify that every root keeps existing
+  content visible during a refresh. A seventh focused test covers the
+  case-insensitive Contacts search filter, including empty and no-match
+  queries.
+- The current branch also compiles and launches on the installed iOS 17.2
+  runtime. On 2026-08-03, an exact-source `xcodebuild` for the iPhone 15 Pro
+  destination succeeded; `simctl` installed the resulting app and launched
+  `com.consideratesoftware.regards` as process 42801. Visual inspection
+  confirmed the Overdue root and the legacy four-item Overdue, Upcoming,
+  Contacts, and Settings tab bar. Two attempted legacy XCUITest actions are
+  not counted as evidence: their runners were killed before test bootstrap,
+  with no app assertion executed. The direct build/install/launch result is
+  the durable fallback acceptance gate missing from the hosted review, not a
+  repeated broad audit sweep.
 
 ### PR #37 accessibility evidence
 
