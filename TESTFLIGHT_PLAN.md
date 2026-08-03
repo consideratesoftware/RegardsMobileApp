@@ -213,9 +213,8 @@ Current gates:
   executed 18 tests; all 90 test executions passed. The prior sweep exposed a
   raw email address that the structural audit could not recognize as a
   human-readable label; the contextual, speakable label fix then passed its
-  focused audit 5/5 before the clean full sweep. Changes after `886d03e` are
-  evidence-only documentation except for the scoped formatting refinement
-  recorded next.
+  focused audit 5/5 before the clean full sweep. Subsequent hosted-review
+  refinements and their replacement exact-source sweep are recorded next.
 - 2026-08-02 hosted-review refinement: commit `40e7d95` makes email fields opt
   into a typed punctuation-to-speech policy explicitly instead of inferring it
   from arbitrary field contents. Unit coverage proves both email conversion
@@ -226,6 +225,20 @@ Current gates:
   re-inspected. Its email remained visible as `obiwan@jeditemple.org` and
   exposed the single accessibility element “personal, obiwan at jeditemple dot
   org.”
+- 2026-08-02 final hosted-review closure: commit `bf3d24e` adds empty-field,
+  placeholder, multi-dot email, plus-address, and case-preservation coverage;
+  removes empty spoken-value punctuation; restores full-width accessibility
+  rows and 44-point contact targets; preserves wrapping selector labels; and
+  replaces stale-coordinate taps with a non-failing live/hittable poll. The
+  first replacement stress attempt passed two full sweeps before exposing a
+  third-sweep Edit activation race. Commit `75d6f9c` varies the three bounded
+  activation paths while re-resolving live elements and confirming source and
+  destination state after each attempt. The failing Edit regression then
+  passed a focused 5/5. A fresh `ios/scripts/audit-stress.sh 5` completed five
+  consecutive 18-test suites at `75d6f9c`; all 90 executions passed, including
+  the formerly flaky test in every sweep. SwiftLint, all 120 unit tests,
+  XcodeGen determinism, review-agent parity, source-boundary guards, YAML, and
+  diff checks also passed.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
