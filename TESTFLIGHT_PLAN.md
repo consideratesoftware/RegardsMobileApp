@@ -242,7 +242,9 @@ Current gates:
   both selection and primary contact, switch tabs, return to the pushed
   screen, and prove both choices survive. Two isolated unit regressions prove
   a repeated load preserves those choices without refetching and a failed
-  initial load remains retryable.
+  initial load remains retryable. Two more cover phone/email classification,
+  confidence-based default selection, and targeted selection/primary
+  mutations, completing the Merge Duplicates ViewModel suite recorded in R24.
 
 ### PR #37 accessibility evidence
 

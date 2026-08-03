@@ -49,6 +49,8 @@ private actor MergeDuplicatesTestContactRepository: ContactRepository {
 
 @MainActor
 struct MergeDuplicatesViewModelTests {
+    // MARK: - Fixtures
+
     private static let duplicateContacts = [
         Contact(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
@@ -65,6 +67,89 @@ struct MergeDuplicatesViewModelTests {
             preferredChannelValue: "+1 415 555 0198"
         ),
     ]
+
+    private static let classificationContacts = [
+        Contact(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000011")!,
+            systemContactRef: "merge-phone-a",
+            displayName: "Phone Alpha",
+            preferredChannel: .signal,
+            preferredChannelValue: "+14155550101"
+        ),
+        Contact(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000012")!,
+            systemContactRef: "merge-phone-b",
+            displayName: "Phone Beta",
+            preferredChannel: .phoneCall,
+            preferredChannelValue: "+1 415 555 0101"
+        ),
+        Contact(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000013")!,
+            systemContactRef: "merge-email-a",
+            displayName: "Email Alpha",
+            preferredChannel: .email,
+            preferredChannelValue: "shared@example.com"
+        ),
+        Contact(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000014")!,
+            systemContactRef: "merge-email-b",
+            displayName: "Email Beta",
+            preferredChannel: .email,
+            preferredChannelValue: "SHARED@example.com"
+        ),
+    ]
+
+    // MARK: - Candidate mapping and mutations
+
+    @Test("Load classifies candidate values and defaults selection by confidence")
+    func loadClassifiesCandidatesAndDefaultsSelection() async {
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success(Self.classificationContacts),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+
+        let high = viewModel.candidates.first { $0.confidence == .high }
+        let medium = viewModel.candidates.first { $0.confidence == .medium }
+        #expect(viewModel.candidates.count == 2)
+        #expect(high?.isSelected == true)
+        #expect(high?.a.phone != nil)
+        #expect(high?.b.phone != nil)
+        #expect(high?.a.email == nil)
+        #expect(high?.b.email == nil)
+        #expect(medium?.isSelected == false)
+        #expect(medium?.a.email != nil)
+        #expect(medium?.b.email != nil)
+        #expect(medium?.a.phone == nil)
+        #expect(medium?.b.phone == nil)
+    }
+
+    @Test("Selection and primary mutations update only the matching candidate")
+    func candidateMutationsUpdateMatchingState() async {
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success(Self.classificationContacts),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+        guard let candidate = viewModel.candidates.first else {
+            Issue.record("Expected duplicate candidates")
+            return
+        }
+        let untouchedID = viewModel.candidates.last?.id
+        let untouchedBefore = viewModel.candidates.last
+
+        viewModel.toggleSelection(for: candidate.id)
+        viewModel.setPrimary(for: candidate.id, isA: false)
+
+        let updated = viewModel.candidates.first { $0.id == candidate.id }
+        #expect(updated?.isSelected == !candidate.isSelected)
+        #expect(updated?.primaryIsA == false)
+        #expect(viewModel.candidates.first { $0.id == untouchedID } == untouchedBefore)
+    }
+
+    // MARK: - Loading lifecycle
 
     @Test("A repeated load preserves in-progress duplicate choices")
     func repeatedLoadPreservesChoices() async {
