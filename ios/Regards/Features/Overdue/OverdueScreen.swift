@@ -9,18 +9,15 @@ public struct OverdueScreen: View {
     @State private var segment: RegardsSegment = .overdue
     private let upcomingCount: Int
     private let onTapContact: (UUID) -> Void
-    private let onTapChannel: (OverdueRowState) -> Void
     private let onSwitchToUpcoming: () -> Void
 
     public init(viewModel: OverdueViewModel,
                 upcomingCount: Int = 7,
                 onTapContact: @escaping (UUID) -> Void = { _ in },
-                onTapChannel: @escaping (OverdueRowState) -> Void = { _ in },
                 onSwitchToUpcoming: @escaping () -> Void = {}) {
         self.viewModel = viewModel
         self.upcomingCount = upcomingCount
         self.onTapContact = onTapContact
-        self.onTapChannel = onTapChannel
         self.onSwitchToUpcoming = onSwitchToUpcoming
     }
 
@@ -145,8 +142,7 @@ public struct OverdueScreen: View {
                 OverdueRow(
                     row: row,
                     isInnerCircle: innerCircle,
-                    onTapContact: { onTapContact(row.contactId) },
-                    onTapChannel: { onTapChannel(row) }
+                    onTapContact: { onTapContact(row.contactId) }
                 )
                 if idx < rows.count - 1 {
                     Hair(inset: 72)
@@ -162,7 +158,6 @@ struct OverdueRow: View {
     let row: OverdueRowState
     let isInnerCircle: Bool
     let onTapContact: () -> Void
-    let onTapChannel: () -> Void
 
     var body: some View {
         AccessibilityAdaptiveLayout {
@@ -235,23 +230,18 @@ struct OverdueRow: View {
     }
 
     private var channelPill: some View {
-        Button(action: onTapChannel) {
-            HStack(spacing: 5) {
-                ChannelGlyph(channel: row.channel, size: 13, color: .white)
-                Text(row.channelLabel)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-            // `accentInk` bg for white body text — passes AA body contrast.
-            // Lighter `accent` on "WhatsApp" at `.footnote.weight(.semibold)`
-            // measures ~3.7:1 (small text, fails AA body).
-            .background(Capsule().fill(RegardsDS.accentInk))
+        HStack(spacing: 5) {
+            ChannelGlyph(channel: row.channel, size: 13, color: RegardsDS.muted)
+            Text(row.channelLabel)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(RegardsDS.muted)
+                .lineLimit(1)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open \(row.channelLabel)")
-        .accessibilityHint("Opens \(row.channelLabel) with \(row.name).")
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
+        .background(Capsule().fill(RegardsDS.hairSoft))
+        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.channelLabel), unavailable")
     }
 }

@@ -5,15 +5,9 @@ public struct ContactDetailScreen: View {
 
     @State private var viewModel: ContactDetailViewModel
     @State private var previewContact: Contact?
-    private let onTapOpenChannel: () -> Void
-    private let onTapMarkCaughtUp: () -> Void
 
-    public init(viewModel: ContactDetailViewModel,
-                onTapOpenChannel: @escaping () -> Void = {},
-                onTapMarkCaughtUp: @escaping () -> Void = {}) {
+    public init(viewModel: ContactDetailViewModel) {
         self._viewModel = State(initialValue: viewModel)
-        self.onTapOpenChannel = onTapOpenChannel
-        self.onTapMarkCaughtUp = onTapMarkCaughtUp
     }
 
     public init(contactId: UUID,
@@ -101,24 +95,21 @@ public struct ContactDetailScreen: View {
     }
 
     private func primaryCTA(contact: Contact) -> some View {
-        Button(action: onTapOpenChannel) {
-            HStack(spacing: 10) {
-                ChannelGlyph(channel: contact.preferredChannel, size: 20, color: .white)
-                Text("Open \(contact.preferredChannel.displayName)")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 54)
-            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 10 : 0)
-            // `accentInk` so the white headline passes AA body contrast.
-            .background(RegardsDS.accentInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        HStack(spacing: 10) {
+            ChannelGlyph(channel: contact.preferredChannel, size: 20, color: RegardsDS.muted)
+            Text("Open \(contact.preferredChannel.displayName)")
+                .font(.headline)
+                .foregroundStyle(RegardsDS.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open \(contact.preferredChannel.displayName) with \(contact.displayName)")
-        .accessibilityHint("Opens in \(contact.preferredChannel.displayName) — no message prefill.")
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 54)
+        .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 10 : 0)
+        .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(RegardsDS.hair, lineWidth: 0.5))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Open \(contact.preferredChannel.displayName), unavailable")
     }
 
     private var secondaryActions: some View {
@@ -135,25 +126,9 @@ public struct ContactDetailScreen: View {
 
     @ViewBuilder
     private var secondaryItems: some View {
-        secondaryButton("Caught up", action: onTapMarkCaughtUp)
+        secondaryStub("Caught up")
         secondaryStub("Snooze 1 wk")
         secondaryStub("Log other")
-    }
-
-    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(RegardsDS.ink)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
-                .background(RegardsDS.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
-        }
-        .buttonStyle(.plain)
     }
 
     private func secondaryStub(_ title: String) -> some View {
@@ -242,7 +217,7 @@ public struct ContactDetailScreen: View {
             ContactValueAccessibility.label(
                 contact.preferredChannel.displayName,
                 displayedValue: contact.preferredChannelValue,
-                speech: contact.preferredChannel == .email ? .email : .verbatim,
+                channel: contact.preferredChannel,
                 annotation: "preferred"
             )
         )
