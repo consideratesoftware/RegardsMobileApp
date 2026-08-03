@@ -174,6 +174,10 @@ slices. The order is fixed while the current pull requests remain open:
    XCUI, mechanical gates, staged review, hosted review, and protected checks
    before merge. Broad repeated sweeps remain owned by post-merge, nightly,
    and pre-release automation.
+   The current-source focused XCUI rerun passed on the pinned simulator:
+   `testAccessibility5AdaptiveContentDoesNotOverlap`,
+   `testContactDetailFromUpcomingPassesAudit`, and
+   `testEditContactBackReturnsToUpcomingContactDetail`.
    Manual accessibility smoke completed 2026-08-03 on the pinned iOS 26.5
    iPhone 17 Pro using Accessibility Inspector emulation. Dynamic Type was
    tested at `accessibility5`; Reduce Motion and Increased Contrast were each
