@@ -19,6 +19,7 @@ final class RegardsNavigationState {
     var upcomingPath = NavigationPath()
     var contactsPath = NavigationPath()
     var settingsPath = NavigationPath()
+    var contactsSearchText = ""
 
     init(selected: RegardsTab = .overdue) {
         self.selected = selected
@@ -32,6 +33,7 @@ final class RegardsNavigationState {
             upcomingPath = NavigationPath()
         case .contacts:
             contactsPath = NavigationPath()
+            contactsSearchText = ""
         case .settings:
             settingsPath = NavigationPath()
         }
