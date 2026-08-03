@@ -35,7 +35,9 @@ Every fresh or scheduled agent run follows this order:
 
 1. Read `AGENTS.md`, then `ARCHITECTURE.md` §18 → §19 → §14, then this file.
 2. Run `git fetch --prune origin` and inspect the branch, worktree, open pull
-   requests, review comments, and required checks.
+   requests, review comments, required checks, and the latest completed
+   default-branch `Accessibility audit` and `Accessibility audit stress (5x)`
+   runs.
 3. If the worktree is dirty, resume it. Do not discard, stash, or overwrite it.
 4. If any open pull request carries a `TF-##` marker, resume it before taking
    new work, even when the checkout is on `main` or another branch. Safely
@@ -44,9 +46,11 @@ Every fresh or scheduled agent run follows this order:
    green and no blocker remains. Follow the dependency order in `Current
    checkpoint`; PR #23 is complete, and the current order is PR #37, then PR
    #24. Start no additional work while this chain is open.
-5. Otherwise, fast-forward `main`, reconcile this queue against merged pull
-   requests carrying a `TF-##` marker, and take the first `READY` item whose
-   dependencies are `DONE`.
+5. Otherwise, fast-forward `main` and reconcile this queue against merged pull
+   requests carrying a `TF-##` marker. If either scheduled accessibility run
+   failed on the current `main`, triage that failure before taking new feature
+   work and create the smallest repair PR when it is reproducible. Otherwise
+   take the first `READY` item whose dependencies are `DONE`.
 6. Work on exactly one queue item. Use a branch named after its stable ID, keep
    the diff reviewable, meet its architecture acceptance criteria, and include
    its `TF-##`, §14 scope alias, and R-items in the pull-request body.
@@ -255,9 +259,14 @@ Current gates:
   than inert buttons. All 124 unit tests and the new deterministic
   `accessibility5` XCUI non-overlap regression pass locally. The repository's
   `a8c9c01` baseline is intentional: it is the merge commit for GitHub PR #23,
-  not the older pre-PR23 / PR35 planning baseline. Full exact-source stress,
-  manual smoke, and staged-review evidence follow after the implementation is
-  committed.
+  not the older pre-PR23 / PR35 planning baseline. At exact implementation
+  commit `6c9b53a`, four consecutive full accessibility suites passed: 19 tests
+  per run, 76/76 executions total, including the formerly flaky Edit routes
+  and the new `accessibility5` regression. The fifth local run was intentionally
+  stopped in progress after the owner removed repeated local sweeps from the
+  PR policy; it did not report a test failure. Post-merge/nightly automation now
+  owns repeated 5× stress. The current-source manual smoke and staged-review
+  evidence remain before merge.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four

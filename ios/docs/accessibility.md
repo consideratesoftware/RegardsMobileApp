@@ -9,8 +9,10 @@ demand, not on pull requests (ARCHITECTURE.md §10 has the reasoning). On a pull
 request the gate is the `pr-accessibility` reviewer plus the manual VoiceOver
 smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
 `Audit stress` and require it green. Because a regression now surfaces on
-`main` rather than on the pull request that caused it, run
-`ios/scripts/audit-stress.sh` locally before any UI-touching push.
+`main` rather than on the pull request that caused it, UI pull requests run
+focused regressions for their affected flows. Repeated local sweeps are
+reserved for investigating a reproduced flake or an explicitly requested
+release candidate.
 
 Keep this file up to date. Every new screen gets a line in the *screens
 audited* table.
@@ -228,10 +230,12 @@ after the if-let-loaded body branch has rendered, which is when the audit can
 run cleanly. Do not reintroduce a predicate-backed wait helper or scope the
 load signal beneath the ScrollView identifier.
 
-### 3. Run the audit suite 5x locally before pushing UI changes
+### 3. Let scheduled automation own repeated stress
 
-Audit failures often have ~1-in-3 hit rates. One CI run is weak signal
-when timing is in play. Run locally before pushing:
+Run the focused `RegardsAccessibilityTests` cases affected by a UI or UI-test
+diff before pushing. Do not make a repeated full-suite sweep a routine PR gate.
+If a scheduled run reproduces a flake, or a release candidate explicitly needs
+local validation, use:
 
 ```bash
 ios/scripts/audit-stress.sh    # default 5 runs
@@ -243,6 +247,6 @@ The script builds once and runs the audit suite N times via
 on a recent Mac: ~3 min.
 
 CI runs the audit 5x after merges to `main`, nightly, and through
-`workflow_dispatch` in `.github/workflows/audit-stress.yml`. The local script
-is the required pre-push check for UI changes and saves you from waiting for CI
-to surface a flake.
+`workflow_dispatch` in `.github/workflows/audit-stress.yml`. Those runs own
+broad flake detection. A failure blocks the next release and becomes the next
+repair item; it does not justify rerunning the full suite during every PR.
