@@ -97,6 +97,20 @@ struct MergeDuplicatesViewModelTests {
             preferredChannel: .email,
             preferredChannelValue: "SHARED@example.com"
         ),
+        Contact(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000015")!,
+            systemContactRef: "merge-name-a",
+            displayName: "Name Only Match",
+            preferredChannel: .phoneCall,
+            preferredChannelValue: ""
+        ),
+        Contact(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000016")!,
+            systemContactRef: "merge-name-b",
+            displayName: "Name Only Match",
+            preferredChannel: .email,
+            preferredChannelValue: ""
+        ),
     ]
 
     // MARK: - Candidate mapping and mutations
@@ -112,7 +126,8 @@ struct MergeDuplicatesViewModelTests {
 
         let high = viewModel.candidates.first { $0.confidence == .high }
         let medium = viewModel.candidates.first { $0.confidence == .medium }
-        #expect(viewModel.candidates.count == 2)
+        let low = viewModel.candidates.first { $0.confidence == .low }
+        #expect(viewModel.candidates.count == 3)
         #expect(high?.isSelected == true)
         #expect(high?.a.phone != nil)
         #expect(high?.b.phone != nil)
@@ -123,6 +138,13 @@ struct MergeDuplicatesViewModelTests {
         #expect(medium?.b.email != nil)
         #expect(medium?.a.phone == nil)
         #expect(medium?.b.phone == nil)
+        #expect(low?.isSelected == false)
+        #expect(low?.a.displayName == "Name Only Match")
+        #expect(low?.b.displayName == "Name Only Match")
+        #expect(low?.a.phone == nil)
+        #expect(low?.b.phone == nil)
+        #expect(low?.a.email == nil)
+        #expect(low?.b.email == nil)
     }
 
     @Test("Selection and primary mutations update only the matching candidate")
