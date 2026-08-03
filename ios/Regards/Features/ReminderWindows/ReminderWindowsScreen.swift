@@ -61,8 +61,12 @@ public struct ReminderWindowsScreen: View {
             RegardsCard {
                 VStack(spacing: 0) {
                     HStack {
-                        ForEach(Self.dayLetters, id: \.0) { (day, letter) in
-                            dayPill(letter: letter, active: window.allowedDays.contains(day))
+                        ForEach(Self.dayLabels, id: \.day) { label in
+                            dayPill(
+                                letter: label.letter,
+                                name: label.name,
+                                active: window.allowedDays.contains(label.day)
+                            )
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -80,7 +84,7 @@ public struct ReminderWindowsScreen: View {
         }
     }
 
-    private func dayPill(letter: String, active: Bool) -> some View {
+    private func dayPill(letter: String, name: String, active: Bool) -> some View {
         ZStack {
             Circle()
                 // `accentInk` so the white day letter passes AA body contrast.
@@ -91,18 +95,7 @@ public struct ReminderWindowsScreen: View {
                 .foregroundStyle(active ? .white : RegardsDS.muted)
         }
         .frame(maxWidth: .infinity)
-        .accessibilityLabel(active ? "\(dayFullName(letter)) allowed" : "\(dayFullName(letter)) not allowed")
-    }
-
-    private func dayFullName(_ letter: String) -> String {
-        switch letter {
-        case "M": return "Monday"
-        case "T": return "Tuesday"
-        case "W": return "Wednesday"
-        case "F": return "Friday"
-        case "S": return "Saturday or Sunday"
-        default:  return letter
-        }
+        .accessibilityLabel(active ? "\(name) allowed" : "\(name) not allowed")
     }
 
     private var daysSummary: String {
@@ -274,8 +267,10 @@ public struct ReminderWindowsScreen: View {
         String(format: "%02d:%02d", time.hour, time.minute)
     }
 
-    static let dayLetters: [(DayOfWeekMask, String)] = [
-        (.sunday, "S"), (.monday, "M"), (.tuesday, "T"), (.wednesday, "W"),
-        (.thursday, "T"), (.friday, "F"), (.saturday, "S"),
+    static let dayLabels: [(day: DayOfWeekMask, letter: String, name: String)] = [
+        (.sunday, "S", "Sunday"), (.monday, "M", "Monday"),
+        (.tuesday, "T", "Tuesday"), (.wednesday, "W", "Wednesday"),
+        (.thursday, "T", "Thursday"), (.friday, "F", "Friday"),
+        (.saturday, "S", "Saturday"),
     ]
 }

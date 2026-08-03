@@ -66,6 +66,13 @@ final class ScreensAccessibilityTests: XCTestCase {
             to: "screen.reminder-windows",
             in: app
         )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["Thursday allowed"]
+                .waitForExistence(timeout: 5),
+            "The second T day pill must announce Thursday, not Tuesday."
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["Sunday not allowed"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["Saturday not allowed"].exists)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
