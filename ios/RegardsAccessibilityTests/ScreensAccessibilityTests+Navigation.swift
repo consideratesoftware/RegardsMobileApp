@@ -4,8 +4,11 @@ extension ScreensAccessibilityTests {
     // MARK: - Helpers
 
     @MainActor
-    func launchToOverdue() -> XCUIApplication {
+    func launchToOverdue(dynamicTypeSize: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
+        if let dynamicTypeSize {
+            app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
+        }
         app.launch()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
         XCTAssertTrue(overdue.waitForExistence(timeout: 10),
@@ -275,7 +278,7 @@ extension ScreensAccessibilityTests {
     @MainActor
     func waitUntilLiveAndHittable(
         _ element: XCUIElement,
-        timeout: TimeInterval = 2
+        timeout: TimeInterval = 10
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {

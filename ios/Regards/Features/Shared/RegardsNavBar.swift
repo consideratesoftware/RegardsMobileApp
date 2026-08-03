@@ -5,8 +5,6 @@ import SwiftUI
 /// muted subtitle ("4 people"). Slightly simpler than SwiftUI's native
 /// `.navigationTitle(...)` styling so we can land the mock pixel-faithful.
 public struct RegardsNavBar: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     public let title: String
     public let subtitle: String?
     public let rightAction: (text: String, handler: (() -> Void)?)?
@@ -24,43 +22,29 @@ public struct RegardsNavBar: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                if showWordmark {
-                    Wordmark(size: 17, color: RegardsDS.accentInk)
-                } else {
-                    Spacer().frame(height: 17)
+            AccessibilityAdaptiveLayout {
+                HStack {
+                    brand
+                    Spacer()
+                    rightActionContent
                 }
-                Spacer()
-                // Render the right action as a `Button` only when the caller
-                // actually provided a handler — otherwise show inert muted
-                // text so it doesn't look tap-affordable. (Stubs during mock
-                // parity were showing as accent-colored "buttons" with no
-                // effect, which is the worst of both worlds.)
-                if let rightAction {
-                    if let handler = rightAction.handler {
-                        Button {
-                            handler()
-                        } label: {
-                            Text(rightAction.text)
-                                .font(.body)
-                                .foregroundStyle(RegardsDS.accentInk)
-                        }
-                    } else {
-                        Text(rightAction.text)
-                            .font(.body)
-                            .foregroundStyle(RegardsDS.muted)
-                    }
+                .frame(minHeight: 24)
+            } accessibility: {
+                VStack(alignment: .leading, spacing: 6) {
+                    brand
+                    rightActionContent
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 24)
             }
-            .frame(height: 24)
 
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 2) {
+            AccessibilityAdaptiveLayout {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     titleText
                     subtitleText
                 }
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
+            } accessibility: {
+                VStack(alignment: .leading, spacing: 2) {
                     titleText
                     subtitleText
                 }
@@ -70,11 +54,44 @@ public struct RegardsNavBar: View {
         .padding(.top, 8)
     }
 
+    @ViewBuilder
+    private var brand: some View {
+        if showWordmark {
+            Wordmark(size: 17, color: RegardsDS.accentInk)
+        } else {
+            Spacer().frame(height: 17)
+        }
+    }
+
+    @ViewBuilder
+    private var rightActionContent: some View {
+        // Render the right action as a `Button` only when the caller actually
+        // provided a handler. Otherwise use inert muted text.
+        if let rightAction {
+            if let handler = rightAction.handler {
+                Button {
+                    handler()
+                } label: {
+                    Text(rightAction.text)
+                        .font(.body)
+                        .foregroundStyle(RegardsDS.accentInk)
+                }
+                .accessibilityIdentifier("regards-nav.right-action")
+            } else {
+                Text(rightAction.text)
+                    .font(.body)
+                    .foregroundStyle(RegardsDS.muted)
+                    .accessibilityIdentifier("regards-nav.right-action")
+            }
+        }
+    }
+
     private var titleText: some View {
         Text(title)
             .font(RegardsFont.largeTitle())
             .foregroundStyle(RegardsDS.ink)
             .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("regards-nav.title")
     }
 
     @ViewBuilder
@@ -83,14 +100,13 @@ public struct RegardsNavBar: View {
             Text(subtitle)
                 .font(.body)
                 .foregroundStyle(RegardsDS.muted)
+                .accessibilityIdentifier("regards-nav.subtitle")
         }
     }
 }
 
 /// Two-option segmented control used for the Overdue / Upcoming toggle.
 public struct RegardsSegmentedControl<Tab: Hashable>: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     public struct Option: Identifiable {
         public let id: Tab
         public let label: String
@@ -112,15 +128,13 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
     }
 
     public var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 2) {
-                    optionButtons
-                }
-            } else {
-                HStack(spacing: 2) {
-                    optionButtons
-                }
+        AccessibilityAdaptiveLayout {
+            HStack(spacing: 2) {
+                optionButtons
+            }
+        } accessibility: {
+            VStack(spacing: 2) {
+                optionButtons
             }
         }
         .padding(3)
@@ -170,5 +184,4 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
             .accessibilityAddTraits(selection == option.id ? .isSelected : [])
         }
     }
-
 }

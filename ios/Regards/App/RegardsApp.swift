@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 @main
@@ -9,6 +10,22 @@ struct RegardsApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(env: env)
+                .modifier(UITestDynamicTypeOverride())
+        }
+    }
+}
+
+/// Gives UI tests a deterministic way to exercise accessibility layouts
+/// without changing the shared Simulator's system settings.
+private struct UITestDynamicTypeOverride: ViewModifier {
+    private let requestedSize = ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DYNAMIC_TYPE"]
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if requestedSize == "accessibility5" {
+            content.environment(\.dynamicTypeSize, .accessibility5)
+        } else {
+            content
         }
     }
 }

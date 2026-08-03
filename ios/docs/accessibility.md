@@ -97,7 +97,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
 | Contact Detail (via Upcoming → row) | PR5 | Factory-built VM per push. |
-| Contact Preview (via Contacts → Contact Detail → Edit) | TF-01 / GitHub PR #23 | Structural audit coverage and standard Back escape route; the real form remains TF-09. |
+| Contact Preview (via Contacts → Contact Detail → Edit) | TF-01 / GitHub PRs #23, #37 | Structural audit coverage, speakable preferred-field state, and standard Back escape route; the real form remains TF-09. |
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
 | Merge Duplicates | PR3 | Reached via Settings → Find duplicate contacts. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
@@ -127,13 +127,20 @@ intentional:
   data.
 - **Dynamic Type on screen content**: at accessibility sizes the shared nav
   title and subtitle, Overdue / Upcoming selector, digest, list rows, and
-  Contact Detail actions and detail cards use stacked variants. At
+  Contact Detail actions, interactions, detail cards, and Contact Preview
+  fields use one shared adaptive-layout policy. At
   `accessibility5`, labels, names, metadata, and CTA copy wrap without clipping
-  or mid-word truncation while the standard-size layouts remain compact.
+  or mid-word truncation while the standard-size layouts remain compact. An
+  XCUI regression launches directly at `accessibility5` and verifies the nav
+  action, title, and subtitle occupy non-overlapping stacked frames.
 - **Contact Preview field semantics**: each read-only field exposes one
   contextual label instead of separate key/value fragments. Email punctuation
   is spoken as “at” and “dot” so the structural audit and VoiceOver receive a
-  human-readable label while the visible address stays unchanged.
+  human-readable label while the visible address stays unchanged. The
+  preferred-field dot is included as “preferred” in the composite label.
+- **Contact Detail channel semantics**: the preferred-channel summary is one
+  accessibility element and uses the same typed value-speech policy as Contact
+  Preview, including natural email punctuation.
 
 ### Bucket 2 — design-intent trade-offs the audit flags
 

@@ -1,8 +1,6 @@
 import SwiftUI
 
 public struct OverdueScreen: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let viewModel: OverdueViewModel
     // View-local segment state + callback — same pattern as
     // `UpcomingScreen`. The tab root owns which actual `TabView` tab is
@@ -101,18 +99,16 @@ public struct OverdueScreen: View {
     }
 
     private var digestRow: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 2) {
-                    digestLead
-                    digestTime
-                }
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    digestLead
-                    digestTime
-                    Spacer(minLength: 0)
-                }
+        AccessibilityAdaptiveLayout {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                digestLead
+                digestTime
+                Spacer(minLength: 0)
+            }
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 2) {
+                digestLead
+                digestTime
             }
         }
     }
@@ -169,17 +165,15 @@ struct OverdueRow: View {
     let onTapChannel: () -> Void
 
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    contactButton
-                    channelPill
-                }
-            } else {
-                HStack(spacing: 10) {
-                    contactButton
-                    channelPill
-                }
+        AccessibilityAdaptiveLayout {
+            HStack(spacing: 10) {
+                contactButton
+                channelPill
+            }
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 8) {
+                contactButton
+                channelPill
             }
         }
         .padding(.horizontal, 14)

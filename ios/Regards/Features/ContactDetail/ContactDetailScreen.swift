@@ -4,7 +4,7 @@ public struct ContactDetailScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var viewModel: ContactDetailViewModel
-    @State private var isPresentingContactPreview = false
+    @State private var previewContact: Contact?
     private let onTapOpenChannel: () -> Void
     private let onTapMarkCaughtUp: () -> Void
 
@@ -63,16 +63,14 @@ public struct ContactDetailScreen: View {
         .accessibilityIdentifier("screen.contact-detail")
         .navigationTitle("Contact")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $isPresentingContactPreview) {
-            if let contact = viewModel.contact {
-                EditContactScreen(contact: contact)
-            }
+        .navigationDestination(item: $previewContact) { contact in
+            EditContactScreen(contact: contact)
         }
         .toolbar {
             if viewModel.contact != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        isPresentingContactPreview = true
+                        previewContact = viewModel.contact
                     } label: {
                         Text("Edit")
                             .foregroundStyle(RegardsDS.accentInk)
@@ -124,24 +122,22 @@ public struct ContactDetailScreen: View {
     }
 
     private var secondaryActions: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 8) {
-                    secondaryButtons
-                }
-            } else {
-                HStack(spacing: 8) {
-                    secondaryButtons
-                }
+        AccessibilityAdaptiveLayout {
+            HStack(spacing: 8) {
+                secondaryItems
+            }
+        } accessibility: {
+            VStack(spacing: 8) {
+                secondaryItems
             }
         }
     }
 
     @ViewBuilder
-    private var secondaryButtons: some View {
+    private var secondaryItems: some View {
         secondaryButton("Caught up", action: onTapMarkCaughtUp)
-        secondaryButton("Snooze 1 wk", action: {})
-        secondaryButton("Log other", action: {})
+        secondaryStub("Snooze 1 wk")
+        secondaryStub("Log other")
     }
 
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -158,6 +154,20 @@ public struct ContactDetailScreen: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
         }
         .buttonStyle(.plain)
+    }
+
+    private func secondaryStub(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(RegardsDS.muted)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
+            .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
+            .accessibilityLabel("\(title), unavailable")
     }
 
     // MARK: - Cards
@@ -185,17 +195,7 @@ public struct ContactDetailScreen: View {
         VStack(spacing: 0) {
             SectionHeader("Preferred channel")
             RegardsCard {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 12) {
-                        channelSummary(contact: contact)
-                        Text("Change")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(RegardsDS.muted)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                } else {
+                AccessibilityAdaptiveLayout {
                     HStack(spacing: 12) {
                         channelSummary(contact: contact)
                         Spacer()
@@ -203,6 +203,16 @@ public struct ContactDetailScreen: View {
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(RegardsDS.muted)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                } accessibility: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        channelSummary(contact: contact)
+                        Text("Change")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(RegardsDS.muted)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
@@ -227,6 +237,15 @@ public struct ContactDetailScreen: View {
                     .foregroundStyle(RegardsDS.muted)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            ContactValueAccessibility.label(
+                contact.preferredChannel.displayName,
+                displayedValue: contact.preferredChannelValue,
+                speech: contact.preferredChannel == .email ? .email : .verbatim,
+                annotation: "preferred"
+            )
+        )
     }
 
     private var interactionsCard: some View {
@@ -242,15 +261,18 @@ public struct ContactDetailScreen: View {
                 } else {
                     VStack(spacing: 0) {
                         ForEach(Array(viewModel.interactions.enumerated()), id: \.element.id) { idx, entry in
-                            HStack(alignment: .top, spacing: 12) {
-                                Text(entry.dateLabel)
-                                    .font(RegardsFont.mono(.footnote))
-                                    .foregroundStyle(RegardsDS.muted)
-                                    .frame(width: 64, alignment: .leading)
-                                Text(entry.descriptionLabel)
-                                    .font(.footnote)
-                                    .foregroundStyle(RegardsDS.ink)
-                                Spacer()
+                            AccessibilityAdaptiveLayout {
+                                HStack(alignment: .top, spacing: 12) {
+                                    interactionDate(entry.dateLabel, fixedWidth: 64)
+                                    interactionDescription(entry.descriptionLabel)
+                                    Spacer()
+                                }
+                            } accessibility: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    interactionDate(entry.dateLabel)
+                                    interactionDescription(entry.descriptionLabel)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
@@ -279,6 +301,19 @@ public struct ContactDetailScreen: View {
             }
         }
     }
+
+    private func interactionDate(_ value: String, fixedWidth: CGFloat? = nil) -> some View {
+        Text(value)
+            .font(RegardsFont.mono(.footnote))
+            .foregroundStyle(RegardsDS.muted)
+            .frame(width: fixedWidth, alignment: .leading)
+    }
+
+    private func interactionDescription(_ value: String) -> some View {
+        Text(value)
+            .font(.footnote)
+            .foregroundStyle(RegardsDS.ink)
+    }
 }
 
 private extension ContactDetailScreen {
@@ -290,20 +325,18 @@ private extension ContactDetailScreen {
                    action: String? = nil,
                    isAccent: Bool = false,
                    isDanger: Bool = false) -> some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
-                    stubAction(action)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                HStack(spacing: 12) {
-                    detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
-                    Spacer()
-                    stubAction(action)
-                }
+        AccessibilityAdaptiveLayout {
+            HStack(spacing: 12) {
+                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
+                Spacer()
+                stubAction(action)
             }
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 8) {
+                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
+                stubAction(action)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -342,7 +375,7 @@ private extension ContactDetailScreen {
     }
 
     func nextReminderLabel(contact: Contact) -> String {
-        // TF-07 replaces this placeholder with the persisted next reminder (R11).
+        // TF-07 replaces this placeholder with the persisted next reminder.
         "Today, 6:30 pm"
     }
 

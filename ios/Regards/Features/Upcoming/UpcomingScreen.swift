@@ -96,41 +96,37 @@ public struct UpcomingScreen: View {
 }
 
 struct UpcomingRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let row: UpcomingRowState
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    HStack(alignment: .top, spacing: 12) {
-                        Avatar(name: row.name, size: 40)
-                        VStack(alignment: .leading, spacing: 4) {
-                            nameAndTag
-                            occasion
-                            HStack(spacing: 6) {
-                                time
-                                ChannelGlyph(channel: row.channel, size: 14)
-                            }
-                        }
+            AccessibilityAdaptiveLayout {
+                HStack(spacing: 12) {
+                    Avatar(name: row.name, size: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        nameAndTag
+                        occasion
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    HStack(spacing: 12) {
-                        Avatar(name: row.name, size: 40)
-                        VStack(alignment: .leading, spacing: 2) {
-                            nameAndTag
-                            occasion
-                        }
-                        Spacer(minLength: 8)
-                        VStack(alignment: .trailing, spacing: 4) {
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        time
+                        ChannelGlyph(channel: row.channel, size: 14)
+                    }
+                }
+            } accessibility: {
+                HStack(alignment: .top, spacing: 12) {
+                    Avatar(name: row.name, size: 40)
+                    VStack(alignment: .leading, spacing: 4) {
+                        nameAndTag
+                        occasion
+                        HStack(spacing: 6) {
                             time
                             ChannelGlyph(channel: row.channel, size: 14)
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
