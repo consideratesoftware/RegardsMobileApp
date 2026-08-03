@@ -1,5 +1,22 @@
 import XCTest
 
+@MainActor
+private final class ElementHittabilityPoller: NSObject {
+    let element: XCUIElement
+    let expectation: XCTestExpectation
+
+    init(element: XCUIElement, expectation: XCTestExpectation) {
+        self.element = element
+        self.expectation = expectation
+    }
+
+    @objc func poll(_ timer: Timer) {
+        guard element.exists, element.isHittable else { return }
+        timer.invalidate()
+        expectation.fulfill()
+    }
+}
+
 extension ScreensAccessibilityTests {
     // MARK: - Helpers
 
@@ -275,15 +292,20 @@ extension ScreensAccessibilityTests {
         _ element: XCUIElement,
         timeout: TimeInterval = 10
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if element.exists, element.isHittable {
-                return true
-            }
-            Thread.sleep(forTimeInterval: 0.05)
-        } while Date() < deadline
+        guard !element.exists || !element.isHittable else { return true }
 
-        return element.exists && element.isHittable
+        let live = XCTestExpectation(description: "Element becomes live and hittable")
+        let target = ElementHittabilityPoller(element: element, expectation: live)
+        let timer = Timer.scheduledTimer(
+            timeInterval: 0.05,
+            target: target,
+            selector: #selector(ElementHittabilityPoller.poll(_:)),
+            userInfo: nil,
+            repeats: true
+        )
+        defer { timer.invalidate() }
+
+        return XCTWaiter.wait(for: [live], timeout: timeout) == .completed
     }
 
     @MainActor

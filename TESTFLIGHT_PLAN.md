@@ -290,10 +290,14 @@ Current gates:
   navigation retries coordinate-only and bounded; derives phone/email field
   placement from `ChannelCatalog`; covers every channel branch plus malformed
   email speech; labels Change stubs unavailable; and registers Muted on Hair
-  Soft contrast. All 126 unit tests passed, as did the focused Overdue, Contact
+  Soft contrast. Final staged-review follow-up removes sleep-based UI-test
+  synchronization and routes Contact Preview's rendered field label through
+  the same channel-aware speech policy, including a malformed-email regression.
+  All 127 unit tests passed, as did the focused Overdue, Contact
   Detail, Contact Preview, and Overdue → Preview → Back tests. No repeated
   local sweep was run; scheduled post-merge/nightly/pre-release workflows own
-  that evidence. The new exact-head staged verdict remains before merge.
+  that evidence. The final local staged verdict is `APPROVE`; the final hosted
+  verdict and required checks remain before merge.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four

@@ -104,7 +104,8 @@ public struct EditContactScreen: View {
                 VStack(spacing: 0) {
                     field("mobile",
                           value: isPhone ? contact.preferredChannelValue : "",
-                          touched: isPhone)
+                          touched: isPhone,
+                          channel: isPhone ? contact.preferredChannel : nil)
                     Hair(inset: 16)
                     field("home", placeholder: "Add phone")
                 }
@@ -124,7 +125,7 @@ public struct EditContactScreen: View {
                       value: isEmail ? contact.preferredChannelValue : "",
                       placeholder: "Add email",
                       touched: isEmail,
-                      speech: .email)
+                      channel: isEmail ? contact.preferredChannel : nil)
             }
         }
     }
@@ -177,7 +178,7 @@ public struct EditContactScreen: View {
                        value: String = "",
                        placeholder: String = "",
                        touched: Bool = false,
-                       speech: ContactValueAccessibility.ValueSpeech = .verbatim) -> some View {
+                       channel: Channel? = nil) -> some View {
         let hasValue = !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let displayedValue = hasValue ? value : placeholder
         return AccessibilityAdaptiveLayout {
@@ -197,12 +198,35 @@ public struct EditContactScreen: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            ContactValueAccessibility.label(
+            Self.accessibilityFieldLabel(
                 label,
                 displayedValue: displayedValue,
-                speech: speech,
+                touched: touched,
+                channel: channel
+            )
+        )
+    }
+
+    static func accessibilityFieldLabel(
+        _ label: String,
+        displayedValue: String,
+        touched: Bool,
+        channel: Channel?
+    ) -> String {
+        if let channel {
+            return ContactValueAccessibility.label(
+                label,
+                displayedValue: displayedValue,
+                channel: channel,
                 annotation: touched ? "preferred" : nil
             )
+        }
+
+        return ContactValueAccessibility.label(
+            label,
+            displayedValue: displayedValue,
+            speech: .verbatim,
+            annotation: touched ? "preferred" : nil
         )
     }
 
