@@ -6,7 +6,7 @@ enum ContactValueAccessibility {
         case email
     }
 
-    static func treatsAsEmail(channel: Channel, displayedValue: String) -> Bool {
+    static func usesEmailField(channel: Channel, displayedValue: String) -> Bool {
         switch ChannelCatalog.metadata(for: channel).valueKind {
         case .email:
             return true
@@ -14,6 +14,17 @@ enum ContactValueAccessibility {
             return ChannelCatalog.isEmail(
                 displayedValue.trimmingCharacters(in: .whitespacesAndNewlines)
             )
+        default:
+            return false
+        }
+    }
+
+    static func usesPhoneField(channel: Channel, displayedValue: String) -> Bool {
+        switch ChannelCatalog.metadata(for: channel).valueKind {
+        case .phoneE164:
+            return true
+        case .phoneOrEmail:
+            return !usesEmailField(channel: channel, displayedValue: displayedValue)
         default:
             return false
         }
@@ -28,8 +39,16 @@ enum ContactValueAccessibility {
         self.label(
             label,
             displayedValue: displayedValue,
-            speech: treatsAsEmail(channel: channel, displayedValue: displayedValue) ? .email : .verbatim,
+            speech: speaksAsEmail(channel: channel, displayedValue: displayedValue) ? .email : .verbatim,
             annotation: annotation
+        )
+    }
+
+    private static func speaksAsEmail(channel: Channel, displayedValue: String) -> Bool {
+        let valueKind = ChannelCatalog.metadata(for: channel).valueKind
+        guard valueKind == .email || valueKind == .phoneOrEmail else { return false }
+        return ChannelCatalog.isEmail(
+            displayedValue.trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 

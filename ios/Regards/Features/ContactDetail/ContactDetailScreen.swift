@@ -174,18 +174,14 @@ public struct ContactDetailScreen: View {
                     HStack(spacing: 12) {
                         channelSummary(contact: contact)
                         Spacer()
-                        Text("Change")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(RegardsDS.muted)
+                        stubAction("Change")
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 } accessibility: {
                     VStack(alignment: .leading, spacing: 12) {
                         channelSummary(contact: contact)
-                        Text("Change")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(RegardsDS.muted)
+                        stubAction("Change")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -340,6 +336,7 @@ private extension ContactDetailScreen {
             Text(action)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(RegardsDS.muted)
+                .accessibilityLabel("\(action), unavailable")
         }
     }
 

@@ -258,21 +258,16 @@ extension ScreensAccessibilityTests {
 
     @MainActor
     func activate(_ element: XCUIElement, attempt: Int) {
-        // Simulator automation can drop one activation style repeatedly for a
-        // live element. Bounded retries vary the synthesis path, while the
+        // Simulator automation can drop a synthesized tap on a live element.
+        // Bounded retries vary the target point, while the
         // caller verifies the source/destination state after every attempt.
         // These are navigation synchronization only; the audit still owns
         // hit-region verification when sensory categories are enabled.
-        switch attempt {
-        case 0:
-            element.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
-            ).tap()
-        case 1:
-            element.tap()
-        default:
-            element.press(forDuration: 0.1)
-        }
+        let offsets = [0.5, 0.35, 0.65]
+        let offset = offsets[min(attempt, offsets.count - 1)]
+        element.coordinate(
+            withNormalizedOffset: CGVector(dx: offset, dy: 0.5)
+        ).tap()
     }
 
     @MainActor
@@ -285,7 +280,7 @@ extension ScreensAccessibilityTests {
             if element.exists, element.isHittable {
                 return true
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            Thread.sleep(forTimeInterval: 0.05)
         } while Date() < deadline
 
         return element.exists && element.isHittable

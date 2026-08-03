@@ -66,6 +66,7 @@ LaunchBackground). Ratios computed from the sRGB values in
 |---|---|---|---|---|---|
 | Ink | Background | ~13.5:1 | ~15.2:1 | 4.5:1 | ✅ |
 | Muted | Background | ~5.6:1 | ~5.8:1 | 4.5:1 | ✅ |
+| Muted | Hair Soft | ~4.7:1 | ~6.0:1 | 4.5:1 | ✅ |
 | Accent Ink | Accent Soft | ~6.9:1 | ~6.6:1 | 4.5:1 | ✅ |
 | White | AccentColor | ~3.4:1 | ~3.1:1 | 3:1 (large/icon) | ✅ |
 
@@ -130,10 +131,10 @@ intentional:
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right
   data.
-- **Dynamic Type on screen content**: at accessibility sizes the shared nav
-  title and subtitle, Overdue / Upcoming selector, digest, list rows, and
-  Contact Detail actions, interactions, detail cards, and Contact Preview
-  fields use one shared adaptive-layout policy. At
+- **Dynamic Type on screen content**: repeated two-branch container layouts in
+  the shared nav, Overdue / Upcoming selector, digest, list rows, Contact Detail
+  actions/interactions/cards, and Contact Preview fields use the shared
+  adaptive-layout policy. Small per-control sizing choices remain inline. At
   `accessibility5`, labels, names, metadata, and CTA copy wrap without clipping
   or mid-word truncation while the standard-size layouts remain compact. An
   XCUI regression launches directly at `accessibility5` and verifies the nav

@@ -222,4 +222,38 @@ struct ContactAccessibilityTests {
         #expect(emailLabel == "FaceTime, ahsoka at jeditemple dot org")
         #expect(phoneLabel == "FaceTime, +1 415 555 0134")
     }
+
+    @Test("Channel metadata drives field placement and inferred speech")
+    func channelFieldPlacementAndSpeech() {
+        let phoneChannels: Set<Channel> = [.phoneCall, .sms, .whatsapp, .signal]
+
+        for channel in Channel.allCases {
+            #expect(
+                ContactValueAccessibility.usesPhoneField(
+                    channel: channel,
+                    displayedValue: "+1 415 555 0134"
+                ) == (phoneChannels.contains(channel) || channel == .facetime)
+            )
+            #expect(
+                ContactValueAccessibility.usesEmailField(
+                    channel: channel,
+                    displayedValue: "ahsoka@jeditemple.org"
+                ) == (channel == .email || channel == .facetime)
+            )
+        }
+
+        let inferredHandle = ContactValueAccessibility.label(
+            "Telegram",
+            displayedValue: "@ahsoka.jedi",
+            channel: .telegram
+        )
+        let malformedEmail = ContactValueAccessibility.label(
+            "Email",
+            displayedValue: "ahsoka@jeditemple",
+            channel: .email
+        )
+
+        #expect(inferredHandle == "Telegram, @ahsoka.jedi")
+        #expect(malformedEmail == "Email, ahsoka@jeditemple")
+    }
 }
