@@ -205,10 +205,12 @@ struct MergeDuplicatesViewModelTests {
         let viewModel = MergeDuplicatesViewModel(contacts: repository)
 
         await viewModel.load()
+        #expect(viewModel.loadState == .failed)
         #expect(viewModel.candidates.isEmpty)
 
         await viewModel.load()
 
+        #expect(viewModel.loadState == .loaded)
         #expect(viewModel.candidates.count == 1)
         let requestCount = await repository.requestCount()
         #expect(requestCount == 2)
