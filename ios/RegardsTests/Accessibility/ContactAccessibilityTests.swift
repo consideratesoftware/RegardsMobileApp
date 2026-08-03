@@ -256,4 +256,17 @@ struct ContactAccessibilityTests {
         #expect(inferredHandle == "Telegram, @ahsoka.jedi")
         #expect(malformedEmail == "Email, ahsoka@jeditemple")
     }
+
+    @Test("Contact Preview preserves malformed email speech")
+    @MainActor
+    func contactPreviewPreservesMalformedEmailSpeech() {
+        let label = EditContactScreen.accessibilityFieldLabel(
+            "personal",
+            displayedValue: "ahsoka@jeditemple",
+            touched: true,
+            channel: .email
+        )
+
+        #expect(label == "personal, ahsoka@jeditemple, preferred")
+    }
 }
