@@ -110,6 +110,7 @@ public struct ContactDetailScreen: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Open \(contact.preferredChannel.displayName), unavailable")
+        .accessibilityIdentifier("contact-detail.open-channel-unavailable")
     }
 
     private var secondaryActions: some View {
@@ -126,12 +127,12 @@ public struct ContactDetailScreen: View {
 
     @ViewBuilder
     private var secondaryItems: some View {
-        secondaryStub("Caught up")
-        secondaryStub("Snooze 1 wk")
-        secondaryStub("Log other")
+        secondaryStub("Caught up", identifier: "contact-detail.caught-up-unavailable")
+        secondaryStub("Snooze 1 wk", identifier: "contact-detail.snooze-unavailable")
+        secondaryStub("Log other", identifier: "contact-detail.log-other-unavailable")
     }
 
-    private func secondaryStub(_ title: String) -> some View {
+    private func secondaryStub(_ title: String, identifier: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.medium))
             .foregroundStyle(RegardsDS.muted)
@@ -143,6 +144,7 @@ public struct ContactDetailScreen: View {
             .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
             .accessibilityLabel("\(title), unavailable")
+            .accessibilityIdentifier(identifier)
     }
 
     // MARK: - Cards
@@ -152,8 +154,12 @@ public struct ContactDetailScreen: View {
             SectionHeader("Cadence")
             RegardsCard {
                 VStack(spacing: 0) {
-                    detailRow(label: "Every", value: viewModel.cadenceLabel,
-                              action: "Change")
+                    detailRow(
+                        label: "Every",
+                        value: viewModel.cadenceLabel,
+                        action: "Change",
+                        actionIdentifier: "contact-detail.cadence-change-unavailable"
+                    )
                     Hair(inset: 16)
                     detailRow(label: "Next reminder", value: nextReminderLabel(contact: contact),
                               isAccent: true)
@@ -174,14 +180,20 @@ public struct ContactDetailScreen: View {
                     HStack(spacing: 12) {
                         channelSummary(contact: contact)
                         Spacer()
-                        stubAction("Change")
+                        stubAction(
+                            "Change",
+                            identifier: "contact-detail.channel-change-unavailable"
+                        )
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 } accessibility: {
                     VStack(alignment: .leading, spacing: 12) {
                         channelSummary(contact: contact)
-                        stubAction("Change")
+                        stubAction(
+                            "Change",
+                            identifier: "contact-detail.channel-change-unavailable"
+                        )
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -217,6 +229,7 @@ public struct ContactDetailScreen: View {
                 annotation: "preferred"
             )
         )
+        .accessibilityIdentifier("contact-detail.channel-summary")
     }
 
     private var interactionsCard: some View {
@@ -294,18 +307,19 @@ private extension ContactDetailScreen {
     func detailRow(label: String,
                    value: String,
                    action: String? = nil,
+                   actionIdentifier: String? = nil,
                    isAccent: Bool = false,
                    isDanger: Bool = false) -> some View {
         AccessibilityAdaptiveLayout {
             HStack(spacing: 12) {
                 detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
                 Spacer()
-                stubAction(action)
+                stubAction(action, identifier: actionIdentifier)
             }
         } accessibility: {
             VStack(alignment: .leading, spacing: 8) {
                 detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
-                stubAction(action)
+                stubAction(action, identifier: actionIdentifier)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -329,7 +343,7 @@ private extension ContactDetailScreen {
     }
 
     @ViewBuilder
-    func stubAction(_ action: String?) -> some View {
+    func stubAction(_ action: String?, identifier: String? = nil) -> some View {
         // Stub label — Phase 1 wires each of these to a real editor. For
         // now we render muted so it doesn't look tap-affordable.
         if let action {
@@ -337,6 +351,7 @@ private extension ContactDetailScreen {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(RegardsDS.muted)
                 .accessibilityLabel("\(action), unavailable")
+                .accessibilityIdentifier(identifier ?? "contact-detail.unavailable-action")
         }
     }
 

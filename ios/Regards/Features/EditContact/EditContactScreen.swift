@@ -181,16 +181,17 @@ public struct EditContactScreen: View {
                        channel: Channel? = nil) -> some View {
         let hasValue = !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let displayedValue = hasValue ? value : placeholder
+        let isPreferred = touched && hasValue
         return AccessibilityAdaptiveLayout {
             HStack(alignment: .firstTextBaseline, spacing: 16) {
                 fieldLabel(label, fixedWidth: 84)
-                fieldValue(displayedValue, hasValue: hasValue, touched: touched)
+                fieldValue(displayedValue, hasValue: hasValue, touched: isPreferred)
                 Spacer()
             }
         } accessibility: {
             VStack(alignment: .leading, spacing: 6) {
                 fieldLabel(label)
-                fieldValue(displayedValue, hasValue: hasValue, touched: touched)
+                fieldValue(displayedValue, hasValue: hasValue, touched: isPreferred)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -201,7 +202,7 @@ public struct EditContactScreen: View {
             Self.accessibilityFieldLabel(
                 label,
                 displayedValue: displayedValue,
-                touched: touched,
+                touched: isPreferred,
                 channel: channel
             )
         )
@@ -213,12 +214,14 @@ public struct EditContactScreen: View {
         touched: Bool,
         channel: Channel?
     ) -> String {
+        let hasPreferredValue = touched
+            && !displayedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         if let channel {
             return ContactValueAccessibility.label(
                 label,
                 displayedValue: displayedValue,
                 channel: channel,
-                annotation: touched ? "preferred" : nil
+                annotation: hasPreferredValue ? "preferred" : nil
             )
         }
 
@@ -226,7 +229,7 @@ public struct EditContactScreen: View {
             label,
             displayedValue: displayedValue,
             speech: .verbatim,
-            annotation: touched ? "preferred" : nil
+            annotation: hasPreferredValue ? "preferred" : nil
         )
     }
 
