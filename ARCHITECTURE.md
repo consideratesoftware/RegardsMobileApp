@@ -592,7 +592,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-03):** the unit target has 150 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color contrast, and Overdue and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-03):** the unit target has 151 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color contrast, and Overdue and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 
@@ -807,7 +807,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 ## 18. Current state — ground truth as of 2026-08-03
 
-`main` = `209171c` (GitHub PR #37, 2026-08-03). The engine contract,
+`main` = `a35fce9` (GitHub PR #24, 2026-08-03). The engine contract,
 section-header accessibility fix, sample-data refresh, channel-validation
 contract, bundle-namespace migration, durable TestFlight queue, and
 cross-provider review parity guard have landed. The trusted staged reviewer now
@@ -821,12 +821,12 @@ state and next executable work.
 - **Domain layer, pure and tested:** all §7 entities; `ReminderEngine` (cadence walk, quiet hours, annual recurrence + Feb-29, batching helper); `DuplicateDetector`; `ChannelCatalog` + `DeepLinkBuilder` for all 13 channels; `MonthDay` with round-trip validation.
 - **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
 - **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
-- **Modern platform composition in the active PR #24 branch:** native navigation/empty-state semantics on
+- **Modern platform composition landed in GitHub PR #24:** native navigation/empty-state semantics on
   the iOS 17 baseline; iOS 18 value-based adaptive/search tabs and
   Reduce-Motion-aware matched navigation; iOS 26 restrained Liquid Glass,
   scroll-aware tab chrome, and a local open-section App Shortcut. The exact
   adoption and fallback matrix lives in `ios/docs/modern-ios.md`.
-- **Accessibility harness:** 15 XCUI audit tests (structural categories, including Edit Contact through all three entry paths) plus 7 navigation, layout, and accessibility-contract regressions, audit-stress tooling (script + workflow), documented test patterns and smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
+- **Accessibility harness:** 22 XCUI audit, navigation, layout, and accessibility-contract tests, audit-stress tooling (script + workflow), documented test patterns, and a smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
 - **CI:** pull requests require xcodegen determinism, build, unit tests with coverage, strict SwiftLint, project syntax, shared privacy and Domain-purity guards, Markdown links, review-agent parity, and the App-authored `Regards staged review`, which is pinned in branch protection to the dedicated App's identity (app id `4461672`) so a same-repository Actions job cannot forge it. That check asserts a valid review ran for the current head, not that the reviewer approved: a missing, malformed or stale-head artifact fails it, while a `REQUEST_CHANGES` verdict publishes its blockers in the check output and passes, leaving the call to the author. The 1x accessibility audit runs after merges to `main`; the 5x sweep runs after merges, nightly, and on demand before release.
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
 
@@ -869,6 +869,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R13 | **Edit Contact shipped as a navigation trap and remains a read-only stub:** the hidden Back button and mixed navigation APIs made Edit unreachable or inescapable; the interim screen now removes inert form actions | `EditContactScreen.swift`, `ContactDetailScreen.swift` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | escape route ✅ **closed by TF-01 slice 1**; real form PR27 |
 | R14 | **Onboarding not in launch path** (single screen, Settings-preview only; `onboardingCompletedAt` never consulted) | `OnboardingScreen.swift`, `RegardsApp.swift:23-40` | 3-screen flow gated at launch per §10.8 | PR29 |
 | R15 | **Transparency screen's 3 "Open" links inert**; repo URL hardcoded — verify before launch | `TransparencyScreen.swift:123, 183-187` | Wire `openURL`; confirm `github.com/consideratesoftware/RegardsMobileApp` is the public repo URL | PR33 |
+| R49 | **Upcoming drops already-overdue contacts during an active reminder slot.** `ReminderEngine` intentionally returns the slot start for deterministic batching, but the ViewModel rejects it when that start is earlier than `now` | `UpcomingViewModel.swift` | Keep the active-slot row while preserving its slot-start identity; pin a regression at 18:30 for an 18:00–22:00 slot | ✅ **closed by TF-01 scheduled-audit follow-up** |
 
 ### P1 — spec/doc integrity
 

@@ -168,6 +168,51 @@ struct RegardsLoadStateTests {
         #expect(viewModel.groups.isEmpty)
     }
 
+    @Test("Upcoming keeps an overdue contact in the active reminder slot")
+    func upcomingIncludesActiveSlot() async throws {
+        let timezone = try #require(TimeZone(secondsFromGMT: 0))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timezone
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 8,
+            day: 3,
+            hour: 18,
+            minute: 30
+        )))
+        let contact = Contact(
+            systemContactRef: "active-slot-contact",
+            displayName: "Alex Chen",
+            tracked: true,
+            cadenceDays: 1,
+            priorityTier: .close,
+            preferredChannel: .signal,
+            preferredChannelValue: "+14155550198",
+            lastInteractedAt: now.addingTimeInterval(-3 * 86_400)
+        )
+        let repository = ScriptedContactRepository(steps: [.success([contact])])
+        let viewModel = UpcomingViewModel(
+            contacts: repository,
+            window: .defaultV1(timezone: timezone),
+            clock: { now }
+        )
+
+        await viewModel.load()
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.totalCount == 1)
+        let row = try #require(viewModel.groups.first?.rows.first)
+        let activeSlotStart = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 8,
+            day: 3,
+            hour: 18
+        )))
+        #expect(row.contactId == contact.id)
+        #expect(row.scheduledFor == activeSlotStart)
+        #expect(row.timeOfDayText == "6:00 pm")
+    }
+
     @Test("Contacts clears failed data and a retry can recover")
     func contactsFailureAndRetry() async {
         let repository = ScriptedContactRepository(steps: [

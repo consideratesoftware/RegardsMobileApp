@@ -8,18 +8,17 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 ## Current checkpoint
 
 - Updated: 2026-08-03
-- Baseline: `main` at `209171c` (merged GitHub PR #37 accessibility follow-up)
-- Active work: `TF-01` (GitHub PR #24 stable-platform modernization)
+- Baseline: `main` at `a35fce9` (merged GitHub PR #24 platform modernization)
+- Active work: `TF-01` current-main accessibility-audit repair on
+  `codex/tf-01-upcoming-active-slot`
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #24 (`ios/modern-platform-showcase`, published;
-  exact-source manual smoke complete; hosted concurrency blocker repaired and
-  awaiting exact-head re-review)
+- Open pull request: pending publication of the focused R49 repair branch
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. The unlocked-Mac handoff for PR #24 is
-  complete; no product, legal, signing, or App Store decision is required.
+- Owner action needed now: none. The current-main audit repair is agent-owned;
+  no product, legal, signing, or App Store decision is required.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -42,8 +41,8 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; PR #23 and PR #37 are complete, and PR #24 is the only current
-   implementation pull request. Start no additional work while it is open.
+   checkpoint`; PR #23, PR #37, and PR #24 are complete. Start no additional
+   work while the current TF-01 repair branch or pull request is unresolved.
 5. Otherwise, fast-forward `main` and reconcile this queue against merged pull
    requests carrying a `TF-##` marker. If either scheduled accessibility run
    failed on the current `main`, triage that failure before taking new feature
@@ -161,21 +160,30 @@ slices. The order is fixed while the current pull requests remain open:
    their review evidence.
    This closes the remaining R13, R16, R27, R28, and R43 acceptance evidence
    and confirms R29's earlier closure.
-4. ACTIVE: GitHub PR #24 is the owner-directed platform-modernization slice.
-   It is rebased onto current `main`; its focused checks and exact-source
-   manual accessibility smoke are complete and it is published. The first
-   hosted semantic review found an overlapping-load race in the three primary
-   tab ViewModels; the branch now ignores stale completions, preserves loaded
-   Contacts content during refresh, and proves both behaviors with controlled
-   interleaving tests. Require the exact-head hosted verdict and all protected
-   checks before guarded auto-merge. Broad 5× sweeps remain owned by post-merge,
-   nightly, and pre-release automation.
-5. Finish the remaining PR19 CI and reproducibility scope: commit
+4. DONE: GitHub PR #24 merged as `a35fce9`, completing the owner-directed
+   platform-modernization slice, its focused checks, exact-source manual
+   accessibility smoke, and hosted-review closures.
+5. ACTIVE: repair the current-main R49 audit failure on
+   `codex/tf-01-upcoming-active-slot`. Post-merge iOS CI run `30842392233` and
+   audit-stress run `30842392398` both failed because Upcoming discarded an
+   already-overdue contact when `ReminderEngine` returned the start of the
+   currently active batching slot. The 5× workflow reproduced the same three
+   downstream XCUI failures in every run. Preserve the slot-start identity,
+   keep the row visible, pin the active-slot regression, and require focused
+   XCUI, mechanical gates, staged review, hosted review, and protected checks
+   before merge. Broad repeated sweeps remain owned by post-merge, nightly,
+   and pre-release automation.
+   Current-source manual smoke on the pinned iOS 26.5 iPhone 17 Pro completed
+   2026-08-03 at 15:01 PDT: the app installed and launched, the Overdue surface
+   reported both Overdue and Upcoming as 10, and the active digest remained
+   anchored at 6:00 pm instead of presenting the erroneous empty Upcoming
+   state captured in the failed hosted audit.
+6. Finish the remaining PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
    configuration and stale audit-stress comment, and reconcile merge-method
    documentation.
-6. Finish mock and code hygiene: seed group, interaction, and occasion states;
+7. Finish mock and code hygiene: seed group, interaction, and occasion states;
    use stable Upcoming row IDs; remove or wire dead assets and comments; prune
    obsolete worktrees and merged branches after exact-target verification.
 
@@ -183,9 +191,8 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- No owner gate is active. PR #24's unlocked-Mac handoff and manual
-  accessibility traversal are complete. Publication, hosted review, required
-  checks, and guarded auto-merge are agent-owned repository work.
+- No owner gate is active. The R49 repair's publication, hosted review,
+  required checks, and guarded auto-merge are agent-owned repository work.
 
 ### PR #24 modernization accessibility evidence
 
