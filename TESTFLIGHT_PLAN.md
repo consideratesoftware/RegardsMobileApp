@@ -12,7 +12,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Active work: `TF-01` current-main accessibility-audit repair on
   `codex/tf-01-upcoming-active-slot`
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: pending publication of the focused R49 repair branch
+- Open pull request: GitHub PR #38 (`codex/tf-01-upcoming-active-slot`, ready;
+  awaiting exact-head hosted review and protected checks)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -163,7 +164,7 @@ slices. The order is fixed while the current pull requests remain open:
 4. DONE: GitHub PR #24 merged as `a35fce9`, completing the owner-directed
    platform-modernization slice, its focused checks, exact-source manual
    accessibility smoke, and hosted-review closures.
-5. ACTIVE: repair the current-main R49 audit failure on
+5. ACTIVE: repair the current-main R49 audit failure in GitHub PR #38 on
    `codex/tf-01-upcoming-active-slot`. Post-merge iOS CI run `30842392233` and
    audit-stress run `30842392398` both failed because Upcoming discarded an
    already-overdue contact when `ReminderEngine` returned the start of the
