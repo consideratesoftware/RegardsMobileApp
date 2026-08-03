@@ -6,6 +6,33 @@ enum ContactValueAccessibility {
         case email
     }
 
+    static func treatsAsEmail(channel: Channel, displayedValue: String) -> Bool {
+        switch ChannelCatalog.metadata(for: channel).valueKind {
+        case .email:
+            return true
+        case .phoneOrEmail:
+            return ChannelCatalog.isEmail(
+                displayedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        default:
+            return false
+        }
+    }
+
+    static func label(
+        _ label: String,
+        displayedValue: String,
+        channel: Channel,
+        annotation: String? = nil
+    ) -> String {
+        self.label(
+            label,
+            displayedValue: displayedValue,
+            speech: treatsAsEmail(channel: channel, displayedValue: displayedValue) ? .email : .verbatim,
+            annotation: annotation
+        )
+    }
+
     static func label(
         _ label: String,
         displayedValue: String,

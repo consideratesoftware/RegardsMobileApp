@@ -119,10 +119,13 @@ intentional:
 - **Contrast** on high-traffic pills / buttons / system chrome: swapped
   from `RegardsDS.accent` (~3.4–3.7:1 against white / translucent-white,
   below AA body) to `RegardsDS.accentInk` (~8:1). Applies to the tab-bar
-  `.tint`, Transparency hero claim card, Overdue channel pill, Contact
-  Detail primary CTA, Merge Duplicates "Merge virtually" button, Reminder
-  Windows active day pill, Onboarding "Allow contacts access" button,
-  and every in-card nav-link text / toolbar "Edit" label.
+  `.tint`, Transparency hero claim card, Merge Duplicates "Merge virtually"
+  button, Reminder Windows active day pill, Onboarding "Allow contacts access"
+  button, and every in-card nav-link text / toolbar "Edit" label.
+- **Unwired actions**: Contact Detail's primary channel, Caught up, Snooze, and
+  Log other actions plus Overdue's channel pills are muted, noninteractive
+  content until TF-04 and TF-08 supply persistence and routing. Their labels
+  include “unavailable” without exposing a false button trait.
 - **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right

@@ -94,8 +94,12 @@ public struct EditContactScreen: View {
     }
 
     private var phoneSection: some View {
+        let isEmail = ContactValueAccessibility.treatsAsEmail(
+            channel: contact.preferredChannel,
+            displayedValue: contact.preferredChannelValue
+        )
         let isPhone = [Channel.phoneCall, .sms, .whatsapp, .signal, .facetime]
-            .contains(contact.preferredChannel)
+            .contains(contact.preferredChannel) && !isEmail
         return VStack(spacing: 0) {
             SectionHeader("Phone")
             RegardsCard {
@@ -109,7 +113,10 @@ public struct EditContactScreen: View {
     }
 
     private var emailSection: some View {
-        let isEmail = contact.preferredChannel == .email
+        let isEmail = ContactValueAccessibility.treatsAsEmail(
+            channel: contact.preferredChannel,
+            displayedValue: contact.preferredChannelValue
+        )
         return VStack(spacing: 0) {
             SectionHeader("Email")
             RegardsCard {

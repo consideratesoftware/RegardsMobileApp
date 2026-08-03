@@ -205,4 +205,21 @@ struct ContactAccessibilityTests {
 
         #expect(label == "personal, obiwan at jeditemple dot org, preferred")
     }
+
+    @Test("FaceTime email and phone values use their matching speech policy")
+    func faceTimeValueSpeech() {
+        let emailLabel = ContactValueAccessibility.label(
+            "FaceTime",
+            displayedValue: "ahsoka@jeditemple.org",
+            channel: .facetime
+        )
+        let phoneLabel = ContactValueAccessibility.label(
+            "FaceTime",
+            displayedValue: "+1 415 555 0134",
+            channel: .facetime
+        )
+
+        #expect(emailLabel == "FaceTime, ahsoka at jeditemple dot org")
+        #expect(phoneLabel == "FaceTime, +1 415 555 0134")
+    }
 }

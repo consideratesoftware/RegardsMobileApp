@@ -255,8 +255,12 @@ Current gates:
   shared adaptive-layout builder; the nav header, interaction dates, and
   Contact Preview field labels no longer rely on fixed heights or widths at
   accessibility sizes. Contact Preview navigation binds the concrete `Contact`
-  destination, and unavailable Snooze / Log other stubs are muted text rather
-  than inert buttons. All 124 unit tests and the new deterministic
+  destination, and unavailable Caught up / Snooze / Log other stubs are muted
+  text rather than inert buttons until TF-04 wires their persistence. The
+  unwired Contact Detail and Overdue channel actions follow the same muted,
+  noninteractive convention until TF-08 adds real routing. FaceTime values now
+  choose phone or email placement and speech from the value itself. All 125
+  unit tests and the new deterministic
   `accessibility5` XCUI non-overlap regression pass locally. The repository's
   `a8c9c01` baseline is intentional: it is the merge commit for GitHub PR #23,
   not the older pre-PR23 / PR35 planning baseline. At exact implementation

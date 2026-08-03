@@ -122,7 +122,6 @@ struct RegardsTabRoot: View {
                     viewModel: overdueVM,
                     upcomingCount: upcomingVM.totalCount,
                     onTapContact: { contactId in overduePath.append(contactId) },
-                    onTapChannel: { _ in },
                     onSwitchToUpcoming: { selected = .upcoming }
                 )
                 .navigationDestination(for: UUID.self) { contactId in
