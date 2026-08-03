@@ -276,7 +276,14 @@ Current gates:
   return to Contact Detail, and Obi-Wan Kenobi's preferred channel as the
   single element “Email, obiwan at jeditemple dot org, preferred.” The
   deterministic `accessibility5` layout regression passed against that source.
-  Only the final staged-review verdict remains before merge.
+  Follow-up implementation `fe3e411` closes the final local-review findings:
+  the remaining Contact Detail and Overdue no-op actions are now muted,
+  noninteractive elements; FaceTime email and phone values choose the correct
+  field and speech policy; and the canonical census is 125 unit tests plus 19
+  XCUI tests. All 125 unit tests and the focused Contact Detail and Contact
+  Preview audits passed. The installed exact-source hierarchy exposed the
+  unavailable actions without button traits. Only the final staged-review
+  verdict remains before merge.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
