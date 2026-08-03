@@ -144,7 +144,12 @@ public final class UpcomingViewModel {
                     in: window,
                     includingContainingSlot: overdueAt <= now
                 ) else { continue }
-                if fires <= horizonEnd, fires >= now {
+                // An already-overdue contact inside an active window resolves
+                // to that window's slot start for deterministic batching. The
+                // slot start can be earlier than `now`; it still represents an
+                // immediate reminder and belongs in Upcoming. Future cadence
+                // eligibility remains guarded by `nextAllowedSlot` itself.
+                if fires <= horizonEnd {
                     rows.append(UpcomingRowState(
                         id: UUID(),
                         contactId: contact.id,
