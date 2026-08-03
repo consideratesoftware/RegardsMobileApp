@@ -94,17 +94,17 @@ public struct EditContactScreen: View {
     }
 
     private var phoneSection: some View {
-        let isEmail = ContactValueAccessibility.treatsAsEmail(
+        let isPhone = ContactValueAccessibility.usesPhoneField(
             channel: contact.preferredChannel,
             displayedValue: contact.preferredChannelValue
         )
-        let isPhone = [Channel.phoneCall, .sms, .whatsapp, .signal, .facetime]
-            .contains(contact.preferredChannel) && !isEmail
         return VStack(spacing: 0) {
             SectionHeader("Phone")
             RegardsCard {
                 VStack(spacing: 0) {
-                    field("mobile", value: isPhone ? contact.preferredChannelValue : "")
+                    field("mobile",
+                          value: isPhone ? contact.preferredChannelValue : "",
+                          touched: isPhone)
                     Hair(inset: 16)
                     field("home", placeholder: "Add phone")
                 }
@@ -113,7 +113,7 @@ public struct EditContactScreen: View {
     }
 
     private var emailSection: some View {
-        let isEmail = ContactValueAccessibility.treatsAsEmail(
+        let isEmail = ContactValueAccessibility.usesEmailField(
             channel: contact.preferredChannel,
             displayedValue: contact.preferredChannelValue
         )

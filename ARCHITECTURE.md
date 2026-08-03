@@ -407,7 +407,7 @@ UI reads: Overdue/Upcoming ViewModels observe `ScheduledReminder` + `Contact` vi
 
 ## 10. UI / UX architecture
 
-Nine screens + one widget family in V1. **As-built decision (#32):** navigation is a **4-tab `TabView`** — Overdue, Upcoming, Contacts, Settings — each tab owning its own `NavigationStack` with per-tab `NavigationPath`, so a push inside Overdue never bleeds into Upcoming and tab state survives switching. v0.5's "one Home screen with a segmented control" is superseded; the segmented Overdue/Upcoming pill at the top of both list screens **stays** as a glanceable count + one-tap cross-switch (it displays live counts, which the tab bar can't). `ContactDetailScreen` is constructed by a factory (`contactDetail(for:)`) so each push gets a fresh VM — never rely on SwiftUI view identity to reset it (regression-tested).
+Nine screens + one widget family in V1. **As-built decision (#32):** navigation is a **4-tab `TabView`** — Overdue, Upcoming, Contacts, Settings — each tab owning its own `NavigationStack` with per-tab `NavigationPath`, so a push inside Overdue never bleeds into Upcoming and tab state survives switching. v0.5's "one Home screen with a segmented control" is superseded; the segmented Overdue/Upcoming pill at the top of both list screens **stays** as a glanceable count + one-tap cross-switch (it displays live counts, which the tab bar can't). `ContactDetailScreen` is constructed by a factory (`contactDetail(for:)`) so each push gets a fresh VM — never rely on SwiftUI view identity to reset it (regression-tested). Contact Preview is the narrow exception: its concrete-contact item destination is child-local state inside the same tab `NavigationStack`; the tab path continues to own the Contact Detail push, and the standard Back action clears the child item before returning through that path.
 
 1. **Overdue (Home)** — overdue contacts sectioned by priority tier. Row: photo, name, "2 weeks overdue", channel icon (tap = open deep link), merged-group chip where applicable. Swipe: **Caught up** / **Snooze 1 wk**. Footer shows the live next-digest time (from persisted reminders — the shipped hardcoded "6:00 pm" strings are R11). Empty state: "All caught up."
 2. **Upcoming** — reminders in the next `digestHorizonDays` (7/14/30, user-set), grouped by day, from **persisted** `ScheduledReminder` rows via `ValueObservation` (R10). Rows show contact, channel, kind tag (birthday/anniversary), scheduled time. Swipe: **Reach out now** (opens deep link + logs interaction + advances cadence) / **Mark caught up**. Horizon picker lives in the nav bar (shipped inert button R11).
@@ -550,7 +550,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-02):** the unit target has 125 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior. The accessibility target has 19 XCUI tests: 15 structural accessibility audits and 4 navigation/layout regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-02):** the unit target has 126 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior. The accessibility target has 19 XCUI tests: 15 structural accessibility audits and 4 navigation/layout regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 
@@ -595,7 +595,7 @@ contract.
 |---|---|---|
 | **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
 | **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test for link-bearing channels; parametric covers `allCases` | R2, R7 closed |
-| **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R27, and R28 closed; README half of R19 closed (root link guard remains PR19); R20 was closed by GitHub PR #22; R29 was closed by PR16 plus PR20–PR22 stress runs; current audit-stress evidence passes 5/5 ×3 consecutive runs |
+| **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R27, and R28 closed; README half of R19 closed (root link guard remains PR19); R20 was closed by GitHub PR #22; R29 was closed by PR16 plus PR20–PR22 stress runs; UI follow-ups pass focused affected regressions and manual smoke before merge, while scheduled post-merge/nightly/pre-release workflows own repeated 5× stress |
 | **PR19** | Repo + CI hygiene: commit `Package.resolved`; `git worktree prune` + delete stale worktree/branches; root-markdown link-check job; Domain coverage floor (≥95%); guard hardening (R32, completed by the TF-01 trusted-gate prerequisite); remove dead SwiftLint `function_body_length` config; seed mocks with a ContactGroup + InteractionLogs + an occasion so all UI states are reachable/auditable; delete `.git/t9FBrGy` | R21, R30–R34 closed; all 4 workflows green |
 
 ### Phase 1B — Production wiring (Jul 13–17) — the mock era ends
@@ -689,7 +689,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 6 | Batched digest notification, not per-contact | 2026-04-15 | Per-contact nags get the app silenced. |
 | 7 | One-time $4.99 + tip jar, no subscriptions, no ads ever | 2026-04-15 | Local-only app; subscription would be dishonest. |
 | 8 | No free tier with contact caps; 7-day trial instead | 2026-04-15 | Caps feel punitive; trust the user with the full app. |
-| 9 | Android: no `INTERNET` permission; iOS: ATS-deny + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; verifiable-by-source on iOS. |
+| 9 | Android: no `INTERNET` permission; iOS: strict ATS defaults with every exception disabled + no networking code | 2026-04-15 | Kernel-enforced guarantee on Android; source guards are the verifiable iOS enforcement because ATS is not a kernel-level denial. |
 | 10 | Source-available under PolyForm Noncommercial 1.0.0 | 2026-04-15 | ~95% of the credibility of MIT/Apache with protection against commercial cloning. |
 | 11 | Support via mailto:, GitHub Issues, manual diagnostics | 2026-04-15 | Backend-free; preserves zero-data-collection. |
 | 12 | Named the app **Regards** | 2026-04-15 | Clarity, warmth, searchability; shortlist rejections documented in v0.5. |
@@ -719,10 +719,6 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 36 | `SchedulingPass` actor is the sole writer of ScheduledReminder rows and OS notifications | 2026-07-01 | One idempotent choke point; UI is read-only over persisted reminders. |
 | 37 | `Package.resolved` is committed | 2026-07-01 | Reproducible builds are part of the privacy claim; floating deps contradict it. |
 | 38 | TestFlight execution uses stable `TF-##` IDs and readiness gates, not a fixed public date | 2026-07-29 | The 2026-08-31 anchor expired before the production loop existed. Durable Git/GitHub checkpoints survive agent context and capacity resets; beta throughput determines the public date. |
-
-**2026-08-02 amendment to decision #9:** “ATS-deny” means strict ATS defaults
-with every exception disabled; ATS is not claimed as a kernel-enforced denial.
-The no-network source guard remains the verifiable iOS enforcement.
 
 ## 17. Working rules for implementation agents
 

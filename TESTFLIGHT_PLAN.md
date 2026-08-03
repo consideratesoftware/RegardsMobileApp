@@ -251,15 +251,16 @@ Current gates:
 - 2026-08-02 second hosted-review closure candidate: Contact Detail and Contact
   Preview now share one typed contact-value speech policy, including trimmed
   empty values, punctuation boundaries, and the spoken meaning of the
-  preferred-field dot. All eight accessibility-size view branches now use one
-  shared adaptive-layout builder; the nav header, interaction dates, and
-  Contact Preview field labels no longer rely on fixed heights or widths at
-  accessibility sizes. Contact Preview navigation binds the concrete `Contact`
+  preferred-field dot. Repeated two-branch accessibility layouts now use one
+  shared adaptive-layout builder; small per-control size choices remain inline.
+  The nav header, interaction dates, and Contact Preview field labels no longer
+  rely on fixed heights or widths at accessibility sizes. Contact Preview
+  navigation binds the concrete `Contact`
   destination, and unavailable Caught up / Snooze / Log other stubs are muted
   text rather than inert buttons until TF-04 wires their persistence. The
   unwired Contact Detail and Overdue channel actions follow the same muted,
   noninteractive convention until TF-08 adds real routing. FaceTime values now
-  choose phone or email placement and speech from the value itself. All 125
+  choose phone or email placement and speech from the value itself. All 126
   unit tests and the new deterministic
   `accessibility5` XCUI non-overlap regression pass locally. The repository's
   `a8c9c01` baseline is intentional: it is the merge commit for GitHub PR #23,
@@ -280,7 +281,7 @@ Current gates:
   the remaining Contact Detail and Overdue no-op actions are now muted,
   noninteractive elements; FaceTime email and phone values choose the correct
   field and speech policy; and the canonical census is 125 unit tests plus 19
-  XCUI tests. All 125 unit tests and the focused Contact Detail and Contact
+  XCUI tests. All 126 unit tests and the focused Contact Detail and Contact
   Preview audits passed. The installed exact-source hierarchy exposed the
   unavailable actions without button traits. Only the final staged-review
   verdict remains before merge.
