@@ -185,23 +185,25 @@ you already know the screen is rendered), never for *wait-until-true*.
 
 Rapid simulator relaunches can also leave duplicate tab-button elements in the
 automation hierarchy or drop a synthesized tap. Wait on the plain tab bar,
-resolve the named button again for every attempt, and tap its live center
-coordinate. Do not poll `hittable`: XCUI can record a test failure while a
-transient element has no activation frame. Verify the destination with its
-plain screen identifier while the source screen disappears, and allow two
-bounded re-resolution retries. `navigateToTab` in
-`ScreensAccessibilityTests` is the canonical implementation.
+resolve the named button again for every attempt, then use the canonical
+non-failing bounded `exists && isHittable` poll before activation. Do not use an
+XCTest predicate expectation for hittability: that path can record a test
+failure while a transient element has no activation frame. Verify the
+destination with its plain screen identifier while the source screen
+disappears, and allow two bounded re-resolution retries with varied activation
+paths. `navigateToTab` and `waitUntilLiveAndHittable` in
+`ScreensAccessibilityTests` are the canonical implementation.
 
 Apply the same pattern to pushed navigation: resolve the current trigger
-element for every attempt, tap its live center coordinate, and require the
-plain destination identifier to appear while the source screen identifier
-disappears. `launchToContactDetailFromContacts`, `navigateFromSettings`,
-`navigateToRow`, and the consolidated `navigate` helper are the canonical
-implementations.
+element for every attempt, use the same bounded poll and varied activations,
+and require the plain destination identifier to appear while the source screen
+identifier disappears. `launchToContactDetailFromContacts`,
+`navigateFromSettings`, `navigateToRow`, and the consolidated `navigate` helper
+are the canonical implementations.
 
-The live-center tap is a synchronization workaround for dropped Simulator
-taps. It does not replace hit-region coverage: the sensory audit owns that
-check when its temporary carve-out is removed.
+The varied activation paths are synchronization workarounds for dropped
+Simulator events. They do not replace hit-region coverage: the sensory audit
+owns that check when its temporary carve-out is removed.
 
 This was the underlying race behind `testContactDetailPassesAudit`
 flaking on three consecutive main runs in May 2026. The current tests wait on

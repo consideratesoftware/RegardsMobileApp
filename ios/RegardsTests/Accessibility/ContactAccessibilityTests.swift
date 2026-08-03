@@ -118,19 +118,19 @@ struct ContactAccessibilityTests {
 
     @Test("Contact Preview omits punctuation for an empty field")
     func contactPreviewEmptyFieldSpeech() {
-        #expect(
-            EditContactAccessibility.displayedValue(
-                value: "",
-                placeholder: "Add phone"
-            ) == "Add phone"
-        )
-        let label = EditContactAccessibility.fieldLabel(
+        let emptyLabel = EditContactAccessibility.fieldLabel(
             "mobile",
             displayedValue: "",
             speech: .verbatim
         )
+        let placeholderLabel = EditContactAccessibility.fieldLabel(
+            "mobile",
+            displayedValue: "Add phone",
+            speech: .verbatim
+        )
 
-        #expect(label == "mobile")
+        #expect(emptyLabel == "mobile")
+        #expect(placeholderLabel == "mobile, Add phone")
     }
 
     @Test("Contact Preview speaks multi-dot email punctuation")

@@ -6,10 +6,6 @@ enum EditContactAccessibility {
         case email
     }
 
-    static func displayedValue(value: String, placeholder: String) -> String {
-        value.isEmpty ? placeholder : value
-    }
-
     static func fieldLabel(
         _ label: String,
         displayedValue: String,
@@ -202,10 +198,7 @@ public struct EditContactScreen: View {
                        placeholder: String = "",
                        touched: Bool = false,
                        speech: EditContactAccessibility.ValueSpeech = .verbatim) -> some View {
-        let displayedValue = EditContactAccessibility.displayedValue(
-            value: value,
-            placeholder: placeholder
-        )
+        let displayedValue = value.isEmpty ? placeholder : value
         return HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(label)
                 .font(.footnote.weight(.medium))
