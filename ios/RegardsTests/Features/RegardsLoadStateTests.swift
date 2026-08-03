@@ -94,12 +94,14 @@ private actor ControllableContactRepository: ContactRepository {
 
 @MainActor
 struct RegardsLoadStateTests {
+    // MARK: - Fixtures
+
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    private static func overdueContact() -> Contact {
+    private static func overdueContact(named displayName: String = "Alex Chen") -> Contact {
         Contact(
-            systemContactRef: "load-state-contact",
-            displayName: "Alex Chen",
+            systemContactRef: "load-state-\(displayName)",
+            displayName: displayName,
             tracked: true,
             cadenceDays: 1,
             priorityTier: .close,
@@ -108,6 +110,8 @@ struct RegardsLoadStateTests {
             lastInteractedAt: now.addingTimeInterval(-3 * 86_400)
         )
     }
+
+    // MARK: - Sequential load states
 
     @Test("Overdue clears failed data and a retry can recover")
     func overdueFailureAndRetry() async {
@@ -193,6 +197,8 @@ struct RegardsLoadStateTests {
         #expect(viewModel.summary == "0 tracked")
     }
 
+    // MARK: - Overlapping loads and refresh
+
     @Test("Overdue ignores a stale failed load after a newer load succeeds")
     func overdueIgnoresStaleFailure() async {
         let repository = ControllableContactRepository()
@@ -271,5 +277,65 @@ struct RegardsLoadStateTests {
         await refresh.value
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.contacts.isEmpty)
+    }
+
+    @Test("Overdue keeps loaded content visible while refreshing")
+    func overdueKeepsLoadedContentWhileRefreshing() async {
+        let repository = ControllableContactRepository()
+        let viewModel = OverdueViewModel(contacts: repository, clock: { Self.now })
+
+        let initialLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(1)
+        await repository.succeed(requestID: 0, contacts: [Self.overdueContact()])
+        await initialLoad.value
+
+        let refresh = Task { await viewModel.load() }
+        await repository.waitForRequestCount(2)
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.rows.count == 1)
+
+        await repository.succeed(requestID: 1, contacts: [])
+        await refresh.value
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.rows.isEmpty)
+    }
+
+    @Test("Upcoming keeps loaded content visible while refreshing")
+    func upcomingKeepsLoadedContentWhileRefreshing() async {
+        let repository = ControllableContactRepository()
+        let viewModel = UpcomingViewModel(contacts: repository, clock: { Self.now })
+
+        let initialLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(1)
+        await repository.succeed(requestID: 0, contacts: [Self.overdueContact()])
+        await initialLoad.value
+
+        let refresh = Task { await viewModel.load() }
+        await repository.waitForRequestCount(2)
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.totalCount == 1)
+
+        await repository.succeed(requestID: 1, contacts: [])
+        await refresh.value
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.totalCount == 0)
+        #expect(viewModel.groups.isEmpty)
+    }
+
+    // MARK: - Contacts search
+
+    @Test("Contacts search is a case-insensitive substring filter")
+    func contactsSearchFiltering() async {
+        let alex = Self.overdueContact()
+        let maya = Self.overdueContact(named: "Maya Patel")
+        let repository = ScriptedContactRepository(steps: [.success([alex, maya])])
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        await viewModel.load()
+
+        #expect(Set(viewModel.filtered(searchText: "").map(\.id)) == Set([alex.id, maya.id]))
+        #expect(viewModel.filtered(searchText: "LEX") == [alex])
+        #expect(viewModel.filtered(searchText: "pat") == [maya])
+        #expect(viewModel.filtered(searchText: "nobody").isEmpty)
     }
 }
