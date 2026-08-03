@@ -245,6 +245,12 @@ Current gates:
   initial load remains retryable. Two more cover phone/email classification,
   confidence-based default selection, and targeted selection/primary
   mutations, completing the Merge Duplicates ViewModel suite recorded in R24.
+- The final Merge Duplicates review closure adds the previously missing
+  name-only `.low` confidence proof and makes repository failures explicit.
+  A failed duplicate scan now renders an unavailable state with a retry action
+  instead of falsely claiming that no duplicates were found; the unit suite
+  asserts failed → loaded recovery, and the focused Merge Duplicates
+  accessibility audit passes on the corrected screen.
 
 ### PR #37 accessibility evidence
 

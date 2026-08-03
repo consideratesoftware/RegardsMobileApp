@@ -17,23 +17,7 @@ public struct MergeDuplicatesScreen: View {
                     .padding(.top, 14)
                     .padding(.bottom, 18)
 
-                if viewModel.candidates.isEmpty {
-                    empty
-                } else {
-                    ForEach(viewModel.candidates) { candidate in
-                        CandidateCard(
-                            state: candidate,
-                            onTapPrimary: { isA in
-                                viewModel.setPrimary(for: candidate.id, isA: isA)
-                            },
-                            onTapMerge: {
-                                viewModel.toggleSelection(for: candidate.id)
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    }
-                }
+                content
 
                 Color.clear.frame(height: 40)
             }
@@ -64,13 +48,52 @@ public struct MergeDuplicatesScreen: View {
 
     private var summaryRule: some View {
         HStack(spacing: 14) {
-            Text("\(viewModel.candidates.count) candidate\(viewModel.candidates.count == 1 ? "" : "s")")
+            Text(summaryLabel)
                 .font(RegardsFont.mono(.caption))
                 .foregroundStyle(RegardsDS.muted)
             Hair().frame(maxWidth: .infinity)
             Text("ranked by strength")
                 .font(RegardsFont.mono(.caption))
                 .foregroundStyle(RegardsDS.muted)
+        }
+    }
+
+    private var summaryLabel: String {
+        switch viewModel.loadState {
+        case .loading:
+            "Checking contacts"
+        case .failed:
+            "Check unavailable"
+        case .loaded:
+            "\(viewModel.candidates.count) candidate\(viewModel.candidates.count == 1 ? "" : "s")"
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.loadState {
+        case .loading:
+            ProgressView("Checking contacts")
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+        case .failed:
+            loadError
+        case .loaded where viewModel.candidates.isEmpty:
+            empty
+        case .loaded:
+            ForEach(viewModel.candidates) { candidate in
+                CandidateCard(
+                    state: candidate,
+                    onTapPrimary: { isA in
+                        viewModel.setPrimary(for: candidate.id, isA: isA)
+                    },
+                    onTapMerge: {
+                        viewModel.toggleSelection(for: candidate.id)
+                    }
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
         }
     }
 
@@ -87,6 +110,22 @@ public struct MergeDuplicatesScreen: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
         .padding(.top, 40)
+    }
+
+    private var loadError: some View {
+        ContentUnavailableView {
+            Label("Unable to check for duplicates", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("Your contacts are still on this device. Try checking them again.")
+        } actions: {
+            Button("Try Again") {
+                Task { await viewModel.load() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(RegardsDS.accentInk)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 32)
     }
 }
 

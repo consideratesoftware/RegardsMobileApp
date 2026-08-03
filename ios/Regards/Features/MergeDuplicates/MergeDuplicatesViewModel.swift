@@ -24,6 +24,7 @@ public struct DuplicateCandidateState: Sendable, Identifiable, Equatable {
 public final class MergeDuplicatesViewModel {
 
     public private(set) var candidates: [DuplicateCandidateState] = []
+    private(set) var loadState: RegardsLoadState = .loading
 
     private let contacts: any ContactRepository
     private let detector = DuplicateDetector()
@@ -36,6 +37,7 @@ public final class MergeDuplicatesViewModel {
     public func load() async {
         guard !hasLoaded else { return }
         hasLoaded = true
+        loadState = .loading
 
         let all: [Contact]
         do {
@@ -44,6 +46,7 @@ public final class MergeDuplicatesViewModel {
             hasLoaded = false
             Self.log.error("failed to fetch contacts for duplicate detection: \(error, privacy: .public)")
             candidates = []
+            loadState = .failed
             return
         }
         let inputs = all.map { contact in
@@ -72,6 +75,7 @@ public final class MergeDuplicatesViewModel {
                 isSelected: pair.confidence == .high
             )
         }
+        loadState = .loaded
     }
 
     public func toggleSelection(for id: String) {
