@@ -9,6 +9,7 @@ final class AllContactsViewModel {
 
     private let repository: any ContactRepository
     private let clock: () -> Date
+    private var loadGeneration = 0
 
     init(contacts: any ContactRepository,
          clock: @escaping () -> Date = { Date() }) {
@@ -33,14 +34,23 @@ final class AllContactsViewModel {
     }
 
     func load() async {
-        loadState = .loading
-        now = clock()
+        loadGeneration += 1
+        let generation = loadGeneration
+        if loadState != .loaded {
+            loadState = .loading
+        }
+        let loadedAt = clock()
         do {
-            contacts = try await repository.fetchTracked()
-            contacts.sort { $0.priorityTier.rawValue < $1.priorityTier.rawValue }
+            var loadedContacts = try await repository.fetchTracked()
+            loadedContacts.sort { $0.priorityTier.rawValue < $1.priorityTier.rawValue }
+            guard generation == loadGeneration else { return }
+            now = loadedAt
+            contacts = loadedContacts
             loadState = .loaded
         } catch {
+            guard generation == loadGeneration else { return }
             Self.log.error("failed to load tracked contacts: \(error, privacy: .public)")
+            now = loadedAt
             contacts = []
             loadState = .failed
         }

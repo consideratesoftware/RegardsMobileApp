@@ -32,6 +32,7 @@ public final class OverdueViewModel {
     private let contacts: any ContactRepository
     private let clock: () -> Date
     private let calendar: Calendar
+    private var loadGeneration = 0
 
     /// `calendar` is injected so tests (and future multi-timezone logic)
     /// can pin the day math to a fixed TZ. Production uses `.current`
@@ -49,11 +50,15 @@ public final class OverdueViewModel {
     }
 
     public func load() async {
-        loadState = .loading
+        loadGeneration += 1
+        let generation = loadGeneration
+        if loadState != .loaded {
+            loadState = .loading
+        }
         do {
             let all = try await contacts.fetchTracked()
             let now = clock()
-            rows = all.compactMap { Self.makeOverdueRow(for: $0, now: now, calendar: calendar) }
+            let loadedRows = all.compactMap { Self.makeOverdueRow(for: $0, now: now, calendar: calendar) }
                 .filter { $0.overdueDays > 0 }
                 .sorted {
                     if $0.priority.rawValue != $1.priority.rawValue {
@@ -61,8 +66,11 @@ public final class OverdueViewModel {
                     }
                     return $0.overdueDays > $1.overdueDays
                 }
+            guard generation == loadGeneration else { return }
+            rows = loadedRows
             loadState = .loaded
         } catch {
+            guard generation == loadGeneration else { return }
             Self.log.error("failed to load tracked contacts: \(error, privacy: .public)")
             rows = []
             loadState = .failed

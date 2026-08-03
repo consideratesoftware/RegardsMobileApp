@@ -27,6 +27,7 @@ public final class UpcomingViewModel {
     private let engine: ReminderEngine
     private let window: ReminderWindow
     private let clock: () -> Date
+    private var loadGeneration = 0
 
     public init(contacts: any ContactRepository,
                 engine: ReminderEngine = ReminderEngine(),
@@ -39,15 +40,21 @@ public final class UpcomingViewModel {
     }
 
     public func load() async {
-        loadState = .loading
+        loadGeneration += 1
+        let generation = loadGeneration
+        if loadState != .loaded {
+            loadState = .loading
+        }
         do {
             let tracked = try await contacts.fetchTracked()
             let now = clock()
             let rows = buildRows(contacts: tracked, now: now)
+            guard generation == loadGeneration else { return }
             totalCount = rows.count
             groups = group(rows: rows)
             loadState = .loaded
         } catch {
+            guard generation == loadGeneration else { return }
             Self.log.error("failed to load upcoming reminders: \(error, privacy: .public)")
             groups = []
             totalCount = 0

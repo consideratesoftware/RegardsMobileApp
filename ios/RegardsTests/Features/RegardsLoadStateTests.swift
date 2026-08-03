@@ -45,6 +45,53 @@ private actor ScriptedContactRepository: ContactRepository {
     func archive(id: UUID, at: Date) async throws {}
 }
 
+private actor ControllableContactRepository: ContactRepository {
+    enum TestError: Error {
+        case unavailable
+    }
+
+    private var nextRequestID = 0
+    private var requests: [Int: CheckedContinuation<[Contact], any Error>] = [:]
+
+    func fetchAll() async throws -> [Contact] {
+        try await fetchTracked()
+    }
+
+    func fetchTracked() async throws -> [Contact] {
+        let requestID = nextRequestID
+        nextRequestID += 1
+        return try await withCheckedThrowingContinuation { continuation in
+            requests[requestID] = continuation
+        }
+    }
+
+    func waitForRequestCount(_ count: Int) async {
+        while nextRequestID < count {
+            await Task.yield()
+        }
+    }
+
+    func succeed(requestID: Int, contacts: [Contact]) {
+        requests.removeValue(forKey: requestID)?.resume(returning: contacts)
+    }
+
+    func fail(requestID: Int) {
+        requests.removeValue(forKey: requestID)?.resume(throwing: TestError.unavailable)
+    }
+
+    func fetch(id: UUID) async throws -> Contact? {
+        nil
+    }
+
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        []
+    }
+
+    func upsert(_ contact: Contact) async throws {}
+
+    func archive(id: UUID, at: Date) async throws {}
+}
+
 @MainActor
 struct RegardsLoadStateTests {
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -144,5 +191,85 @@ struct RegardsLoadStateTests {
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.contacts.isEmpty)
         #expect(viewModel.summary == "0 tracked")
+    }
+
+    @Test("Overdue ignores a stale failed load after a newer load succeeds")
+    func overdueIgnoresStaleFailure() async {
+        let repository = ControllableContactRepository()
+        let viewModel = OverdueViewModel(contacts: repository, clock: { Self.now })
+
+        let firstLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(1)
+        let secondLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(2)
+
+        await repository.succeed(requestID: 1, contacts: [Self.overdueContact()])
+        await secondLoad.value
+        await repository.fail(requestID: 0)
+        await firstLoad.value
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.rows.count == 1)
+    }
+
+    @Test("Upcoming ignores a stale failed load after a newer load succeeds")
+    func upcomingIgnoresStaleFailure() async {
+        let repository = ControllableContactRepository()
+        let viewModel = UpcomingViewModel(contacts: repository, clock: { Self.now })
+
+        let firstLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(1)
+        let secondLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(2)
+
+        await repository.succeed(requestID: 1, contacts: [Self.overdueContact()])
+        await secondLoad.value
+        await repository.fail(requestID: 0)
+        await firstLoad.value
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.totalCount == 1)
+        #expect(viewModel.groups.count == 1)
+    }
+
+    @Test("Contacts ignores a stale failed load after a newer load succeeds")
+    func contactsIgnoresStaleFailure() async {
+        let repository = ControllableContactRepository()
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        let firstLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(1)
+        let secondLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(2)
+
+        await repository.succeed(requestID: 1, contacts: [Self.overdueContact()])
+        await secondLoad.value
+        await repository.fail(requestID: 0)
+        await firstLoad.value
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.count == 1)
+        #expect(viewModel.summary == "1 tracked")
+    }
+
+    @Test("Contacts keeps loaded content visible while refreshing")
+    func contactsKeepsLoadedContentWhileRefreshing() async {
+        let repository = ControllableContactRepository()
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        let initialLoad = Task { await viewModel.load() }
+        await repository.waitForRequestCount(1)
+        await repository.succeed(requestID: 0, contacts: [Self.overdueContact()])
+        await initialLoad.value
+
+        let refresh = Task { await viewModel.load() }
+        await repository.waitForRequestCount(2)
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.count == 1)
+
+        await repository.succeed(requestID: 1, contacts: [])
+        await refresh.value
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.isEmpty)
     }
 }
