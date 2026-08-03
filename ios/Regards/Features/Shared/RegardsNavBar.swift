@@ -182,6 +182,7 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(option.label)\(option.count.map { ", \($0)" } ?? "")")
             .accessibilityAddTraits(selection == option.id ? .isSelected : [])
+            .accessibilityIdentifier("regards-segment.\(option.label.lowercased())")
         }
     }
 }

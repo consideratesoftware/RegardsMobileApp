@@ -206,6 +206,9 @@ public struct EditContactScreen: View {
                 channel: channel
             )
         )
+        .accessibilityIdentifier(
+            "edit-contact.field-\(label.lowercased().replacingOccurrences(of: " ", with: "-"))"
+        )
     }
 
     static func accessibilityFieldLabel(
@@ -214,14 +217,12 @@ public struct EditContactScreen: View {
         touched: Bool,
         channel: Channel?
     ) -> String {
-        let hasPreferredValue = touched
-            && !displayedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         if let channel {
             return ContactValueAccessibility.label(
                 label,
                 displayedValue: displayedValue,
                 channel: channel,
-                annotation: hasPreferredValue ? "preferred" : nil
+                annotation: touched ? "preferred" : nil
             )
         }
 
@@ -229,7 +230,7 @@ public struct EditContactScreen: View {
             label,
             displayedValue: displayedValue,
             speech: .verbatim,
-            annotation: hasPreferredValue ? "preferred" : nil
+            annotation: touched ? "preferred" : nil
         )
     }
 

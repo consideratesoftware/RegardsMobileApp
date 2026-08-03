@@ -312,6 +312,19 @@ Current gates:
   #39 records the scheduled-audit policy without replacing PR18's historical
   5/5 ×3 evidence. The exact final SHA and smoke results will be bound together
   in the required PR comment after the final push.
+- 2026-08-03 exact-head hosted-review response: the App review of `95c60c6`
+  caught one remaining empty preferred-value annotation in Contact Detail.
+  The shared label path now gates “preferred” on a nonblank value and has a
+  matching unit regression. The response also reconciles AGENTS.md's ATS
+  wording, restores two-second default hittability polling, verifies nonzero
+  frames before overlap comparisons, covers the no-channel Contact Preview
+  speech branch, and extends the focused `accessibility5` regression across
+  the segmented control, digest, Overdue and Upcoming rows, Contact Detail
+  cadence layout, and Contact Preview fields. The 21-test contact-accessibility
+  unit suite, all 131 unit tests, the expanded focused XCUI regression, and the
+  unavailable-action contract regression pass. No repeated local stress sweep
+  was run; the exact final SHA and current-source smoke will be recorded in the
+  PR comment after the final push.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four

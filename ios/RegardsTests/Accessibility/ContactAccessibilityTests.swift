@@ -206,6 +206,18 @@ struct ContactAccessibilityTests {
         #expect(label == "personal, obiwan at jeditemple dot org, preferred")
     }
 
+    @Test("Preferred-state meaning requires a spoken value")
+    func preferredStateRequiresValue() {
+        let label = ContactValueAccessibility.label(
+            "personal",
+            displayedValue: "  \n",
+            speech: .email,
+            annotation: "preferred"
+        )
+
+        #expect(label == "personal")
+    }
+
     @Test("FaceTime email and phone values use their matching speech policy")
     func faceTimeValueSpeech() {
         let emailLabel = ContactValueAccessibility.label(
@@ -281,5 +293,29 @@ struct ContactAccessibilityTests {
         )
 
         #expect(label == "mobile")
+    }
+
+    @Test("Contact Detail does not prefer an empty channel value")
+    @MainActor
+    func contactDetailDoesNotPreferEmptyValue() {
+        var contact = Self.makeContact()
+        contact.preferredChannelValue = "  \n"
+
+        let label = ContactDetailScreen.channelSummaryAccessibilityLabel(contact: contact)
+
+        #expect(label == "WhatsApp")
+    }
+
+    @Test("Contact Preview preserves a non-channel field verbatim")
+    @MainActor
+    func contactPreviewNonChannelFieldSpeech() {
+        let label = EditContactScreen.accessibilityFieldLabel(
+            "home",
+            displayedValue: "Add phone",
+            touched: false,
+            channel: nil
+        )
+
+        #expect(label == "home, Add phone")
     }
 }

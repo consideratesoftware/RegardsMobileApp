@@ -221,15 +221,17 @@ public struct ContactDetailScreen: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            ContactValueAccessibility.label(
-                contact.preferredChannel.displayName,
-                displayedValue: contact.preferredChannelValue,
-                channel: contact.preferredChannel,
-                annotation: "preferred"
-            )
-        )
+        .accessibilityLabel(Self.channelSummaryAccessibilityLabel(contact: contact))
         .accessibilityIdentifier("contact-detail.channel-summary")
+    }
+
+    static func channelSummaryAccessibilityLabel(contact: Contact) -> String {
+        ContactValueAccessibility.label(
+            contact.preferredChannel.displayName,
+            displayedValue: contact.preferredChannelValue,
+            channel: contact.preferredChannel,
+            annotation: "preferred"
+        )
     }
 
     private var interactionsCard: some View {
@@ -339,13 +341,16 @@ private extension ContactDetailScreen {
             Text(value)
                 .font(.body.weight(isAccent ? .semibold : .medium))
                 .foregroundStyle(valueColor(isAccent: isAccent, isDanger: isDanger))
+                .accessibilityIdentifier(
+                    "contact-detail.detail-value-\(label.lowercased().replacingOccurrences(of: " ", with: "-"))"
+                )
         }
     }
 
     @ViewBuilder
     func stubAction(_ action: String?, identifier: String? = nil) -> some View {
-        // Stub label — Phase 1 wires each of these to a real editor. For
-        // now we render muted so it doesn't look tap-affordable.
+        // TF-04/TF-08 wire these to real actions. Until then, muted text
+        // accurately communicates that the labels are unavailable.
         if let action {
             Text(action)
                 .font(.subheadline.weight(.medium))
