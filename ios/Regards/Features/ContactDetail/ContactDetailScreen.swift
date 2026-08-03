@@ -3,11 +3,8 @@ import SwiftUI
 public struct ContactDetailScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private struct EditRoute: Hashable {
-        let contact: Contact
-    }
-
     @State private var viewModel: ContactDetailViewModel
+    @State private var isPresentingContactPreview = false
     private let onTapOpenChannel: () -> Void
     private let onTapMarkCaughtUp: () -> Void
 
@@ -66,16 +63,21 @@ public struct ContactDetailScreen: View {
         .accessibilityIdentifier("screen.contact-detail")
         .navigationTitle("Contact")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: EditRoute.self) { route in
-            EditContactScreen(contact: route.contact)
+        .navigationDestination(isPresented: $isPresentingContactPreview) {
+            if let contact = viewModel.contact {
+                EditContactScreen(contact: contact)
+            }
         }
         .toolbar {
-            if let contact = viewModel.contact {
+            if viewModel.contact != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(value: EditRoute(contact: contact)) {
+                    Button {
+                        isPresentingContactPreview = true
+                    } label: {
                         Text("Edit")
                             .foregroundStyle(RegardsDS.accentInk)
                     }
+                    .accessibilityIdentifier("contact-detail.edit")
                 }
             }
         }

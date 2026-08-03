@@ -117,7 +117,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             triggerDescription: "Edit",
             in: app
         ) {
-            app.navigationBars.buttons["Edit"]
+            editButton(in: app)
         }
         assertReadOnlyBanner(in: app)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
@@ -141,7 +141,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             sourceIdentifier: "screen.overdue",
             in: app
         )
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -160,7 +160,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             sourceIdentifier: "screen.upcoming",
             in: app
         )
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -179,7 +179,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             triggerDescription: "Edit",
             in: app
         ) {
-            app.navigationBars.buttons["Edit"]
+            editButton(in: app)
         }
         assertReadOnlyBanner(in: app)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
@@ -214,7 +214,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             triggerDescription: "Edit",
             in: app
         ) {
-            app.navigationBars.buttons["Edit"]
+            editButton(in: app)
         }
         assertReadOnlyBanner(in: app)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
@@ -239,7 +239,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             triggerDescription: "Edit",
             in: app
         ) {
-            app.navigationBars.buttons["Edit"]
+            editButton(in: app)
         }
         assertReadOnlyBanner(in: app)
 
@@ -286,7 +286,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             in: app
         )
         let firstDetail = app.descendants(matching: .any)["screen.contact-detail"]
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
         // The hero header text is the only `staticText` child with an
         // `.isHeader` trait on this screen.
         let firstName = firstDetail.staticTexts
@@ -311,7 +311,7 @@ final class ScreensAccessibilityTests: XCTestCase {
             in: app
         )
         let secondDetail = app.descendants(matching: .any)["screen.contact-detail"]
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
         let secondName = secondDetail.staticTexts
             .matching(NSPredicate(format: "traits & %llu != 0", UIAccessibilityTraits.header.rawValue))
             .firstMatch.label
