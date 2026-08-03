@@ -11,8 +11,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Baseline: `main` at `209171c` (merged GitHub PR #37 accessibility follow-up)
 - Active work: `TF-01` (GitHub PR #24 stable-platform modernization)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #24 (`ios/modern-platform-showcase`, draft;
-  exact-source manual smoke complete; final staged review and publication next)
+- Open pull request: GitHub PR #24 (`ios/modern-platform-showcase`, published;
+  exact-source manual smoke complete; hosted concurrency blocker repaired and
+  awaiting exact-head re-review)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -162,10 +163,13 @@ slices. The order is fixed while the current pull requests remain open:
    and confirms R29's earlier closure.
 4. ACTIVE: GitHub PR #24 is the owner-directed platform-modernization slice.
    It is rebased onto current `main`; its focused checks and exact-source
-   manual accessibility smoke are complete. Publish it after the final staged
-   review approves, then require the hosted semantic verdict and all protected
-   checks before guarded auto-merge. Broad 5× sweeps remain owned by
-   post-merge, nightly, and pre-release automation.
+   manual accessibility smoke are complete and it is published. The first
+   hosted semantic review found an overlapping-load race in the three primary
+   tab ViewModels; the branch now ignores stale completions, preserves loaded
+   Contacts content during refresh, and proves both behaviors with controlled
+   interleaving tests. Require the exact-head hosted verdict and all protected
+   checks before guarded auto-merge. Broad 5× sweeps remain owned by post-merge,
+   nightly, and pre-release automation.
 5. Finish the remaining PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
@@ -209,6 +213,12 @@ Current gates:
 - SwiftLint passed with zero violations. No local 5× sweep was run; the latest
   current-`main` one-run audit and scheduled 5× stress workflow are green, and
   those workflows continue to own broad repetition.
+- The first hosted semantic review found that overlapping initial-load and
+  retry tasks could complete out of order. Overdue, Upcoming, and Contacts now
+  generation-gate every completion so a stale failure cannot overwrite newer
+  loaded data. Four focused unit tests deterministically interleave requests
+  across all three ViewModels and verify that Contacts keeps existing content
+  visible during a refresh.
 
 ### PR #37 accessibility evidence
 
