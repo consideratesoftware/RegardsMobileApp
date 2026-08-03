@@ -64,7 +64,7 @@ extension ScreensAccessibilityTests {
             detail.exists && !contacts.exists,
             "The first Contacts row should replace Contacts with Contact Detail."
         )
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
         return app
     }
 
@@ -229,7 +229,7 @@ extension ScreensAccessibilityTests {
             triggerDescription: "Edit",
             in: app
         ) {
-            app.navigationBars.buttons["Edit"]
+            editButton(in: app)
         }
         assertReadOnlyBanner(in: app)
         navigate(
@@ -240,7 +240,7 @@ extension ScreensAccessibilityTests {
         ) {
             app.navigationBars.buttons["Contact"]
         }
-        XCTAssertTrue(app.navigationBars.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
     }
 
     @MainActor
@@ -286,6 +286,11 @@ extension ScreensAccessibilityTests {
         } while Date() < deadline
 
         return element.exists && element.isHittable
+    }
+
+    @MainActor
+    func editButton(in app: XCUIApplication) -> XCUIElement {
+        app.navigationBars.buttons["contact-detail.edit"]
     }
 
 }
