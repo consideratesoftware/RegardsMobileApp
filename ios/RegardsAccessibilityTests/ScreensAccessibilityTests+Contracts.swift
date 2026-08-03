@@ -2,6 +2,19 @@ import XCTest
 
 extension ScreensAccessibilityTests {
     @MainActor
+    func testContactDetailBackReturnsToContacts() {
+        let app = launchToContactDetailFromContacts()
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.contacts",
+            triggerDescription: "Contacts back button",
+            in: app
+        ) {
+            app.navigationBars.buttons.element(boundBy: 0)
+        }
+    }
+
+    @MainActor
     func testAccessibility5AdaptiveContentDoesNotOverlap() {
         let app = launchToOverdue(dynamicTypeSize: "accessibility5")
         XCTAssertTrue(
