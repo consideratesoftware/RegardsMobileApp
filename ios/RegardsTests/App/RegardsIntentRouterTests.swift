@@ -62,11 +62,13 @@ struct RegardsIntentRouterTests {
         let navigation = RegardsNavigationState(selected: .contacts)
         navigation.overduePath.append(UUID())
         navigation.contactsPath.append(UUID())
+        navigation.contactsSearchText = "no matches"
 
         navigation.openRoot(.contacts)
 
         #expect(navigation.selected == .contacts)
         #expect(navigation.contactsPath.isEmpty)
+        #expect(navigation.contactsSearchText.isEmpty)
         #expect(navigation.overduePath.count == 1)
     }
 

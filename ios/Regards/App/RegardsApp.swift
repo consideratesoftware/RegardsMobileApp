@@ -112,7 +112,6 @@ struct RegardsTabRoot: View {
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
     @State private var mergeDuplicatesVM: MergeDuplicatesViewModel
-    @State private var contactsSearchText = ""
     @State private var intentRouter = RegardsIntentRouter.shared
     @Namespace private var overdueContactTransition
     @Namespace private var upcomingContactTransition
@@ -237,7 +236,7 @@ struct RegardsTabRoot: View {
         NavigationStack(path: $navigation.contactsPath) {
             AllContactsScreen(
                 env: env,
-                searchText: $contactsSearchText
+                searchText: $navigation.contactsSearchText
             )
             .navigationDestination(for: UUID.self) { contactId in
                 contactDetail(for: contactId)

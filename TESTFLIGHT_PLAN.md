@@ -251,6 +251,12 @@ Current gates:
   instead of falsely claiming that no duplicates were found; the unit suite
   asserts failed → loaded recovery, and the focused Merge Duplicates
   accessibility audit passes on the corrected screen.
+- App-Shortcut root navigation now owns Contacts search state alongside the
+  Contacts navigation path. Opening Contacts from a system request clears both
+  the pushed path and any stale filter; the focused router test proves the
+  reset while preserving the other tabs' stacks. Architecture §10 and R11 now
+  also record that the obsolete inert Horizon/All controls were removed, with
+  the real horizon editor still owned by TF-05.
 
 ### PR #37 accessibility evidence
 
