@@ -265,8 +265,14 @@ Current gates:
   and the new `accessibility5` regression. The fifth local run was intentionally
   stopped in progress after the owner removed repeated local sweeps from the
   PR policy; it did not report a test failure. Post-merge/nightly automation now
-  owns repeated 5× stress. The current-source manual smoke and staged-review
-  evidence remain before merge.
+  owns repeated 5× stress. The final implementation source at `57c2f37` then
+  built in Release and was installed and launched on the pinned iOS 26.5
+  iPhone 17 Pro. Its current-source Simulator hierarchy confirmed the Contact
+  Detail → Contact Preview route, the standard Back button labelled “Contact,”
+  return to Contact Detail, and Obi-Wan Kenobi's preferred channel as the
+  single element “Email, obiwan at jeditemple dot org, preferred.” The
+  deterministic `accessibility5` layout regression passed against that source.
+  Only the final staged-review verdict remains before merge.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
