@@ -18,15 +18,21 @@ struct RegardsApp: App {
 /// Gives UI tests a deterministic way to exercise accessibility layouts
 /// without changing the shared Simulator's system settings.
 private struct UITestDynamicTypeOverride: ViewModifier {
+#if DEBUG
     private let requestedSize = ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DYNAMIC_TYPE"]
+#endif
 
     @ViewBuilder
     func body(content: Content) -> some View {
+#if DEBUG
         if requestedSize == "accessibility5" {
             content.environment(\.dynamicTypeSize, .accessibility5)
         } else {
             content
         }
+#else
+        content
+#endif
     }
 }
 
