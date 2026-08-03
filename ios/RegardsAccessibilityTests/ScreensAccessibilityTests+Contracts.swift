@@ -15,6 +15,62 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
+    func testMergeCandidateChoicesSurviveTabRoundTrip() {
+        let app = launchToSettings(includeDuplicateFixture: true)
+        navigateFromSettings(
+            triggerIdentifier: "settings.find-duplicate-contacts",
+            to: "screen.merge-duplicates",
+            in: app
+        )
+
+        let plainSelection = app.buttons["merge-duplicates.selection"]
+        let plainSecondary = app.buttons["merge-duplicates.primary-b"]
+        XCTAssertTrue(plainSelection.waitForExistence(timeout: 10))
+        XCTAssertTrue(plainSecondary.waitForExistence(timeout: 10))
+
+        let selection = app.buttons
+            .matching(identifier: "merge-duplicates.selection")
+            .firstMatch
+        let secondary = app.buttons
+            .matching(identifier: "merge-duplicates.primary-b")
+            .firstMatch
+        XCTAssertEqual(selection.label, "Merge virtually")
+        XCTAssertTrue(secondary.label.contains("Phone"))
+        XCTAssertTrue(secondary.label.contains("+1 415 555 0198"))
+        XCTAssertFalse(secondary.label.hasSuffix(", primary"))
+        XCTAssertTrue(waitUntilLiveAndHittable(selection))
+        activate(selection, attempt: 0)
+        XCTAssertEqual(selection.label, "Not a match")
+        XCTAssertTrue(waitUntilLiveAndHittable(secondary))
+        activate(secondary, attempt: 0)
+        XCTAssertTrue(secondary.label.hasSuffix(", primary"))
+
+        navigateToTab(
+            named: "Overdue",
+            from: "screen.merge-duplicates",
+            to: "screen.overdue",
+            in: app
+        )
+        navigateToTab(
+            named: "Settings",
+            from: "screen.overdue",
+            to: "screen.merge-duplicates",
+            in: app
+        )
+
+        let restoredSelection = app.buttons
+            .matching(identifier: "merge-duplicates.selection")
+            .firstMatch
+        let restoredSecondary = app.buttons
+            .matching(identifier: "merge-duplicates.primary-b")
+            .firstMatch
+        XCTAssertTrue(restoredSelection.exists)
+        XCTAssertTrue(restoredSecondary.exists)
+        XCTAssertEqual(restoredSelection.label, "Not a match")
+        XCTAssertTrue(restoredSecondary.label.hasSuffix(", primary"))
+    }
+
+    @MainActor
     func testAccessibility5AdaptiveContentDoesNotOverlap() {
         let app = launchToOverdue(dynamicTypeSize: "accessibility5")
         XCTAssertTrue(

@@ -5,7 +5,16 @@ import SwiftUI
 struct RegardsApp: App {
     // Phase 0 runs against MockRepositories. Phase 1 swaps in GRDBRepositories
     // here without touching any view code.
-    private let env = AppEnvironment.makeMock()
+    private let env: AppEnvironment = {
+#if DEBUG
+        AppEnvironment.makeMock(
+            includeDuplicateFixture:
+                ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1"
+        )
+#else
+        AppEnvironment.makeMock()
+#endif
+    }()
 
     var body: some Scene {
         WindowGroup {
@@ -102,6 +111,7 @@ struct RegardsTabRoot: View {
     @State private var navigation = RegardsNavigationState()
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
+    @State private var mergeDuplicatesVM: MergeDuplicatesViewModel
     @State private var contactsSearchText = ""
     @State private var intentRouter = RegardsIntentRouter.shared
     @Namespace private var overdueContactTransition
@@ -112,6 +122,9 @@ struct RegardsTabRoot: View {
         self.env = env
         self._overdueVM = State(initialValue: OverdueViewModel(contacts: env.contacts))
         self._upcomingVM = State(initialValue: UpcomingViewModel(contacts: env.contacts))
+        self._mergeDuplicatesVM = State(
+            initialValue: MergeDuplicatesViewModel(contacts: env.contacts)
+        )
     }
 
     var body: some View {
@@ -254,9 +267,7 @@ struct RegardsTabRoot: View {
         case .reminderWindows:
             ReminderWindowsScreen()
         case .mergeDuplicates:
-            MergeDuplicatesScreen(
-                viewModel: MergeDuplicatesViewModel(contacts: env.contacts)
-            )
+            MergeDuplicatesScreen(viewModel: mergeDuplicatesVM)
         case .transparency:
             TransparencyScreen()
         case .onboarding:

@@ -104,7 +104,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Contact Detail (via Upcoming → row) | PR5 | Factory-built VM per push. |
 | Contact Preview (via Contacts → Contact Detail → Edit) | TF-01 / GitHub PRs #23, #37 | Structural audit coverage, speakable preferred-field state, and standard Back escape route; the real form remains TF-09. |
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
-| Merge Duplicates | PR3 | Reached via Settings → Find duplicate contacts. |
+| Merge Duplicates | PR3 / TF-01 | Reached via Settings → Find duplicate contacts; candidate choices survive a tab-root round trip. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
 | Onboarding | PR3 | Reached via Settings → Onboarding preview. |
 
