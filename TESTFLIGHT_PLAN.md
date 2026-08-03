@@ -12,14 +12,13 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Active work: `TF-01` (GitHub PR #24 stable-platform modernization)
 - Next ready work: none (`TF-02` follows completed `TF-01`)
 - Open pull request: GitHub PR #24 (`ios/modern-platform-showcase`, draft;
-  rebasing and verification in progress on current `main`)
+  exact-source manual smoke complete; final staged review and publication next)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: unlock the Mac once and leave the desktop available
-  so the scheduled continuation can complete PR #24's exact-head VoiceOver
-  traversal. No product, legal, signing, or App Store decision is required.
+- Owner action needed now: none. The unlocked-Mac handoff for PR #24 is
+  complete; no product, legal, signing, or App Store decision is required.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -162,9 +161,11 @@ slices. The order is fixed while the current pull requests remain open:
    This closes the remaining R13, R16, R27, R28, and R43 acceptance evidence
    and confirms R29's earlier closure.
 4. ACTIVE: GitHub PR #24 is the owner-directed platform-modernization slice.
-   Rebase it onto current `main`, publish it, then run its focused checks,
-   staged review, and manual accessibility smoke. Broad 5× sweeps remain owned
-   by post-merge, nightly, and pre-release automation.
+   It is rebased onto current `main`; its focused checks and exact-source
+   manual accessibility smoke are complete. Publish it after the final staged
+   review approves, then require the hosted semantic verdict and all protected
+   checks before guarded auto-merge. Broad 5× sweeps remain owned by
+   post-merge, nightly, and pre-release automation.
 5. Finish the remaining PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
@@ -178,18 +179,36 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- `TF-01` platform-modernization slice / PR #24: after focused automated
-  checks and staged review are green, run the manual
-  VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
-  Contrast smoke against the modernized UI, record exact-head evidence, then
-  publish it and enable guarded auto-merge only after hosted review approval.
+- No owner gate is active. PR #24's unlocked-Mac handoff and manual
+  accessibility traversal are complete. Publication, hosted review, required
+  checks, and guarded auto-merge are agent-owned repository work.
 
-  Human handoff checklist: the owner unlocks the Mac. The scheduled
-  continuation then builds and launches the exact remote head on the pinned
-  simulator, completes the documented VoiceOver focus-order, label, hint,
-  action, and Back-escape traversal, records the result, restores VoiceOver,
-  reruns the accessibility and fit/finish verdicts, and publishes the pull
-  request only when no blocker remains.
+### PR #24 modernization accessibility evidence
+
+- Implementation `0188901` was built, installed, and launched with Xcode 26.6
+  on the pinned iOS 26.5 iPhone 17 Pro simulator. Accessibility Inspector was
+  targeted to the running Regards process; its inspection pointer and the
+  Simulator accessibility hierarchy supplied the documented VoiceOver
+  emulation gate.
+- The traversal reached Overdue, Upcoming, Contacts, Settings, Contact Detail,
+  and Reminder Windows. It exposed screen and section headings, selected
+  segments, natural-language row labels, action hints, search-field traits,
+  tab reachability, and labeled Back escapes. Unavailable channel and logging
+  actions had no button trait. Upcoming and Contacts both reached Contact
+  Detail and returned without trapping focus.
+- The traversal found one defect the structural audit did not: the second
+  `T` day pill announced “Tuesday” instead of “Thursday,” and both `S` pills
+  shared one ambiguous name. Implementation `0188901` binds every day to its
+  full name. The focused Reminder Windows audit now asserts “Thursday
+  allowed,” “Sunday not allowed,” and “Saturday not allowed” and passes.
+- Dynamic Type `accessibility5` exposed the corrected labels and complete
+  Reminder Windows content. Reduce Motion and Increased Contrast were tested
+  on and off; dark increased-contrast content, selection, rings, icons, and
+  navigation remained visible and usable. The simulator was restored to
+  light appearance, `large` text, standard contrast, and Reduce Motion off.
+- SwiftLint passed with zero violations. No local 5× sweep was run; the latest
+  current-`main` one-run audit and scheduled 5× stress workflow are green, and
+  those workflows continue to own broad repetition.
 
 ### PR #37 accessibility evidence
 
