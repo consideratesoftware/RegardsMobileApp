@@ -550,7 +550,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-03):** the unit target has 128 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior. The accessibility target has 20 XCUI tests: 15 structural accessibility audits and 5 navigation, layout, and accessibility-contract regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-03):** the unit target has 131 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, contact accessibility, color contrast, and Overdue ViewModel behavior. The accessibility target has 20 XCUI tests: 15 structural accessibility audits and 5 navigation, layout, and accessibility-contract regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 

@@ -114,12 +114,14 @@ public struct OverdueScreen: View {
         Text("Send your regards —")
             .font(RegardsFont.serifItalic(.title2))
             .foregroundStyle(RegardsDS.ink)
+            .accessibilityIdentifier("overdue.digest-lead")
     }
 
     private var digestTime: some View {
         Text(viewModel.nextDigestLabel)
             .font(.subheadline)
             .foregroundStyle(RegardsDS.muted)
+            .accessibilityIdentifier("overdue.digest-time")
     }
 
     private var emptyState: some View {

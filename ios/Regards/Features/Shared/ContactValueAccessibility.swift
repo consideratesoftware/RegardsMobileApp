@@ -59,7 +59,8 @@ enum ContactValueAccessibility {
         annotation: String? = nil
     ) -> String {
         let trimmedValue = displayedValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = [label, spokenValue(trimmedValue, speech: speech), annotation]
+        let valueAnnotation = trimmedValue.isEmpty ? nil : annotation
+        let parts = [label, spokenValue(trimmedValue, speech: speech), valueAnnotation]
             .compactMap { value -> String? in
                 guard let value, !value.isEmpty else { return nil }
                 return value

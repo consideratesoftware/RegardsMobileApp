@@ -107,7 +107,8 @@ Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is expected before an
 
 ## Info.plist privacy invariants
 
-The app target in `project.yml` pins ATS to deny all loads:
+The app target in `project.yml` keeps ATS strict with every developer-added
+exception disabled:
 
 ```yaml
 NSAppTransportSecurity:

@@ -319,7 +319,7 @@ extension ScreensAccessibilityTests {
     @MainActor
     func waitUntilLiveAndHittable(
         _ element: XCUIElement,
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 2
     ) -> Bool {
         if element.exists, element.isHittable { return true }
 
@@ -335,6 +335,51 @@ extension ScreensAccessibilityTests {
         defer { timer.invalidate() }
 
         return XCTWaiter.wait(for: [live], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    func assertStacked(
+        _ lower: XCUIElement,
+        below upper: XCUIElement,
+        _ message: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertGreaterThan(
+            upper.frame.width,
+            0,
+            "Upper element: \(message)",
+            file: file,
+            line: line
+        )
+        XCTAssertGreaterThan(
+            upper.frame.height,
+            0,
+            "Upper element: \(message)",
+            file: file,
+            line: line
+        )
+        XCTAssertGreaterThan(
+            lower.frame.width,
+            0,
+            "Lower element: \(message)",
+            file: file,
+            line: line
+        )
+        XCTAssertGreaterThan(
+            lower.frame.height,
+            0,
+            "Lower element: \(message)",
+            file: file,
+            line: line
+        )
+        XCTAssertGreaterThanOrEqual(
+            lower.frame.minY,
+            upper.frame.maxY,
+            message,
+            file: file,
+            line: line
+        )
     }
 
     @MainActor
