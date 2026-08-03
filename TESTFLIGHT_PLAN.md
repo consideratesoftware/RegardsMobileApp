@@ -17,7 +17,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none.
+- Owner action needed now: unlock the Mac once and leave the desktop available
+  so the scheduled continuation can complete PR #24's exact-head VoiceOver
+  traversal. No product, legal, signing, or App Store decision is required.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -181,6 +183,13 @@ Current gates:
   VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
   Contrast smoke against the modernized UI, record exact-head evidence, then
   publish it and enable guarded auto-merge only after hosted review approval.
+
+  Human handoff checklist: the owner unlocks the Mac. The scheduled
+  continuation then builds and launches the exact remote head on the pinned
+  simulator, completes the documented VoiceOver focus-order, label, hint,
+  action, and Back-escape traversal, records the result, restores VoiceOver,
+  reruns the accessibility and fit/finish verdicts, and publishes the pull
+  request only when no blocker remains.
 
 ### PR #37 accessibility evidence
 
