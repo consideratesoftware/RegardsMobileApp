@@ -1,32 +1,5 @@
 import SwiftUI
 
-enum EditContactAccessibility {
-    enum ValueSpeech {
-        case verbatim
-        case email
-    }
-
-    static func fieldLabel(
-        _ label: String,
-        displayedValue: String,
-        speech: ValueSpeech
-    ) -> String {
-        guard !displayedValue.isEmpty else { return label }
-
-        let spokenValue = switch speech {
-        case .verbatim:
-            displayedValue
-        case .email:
-            displayedValue
-                .replacingOccurrences(of: "@", with: " at ")
-                .replacingOccurrences(of: ".", with: " dot ")
-                .split(whereSeparator: { $0.isWhitespace })
-                .joined(separator: " ")
-        }
-        return "\(label), \(spokenValue)"
-    }
-}
-
 public struct EditContactScreen: View {
     let contact: Contact
 
@@ -197,35 +170,53 @@ public struct EditContactScreen: View {
                        value: String = "",
                        placeholder: String = "",
                        touched: Bool = false,
-                       speech: EditContactAccessibility.ValueSpeech = .verbatim) -> some View {
-        let displayedValue = value.isEmpty ? placeholder : value
-        return HStack(alignment: .firstTextBaseline, spacing: 16) {
-            Text(label)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(RegardsDS.muted)
-                .frame(width: 84, alignment: .leading)
-            HStack(spacing: 6) {
-                Text(displayedValue)
-                    .font(.body)
-                    .foregroundStyle(value.isEmpty ? RegardsDS.muted : RegardsDS.ink)
-                if touched {
-                    Circle()
-                        .fill(RegardsDS.accent)
-                        .frame(width: 6, height: 6)
-                }
+                       speech: ContactValueAccessibility.ValueSpeech = .verbatim) -> some View {
+        let hasValue = !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let displayedValue = hasValue ? value : placeholder
+        return AccessibilityAdaptiveLayout {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                fieldLabel(label, fixedWidth: 84)
+                fieldValue(displayedValue, hasValue: hasValue, touched: touched)
+                Spacer()
             }
-            Spacer()
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 6) {
+                fieldLabel(label)
+                fieldValue(displayedValue, hasValue: hasValue, touched: touched)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            EditContactAccessibility.fieldLabel(
+            ContactValueAccessibility.label(
                 label,
                 displayedValue: displayedValue,
-                speech: speech
+                speech: speech,
+                annotation: touched ? "preferred" : nil
             )
         )
+    }
+
+    private func fieldLabel(_ label: String, fixedWidth: CGFloat? = nil) -> some View {
+        Text(label)
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(RegardsDS.muted)
+            .frame(width: fixedWidth, alignment: .leading)
+    }
+
+    private func fieldValue(_ value: String, hasValue: Bool, touched: Bool) -> some View {
+        HStack(spacing: 6) {
+            Text(value)
+                .font(.body)
+                .foregroundStyle(hasValue ? RegardsDS.ink : RegardsDS.muted)
+            if touched {
+                Circle()
+                    .fill(RegardsDS.accent)
+                    .frame(width: 6, height: 6)
+            }
+        }
     }
 
     private var firstName: String {

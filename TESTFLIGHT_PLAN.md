@@ -177,8 +177,9 @@ Current gates:
 
 - `TF-01` slice 1 follow-up / PR #37: PR #23 merged before the smoke-driven
   responsive layouts and navigation-harness fixes were pushed. PR #37 carries
-  those verified changes. No owner action remains; exact-source mechanical
-  gates and all six staged reviewers must be green before it merges.
+  those verified changes. The final current-source Simulator smoke requires
+  only an unlocked Mac; no in-app owner decision is needed. Exact-source
+  mechanical gates and all six staged reviewers must be green before it merges.
 - `TF-01` slice 2 / PR #24: merge the accessibility follow-up first, then
   retarget and rebase the child onto `main`. Rerun its checks, staged review,
   and manual accessibility smoke before publication or auto-merge.
@@ -243,6 +244,20 @@ Current gates:
   passed, including the formerly flaky test in every sweep. SwiftLint, all 120
   unit tests, XcodeGen determinism, review-agent parity, source-boundary guards,
   YAML, and diff checks also passed.
+- 2026-08-02 second hosted-review closure candidate: Contact Detail and Contact
+  Preview now share one typed contact-value speech policy, including trimmed
+  empty values, punctuation boundaries, and the spoken meaning of the
+  preferred-field dot. All eight accessibility-size view branches now use one
+  shared adaptive-layout builder; the nav header, interaction dates, and
+  Contact Preview field labels no longer rely on fixed heights or widths at
+  accessibility sizes. Contact Preview navigation binds the concrete `Contact`
+  destination, and unavailable Snooze / Log other stubs are muted text rather
+  than inert buttons. All 124 unit tests and the new deterministic
+  `accessibility5` XCUI non-overlap regression pass locally. The repository's
+  `a8c9c01` baseline is intentional: it is the merge commit for GitHub PR #23,
+  not the older pre-PR23 / PR35 planning baseline. Full exact-source stress,
+  manual smoke, and staged-review evidence follow after the implementation is
+  committed.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four

@@ -96,7 +96,7 @@ struct ContactAccessibilityTests {
 
     @Test("Contact Preview speaks email punctuation")
     func contactPreviewEmailSpeech() {
-        let label = EditContactAccessibility.fieldLabel(
+        let label = ContactValueAccessibility.label(
             "personal",
             displayedValue: "obiwan@jeditemple.org",
             speech: .email
@@ -107,7 +107,7 @@ struct ContactAccessibilityTests {
 
     @Test("Contact Preview preserves non-email punctuation")
     func contactPreviewVerbatimSpeech() {
-        let label = EditContactAccessibility.fieldLabel(
+        let label = ContactValueAccessibility.label(
             "Handle",
             displayedValue: "@jedi.temple",
             speech: .verbatim
@@ -118,12 +118,12 @@ struct ContactAccessibilityTests {
 
     @Test("Contact Preview omits punctuation for an empty field")
     func contactPreviewEmptyFieldSpeech() {
-        let emptyLabel = EditContactAccessibility.fieldLabel(
+        let emptyLabel = ContactValueAccessibility.label(
             "mobile",
             displayedValue: "",
             speech: .verbatim
         )
-        let placeholderLabel = EditContactAccessibility.fieldLabel(
+        let placeholderLabel = ContactValueAccessibility.label(
             "mobile",
             displayedValue: "Add phone",
             speech: .verbatim
@@ -135,7 +135,7 @@ struct ContactAccessibilityTests {
 
     @Test("Contact Preview speaks multi-dot email punctuation")
     func contactPreviewMultiDotEmailSpeech() {
-        let label = EditContactAccessibility.fieldLabel(
+        let label = ContactValueAccessibility.label(
             "work",
             displayedValue: "a.b@sub.jeditemple.org",
             speech: .email
@@ -146,12 +146,63 @@ struct ContactAccessibilityTests {
 
     @Test("Contact Preview preserves plus addressing and case")
     func contactPreviewPlusAddressSpeech() {
-        let label = EditContactAccessibility.fieldLabel(
+        let label = ContactValueAccessibility.label(
             "work",
             displayedValue: "Leia+ALDERAAN@JEDI.TEMPLE",
             speech: .email
         )
 
         #expect(label == "work, Leia+ALDERAAN at JEDI dot TEMPLE")
+    }
+
+    @Test("Contact values leave a well-formed email verbatim when requested")
+    func wellFormedEmailVerbatimSpeech() {
+        let label = ContactValueAccessibility.label(
+            "Handle",
+            displayedValue: "obiwan@jeditemple.org",
+            speech: .verbatim
+        )
+
+        #expect(label == "Handle, obiwan@jeditemple.org")
+    }
+
+    @Test("Contact values trim whitespace-only content")
+    func whitespaceOnlySpeech() {
+        let label = ContactValueAccessibility.label(
+            "mobile",
+            displayedValue: "  \n  ",
+            speech: .verbatim
+        )
+
+        #expect(label == "mobile")
+    }
+
+    @Test("Contact values handle email speech without punctuation boundaries")
+    func emailSpeechBoundaryValues() {
+        let noDot = ContactValueAccessibility.label(
+            "work",
+            displayedValue: "obiwan@jeditemple",
+            speech: .email
+        )
+        let dotOnly = ContactValueAccessibility.label(
+            "work",
+            displayedValue: ".",
+            speech: .email
+        )
+
+        #expect(noDot == "work, obiwan at jeditemple")
+        #expect(dotOnly == "work, dot")
+    }
+
+    @Test("Contact values include preferred-state meaning")
+    func preferredStateSpeech() {
+        let label = ContactValueAccessibility.label(
+            "personal",
+            displayedValue: "obiwan@jeditemple.org",
+            speech: .email,
+            annotation: "preferred"
+        )
+
+        #expect(label == "personal, obiwan at jeditemple dot org, preferred")
     }
 }
