@@ -13,8 +13,14 @@ public struct MockRepositories: Sendable {
     public let window: any ReminderWindowRepository
     public let profile: any UserProfileRepository
 
-    public init(now: Date = MockRepositories.defaultNow) {
-        let store = MockStore(now: now)
+    public init(
+        now: Date = MockRepositories.defaultNow,
+        includeDuplicateFixture: Bool = false
+    ) {
+        let store = MockStore(
+            now: now,
+            includeDuplicateFixture: includeDuplicateFixture
+        )
         self.contacts = MockContactRepository(store: store)
         self.groups = MockContactGroupRepository(store: store)
         self.reminders = MockReminderRepository(store: store)
@@ -44,20 +50,26 @@ actor MockStore {
     var window: ReminderWindow
     var profile: UserProfile
 
-    init(now: Date) {
+    init(now: Date, includeDuplicateFixture: Bool) {
         self.window = ReminderWindow.defaultV1(timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current)
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
                                     entitlementTier: .trial,
                                     entitlementRefreshedAt: now)
 
-        for contact in Self.seedCast(now: now) {
+        for contact in Self.seedCast(
+            now: now,
+            includeDuplicateFixture: includeDuplicateFixture
+        ) {
             self.contacts[contact.id] = contact
         }
     }
 
-    static func seedCast(now: Date) -> [Contact] {
+    static func seedCast(
+        now: Date,
+        includeDuplicateFixture: Bool
+    ) -> [Contact] {
         let day: TimeInterval = 86_400
-        return [
+        var contacts = [
             Contact(
                 systemContactRef: "sys-leia",
                 displayName: "Leia Organa",
@@ -140,6 +152,19 @@ actor MockStore {
                 preferredChannelValue: "+91 98100 00000",
                 lastInteractedAt: now.addingTimeInterval(-day * 87)),
         ]
+        if includeDuplicateFixture {
+            contacts.append(Contact(
+                systemContactRef: "ui-test-luke-duplicate",
+                displayName: "Luke Skywalker",
+                tracked: true,
+                cadenceDays: 30,
+                priorityTier: .close,
+                preferredChannel: .signal,
+                preferredChannelValue: "+1 415 555 0198",
+                lastInteractedAt: now.addingTimeInterval(-day * 36)
+            ))
+        }
+        return contacts
     }
 
     func allContacts() -> [Contact] { Array(contacts.values) }

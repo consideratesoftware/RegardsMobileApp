@@ -21,10 +21,16 @@ extension ScreensAccessibilityTests {
     // MARK: - Helpers
 
     @MainActor
-    func launchToOverdue(dynamicTypeSize: String? = nil) -> XCUIApplication {
+    func launchToOverdue(
+        dynamicTypeSize: String? = nil,
+        includeDuplicateFixture: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         if let dynamicTypeSize {
             app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
+        }
+        if includeDuplicateFixture {
+            app.launchEnvironment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] = "1"
         }
         app.launch()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
@@ -37,8 +43,8 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
-    func launchToSettings() -> XCUIApplication {
-        let app = launchToOverdue()
+    func launchToSettings(includeDuplicateFixture: Bool = false) -> XCUIApplication {
+        let app = launchToOverdue(includeDuplicateFixture: includeDuplicateFixture)
         navigateToTab(
             named: "Settings",
             from: "screen.overdue",

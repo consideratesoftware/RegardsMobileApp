@@ -231,6 +231,16 @@ Current gates:
   with no app assertion executed. The direct build/install/launch result is
   the durable fallback acceptance gate missing from the hosted review, not a
   repeated broad audit sweep.
+- A later hosted correctness pass found that `MergeDuplicatesScreen` accepted
+  a fresh view model from its navigation-destination factory but stored it as
+  a plain value. Parent re-rendering could therefore replace the pushed
+  screen's model and discard in-progress primary/selection choices. The
+  Settings tab root now owns one observable model with `@State`, and its
+  initial load is idempotent, so destination reconstruction cannot discard or
+  reload in-progress choices. A DEBUG-only duplicate fixture and focused XCUI
+  regression verify the visible phone remains in the VoiceOver label, change
+  both selection and primary contact, switch tabs, return to the pushed
+  screen, and prove both choices survive.
 
 ### PR #37 accessibility evidence
 

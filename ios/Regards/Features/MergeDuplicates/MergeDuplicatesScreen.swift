@@ -113,8 +113,18 @@ struct CandidateCard: View {
             }
 
             HStack(spacing: 10) {
-                candidateTile(state.a, isPrimary: state.primaryIsA, onTap: { onTapPrimary(true) })
-                candidateTile(state.b, isPrimary: !state.primaryIsA, onTap: { onTapPrimary(false) })
+                candidateTile(
+                    state.a,
+                    isPrimary: state.primaryIsA,
+                    identifier: "merge-duplicates.primary-a",
+                    onTap: { onTapPrimary(true) }
+                )
+                candidateTile(
+                    state.b,
+                    isPrimary: !state.primaryIsA,
+                    identifier: "merge-duplicates.primary-b",
+                    onTap: { onTapPrimary(false) }
+                )
             }
 
             Button(action: onTapMerge) {
@@ -130,6 +140,7 @@ struct CandidateCard: View {
                     )
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("merge-duplicates.selection")
             .accessibilityHint("Virtual merge only — your system Contacts are never modified.")
         }
         .padding(14)
@@ -142,6 +153,7 @@ struct CandidateCard: View {
 
     private func candidateTile(_ member: DuplicateCandidateState.Member,
                                isPrimary: Bool,
+                               identifier: String,
                                onTap: @escaping () -> Void) -> some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 6) {
@@ -181,7 +193,33 @@ struct CandidateCard: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(member.displayName)\(isPrimary ? ", primary" : "")")
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(candidateAccessibilityLabel(member, isPrimary: isPrimary))
         .accessibilityHint(isPrimary ? "Currently set as primary." : "Double-tap to make primary.")
+    }
+
+    private func candidateAccessibilityLabel(
+        _ member: DuplicateCandidateState.Member,
+        isPrimary: Bool
+    ) -> String {
+        var parts = [member.displayName]
+        if let phone = member.phone {
+            parts.append(ContactValueAccessibility.label(
+                "Phone",
+                displayedValue: phone,
+                speech: .verbatim
+            ))
+        }
+        if let email = member.email {
+            parts.append(ContactValueAccessibility.label(
+                "Email",
+                displayedValue: email,
+                speech: .email
+            ))
+        }
+        if isPrimary {
+            parts.append("primary")
+        }
+        return parts.joined(separator: ", ")
     }
 }

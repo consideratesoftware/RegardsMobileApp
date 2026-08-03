@@ -27,16 +27,21 @@ public final class MergeDuplicatesViewModel {
 
     private let contacts: any ContactRepository
     private let detector = DuplicateDetector()
+    private var hasLoaded = false
 
     public init(contacts: any ContactRepository) {
         self.contacts = contacts
     }
 
     public func load() async {
+        guard !hasLoaded else { return }
+        hasLoaded = true
+
         let all: [Contact]
         do {
             all = try await contacts.fetchAll()
         } catch {
+            hasLoaded = false
             Self.log.error("failed to fetch contacts for duplicate detection: \(error, privacy: .public)")
             candidates = []
             return

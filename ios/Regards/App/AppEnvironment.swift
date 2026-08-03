@@ -29,8 +29,14 @@ public struct AppEnvironment: Sendable {
 
     /// Phase 0 default — MockRepositories seeded with the JSX cast. Used by
     /// SwiftUI `#Preview` blocks and unit tests that need populated screens.
-    public static func makeMock(now: Date = MockRepositories.defaultNow) -> AppEnvironment {
-        let mocks = MockRepositories(now: now)
+    public static func makeMock(
+        now: Date = MockRepositories.defaultNow,
+        includeDuplicateFixture: Bool = false
+    ) -> AppEnvironment {
+        let mocks = MockRepositories(
+            now: now,
+            includeDuplicateFixture: includeDuplicateFixture
+        )
         return AppEnvironment(
             contacts: mocks.contacts,
             groups: mocks.groups,
