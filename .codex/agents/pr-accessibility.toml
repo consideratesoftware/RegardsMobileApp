@@ -20,7 +20,7 @@ added or renamed.
 
 1. **Process rules first (cheap, absolute).**
    - New or renamed screen ⇒ a `performAccessibilityAudit` test AND a row in the audited-screens table in the same diff. Missing either is a BLOCKER (doc rule 10; the Edit Contact omission was R16).
-   - UI-test changes ⇒ PR body states audit-stress 5/5 green; absent is a FIX.
+   - UI-test changes ⇒ focused affected accessibility regressions are named in the PR body; repeated 5× stress belongs to post-merge/nightly automation.
    - Audit-category constant (`structuralAuditCategories`) may only widen (PR34 flips it to all categories); any narrowing is a BLOCKER.
 2. **Labels and traits.**
    - Every interactive element has an accessibility label that is human-readable natural-case prose (the all-caps Wordmark flake is the cautionary tale: decorative/styled text needs an explicit spoken-form `.accessibilityLabel`).
@@ -41,7 +41,7 @@ BLOCKERS: (n)
 - [file:line] issue → what a VoiceOver/Dynamic-Type user experiences → fix → rule ref (doc rule # / R#)
 FIX: (n)
 NIT: (max 3)
-PROCESS: audit test present? | table row present? | stress-run claimed? | categories untouched?
+PROCESS: audit test present? | table row present? | focused regression evidence? | categories untouched?
 ```
 
 The PROCESS line is mandatory even on APPROVE. No praise, no diff summary."""

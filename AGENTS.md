@@ -101,7 +101,7 @@ Navigation uses **one `NavigationStack` per tab** with per-tab `NavigationPath` 
 
 The **structural** audit categories gate merges today (`elementDetection`, `sufficientElementDescription`, `trait`) via the `structuralAuditCategories` constant in `ScreensAccessibilityTests`. The **sensory** categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are temporarily off and tracked in the "Sensory-audit carve-outs" section of `accessibility.md`; PR34 (ARCHITECTURE.md §14) flips the constant to all categories.
 
-UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. Run `ios/scripts/audit-stress.sh` (5 consecutive audit runs) before pushing any UI-test change.
+UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; repeated 5× stress belongs to the post-merge, nightly, and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
 
 Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is expected before any UI-touching merge.
 
@@ -145,7 +145,10 @@ Every autonomous run begins with the restart protocol in
 `TESTFLIGHT_PLAN.md`. Resume dirty work and open pull requests before taking a
 new item. Work on one stable `TF-##` item at a time and update its checkpoint
 in the same pull request. Git branches, the worktree, pull-request checks, and
-the plan file are the durable handoff; never depend on chat history.
+the plan file are the durable handoff; never depend on chat history. Scheduled
+runs also inspect the latest completed default-branch accessibility audit and
+5× stress workflows. A reproducible failure on current `main` becomes the next
+repair before new feature work.
 
 ## PR review
 
