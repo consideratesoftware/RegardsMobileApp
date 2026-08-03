@@ -233,12 +233,16 @@ Current gates:
   first replacement stress attempt passed two full sweeps before exposing a
   third-sweep Edit activation race. Commit `75d6f9c` varies the three bounded
   activation paths while re-resolving live elements and confirming source and
-  destination state after each attempt. The failing Edit regression then
-  passed a focused 5/5. A fresh `ios/scripts/audit-stress.sh 5` completed five
-  consecutive 18-test suites at `75d6f9c`; all 90 executions passed, including
-  the formerly flaky test in every sweep. SwiftLint, all 120 unit tests,
-  XcodeGen determinism, review-agent parity, source-boundary guards, YAML, and
-  diff checks also passed.
+  destination state after each attempt. That candidate passed a focused 5/5
+  and one 90/90 sweep, but the next exact-head sweep reproduced the same Edit
+  activation failure; that evidence is superseded. Commit `8f3f373` replaces
+  the toolbar `NavigationLink` with state-driven navigation and gives the Edit
+  control a stable accessibility identifier. The failing regression then
+  passed 10/10 focused launches. A fresh `ios/scripts/audit-stress.sh 5`
+  completed five consecutive 18-test suites at `8f3f373`; all 90 executions
+  passed, including the formerly flaky test in every sweep. SwiftLint, all 120
+  unit tests, XcodeGen determinism, review-agent parity, source-boundary guards,
+  YAML, and diff checks also passed.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four
