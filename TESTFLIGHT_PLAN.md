@@ -174,11 +174,16 @@ slices. The order is fixed while the current pull requests remain open:
    XCUI, mechanical gates, staged review, hosted review, and protected checks
    before merge. Broad repeated sweeps remain owned by post-merge, nightly,
    and pre-release automation.
-   Current-source manual smoke on the pinned iOS 26.5 iPhone 17 Pro completed
-   2026-08-03 at 15:01 PDT: the app installed and launched, the Overdue surface
-   reported both Overdue and Upcoming as 10, and the active digest remained
-   anchored at 6:00 pm instead of presenting the erroneous empty Upcoming
-   state captured in the failed hosted audit.
+   Manual accessibility smoke completed 2026-08-03 on the pinned iOS 26.5
+   iPhone 17 Pro using Accessibility Inspector emulation. Dynamic Type was
+   tested at `accessibility5`; Reduce Motion and Increased Contrast were each
+   tested both on and off. Upcoming exposed a heading, selected segment, date
+   heading, and 10 natural-language button rows with activation hints. A row
+   remained tappable at `accessibility5`, opened Contact Detail, and retained a
+   visible return path. The stacked segment, rows, icons, and priority treatment
+   remained legible without clipping, washed-out pairs, or color-only meaning.
+   Findings: none. Simulator settings were restored to large text, Reduce
+   Motion off, and Increased Contrast off after the smoke.
 6. Finish the remaining PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
