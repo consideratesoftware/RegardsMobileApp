@@ -269,4 +269,17 @@ struct ContactAccessibilityTests {
 
         #expect(label == "personal, ahsoka@jeditemple, preferred")
     }
+
+    @Test("Contact Preview does not prefer an empty value")
+    @MainActor
+    func contactPreviewDoesNotPreferEmptyValue() {
+        let label = EditContactScreen.accessibilityFieldLabel(
+            "mobile",
+            displayedValue: "  \n",
+            touched: true,
+            channel: .phoneCall
+        )
+
+        #expect(label == "mobile")
+    }
 }

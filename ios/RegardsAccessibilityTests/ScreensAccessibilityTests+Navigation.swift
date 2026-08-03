@@ -274,6 +274,35 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
+    func assertUnavailableElement(
+        identifier: String,
+        expectedLabel: String?,
+        in app: XCUIApplication
+    ) {
+        let plainElement = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(
+            plainElement.waitForExistence(timeout: 10),
+            "\(identifier) should exist as unavailable content."
+        )
+        let matches = app.descendants(matching: .any).matching(identifier: identifier)
+        XCTAssertGreaterThan(
+            matches.count,
+            0,
+            "\(identifier) should remain available for trait assertions."
+        )
+        let element = matches.firstMatch
+        XCTAssertTrue(element.label.hasSuffix(", unavailable"))
+        if let expectedLabel {
+            XCTAssertEqual(element.label, expectedLabel)
+        }
+        XCTAssertEqual(
+            app.buttons.matching(identifier: identifier).count,
+            0,
+            "\(identifier) must not expose a button trait before it is wired."
+        )
+    }
+
+    @MainActor
     func activate(_ element: XCUIElement, attempt: Int) {
         // Simulator automation can drop a synthesized tap on a live element.
         // Bounded retries vary the target point, while the
@@ -292,7 +321,7 @@ extension ScreensAccessibilityTests {
         _ element: XCUIElement,
         timeout: TimeInterval = 10
     ) -> Bool {
-        guard !element.exists || !element.isHittable else { return true }
+        if element.exists, element.isHittable { return true }
 
         let live = XCTestExpectation(description: "Element becomes live and hittable")
         let target = ElementHittabilityPoller(element: element, expectation: live)

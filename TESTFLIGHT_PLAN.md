@@ -7,7 +7,7 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-08-02
+- Updated: 2026-08-03
 - Baseline: `main` at `a8c9c01` (merged GitHub PR #23 repository-truth slice)
 - Active work: `TF-01` (merge GitHub PR #37, then its stacked
   platform-modernization slice)
@@ -20,8 +20,10 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. The PR #23 Simulator accessibility smoke and
-  the dedicated GitHub App setup are complete.
+- Owner action needed now: none. PR #37's final exact-head Simulator smoke is
+  an automation gate; its evidence will be bound to the immutable 40-character
+  SHA in a PR comment after the final push so documenting it cannot create a
+  different head.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -181,9 +183,12 @@ Current gates:
 
 - `TF-01` slice 1 follow-up / PR #37: PR #23 merged before the smoke-driven
   responsive layouts and navigation-harness fixes were pushed. PR #37 carries
-  those verified changes. The final current-source Simulator smoke requires
-  only an unlocked Mac; no in-app owner decision is needed. Exact-source
-  mechanical gates and all six staged reviewers must be green before it merges.
+  those verified changes. The final exact-head Simulator smoke requires only
+  an unlocked Mac; no in-app owner decision is needed. After the final push,
+  record one PR comment naming the tested immutable 40-character SHA and the
+  VoiceOver hierarchy, Dynamic Type `accessibility5`, Reduce Motion, and
+  Increased Contrast results. Exact-source mechanical gates and all six staged
+  reviewers must be green before it merges.
 - `TF-01` slice 2 / PR #24: merge the accessibility follow-up first, then
   retarget and rebase the child onto `main`. Rerun its checks, staged review,
   and manual accessibility smoke before publication or auto-merge.
@@ -280,8 +285,8 @@ Current gates:
   Follow-up implementation `fe3e411` closes the final local-review findings:
   the remaining Contact Detail and Overdue no-op actions are now muted,
   noninteractive elements; FaceTime email and phone values choose the correct
-  field and speech policy; and the canonical census is 125 unit tests plus 19
-  XCUI tests. All 126 unit tests and the focused Contact Detail and Contact
+  field and speech policy; and that intermediate source's census was 125 unit
+  tests plus 19 XCUI tests. All 126 unit tests and the focused Contact Detail and Contact
   Preview audits passed. The installed exact-source hierarchy exposed the
   unavailable actions without button traits. Only the final staged-review
   verdict remains before merge.
@@ -298,6 +303,15 @@ Current gates:
   local sweep was run; scheduled post-merge/nightly/pre-release workflows own
   that evidence. The final local staged verdict is `APPROVE`; the final hosted
   verdict and required checks remain before merge.
+- 2026-08-03 hosted-review response: unavailable Contact Detail and Overdue
+  actions now have stable identifiers and focused XCUI coverage proving their
+  “unavailable” labels and lack of button traits. The accessibility5 regression
+  covers the navigation header, secondary actions, and channel card; Edit →
+  Detail regressions now continue back to both originating tab roots. Empty
+  preferred values no longer expose a dot or “preferred” annotation. Decision
+  #39 records the scheduled-audit policy without replacing PR18's historical
+  5/5 ×3 evidence. The exact final SHA and smoke results will be bound together
+  in the required PR comment after the final push.
 - Prior implementation stress evidence: the same command completed five full
   passes at `f069297` on 2026-08-02, with all 90 test executions passing.
 - Historical regression evidence before the `ddbb80d` smoke fixes: four

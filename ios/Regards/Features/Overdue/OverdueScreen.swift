@@ -235,7 +235,7 @@ struct OverdueRow: View {
             Text(row.channelLabel)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(RegardsDS.muted)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 44)
@@ -243,5 +243,6 @@ struct OverdueRow: View {
         .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(row.channelLabel), unavailable")
+        .accessibilityIdentifier("overdue.channel-unavailable")
     }
 }

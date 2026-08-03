@@ -27,28 +27,6 @@ final class ScreensAccessibilityTests: XCTestCase {
     }
 
     @MainActor
-    func testAccessibility5NavContentDoesNotOverlap() {
-        let app = launchToOverdue(dynamicTypeSize: "accessibility5")
-        let action = app.descendants(matching: .any)["regards-nav.right-action"]
-        let title = app.descendants(matching: .any)["regards-nav.title"]
-        let subtitle = app.descendants(matching: .any)["regards-nav.subtitle"]
-
-        XCTAssertTrue(action.waitForExistence(timeout: 10))
-        XCTAssertTrue(title.waitForExistence(timeout: 10))
-        XCTAssertTrue(subtitle.waitForExistence(timeout: 10))
-        XCTAssertGreaterThanOrEqual(
-            title.frame.minY,
-            action.frame.maxY,
-            "The accessibility-sized nav action must finish before the title begins."
-        )
-        XCTAssertGreaterThanOrEqual(
-            subtitle.frame.minY,
-            title.frame.maxY,
-            "The accessibility-sized subtitle must stack below the title."
-        )
-    }
-
-    @MainActor
     func testUpcomingTabPassesAudit() throws {
         let app = launchToOverdue()
         navigateToTab(
@@ -213,6 +191,14 @@ final class ScreensAccessibilityTests: XCTestCase {
         ) {
             app.navigationBars.buttons["Contact"]
         }
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.overdue",
+            triggerDescription: "Overdue back button",
+            in: app
+        ) {
+            app.navigationBars.buttons.element(boundBy: 0)
+        }
     }
 
     @MainActor
@@ -247,6 +233,14 @@ final class ScreensAccessibilityTests: XCTestCase {
             in: app
         ) {
             app.navigationBars.buttons["Contact"]
+        }
+        navigate(
+            from: "screen.contact-detail",
+            to: "screen.upcoming",
+            triggerDescription: "Upcoming back button",
+            in: app
+        ) {
+            app.navigationBars.buttons.element(boundBy: 0)
         }
     }
 
