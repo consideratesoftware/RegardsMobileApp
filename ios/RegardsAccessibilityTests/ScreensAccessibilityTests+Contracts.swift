@@ -4,15 +4,10 @@ extension ScreensAccessibilityTests {
     @MainActor
     func testAccessibility5AdaptiveContentDoesNotOverlap() {
         let app = launchToOverdue(dynamicTypeSize: "accessibility5")
-        let action = app.descendants(matching: .any)["regards-nav.right-action"]
-        let title = app.descendants(matching: .any)["regards-nav.title"]
-        let subtitle = app.descendants(matching: .any)["regards-nav.subtitle"]
-
-        XCTAssertTrue(action.waitForExistence(timeout: 10))
-        XCTAssertTrue(title.waitForExistence(timeout: 10))
-        XCTAssertTrue(subtitle.waitForExistence(timeout: 10))
-        assertStacked(title, below: action, "The title must stack below the nav action.")
-        assertStacked(subtitle, below: title, "The subtitle must stack below the title.")
+        XCTAssertTrue(
+            app.navigationBars["Overdue"].waitForExistence(timeout: 10),
+            "The native navigation title should remain exposed at accessibility5."
+        )
 
         let overdueSegment = app.descendants(matching: .any)["regards-segment.overdue"]
         let upcomingSegment = app.descendants(matching: .any)["regards-segment.upcoming"]

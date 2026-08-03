@@ -18,6 +18,7 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
     let options: [Option]
     @Namespace private var selectionTransition
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(selection: Binding<Tab>, options: [Option]) {
         self._selection = selection
@@ -48,7 +49,9 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
         return layout {
             ForEach(options) { opt in
                 Button {
-                    selection = opt.id
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        selection = opt.id
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Text(opt.label)
@@ -73,36 +76,47 @@ public struct RegardsSegmentedControl<Tab: Hashable>: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
-                    .background { selectionBackground(for: opt.id) }
                     .contentShape(Rectangle())
+                    .modifier(
+                        RegardsSegmentSelectionSurface(
+                            isSelected: selection == opt.id,
+                            namespace: selectionTransition
+                        )
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(opt.label)\(opt.count.map { ", \($0)" } ?? "")")
                 .accessibilityAddTraits(selection == opt.id ? .isSelected : [])
+                .accessibilityIdentifier("regards-segment.\(opt.label.lowercased())")
             }
         }
     }
 
+}
+
+private struct RegardsSegmentSelectionSurface: ViewModifier {
+    let isSelected: Bool
+    let namespace: Namespace.ID
+
     @ViewBuilder
-    private func selectionBackground(for option: Tab) -> some View {
-        if selection == option {
+    func body(content: Content) -> some View {
+        if isSelected {
             if #available(iOS 26.0, *) {
-                ZStack {
+                content
+                    .glassEffect(
+                        .regular.tint(RegardsDS.accentSoft).interactive(),
+                        in: .rect(cornerRadius: 9)
+                    )
+                    .glassEffectID("regards.segment.selection", in: namespace)
+            } else {
+                content.background {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(RegardsDS.surface)
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Color.clear)
-                        .glassEffect(
-                            .regular.tint(RegardsDS.accentSoft).interactive(),
-                            in: .rect(cornerRadius: 9)
-                        )
-                        .glassEffectID("regards.segment.selection", in: selectionTransition)
+                        .shadow(color: RegardsDS.ink.opacity(0.06), radius: 1, y: 1)
                 }
-            } else {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(RegardsDS.surface)
-                    .shadow(color: RegardsDS.ink.opacity(0.06), radius: 1, y: 1)
             }
+        } else {
+            content
         }
     }
 }
