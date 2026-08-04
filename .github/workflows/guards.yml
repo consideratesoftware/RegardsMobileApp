@@ -39,6 +39,30 @@ jobs:
       - name: Scan ios/Regards/Domain for platform imports
         run: scripts/check-domain-purity.sh
 
+  android-manifest-guard:
+    name: Android manifest forbids network permissions (§11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify no INTERNET/ACCESS_NETWORK_STATE and strip lines intact
+        run: scripts/check-android-manifest.sh
+
+  android-privacy-grep:
+    name: Android sources are network-free (§11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Scan android/ for networking call sites
+        run: scripts/check-android-no-network.sh
+
+  android-domain-purity-grep:
+    name: Android domain layer is platform-free (§5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Scan android/domain for platform imports
+        run: scripts/check-android-domain-purity.sh
+
   yaml-lint:
     name: project.yml syntax
     runs-on: ubuntu-latest
