@@ -62,7 +62,9 @@ xcodebuild ... -only-testing:RegardsAccessibilityTests test
 xcodebuild ... -only-testing:RegardsTests/OverdueViewModelTests/testName test
 ```
 
-`RegardsUITests` exists but is **not** in the default test plan — it's a placeholder for general UI automation.
+The unused `RegardsUITests` placeholder target was removed in TF-01. User-flow
+automation belongs in `RegardsAccessibilityTests` until a real general UI suite
+has an owned release criterion.
 
 ### Lint
 
@@ -121,8 +123,8 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 
 ## CI map
 
-- `.github/workflows/ios-ci.yml` — xcodegen determinism → build → (unit tests + coverage) + (accessibility audit). No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
-- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, markdown link check for `ios/docs/` (PR19 extends it to root markdown).
+- `.github/workflows/ios-ci.yml` — xcodegen determinism → build → unit tests with a ≥95% Domain coverage floor; the post-merge accessibility audit runs separately. No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
+- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, and Markdown link checks for root docs plus `ios/docs/`.
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
 - `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× (flake detector). Since 2026-08-02 it runs on merges to `main`, nightly, and `workflow_dispatch`, not on pull requests; dispatch it and require green before cutting a release.
 - `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from

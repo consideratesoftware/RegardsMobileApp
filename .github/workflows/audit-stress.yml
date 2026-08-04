@@ -36,9 +36,8 @@ on:
 
 concurrency:
   group: audit-stress-${{ github.ref }}
-  # Was true, to coalesce rapid pushes to a PR branch. There are no PR pushes
-  # now, and cancelling a 30-minute run that is nearly done throws away the
-  # only signal this workflow exists to produce.
+  # Preserve every post-merge, nightly, and release-candidate signal. Cancelling
+  # an in-flight stress run would discard the evidence this workflow produces.
   cancel-in-progress: false
 
 env:

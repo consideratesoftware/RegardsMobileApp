@@ -575,7 +575,6 @@ ios/
   RegardsWidget/                  — [PR31] WidgetKit extension target (App Group, read-only DB)
   RegardsTests/                   — swift-testing unit bundle (Domain, Data, Platform fakes, VMs)
   RegardsAccessibilityTests/      — XCUITest audit bundle (post-merge, nightly, and release-gating)
-  RegardsUITests/                 — placeholder; NOT in the default test plan (repurpose or delete, R22)
   docs/                           — accessibility.md, accessibility-smoke.md, modern-ios.md
   scripts/                        — audit-stress.sh (on-demand flake investigation / release helper)
 ```
@@ -592,11 +591,11 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-03):** the unit target has 151 declared tests total, including one placeholder, across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color contrast, and Overdue and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The out-of-plan `RegardsUITests` target still has one placeholder (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-04):** the unit target has 150 declared tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color contrast, and Overdue and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 
-- **Domain: exhaustive unit coverage, CI-enforced floor.** PR19 adds a coverage gate: ≥95% line coverage on `ios/Regards/Domain/**` via `xccov` in the unit-tests job (the v0.5 "100%" aspiration meets reality at 95% + mandatory tests for every listed edge case). The floor may only go up.
+- **Domain: exhaustive unit coverage, CI-enforced floor.** The unit-tests job enforces ≥95% line coverage on `ios/Regards/Domain/**` via `xccov` (the v0.5 "100%" aspiration meets reality at 95% + mandatory tests for every listed edge case). The floor may only go up.
 - **Engine edge cases that MUST have tests after PR16** (each currently missing and each guards a shipped or latent defect): a window **on** a DST transition day (US 2026 transitions Mar 8 / Nov 1 are Sundays — the shipped tests use weekday-only windows and dodge the bug; add Sunday-inclusive windows and a synthetic zone like `Australia/Lord_Howe` for the 30-min case), fall-back duplicated-hour disambiguation, spring-forward nonexistent slot-start, midnight-boundary walk, contiguous-range collapse, wrap-rejection validation, degenerate-window → nil, quiet-hours-consume-everything → nil, same-day-late occasion fires today, never-contacted anchor = createdAt, slot-start snapping equality.
 - **Deep-link parametric completeness:** one case per `Channel` (a test asserts the parametric list covers `Channel.allCases`), plus the property `isValid ⟹ build != nil` for every link-bearing channel, plus the specific regressions: facetime-email, m.me URL, `@handle` telegram, non-http custom scheme.
 - **SchedulingPass (PR25):** fake repos + fake `NotificationScheduling`; assert idempotence, orphan cancellation, group-collapse (one reminder per group), digest identity stability, 60-cap behavior.
@@ -648,7 +647,7 @@ boundaries.
 | **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
 | **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test for link-bearing channels; parametric covers `allCases` | R2, R7 closed |
 | **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R27, and R28 closed; README half of R19 closed (root link guard remains PR19); R20 was closed by GitHub PR #22; R29 was closed by PR16 plus PR20–PR22 stress runs; historical acceptance evidence passed 5/5 ×3 consecutive stress runs. Under decision #39, later UI follow-ups pass focused regressions and manual smoke before merge; scheduled runs own repeated stress. |
-| **PR19** | Repo + CI hygiene: commit `Package.resolved`; `git worktree prune` + delete stale worktree/branches; root-markdown link-check job; Domain coverage floor (≥95%); guard hardening (R32, completed by the TF-01 trusted-gate prerequisite); remove dead SwiftLint `function_body_length` config; seed mocks with a ContactGroup + InteractionLogs + an occasion so all UI states are reachable/auditable; delete `.git/t9FBrGy` | R21, R30–R34 closed; all 4 workflows green |
+| **PR19** | Repo + CI hygiene, delivered as bounded TF-01 slices: commit `Package.resolved`; remove placeholder tests; check root Markdown; enforce a ≥95% Domain coverage floor; remove dead SwiftLint configuration; reconcile workflow and merge-method docs. Follow with exact-target stale-worktree cleanup, representative mock seeds, stable row IDs, and dead-asset cleanup. Guard hardening (R32) was completed by the trusted-gate prerequisite. | CI/reproducibility slice closes R19, R21, R22, R31, R33, and R42; follow-up closes R30, R34/R36, and R40; all workflows green |
 
 ### Phase 1B — Production wiring (Jul 13–17) — the mock era ends
 
@@ -805,16 +804,18 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-08-03
+## 18. Current state — ground truth as of 2026-08-04
 
-`main` = `a35fce9` (GitHub PR #24, 2026-08-03). The engine contract,
+`main` = `3e391c6` (GitHub PR #38, 2026-08-03). The engine contract,
 section-header accessibility fix, sample-data refresh, channel-validation
 contract, bundle-namespace migration, durable TestFlight queue, and
 cross-provider review parity guard have landed. The trusted staged reviewer now
 uses a dedicated GitHub App check, shared source-boundary guards, and
 check-output delivery. Automated accessibility audits run after merges,
-nightly, and before release. `TESTFLIGHT_PLAN.md` records the live pull-request
-state and next executable work.
+nightly, and before release. The exact-main one-run audit (`30858964352`) and
+5× stress run (`30858964211`) both passed after the R49 repair.
+`TESTFLIGHT_PLAN.md` records the live pull-request state and next executable
+work.
 
 ### What exists and works (Phase 0 complete, PRs #1–#5)
 
@@ -878,10 +879,10 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R16 | Edit Contact missing from the audited-screens table AND the audit suite (violates accessibility.md rule 10) | `ios/docs/accessibility.md:76-89`, `ScreensAccessibilityTests.swift` | Add row + test | ✅ **closed by TF-01 slice 1** |
 | R17 | `NSContactsUsageDescription` is read-only copy; §11 requires the edit mention before write-back ships. `NSCalendarsFullAccessUsageDescription` absent (needed PR30) | `project.yml:84-86` | Reword with PR27; add calendar key with PR30 | PR27/PR30 |
 | R18 | `PrivacyInfo.xcprivacy` has empty `NSPrivacyAccessedAPITypes`; SQLite/GRDB file-timestamp access will need required-reason entries at submission | `ios/Regards/PrivacyInfo.xcprivacy` | Populate against Apple's current category list during Phase 3 prep | PR34/§20 |
-| R19 | Root markdown was exempt from link checks, and README referenced nonexistent `docs/DOMAIN_MODEL.md` and `android/` paths | `README.md`; `guards.yml:60-69` | README references ✅ **closed by TF-01 slice 1**; extend link check to root `*.md` in PR19 | PR18/PR19 |
+| R19 | Root markdown was exempt from link checks, and README referenced nonexistent `docs/DOMAIN_MODEL.md` and `android/` paths | `README.md`; `guards.yml` | README references ✅ **closed by TF-01 slice 1**; root Markdown checks ✅ **closed by TF-01 CI/reproducibility slice** | ✅ **closed** |
 | R20 | **CLAUDE.md misroutes agents (5 stale claims):** iPhone 15 destinations (CI uses 16 Pro); "Platform/ currently empty" (has Contacts adapter); PrivacyInfo said to live in `Resources/`; `pr3AuditCategories`/"PR3 follow-ups" naming (actual: `structuralAuditCategories`, "Sensory-audit carve-outs"); "snapshot job declared `if: false`" (it's a comment, no job) | `CLAUDE.md:37,41,78,80,92,111` | Rewrite (done in the same change set as this doc v1.0); future edits follow sibling-PR rule | ✅ **closed by TF-00 / GitHub PR #22** |
-| R21 | `Package.resolved` gitignored while GRDB floats `from: 6.29.0` — contradicts reproducible-build claim | `.gitignore:32`, `project.yml:41-44` | Decision #37: commit it | PR19 |
-| R22 | `RegardsUITests` placeholder target in no scheme/workflow; `PlaceholderTests.swift` in unit bundle | `ios/RegardsUITests/`, `RegardsTests/PlaceholderTests.swift` | Delete placeholders; keep the target only if PR34 snapshot/UI flows use it | PR19/PR34 |
+| R21 | `Package.resolved` gitignored while GRDB floats `from: 6.29.0` — contradicts reproducible-build claim | `.gitignore`, `project.yml` | Commit the resolved GRDB revision | ✅ **closed by TF-01 CI/reproducibility slice** |
+| R22 | `RegardsUITests` placeholder target in no scheme/workflow; `PlaceholderTests.swift` in unit bundle | `ios/RegardsUITests/`, `RegardsTests/PlaceholderTests.swift` | Delete both placeholders and the ownerless target | ✅ **closed by TF-01 CI/reproducibility slice** |
 | R23 | Mock and GRDB repositories share no contract tests — mocks can drift from production semantics | `RegardsTests/Data/RepositoriesTests.swift` | Shared contract-test suite run against both | PR20 |
 | R24 | No unit tests for Upcoming/ContactDetail VMs; MergeDuplicates was also missing a suite at rebaseline | `ios/RegardsTests/Features/` | Add with the PRs that touch each VM | Upcoming/ContactDetail PR22/PR25; MergeDuplicates ✅ **closed by TF-01 modernization / GitHub PR #24** |
 | R25 | `CNContactsSource.fetchAllContacts` blocks a cooperative-pool thread for the full enumeration (5k-contact stall); `@unchecked Sendable` justified only by comment | `ContactsSource.swift:69, 98-125` | Move enumeration off the pool; 5k-contact perf test | PR35 |
@@ -895,9 +896,9 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R | Item | Where | Fix | PR |
 |---|---|---|---|---|
 | R30 | Stale worktree with obsolete parallel scaffold (`generate_pbxproj.py`, old Domain, committed `.xcuserstate`) + prunable branch `claude/crazy-franklin-75fc28` + stray `.git/t9FBrGy` + ~16 merged local branches | `.claude/worktrees/`, `.git/` | `git worktree prune`, delete branches, rm temp file | PR19 |
-| R31 | Domain coverage floor absent (§13 promises near-total); coverage collected but unenforced | `ios-ci.yml:99-148` | ≥95% xccov gate on `Domain/**` | PR19 |
+| R31 | Domain coverage floor absent (§13 promises near-total); coverage collected but unenforced | `ios-ci.yml` | ≥95% xccov gate on `Domain/**` | ✅ **closed by TF-01 CI/reproducibility slice** |
 | R32 | Guard gaps: domain-purity misses `@preconcurrency import` / `import class Contacts.X` / `import Network`; privacy-grep misses `NSURLConnection`, `CFSocket` | `guards.yml:33,46` | Shared source-boundary scripts reject every listed form, and canonical plus trusted-review workflows call those scripts | ✅ **closed by TF-01 trusted gate prerequisite (GitHub PR #26)** |
-| R33 | Dead SwiftLint config: `function_body_length` threshold block while the rule is disabled | `.swiftlint.yml:12-21,53-55` | Remove block or re-enable rule | PR19 |
+| R33 | Dead SwiftLint config: `function_body_length` threshold block while the rule is disabled | `.swiftlint.yml` | Remove the unreachable threshold block | ✅ **closed by TF-01 CI/reproducibility slice** |
 | R34 | Mock seeds miss ContactGroup/InteractionLog/occasion — merged chip, interactions card, occasion tags unreachable & unauditable; `UpcomingRowState.id = UUID()` per build breaks diffing (R36) | `MockRepositories.swift:47-143`, `UpcomingViewModel.swift:130` | Seed all three; stable ids `contactId+kind` | PR19/PR22 |
 | R35 | Importer aborts mid-batch on first row error | `ContactsImporter.swift:56-64` | Per-row tolerance + counts | PR21 |
 | R36 | (folded into R34) | — | — | PR22 |
@@ -906,7 +907,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R39 | Migrator seeds `Optional` top-level JSON (`jsonStringEncoded(window.quietHours)`) — inserts `"null"` / throws if the default ever ships nil quiet hours | `DatabaseMigrator.swift:106,124-129`, `Records.swift:247-248` | Encode non-optional or store SQL NULL | PR20 (with v2) |
 | R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift:9-11`, `accessibility.md:50-52` | Delete or wire; fix comments | PR19 |
 | R41 | Contrast registry incomplete vs UI reality (white-on-accentInk CTAs, accentInk-on-surface, danger-on-surface unlisted) | `RegardsColors.swift:70-83` | Extend `contrastPairs` + tests | PR34 |
-| R42 | `audit-stress.yml` header comment claims path-triggering that PR #15 removed | `audit-stress.yml:3-4` | Fix comment | PR19 |
+| R42 | `audit-stress.yml` documentation described obsolete PR-trigger behavior | `audit-stress.yml` | Describe the current post-merge, nightly, and release-candidate signals | ✅ **closed by TF-01 scheduling-policy and CI/reproducibility slices** |
 | R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | ✅ **closed by TF-01 slice 1** |
 | R44 | `LSApplicationCategoryType` = social-networking in project.yml while the listing plan says Productivity primary | `project.yml:94` | Align with §20 category decision | PR34 |
 | R45 | 8.4 MB `Substack_banner.png` sitting at repo root (ignored but clutter); `.DS_Store` files | repo root | Move banner to journal assets outside the repo; OS files stay ignored | anytime |
@@ -918,7 +919,8 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 
 ### Versioning & branching
 
-- `main` is always releasable; feature branches → PR → squash-merge. Version
+- `main` is always releasable; feature branches → PR → a merge method allowed
+  by the current main ruleset (rebase or merge; squash is currently disallowed). Version
   `CFBundleShortVersionString` stays `0.1.0` until the internal TestFlight
   feature freeze, then becomes `1.0.0` (decision #35's version rule survives
   its expired date). `CFBundleVersion` increments every TestFlight upload
