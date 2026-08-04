@@ -1,0 +1,14 @@
+{
+  "targets": [
+    {
+      "name": "Regards.app",
+      "files": [
+        {
+          "path": "/workspace/ios/Regards/App/RegardsApp.swift",
+          "coveredLines": 10,
+          "executableLines": 10
+        }
+      ]
+    }
+  ]
+}

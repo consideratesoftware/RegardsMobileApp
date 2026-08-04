@@ -122,6 +122,8 @@ jobs:
           done
           echo "::error::xcodebuild -downloadPlatform iOS failed after 3 attempts"
           exit 1
+      - name: Test Domain coverage gate fixtures
+        run: scripts/tests/domain-coverage-gate-tests.sh
       - name: Run RegardsTests
         working-directory: ios
         run: |

@@ -54,4 +54,4 @@ xcrun xccov view --report --json "$result_bundle" | ruby -rjson -e '
     warn format("::error::Domain coverage %.2f%% is below the %.2f%% floor", percentage, minimum)
     exit 1
   end
-' "$minimum"
+' -- "$minimum"

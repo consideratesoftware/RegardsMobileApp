@@ -36,8 +36,9 @@ on:
 
 concurrency:
   group: audit-stress-${{ github.ref }}
-  # Preserve every post-merge, nightly, and release-candidate signal. Cancelling
-  # an in-flight stress run would discard the evidence this workflow produces.
+  # Never cancel the in-flight run. GitHub keeps one running and only the latest
+  # pending run per group, so overlapping push, nightly, or manual signals may
+  # coalesce before they start.
   cancel-in-progress: false
 
 env:
