@@ -7,18 +7,18 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 
 ## Current checkpoint
 
-- Updated: 2026-08-03
-- Baseline: `main` at `a35fce9` (merged GitHub PR #24 platform modernization)
-- Active work: `TF-01` current-main accessibility-audit repair on
-  `codex/tf-01-upcoming-active-slot`
+- Updated: 2026-08-04
+- Baseline: `main` at `3e391c6` (merged GitHub PR #38 R49 repair)
+- Active work: `TF-01` PR19 CI/reproducibility slice on
+  `codex/tf-01-ci-repro`
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #38 (`codex/tf-01-upcoming-active-slot`, ready;
-  awaiting exact-head hosted review and protected checks)
+- Open pull request: none yet; publish the current branch after its exact-head
+  gates and staged review pass
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. The current-main audit repair is agent-owned;
+- Owner action needed now: none. The CI/reproducibility slice is agent-owned;
   no product, legal, signing, or App Store decision is required.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
@@ -147,8 +147,8 @@ is merged.
 
 ### TF-01 serial chain
 
-TF-01 has one completed merge-gate prerequisite followed by four reviewable
-slices. The order is fixed while the current pull requests remain open:
+TF-01 has one completed merge-gate prerequisite followed by a serial sequence
+of bounded reviewable slices. The order is fixed; do not overlap them:
 
 1. DONE: GitHub PR #26 installed the trusted hosted-review workflow, dedicated
    App check, and shared source-boundary guards. Branch protection now binds
@@ -164,8 +164,8 @@ slices. The order is fixed while the current pull requests remain open:
 4. DONE: GitHub PR #24 merged as `a35fce9`, completing the owner-directed
    platform-modernization slice, its focused checks, exact-source manual
    accessibility smoke, and hosted-review closures.
-5. ACTIVE: repair the current-main R49 audit failure in GitHub PR #38 on
-   `codex/tf-01-upcoming-active-slot`. Post-merge iOS CI run `30842392233` and
+5. DONE: GitHub PR #38 merged as `3e391c6`, repairing the current-main R49
+   audit failure. Earlier iOS CI run `30842392233` and
    audit-stress run `30842392398` both failed because Upcoming discarded an
    already-overdue contact when `ReminderEngine` returned the start of the
    currently active batching slot. The 5× workflow reproduced the same three
@@ -187,8 +187,10 @@ slices. The order is fixed while the current pull requests remain open:
    visible return path. The stacked segment, rows, icons, and priority treatment
    remained legible without clipping, washed-out pairs, or color-only meaning.
    Findings: none. Simulator settings were restored to large text, Reduce
-   Motion off, and Increased Contrast off after the smoke.
-6. Finish the remaining PR19 CI and reproducibility scope: commit
+   Motion off, and Increased Contrast off after the smoke. Exact-main iOS CI
+   run `30858964352`, including the one-run accessibility audit, and 5× stress
+   run `30858964211` both passed after merge.
+6. ACTIVE: finish the bounded PR19 CI and reproducibility scope: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
    configuration and stale audit-stress comment, and reconcile merge-method
@@ -201,8 +203,8 @@ slices. The order is fixed while the current pull requests remain open:
 
 Current gates:
 
-- No owner gate is active. The R49 repair's publication, hosted review,
-  required checks, and guarded auto-merge are agent-owned repository work.
+- No owner gate is active. The CI/reproducibility slice's publication, hosted
+  review, required checks, and guarded merge are agent-owned repository work.
 
 ### PR #24 modernization accessibility evidence
 

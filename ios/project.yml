@@ -118,19 +118,6 @@ targets:
     dependencies:
       - target: Regards
 
-  RegardsUITests:
-    type: bundle.ui-testing
-    platform: iOS
-    sources:
-      - path: RegardsUITests
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.consideratesoftware.RegardsUITests
-        GENERATE_INFOPLIST_FILE: "YES"
-        TEST_TARGET_NAME: Regards
-    dependencies:
-      - target: Regards
-
   RegardsAccessibilityTests:
     type: bundle.ui-testing
     platform: iOS

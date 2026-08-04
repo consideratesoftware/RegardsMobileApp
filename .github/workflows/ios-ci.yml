@@ -18,6 +18,7 @@ concurrency:
 
 env:
   XCODE_VERSION: "26.6"
+  DOMAIN_COVERAGE_MIN: "95"
   # `OS=latest` alone doesn't pick a device — xcodebuild needs a name to
   # disambiguate. iPhone 17 Pro is the project's pinned test device and
   # resolves to the image's latest installed iOS runtime. Keep this device
@@ -138,6 +139,8 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             test \
             | xcbeautify --renderer github-actions
+      - name: Enforce Domain coverage floor
+        run: scripts/check-domain-coverage.sh ios/build/RegardsTests.xcresult
       - name: Upload xcresult
         if: always()
         uses: actions/upload-artifact@v4

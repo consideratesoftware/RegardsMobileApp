@@ -50,10 +50,6 @@ file_length:
   warning: 500
   error: 800
 
-function_body_length:
-  warning: 60
-  error: 120
-
 identifier_name:
   min_length:
     warning: 2
