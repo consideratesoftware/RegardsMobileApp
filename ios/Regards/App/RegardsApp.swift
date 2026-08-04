@@ -1,42 +1,24 @@
 import Foundation
 import SwiftUI
 
-enum RegardsMockRuntime {
-    static let now = MockRepositories.defaultNow
-    static let window = ReminderWindow.defaultV1(
-        timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current
-    )
-
-    static func makeEnvironment(includeDuplicateFixture: Bool = false) -> AppEnvironment {
-        AppEnvironment.makeMock(
-            now: now,
-            includeDuplicateFixture: includeDuplicateFixture
-        )
-    }
-}
-
 @main
 struct RegardsApp: App {
-    // Phase 0 runs against MockRepositories. Phase 1 swaps in GRDBRepositories
-    // here without touching any view code.
-    private let env: AppEnvironment = {
+    // Phase 0 uses one mock runtime. Phase 1 swaps this factory for
+    // `AppRuntime.makeProduction(database:)` without touching view code.
+    private let runtime: AppRuntime = {
 #if DEBUG
-        RegardsMockRuntime.makeEnvironment(
+        AppRuntime.makeMock(
             includeDuplicateFixture:
                 ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1"
         )
 #else
-        RegardsMockRuntime.makeEnvironment()
+        AppRuntime.makeMock()
 #endif
     }()
 
     var body: some Scene {
         WindowGroup {
-            RootView(
-                env: env,
-                window: RegardsMockRuntime.window,
-                clock: { RegardsMockRuntime.now }
-            )
+            RootView(runtime: runtime)
                 .modifier(UITestDynamicTypeOverride())
         }
     }
@@ -66,26 +48,18 @@ private struct UITestDynamicTypeOverride: ViewModifier {
 /// The first SwiftUI view the user sees. Shows the splash for a brief brand
 /// moment, then crossfades into the real tab root once `.task` fires.
 struct RootView: View {
-    let env: AppEnvironment
-    let window: ReminderWindow
-    let clock: @Sendable () -> Date
+    let runtime: AppRuntime
     @State private var isReady = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(
-        env: AppEnvironment,
-        window: ReminderWindow = .defaultV1(),
-        clock: @escaping @Sendable () -> Date = { Date() }
-    ) {
-        self.env = env
-        self.window = window
-        self.clock = clock
+    init(runtime: AppRuntime) {
+        self.runtime = runtime
     }
 
     var body: some View {
         ZStack {
             if isReady {
-                RegardsTabRoot(env: env, window: window, clock: clock)
+                RegardsTabRoot(runtime: runtime)
                     .transition(.opacity)
             } else {
                 SplashView()
@@ -137,7 +111,7 @@ struct SplashView: View {
 /// four tabs. Each tab wraps its content in a `NavigationStack` so pushes
 /// (Contact Detail, Edit, Transparency, …) stay local to the tab.
 struct RegardsTabRoot: View {
-    let env: AppEnvironment
+    let runtime: AppRuntime
     @State private var navigation = RegardsNavigationState()
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
@@ -147,38 +121,57 @@ struct RegardsTabRoot: View {
     @Namespace private var upcomingContactTransition
     @Namespace private var contactsContactTransition
 
-    init(
-        env: AppEnvironment,
-        window: ReminderWindow = .defaultV1(),
-        clock: @escaping @Sendable () -> Date = { Date() }
-    ) {
-        self.env = env
+    init(runtime: AppRuntime) {
+        self.runtime = runtime
         self._overdueVM = State(
-            initialValue: OverdueViewModel(contacts: env.contacts, clock: clock)
+            initialValue: Self.makeOverdueViewModel(runtime: runtime)
         )
         self._upcomingVM = State(
-            initialValue: Self.makeUpcomingViewModel(
-                env: env,
-                window: window,
-                clock: clock
-            )
+            initialValue: Self.makeUpcomingViewModel(runtime: runtime)
         )
         self._mergeDuplicatesVM = State(
-            initialValue: MergeDuplicatesViewModel(contacts: env.contacts)
+            initialValue: MergeDuplicatesViewModel(contacts: runtime.environment.contacts)
         )
     }
 
     @MainActor
-    static func makeUpcomingViewModel(
-        env: AppEnvironment,
-        window: ReminderWindow,
-        clock: @escaping @Sendable () -> Date
-    ) -> UpcomingViewModel {
+    static func makeOverdueViewModel(runtime: AppRuntime) -> OverdueViewModel {
+        OverdueViewModel(
+            contacts: runtime.environment.contacts,
+            clock: runtime.clock,
+            calendar: runtime.calendar
+        )
+    }
+
+    @MainActor
+    static func makeUpcomingViewModel(runtime: AppRuntime) -> UpcomingViewModel {
         UpcomingViewModel(
-            contacts: env.contacts,
-            reminders: env.reminders,
-            window: window,
-            clock: clock
+            contacts: runtime.environment.contacts,
+            reminders: runtime.environment.reminders,
+            window: runtime.window,
+            clock: runtime.clock
+        )
+    }
+
+    @MainActor
+    static func makeAllContactsViewModel(runtime: AppRuntime) -> AllContactsViewModel {
+        AllContactsViewModel(
+            contacts: runtime.environment.contacts,
+            clock: runtime.clock
+        )
+    }
+
+    @MainActor
+    static func makeContactDetailViewModel(
+        contactId: UUID,
+        runtime: AppRuntime
+    ) -> ContactDetailViewModel {
+        ContactDetailViewModel(
+            contactId: contactId,
+            contacts: runtime.environment.contacts,
+            interactionsRepo: runtime.environment.interactions,
+            clock: runtime.clock,
+            calendar: runtime.calendar
         )
     }
 
@@ -291,7 +284,7 @@ struct RegardsTabRoot: View {
     private var contactsRoot: some View {
         NavigationStack(path: $navigation.contactsPath) {
             AllContactsScreen(
-                env: env,
+                viewModel: Self.makeAllContactsViewModel(runtime: runtime),
                 searchText: $navigation.contactsSearchText
             )
             .navigationDestination(for: UUID.self) { contactId in
@@ -337,9 +330,10 @@ struct RegardsTabRoot: View {
     @ViewBuilder
     private func contactDetail(for contactId: UUID) -> some View {
         ContactDetailScreen(
-            contactId: contactId,
-            contacts: env.contacts,
-            interactionsRepo: env.interactions
+            viewModel: Self.makeContactDetailViewModel(
+                contactId: contactId,
+                runtime: runtime
+            )
         )
     }
 }
@@ -360,5 +354,5 @@ private struct RegardsTabBarBehavior: ViewModifier {
 }
 
 #Preview("Tab root") {
-    RegardsTabRoot(env: AppEnvironment.makeMock())
+    RegardsTabRoot(runtime: .makeMock())
 }

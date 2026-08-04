@@ -7,11 +7,9 @@ public struct AllContactsScreen: View {
     @State private var viewModel: AllContactsViewModel
     @Binding private var searchText: String
 
-    public init(env: AppEnvironment,
-                searchText: Binding<String>) {
-        self._viewModel = State(
-            initialValue: AllContactsViewModel(contacts: env.contacts)
-        )
+    init(viewModel: AllContactsViewModel,
+         searchText: Binding<String>) {
+        self._viewModel = State(initialValue: viewModel)
         self._searchText = searchText
     }
 

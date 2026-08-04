@@ -107,33 +107,6 @@ struct MockRepositoriesTests {
         #expect(secondIDs == firstIDs)
     }
 
-    @Test("App mock composition renders occasions in its own forward horizon")
-    @MainActor
-    func appCompositionSharesMockClockAndWindow() async throws {
-        let environment = RegardsMockRuntime.makeEnvironment()
-        let viewModel = RegardsTabRoot.makeUpcomingViewModel(
-            env: environment,
-            window: RegardsMockRuntime.window,
-            clock: { RegardsMockRuntime.now }
-        )
-
-        await viewModel.load()
-
-        let occasionRows = viewModel.groups
-            .flatMap(\.rows)
-            .filter { $0.kind != .cadence }
-        let calendar = UpcomingViewModel.gregorianCalendar(
-            for: RegardsMockRuntime.window.timeZone
-        )
-        let horizonEnd = try #require(
-            calendar.date(byAdding: .day, value: viewModel.horizonDays, to: RegardsMockRuntime.now)
-        )
-        #expect(Set(occasionRows.map(\.kind)) == [.birthday, .anniversary])
-        #expect(occasionRows.allSatisfy {
-            $0.scheduledFor >= RegardsMockRuntime.now && $0.scheduledFor < horizonEnd
-        })
-    }
-
     @Test("Occasion horizon follows wall-clock days across DST transitions")
     @MainActor
     func occasionHorizonUsesCalendarDays() async throws {
@@ -321,5 +294,41 @@ struct MockRepositoriesTests {
             .flatMap(\.rows)
             .contains { $0.kind == .birthday }
         #expect(hasBirthday == isVisible)
+    }
+
+    @Test("Occasion horizon is inclusive at now and exclusive at its end")
+    @MainActor
+    func occasionHorizonUsesHalfOpenBounds() async throws {
+        let timezone = try #require(TimeZone(secondsFromGMT: 0))
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timezone
+        let horizonEnd = try #require(calendar.date(byAdding: .day, value: 14, to: now))
+        let mocks = MockRepositories(now: now, window: .defaultV1(timezone: timezone))
+        let contact = try #require(try await mocks.contacts.fetchTracked().first)
+        let visible = ScheduledReminder(
+            contactId: contact.id,
+            kind: .birthday,
+            scheduledFor: now,
+            osNotificationId: "exact-now"
+        )
+        let excluded = ScheduledReminder(
+            contactId: contact.id,
+            kind: .anniversary,
+            scheduledFor: horizonEnd,
+            osNotificationId: "exact-horizon-end"
+        )
+        let viewModel = UpcomingViewModel(
+            contacts: mocks.contacts,
+            reminders: StaticReminderRepository([visible, excluded]),
+            window: .defaultV1(timezone: timezone),
+            clock: { now }
+        )
+
+        await viewModel.load()
+
+        let rows = viewModel.groups.flatMap(\.rows)
+        #expect(rows.contains { $0.id.reminderId == visible.id })
+        #expect(!rows.contains { $0.id.reminderId == excluded.id })
     }
 }

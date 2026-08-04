@@ -27,7 +27,7 @@ never pick up Android work.
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. The CI/reproducibility slice is agent-owned;
+- Owner action needed now: none. The mock/code-hygiene slice is agent-owned;
   no product, legal, signing, or App Store decision is required.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
@@ -110,7 +110,8 @@ The first internal build is useful when production storage and import are live,
 the core caught-up/snooze flow persists, reminder windows shape persisted
 notifications, notification actions round-trip, deep links execute, onboarding
 has grant and denial paths, all visible controls are real, and CI plus the
-structural accessibility audit are green. That is the exit of `TF-08`.
+structural accessibility audit are green. Both `TF-08` and `TF-11` must be
+`DONE` before this internal gate opens.
 
 The owner then supplies signing/App Store access and performs the device-only
 checks. Internal feedback may add P0/P1 fixes ahead of `TF-09`; it does not
@@ -247,7 +248,7 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    finds nothing safely prunable. The patch-equivalent Android branch and
    empty `.git/t9FBrGy` are removable only after their active worktree is
    switched and the exact targets are rechecked; unique work stays preserved.
-   Current-source evidence on the pinned iOS 26.5 iPhone 17 Pro: all 161 unit
+   Current-source evidence on the pinned iOS 26.5 iPhone 17 Pro: all 164 unit
    tests pass; the Overdue, Upcoming, Contact Detail representative-state
    audits and `testAccessibility5AdaptiveContentDoesNotOverlap` pass; strict
    SwiftLint, privacy/domain/Android guards, source-boundary fixtures, review

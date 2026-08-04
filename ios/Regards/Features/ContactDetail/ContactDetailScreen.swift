@@ -12,12 +12,16 @@ public struct ContactDetailScreen: View {
 
     public init(contactId: UUID,
                 contacts: any ContactRepository,
-                interactionsRepo: any InteractionRepository) {
+                interactionsRepo: any InteractionRepository,
+                clock: @escaping () -> Date = { Date() },
+                calendar: Calendar = .current) {
         self.init(
             viewModel: ContactDetailViewModel(
                 contactId: contactId,
                 contacts: contacts,
-                interactionsRepo: interactionsRepo
+                interactionsRepo: interactionsRepo,
+                clock: clock,
+                calendar: calendar
             )
         )
     }

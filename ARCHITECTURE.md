@@ -596,7 +596,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-04):** the unit target has 150 declared tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color contrast, and Overdue and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-04):** the unit target has 164 declared tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
 
 **Standing requirements:**
 
@@ -849,15 +849,22 @@ work.
 
 ### What exists but is dormant (Phase 1 fragments, PRs #9–#10)
 
-- `AppEnvironment.makeProduction` + `DatabaseFactory.makeDatabase()`: **zero callers.** `@main` injects `makeMock()` (`RegardsApp.swift:7`).
+- `AppRuntime.makeProduction` + `DatabaseFactory.makeDatabase()`: **zero callers.** `@main` injects one `AppRuntime.makeMock()` composition.
 - `CNContactsSource` + `ContactsImporter` (additive first-import only): **zero app callers**; exercised by 13 unit tests. Fetches birthdays, then drops them in mapping.
-- Of 6 injected repositories the UI reads **2** (`contacts`, `interactions.fetchRecent`); `reminders`, `window`, `profile`, `groups` have no UI consumers. No interaction is ever written (`append` uncalled). No `ScheduledReminder` row is ever created. No notification is ever scheduled. No deep link is ever opened.
+- Of 6 injected repositories the UI reads **3** (`contacts`,
+  `interactions.fetchRecent`, and `reminders.fetchAllPending`). The bounded
+  Phase 0 mock path seeds pending birthday and anniversary reminders so those
+  states remain visible and auditable; no production scheduling pass or
+  reactive observation exists until TF-07. `window`, `profile`, and `groups`
+  still have no direct UI consumers. No interaction is ever written (`append`
+  uncalled). No production `ScheduledReminder` row is created, no notification
+  is scheduled, and no deep link is opened.
 
 ### What is broken (fix before building — full detail in §19)
 
 Headline open P0s: Edit Contact is still a read-only stub; Reminder Windows is
-display-only; Upcoming ignores persisted reminders; merge and onboarding flows
-do not persist.
+display-only; Upcoming has no production scheduling or reactive-observation
+pipeline; merge and onboarding flows do not persist.
 
 ### What does not exist at all
 

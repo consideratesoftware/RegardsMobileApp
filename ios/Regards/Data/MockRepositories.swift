@@ -15,10 +15,12 @@ public struct MockRepositories: Sendable {
 
     public init(
         now: Date = MockRepositories.defaultNow,
+        window: ReminderWindow = MockRepositories.defaultWindow,
         includeDuplicateFixture: Bool = false
     ) {
         let store = MockStore(
             now: now,
+            window: window,
             includeDuplicateFixture: includeDuplicateFixture
         )
         self.contacts = MockContactRepository(store: store)
@@ -37,6 +39,10 @@ public struct MockRepositories: Sendable {
         comps.timeZone = TimeZone(identifier: "Asia/Kolkata")
         return Calendar(identifier: .gregorian).date(from: comps) ?? Date()
     }()
+
+    public static let defaultWindow = ReminderWindow.defaultV1(
+        timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current
+    )
 }
 
 // MARK: - Shared in-memory store
@@ -50,8 +56,8 @@ actor MockStore {
     var window: ReminderWindow
     var profile: UserProfile
 
-    init(now: Date, includeDuplicateFixture: Bool) {
-        self.window = ReminderWindow.defaultV1(timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current)
+    init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
+        self.window = window
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
                                     entitlementTier: .trial,
                                     entitlementRefreshedAt: now)

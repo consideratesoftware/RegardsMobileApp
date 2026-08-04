@@ -31,10 +31,12 @@ public struct AppEnvironment: Sendable {
     /// SwiftUI `#Preview` blocks and unit tests that need populated screens.
     public static func makeMock(
         now: Date = MockRepositories.defaultNow,
+        window: ReminderWindow = MockRepositories.defaultWindow,
         includeDuplicateFixture: Bool = false
     ) -> AppEnvironment {
         let mocks = MockRepositories(
             now: now,
+            window: window,
             includeDuplicateFixture: includeDuplicateFixture
         )
         return AppEnvironment(
@@ -61,5 +63,58 @@ public struct AppEnvironment: Sendable {
             window: repos.window,
             profile: repos.profile
         )
+    }
+}
+
+/// Complete root composition. Repositories and every time-derived screen use
+/// the same window, clock, and calendar so the Phase 0 fixture cannot disagree
+/// across tabs and the Phase 1 production swap cannot retain mock timing.
+public struct AppRuntime: Sendable {
+    public let environment: AppEnvironment
+    public let window: ReminderWindow
+    public let calendar: Calendar
+    public let clock: @Sendable () -> Date
+
+    public init(
+        environment: AppEnvironment,
+        window: ReminderWindow,
+        calendar: Calendar,
+        clock: @escaping @Sendable () -> Date
+    ) {
+        self.environment = environment
+        self.window = window
+        self.calendar = calendar
+        self.clock = clock
+    }
+
+    public static func makeMock(includeDuplicateFixture: Bool = false) -> AppRuntime {
+        let now = MockRepositories.defaultNow
+        let window = MockRepositories.defaultWindow
+        return AppRuntime(
+            environment: .makeMock(
+                now: now,
+                window: window,
+                includeDuplicateFixture: includeDuplicateFixture
+            ),
+            window: window,
+            calendar: calendar(for: window.timeZone),
+            clock: { now }
+        )
+    }
+
+    public static func makeProduction(database: DatabaseQueue) -> AppRuntime {
+        let window = ReminderWindow.defaultV1()
+        return AppRuntime(
+            environment: .makeProduction(database: database),
+            window: window,
+            calendar: calendar(for: window.timeZone),
+            clock: { Date() }
+        )
+    }
+
+    private static func calendar(for timeZone: TimeZone) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
     }
 }
