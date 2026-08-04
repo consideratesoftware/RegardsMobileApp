@@ -59,14 +59,23 @@ struct AppRuntimeTests {
     }
 
     @Test("Production runtime uses live device timing instead of mock timing")
-    func productionRuntimeDoesNotRetainMockTiming() throws {
-        let runtime = AppRuntime.makeProduction(
-            database: try DatabaseFactory.makeInMemoryDatabase()
+    func productionRuntimeDoesNotRetainMockTiming() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let persistedWindow = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 10)),
+            ],
+            timezoneIdentifier: "America/Los_Angeles"
         )
-        let liveNow = Date()
+        let seedEnvironment = AppEnvironment.makeProduction(database: database)
+        try await seedEnvironment.window.saveGlobal(persistedWindow)
 
-        #expect(abs(runtime.clock().timeIntervalSince(liveNow)) < 5)
-        #expect(runtime.window.timeZone.identifier == TimeZone.current.identifier)
+        let runtime = try await AppRuntime.makeProduction(database: database)
+
+        #expect(runtime.window == persistedWindow)
+        #expect(runtime.calendar.timeZone.identifier == persistedWindow.timezoneIdentifier)
         #expect(runtime.clock() != MockRepositories.defaultNow)
+        #expect(try await runtime.environment.window.fetchGlobal() == runtime.window)
     }
 }

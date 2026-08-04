@@ -3,8 +3,8 @@ import SwiftUI
 
 @main
 struct RegardsApp: App {
-    // Phase 0 uses one mock runtime. Phase 1 swaps this factory for
-    // `AppRuntime.makeProduction(database:)` without touching view code.
+    // Phase 0 uses one mock runtime. Phase 1 builds the async production
+    // runtime during launch without touching view code.
     private let runtime: AppRuntime = {
 #if DEBUG
         AppRuntime.makeMock(

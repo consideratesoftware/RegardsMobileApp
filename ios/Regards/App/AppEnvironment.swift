@@ -102,10 +102,11 @@ public struct AppRuntime: Sendable {
         )
     }
 
-    public static func makeProduction(database: DatabaseQueue) -> AppRuntime {
-        let window = ReminderWindow.defaultV1()
+    public static func makeProduction(database: DatabaseQueue) async throws -> AppRuntime {
+        let environment = AppEnvironment.makeProduction(database: database)
+        let window = try await environment.window.fetchGlobal()
         return AppRuntime(
-            environment: .makeProduction(database: database),
+            environment: environment,
             window: window,
             calendar: calendar(for: window.timeZone),
             clock: { Date() }
