@@ -7,6 +7,11 @@
           "path": "/workspace/ios/Regards/Domain/Contact.swift",
           "coveredLines": 0,
           "executableLines": 0
+        },
+        {
+          "path": "/workspace/ios/Regards/Domain/Reminders/ReminderEngine.swift",
+          "coveredLines": 0,
+          "executableLines": 0
         }
       ]
     }

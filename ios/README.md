@@ -34,12 +34,14 @@ xcodebuild \
   -project Regards.xcodeproj \
   -scheme Regards \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -onlyUsePackageVersionsFromResolvedFile \
   build
 
 xcodebuild \
   -project Regards.xcodeproj \
   -scheme Regards \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -onlyUsePackageVersionsFromResolvedFile \
   test
 ```
 

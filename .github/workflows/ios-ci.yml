@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 # Path filters were intentionally removed: branch protection requires
 # the iOS CI checks to pass, and a path-filtered workflow doesn't run
 # on unrelated-paths PRs (gitignore tweaks, root README edits, etc.).
@@ -18,7 +21,6 @@ concurrency:
 
 env:
   XCODE_VERSION: "26.6"
-  DOMAIN_COVERAGE_MIN: "95"
   # `OS=latest` alone doesn't pick a device — xcodebuild needs a name to
   # disambiguate. iPhone 17 Pro is the project's pinned test device and
   # resolves to the image's latest installed iOS runtime. Keep this device
@@ -43,7 +45,7 @@ jobs:
       - name: Assert committed xcodeproj matches project.yml
         run: |
           if ! git diff --exit-code ios/Regards.xcodeproj; then
-            echo "::error::Regards.xcodeproj is out of date. Run 'cd ios && xcodegen generate' and commit the result."
+            echo "::error::The generated project or Package.resolved drifted. Run 'cd ios && xcodegen generate'; if only Package.resolved changed, review and commit the intended dependency resolution."
             exit 1
           fi
 
@@ -89,6 +91,7 @@ jobs:
             -scheme "$SCHEME" \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
+            -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -136,6 +139,7 @@ jobs:
             -only-testing:RegardsTests \
             -resultBundlePath build/RegardsTests.xcresult \
             -enableCodeCoverage YES \
+            -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -194,6 +198,7 @@ jobs:
             -configuration Debug \
             -only-testing:RegardsAccessibilityTests \
             -resultBundlePath build/RegardsAccessibilityTests.xcresult \
+            -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
