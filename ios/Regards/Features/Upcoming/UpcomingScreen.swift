@@ -200,7 +200,7 @@ struct UpcomingRow: View {
     private var accessibilityLabel: String {
         let what = row.kind == .cadence
             ? (row.cadenceText ?? "")
-            : (row.occasionText ?? row.kind.rawValue.replacingOccurrences(of: "_", with: " "))
+            : (row.occasionText ?? "")
         return "\(row.name), \(what) at \(row.timeOfDayText)"
     }
 }

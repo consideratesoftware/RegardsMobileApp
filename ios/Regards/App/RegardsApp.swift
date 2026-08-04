@@ -1,24 +1,42 @@
 import Foundation
 import SwiftUI
 
+enum RegardsMockRuntime {
+    static let now = MockRepositories.defaultNow
+    static let window = ReminderWindow.defaultV1(
+        timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current
+    )
+
+    static func makeEnvironment(includeDuplicateFixture: Bool = false) -> AppEnvironment {
+        AppEnvironment.makeMock(
+            now: now,
+            includeDuplicateFixture: includeDuplicateFixture
+        )
+    }
+}
+
 @main
 struct RegardsApp: App {
     // Phase 0 runs against MockRepositories. Phase 1 swaps in GRDBRepositories
     // here without touching any view code.
     private let env: AppEnvironment = {
 #if DEBUG
-        AppEnvironment.makeMock(
+        RegardsMockRuntime.makeEnvironment(
             includeDuplicateFixture:
                 ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1"
         )
 #else
-        AppEnvironment.makeMock()
+        RegardsMockRuntime.makeEnvironment()
 #endif
     }()
 
     var body: some Scene {
         WindowGroup {
-            RootView(env: env)
+            RootView(
+                env: env,
+                window: RegardsMockRuntime.window,
+                clock: { RegardsMockRuntime.now }
+            )
                 .modifier(UITestDynamicTypeOverride())
         }
     }
@@ -49,13 +67,25 @@ private struct UITestDynamicTypeOverride: ViewModifier {
 /// moment, then crossfades into the real tab root once `.task` fires.
 struct RootView: View {
     let env: AppEnvironment
+    let window: ReminderWindow
+    let clock: @Sendable () -> Date
     @State private var isReady = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(
+        env: AppEnvironment,
+        window: ReminderWindow = .defaultV1(),
+        clock: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.env = env
+        self.window = window
+        self.clock = clock
+    }
 
     var body: some View {
         ZStack {
             if isReady {
-                RegardsTabRoot(env: env)
+                RegardsTabRoot(env: env, window: window, clock: clock)
                     .transition(.opacity)
             } else {
                 SplashView()
@@ -117,17 +147,38 @@ struct RegardsTabRoot: View {
     @Namespace private var upcomingContactTransition
     @Namespace private var contactsContactTransition
 
-    init(env: AppEnvironment) {
+    init(
+        env: AppEnvironment,
+        window: ReminderWindow = .defaultV1(),
+        clock: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.env = env
-        self._overdueVM = State(initialValue: OverdueViewModel(contacts: env.contacts))
+        self._overdueVM = State(
+            initialValue: OverdueViewModel(contacts: env.contacts, clock: clock)
+        )
         self._upcomingVM = State(
-            initialValue: UpcomingViewModel(
-                contacts: env.contacts,
-                reminders: env.reminders
+            initialValue: Self.makeUpcomingViewModel(
+                env: env,
+                window: window,
+                clock: clock
             )
         )
         self._mergeDuplicatesVM = State(
             initialValue: MergeDuplicatesViewModel(contacts: env.contacts)
+        )
+    }
+
+    @MainActor
+    static func makeUpcomingViewModel(
+        env: AppEnvironment,
+        window: ReminderWindow,
+        clock: @escaping @Sendable () -> Date
+    ) -> UpcomingViewModel {
+        UpcomingViewModel(
+            contacts: env.contacts,
+            reminders: env.reminders,
+            window: window,
+            clock: clock
         )
     }
 

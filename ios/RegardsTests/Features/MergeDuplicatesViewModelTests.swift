@@ -171,6 +171,30 @@ struct MergeDuplicatesViewModelTests {
         #expect(viewModel.candidates.first { $0.id == untouchedID } == untouchedBefore)
     }
 
+    @Test("Archived contacts and members of the same virtual group are excluded")
+    func archivedAndGroupedContactsAreExcluded() async {
+        let groupID = UUID()
+        var groupedPrimary = Self.duplicateContacts[0]
+        var groupedMember = Self.duplicateContacts[1]
+        groupedPrimary.contactGroupId = groupID
+        groupedMember.contactGroupId = groupID
+        let archived = Contact(
+            systemContactRef: "merge-test-archived",
+            displayName: "Luke Skywalker",
+            preferredChannel: .signal,
+            preferredChannelValue: "+1 415 555 0198",
+            archivedAt: Date()
+        )
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success([groupedPrimary, groupedMember, archived]),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+
+        #expect(viewModel.candidates.isEmpty)
+    }
+
     // MARK: - Loading lifecycle
 
     @Test("A repeated load preserves in-progress duplicate choices")

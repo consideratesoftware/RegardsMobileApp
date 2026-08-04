@@ -263,6 +263,9 @@ public struct ContactDetailScreen: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(entry.dateLabel), \(entry.descriptionLabel)")
+                            .accessibilityIdentifier("contact-detail.interaction-row")
                             if idx < viewModel.interactions.count - 1 {
                                 Hair(inset: 16)
                             }

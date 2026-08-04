@@ -104,13 +104,9 @@ public final class OverdueViewModel {
             now: now,
             effectiveLastInteractedAt: contact.lastInteractedAt,
             isOverdue: overdueDays > 0,
-            overdueDays: overdueDays
+            overdueDays: overdueDays,
+            isVirtualMerged: contact.contactGroupId != nil
         )
-
-        let baseAccessibilityLabel = contact.accessibilityLabel(context: context)
-        let accessibilityLabel = contact.contactGroupId == nil
-            ? baseAccessibilityLabel
-            : "\(baseAccessibilityLabel), merged contact"
 
         return OverdueRowState(
             contactId: contact.id,
@@ -125,7 +121,7 @@ public final class OverdueViewModel {
             channel: contact.preferredChannel,
             channelLabel: contact.preferredChannel.displayName,
             channelValue: contact.preferredChannelValue,
-            accessibilityLabel: accessibilityLabel
+            accessibilityLabel: contact.accessibilityLabel(context: context)
         )
     }
 }

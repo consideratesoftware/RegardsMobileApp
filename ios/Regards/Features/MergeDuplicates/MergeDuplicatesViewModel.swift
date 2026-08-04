@@ -49,7 +49,8 @@ public final class MergeDuplicatesViewModel {
             loadState = .failed
             return
         }
-        let inputs = all.map { contact in
+        let eligible = all.filter(\.isActive)
+        let inputs = eligible.map { contact in
             let value = contact.preferredChannelValue
             let isPhone = !value.isEmpty
                 && ChannelCatalog.isPhoneE164(ChannelCatalog.normalizedPhone(value))
@@ -62,10 +63,13 @@ public final class MergeDuplicatesViewModel {
             )
         }
         let pairs = detector.candidates(from: inputs)
-        let byId = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+        let byId = Dictionary(uniqueKeysWithValues: eligible.map { ($0.id, $0) })
 
         candidates = pairs.compactMap { pair -> DuplicateCandidateState? in
-            guard let contactA = byId[pair.contactA], let contactB = byId[pair.contactB] else { return nil }
+            guard let contactA = byId[pair.contactA],
+                  let contactB = byId[pair.contactB],
+                  contactA.contactGroupId == nil || contactA.contactGroupId != contactB.contactGroupId
+            else { return nil }
             return DuplicateCandidateState(
                 a: Self.member(from: contactA),
                 b: Self.member(from: contactB),

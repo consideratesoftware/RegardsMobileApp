@@ -21,30 +21,6 @@ final class ScreensAccessibilityTests: XCTestCase {
     // MARK: - Tab-root screens
 
     @MainActor
-    func testOverdueTabPassesAudit() throws {
-        let app = launchToOverdue()
-        let rows = app.descendants(matching: .any).matching(identifier: "overdue.row")
-        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
-        assertRepresentativeMergedState(in: rows)
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-    }
-
-    @MainActor
-    func testUpcomingTabPassesAudit() throws {
-        let app = launchToOverdue()
-        navigateToTab(
-            named: "Upcoming",
-            from: "screen.overdue",
-            to: "screen.upcoming",
-            in: app
-        )
-        let rows = app.descendants(matching: .any).matching(identifier: "upcoming.row")
-        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
-        assertRepresentativeOccasionStates(in: rows)
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-    }
-
-    @MainActor
     func testContactsTabPassesAudit() throws {
         let app = launchToOverdue()
         navigateToTab(

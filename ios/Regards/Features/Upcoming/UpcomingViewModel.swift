@@ -5,10 +5,12 @@ public struct UpcomingRowState: Sendable, Identifiable, Equatable {
     public struct RowID: Sendable, Hashable {
         public let contactId: UUID
         public let kind: ReminderKind
+        public let reminderId: UUID?
 
-        public init(contactId: UUID, kind: ReminderKind) {
+        public init(contactId: UUID, kind: ReminderKind, reminderId: UUID? = nil) {
             self.contactId = contactId
             self.kind = kind
+            self.reminderId = reminderId
         }
     }
 
@@ -149,7 +151,8 @@ public final class UpcomingViewModel {
         reminders: [ScheduledReminder],
         now: Date
     ) -> [UpcomingRowState] {
-        let horizonEnd = now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
+        let calendar = Self.gregorianCalendar(for: window.timeZone)
+        let horizonEnd = calendar.date(byAdding: .day, value: horizonDays, to: now) ?? now
         var rows: [UpcomingRowState] = []
 
         for contact in contacts {
@@ -171,7 +174,7 @@ public final class UpcomingViewModel {
                 // slot start can be earlier than `now`; it still represents an
                 // immediate reminder and belongs in Upcoming. Future cadence
                 // eligibility remains guarded by `nextAllowedSlot` itself.
-                if fires <= horizonEnd {
+                if fires < horizonEnd {
                     rows.append(UpcomingRowState(
                         id: .init(contactId: contact.id, kind: .cadence),
                         contactId: contact.id,
@@ -194,17 +197,34 @@ public final class UpcomingViewModel {
         // pipeline that owns every Upcoming row (§14 PR25 / R10).
         let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
         for reminder in reminders where reminder.kind != .cadence {
-            guard reminder.scheduledFor <= horizonEnd,
+            guard reminder.scheduledFor >= now,
+                  reminder.scheduledFor < horizonEnd,
                   let contact = contactsByID[reminder.contactId] else { continue }
+            let occasionText: String
+            if let label = reminder.occasionLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !label.isEmpty {
+                occasionText = label
+            } else {
+                occasionText = switch reminder.kind {
+                case .birthday: "Birthday"
+                case .anniversary: "Anniversary"
+                case .customOccasion: "Occasion"
+                case .cadence: ""
+                }
+            }
             rows.append(UpcomingRowState(
-                id: .init(contactId: contact.id, kind: reminder.kind),
+                id: .init(
+                    contactId: contact.id,
+                    kind: reminder.kind,
+                    reminderId: reminder.id
+                ),
                 contactId: contact.id,
                 name: contact.displayName,
                 kind: reminder.kind,
                 scheduledFor: reminder.scheduledFor,
                 channel: contact.preferredChannel,
                 cadenceText: nil,
-                occasionText: Self.occasionText(for: reminder),
+                occasionText: occasionText,
                 timeOfDayText: Self.format(
                     time: reminder.scheduledFor,
                     timezone: window.timeZone
@@ -224,20 +244,10 @@ public final class UpcomingViewModel {
             if $0.contactId != $1.contactId {
                 return $0.contactId.uuidString < $1.contactId.uuidString
             }
-            return $0.kind.rawValue < $1.kind.rawValue
-        }
-    }
-
-    private static func occasionText(for reminder: ScheduledReminder) -> String {
-        if let label = reminder.occasionLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !label.isEmpty {
-            return label
-        }
-        return switch reminder.kind {
-        case .birthday: "Birthday"
-        case .anniversary: "Anniversary"
-        case .customOccasion: "Occasion"
-        case .cadence: ""
+            if $0.kind != $1.kind {
+                return $0.kind.rawValue < $1.kind.rawValue
+            }
+            return ($0.id.reminderId?.uuidString ?? "") < ($1.id.reminderId?.uuidString ?? "")
         }
     }
 

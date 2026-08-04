@@ -16,11 +16,13 @@ never pick up Android work.
 - Baseline: `main` at `bbd7c93` (merged Android-only GitHub PR #41); the latest
   iOS source change is `87fa055` (merged GitHub PR #40)
 - Active work: `TF-01` PR19 mock and code-hygiene slice on
-  `codex/tf-01-mock-hygiene`. The linked worktree started from `87fa055` and
-  must be synchronized with current `main` before publication.
+  `codex/tf-01-mock-hygiene`, published as ready GitHub PR #42 and synchronized
+  with current `main`.
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open TF pull request: none. GitHub PR #39 merged as `ade40e3`; GitHub PR #41
-  merged as `bbd7c93` on the separate Android track and is not TF work.
+- Open TF pull request: GitHub PR #42 (ready; local staged review repairs and
+  hosted checks in progress; auto-merge off). GitHub PR #39 merged as
+  `ade40e3`; GitHub PR #41 merged as `bbd7c93` on the separate Android track
+  and is not TF work.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -94,7 +96,7 @@ consciously defer every blocker before merging. It must not:
 - upload a build, change App Store Connect, contact testers, publish content,
   or perform a physical-device check without the required owner access;
 - exceed the three-lane implementation WIP limit or bypass an explicit queue
-  dependency. Review and CI monitoring may continue alongside both lanes.
+  dependency. Review and CI monitoring may continue alongside all three lanes.
 
 When an owner-only action blocks the next acceptance criterion, mark the item
 `OWNER`, write one exact checklist under `Owner gates`, and continue any
@@ -154,7 +156,7 @@ numbers.
 an implementation problem. Promote the next item to `READY` when its dependency
 is merged. The owner-authorized default implementation WIP limit is three, but
 the current dependency column remains authoritative until a reviewed DAG change
-promotes two independent items. Linked worktrees isolate independent lanes;
+promotes independent items. Linked worktrees isolate independent lanes;
 dependent changes use stacked pull requests in one lane.
 
 ### Three-lane dependency waves
@@ -234,7 +236,7 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    `30870019501`, hosted review run `30870018471`, and every required check
    passed. Post-merge iOS CI run `30870432645` and 5× stress run
    `30870432634` also passed.
-7. ACTIVE on `codex/tf-01-mock-hygiene`: seed representative group,
+7. ACTIVE in ready GitHub PR #42 on `codex/tf-01-mock-hygiene`: seed representative group,
    interaction, and occasion states; use stable Upcoming row IDs; remove dead
    assets and correct their comments. These are pending R34/R36/R40 closures,
    not closed until the follow-up merges. R30 remains open: 18 merged remote
@@ -245,6 +247,16 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    finds nothing safely prunable. The patch-equivalent Android branch and
    empty `.git/t9FBrGy` are removable only after their active worktree is
    switched and the exact targets are rechecked; unique work stays preserved.
+   Current-source evidence on the pinned iOS 26.5 iPhone 17 Pro: all 161 unit
+   tests pass; the Overdue, Upcoming, Contact Detail representative-state
+   audits and `testAccessibility5AdaptiveContentDoesNotOverlap` pass; strict
+   SwiftLint, privacy/domain/Android guards, source-boundary fixtures, review
+   parity, workflow YAML, diff checks, and temporary-copy XcodeGen determinism
+   pass. Accessibility Inspector targeted the final Regards process and
+   reported no warnings; hierarchy traversal confirmed the merged-contact,
+   birthday, anniversary, and combined interaction narration. The simulator
+   remained at large text with Reduce Motion and Increased Contrast off after
+   the smoke.
 
 ## Owner gates
 

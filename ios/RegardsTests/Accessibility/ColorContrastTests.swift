@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import Regards
 
 /// WCAG contrast gate for the design-system palette. Runs on every PR — if a
@@ -35,5 +36,17 @@ struct ColorContrastTests {
         // The PR1 audit caught the original value at ~3.9:1; we should now be
         // well above 4.5.
         #expect(ratio >= 4.5, "muted-on-bg = \(ratio)")
+    }
+}
+
+struct AssetCatalogHygieneTests {
+
+    @Test("Obsolete palette assets are absent while system-owned colors remain")
+    func obsoletePaletteColorsAreAbsent() {
+        #expect(UIColor(named: "Ink") == nil)
+        #expect(UIColor(named: "Muted") == nil)
+        #expect(UIColor(named: "Background") == nil)
+        #expect(UIColor(named: "AccentColor") != nil)
+        #expect(UIColor(named: "LaunchBackground") != nil)
     }
 }

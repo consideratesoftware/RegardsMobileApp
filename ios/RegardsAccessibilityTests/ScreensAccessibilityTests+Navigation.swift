@@ -204,6 +204,8 @@ extension ScreensAccessibilityTests {
             }
             let row = rows[index]
             if !row.isHittable {
+                // Representative states add enough rows to place the target
+                // below the viewport at accessibility Dynamic Type sizes.
                 source.swipeUp()
             }
             guard waitUntilLiveAndHittable(row) else { continue }

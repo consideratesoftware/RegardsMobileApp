@@ -257,7 +257,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 90,
                 priorityTier: .regular,
                 preferredChannel: .email,
-                preferredChannelValue: "obiwan@jeditemple.org",
+                preferredChannelValue: "obiwan@jeditemple.example",
                 lastInteractedAt: now.addingTimeInterval(-day * 84)),
             Contact(
                 systemContactRef: "sys-ahsoka",
