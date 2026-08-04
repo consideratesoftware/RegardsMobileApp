@@ -1,7 +1,8 @@
 {
   "ignorePatterns": [
     { "pattern": "^http(s)?://localhost" },
-    { "pattern": "^http(s)?://127.0.0.1" }
+    { "pattern": "^http(s)?://127.0.0.1" },
+    { "pattern": "^https://sdahiya\\.substack\\.com/?$" }
   ],
   "retryOn429": true,
   "retryCount": 2,
