@@ -13,14 +13,15 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-08-04
-- Baseline: `main` at `3e391c6` (merged GitHub PR #38 R49 repair)
-- Active work: `TF-01` PR19 CI/reproducibility slice on
-  `codex/tf-01-ci-repro`
+- Baseline: `main` at `bbd7c93` (merged Android-only GitHub PR #41); the latest
+  iOS source change is `87fa055` (merged GitHub PR #40)
+- Active work: `TF-01` PR19 mock and code-hygiene slice on
+  `codex/tf-01-mock-hygiene`. The linked worktree started from `87fa055` and
+  must be synchronized with current `main` before publication.
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #39 (`codex/tf-01-ci-repro`, ready; hosted
-  feedback repair committed locally; exact-head local and hosted reviews plus
-  required checks must approve before merge; auto-merge off)
-- Internal TestFlight gate: after `TF-08`
+- Open TF pull request: none. GitHub PR #39 merged as `ade40e3`; GitHub PR #41
+  merged as `bbd7c93` on the separate Android track and is not TF work.
+- Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
@@ -55,9 +56,11 @@ Every fresh or scheduled agent run follows this order:
    failed on the current `main`, triage that failure before taking new feature
    work and create the smallest repair PR when it is reproducible. Otherwise
    take the first `READY` item whose dependencies are `DONE`.
-6. Work on exactly one queue item. Use a branch named after its stable ID, keep
-   the diff reviewable, meet its architecture acceptance criteria, and include
-   its `TF-##`, §14 scope alias, and R-items in the pull-request body.
+6. Maintain at most three implementation lanes, and start a lane only when every
+   dependency listed in this queue is `DONE`. Use linked worktrees for
+   independent lanes and stacked pull requests within a dependent lane. Keep
+   each diff reviewable and include its `TF-##`, §14 scope alias, and R-items
+   in the pull-request body. Review and CI monitoring do not consume a lane.
 7. Run proportionate local checks before push. Every pull request must pass the
    repository gates and `$regards-pr-review` (or `/pr-review`) before merge.
 8. Update this checkpoint in the same pull request. Never mark an item `DONE`
@@ -90,8 +93,8 @@ consciously defer every blocker before merging. It must not:
 - invent signing, legal, pricing, privacy-label, or App Store answers;
 - upload a build, change App Store Connect, contact testers, publish content,
   or perform a physical-device check without the required owner access;
-- start a second work item while another branch, worktree, or pull request is
-  unresolved.
+- exceed the three-lane implementation WIP limit or bypass an explicit queue
+  dependency. Review and CI monitoring may continue alongside both lanes.
 
 When an owner-only action blocks the next acceptance criterion, mark the item
 `OWNER`, write one exact checklist under `Owner gates`, and continue any
@@ -128,28 +131,55 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; adopt the latest stable iOS composition with explicit fallbacks; current-state prose and checks agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
+| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
-| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
-| TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
+| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35 |
+| TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
-| TF-06 | BLOCKED | TF-05 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |
-| TF-07 | BLOCKED | TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved | PR25; R4–R6, R10–R11, R24 |
+| TF-06 | BLOCKED | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |
+| TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved | PR25; R4–R6, R10–R11, R24 |
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; interaction logging and routing tests pass | PR26; R11, R37 |
-| TF-09 | BLOCKED | TF-08 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
-| TF-10 | BLOCKED | TF-09 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
-| TF-11 | BLOCKED | TF-10 | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls | PR29; R11, R14 |
-| TF-12 | BLOCKED | TF-11 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
+| TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
+| TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
+| TF-11 | BLOCKED | TF-03, TF-06 | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls | PR29; R11, R14 |
+| TF-12 | BLOCKED | TF-09, TF-10 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
 | TF-13 | BLOCKED | TF-12 | Widget target and App Group migration preserve the DB; read-only small/medium/lock widgets refresh from SchedulingPass | PR31 |
-| TF-14 | BLOCKED | TF-13 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
-| TF-15 | BLOCKED | TF-14 | Settings export/delete/support/transparency/entitlement surfaces work; JSON covers every table and delete returns to onboarding | PR33; R11, R15 |
-| TF-16 | BLOCKED | TF-15 | Full accessibility categories and 5× stress pass, snapshot gate, contrast registry, privacy required-reason entries, category/export keys, and Dynamic Type smoke | PR34; R18, R41, R44 |
-| TF-17 | BLOCKED | TF-16 | 5k-contact path is off the cooperative pool and meets the device budget; strings/copy and launch polish are complete | PR35; R25 |
-| TF-18 | BLOCKED | TF-17 | Clean archive, monotonic build number, internal feedback triage, device matrix, privacy/network evidence, beta metadata, signing, upload, processing, and external-group approval | §20 release playbook |
+| TF-14 | BLOCKED | TF-02, TF-11 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
+| TF-15 | BLOCKED | TF-11, TF-13, TF-14 | Settings export/delete/support/transparency/entitlement surfaces work; JSON covers every table and delete returns to onboarding | PR33; R11, R15 |
+| TF-16 | BLOCKED | TF-08, TF-09, TF-15, TF-17 | Full accessibility categories and 5× stress pass, snapshot gate, contrast registry, privacy required-reason entries, category/export keys, and Dynamic Type smoke | PR34; R18, R41, R44 |
+| TF-17 | BLOCKED | TF-15 | String Catalog, final copy, and launch polish are complete before snapshot and accessibility baselines freeze | PR35 |
+| TF-18 | BLOCKED | TF-16 | Clean archive, monotonic build number, internal feedback triage, A15 performance confirmation, device matrix, privacy/network evidence, beta metadata, signing, upload, processing, and external-group approval | §20 release playbook |
 
 `BLOCKED` in this queue normally means “waiting on the listed dependency,” not
 an implementation problem. Promote the next item to `READY` when its dependency
-is merged.
+is merged. The owner-authorized default implementation WIP limit is three, but
+the current dependency column remains authoritative until a reviewed DAG change
+promotes two independent items. Linked worktrees isolate independent lanes;
+dependent changes use stacked pull requests in one lane.
+
+### Three-lane dependency waves
+
+The queue is a dependency graph, not a blanket sequence. A lane starts as soon
+as its row's dependencies are `DONE`, without waiting for unrelated work in a
+nominal wave. Expected concurrency is: TF-02 alone; TF-03 + TF-04; then TF-03
+may continue while TF-05 + TF-06 occupy the other two lanes; TF-07 + TF-11;
+TF-08 with TF-14 when ready; TF-09 + TF-10 + TF-14; TF-12 with TF-14 when
+needed; then the TF-13 → TF-15 → TF-17 → TF-16 → TF-18 joins. Joins branch
+from the combined current `main`, never from only one parent. Independent
+siblings use separate linked worktrees. Stacks are reserved for real
+dependency edges and are rebased and retargeted to `main` after their parent
+merges.
+
+Treat shared schema/location transitions and high-collision composition as
+locks, not artificial global dependencies. Only one lane may own a schema or
+database-location transition. Coordinate ownership before concurrent edits to
+`AppEnvironment`, `RegardsApp`, repository/migration files, SchedulingPass,
+Upcoming/Overdue/Contact Detail, Onboarding/Settings, `project.yml` and its
+generated Xcode project, shared accessibility helpers, or execution docs.
+Simulator-heavy gates run serially unless lanes use distinct simulator clones
+and DerivedData paths. A staged six-role review may temporarily consume all
+subagent capacity; implementation lanes yield at a filesystem-safe checkpoint
+and resume after review consolidation.
 
 ### TF-01 serial chain
 
@@ -196,22 +226,33 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    Motion off, and Increased Contrast off after the smoke. Exact-main iOS CI
    run `30858964352`, including the one-run accessibility audit, and 5× stress
    run `30858964211` both passed after merge.
-6. ACTIVE: finish the bounded PR19 CI and reproducibility scope in GitHub PR
-   #39: commit
-   `Package.resolved`, remove placeholders, extend root Markdown checks, add
-   the Domain coverage floor, remove the dead SwiftLint `function_body_length`
-   configuration and stale audit-stress comment, and reconcile merge-method
-   documentation.
-7. Finish mock and code hygiene: seed group, interaction, and occasion states;
-   use stable Upcoming row IDs; remove or wire dead assets and comments; prune
-   obsolete worktrees and merged branches after exact-target verification.
+6. DONE: GitHub PR #39 merged as `ade40e3`, closing R19, R21, R22, R31, and
+   R33. It committed `Package.resolved`, removed the ownerless placeholders,
+   extended root Markdown checks, installed a fail-closed 95% Domain coverage
+   floor (96.88% on the merged head), removed dead SwiftLint configuration,
+   and reconciled audit and merge-method documentation. Exact-head iOS CI run
+   `30870019501`, hosted review run `30870018471`, and every required check
+   passed. Post-merge iOS CI run `30870432645` and 5× stress run
+   `30870432634` also passed.
+7. ACTIVE on `codex/tf-01-mock-hygiene`: seed representative group,
+   interaction, and occasion states; use stable Upcoming row IDs; remove dead
+   assets and correct their comments. These are pending R34/R36/R40 closures,
+   not closed until the follow-up merges. R30 remains open: 18 merged remote
+   and 38 merged local branches were removed and automatic source-branch
+   deletion was enabled, but the live `crazy-franklin-75fc28` worktree still
+   contains 32 untracked files and `codex/pr24-pre-stack-rebase-20260730` has
+   three patch-inequivalent commits. `git worktree prune --dry-run --verbose`
+   finds nothing safely prunable. The patch-equivalent Android branch and
+   empty `.git/t9FBrGy` are removable only after their active worktree is
+   switched and the exact targets are rechecked; unique work stays preserved.
 
 ## Owner gates
 
 Current gates:
 
-- No owner gate is active. PR #39's local and hosted reviews, publication,
-  required checks, and guarded merge are agent-owned repository work.
+- No owner gate is active. The R34/R36/R40 implementation, verification,
+  publication, and guarded merge are agent-owned. R30 is intentionally open;
+  no unique work may be removed merely to close a hygiene row.
 
 ### PR #24 modernization accessibility evidence
 

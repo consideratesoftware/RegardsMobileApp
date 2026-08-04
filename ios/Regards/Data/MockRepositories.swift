@@ -62,6 +62,122 @@ actor MockStore {
         ) {
             self.contacts[contact.id] = contact
         }
+
+        let representative = Self.seedRepresentativeStates(
+            now: now,
+            window: window,
+            contacts: contacts
+        )
+        contacts = representative.contacts
+        groups = representative.groups
+        reminders = representative.reminders
+        interactions = representative.interactions
+    }
+
+    /// Phase 0 deliberately renders representative persisted states so the
+    /// corresponding UI does not exist only as unreachable implementation:
+    /// a virtual merge marker, recent interactions, and both occasion tags.
+    /// Production scheduling still belongs to TF-07; these rows are local
+    /// in-memory fixtures only.
+    private nonisolated static func seedRepresentativeStates(
+        now: Date,
+        window: ReminderWindow,
+        contacts seededContacts: [UUID: Contact]
+    ) -> (
+        contacts: [UUID: Contact],
+        groups: [UUID: ContactGroup],
+        reminders: [UUID: ScheduledReminder],
+        interactions: [UUID: InteractionLog]
+    ) {
+        let day: TimeInterval = 86_400
+        var contacts = seededContacts
+        var groups: [UUID: ContactGroup] = [:]
+        var reminders: [UUID: ScheduledReminder] = [:]
+        var interactions: [UUID: InteractionLog] = [:]
+
+        if var leia = contacts.values.first(where: { $0.systemContactRef == "sys-leia" }) {
+            let group = ContactGroup(
+                displayName: "Leia Organa",
+                primaryContactId: leia.id,
+                createdAt: now.addingTimeInterval(-day * 120),
+                createdBy: .suggestionAccepted
+            )
+            groups[group.id] = group
+            leia.contactGroupId = group.id
+            contacts[leia.id] = leia
+
+            let archivedDuplicate = Contact(
+                systemContactRef: "sys-leia-archived-duplicate",
+                displayName: "Leia Organa",
+                tracked: false,
+                priorityTier: .innerCircle,
+                preferredChannel: .email,
+                preferredChannelValue: "leia@alderaan.example",
+                contactGroupId: group.id,
+                createdAt: now.addingTimeInterval(-day * 400),
+                archivedAt: now.addingTimeInterval(-day * 90)
+            )
+            contacts[archivedDuplicate.id] = archivedDuplicate
+
+            let recent = InteractionLog(
+                contactId: leia.id,
+                occurredAt: now.addingTimeInterval(-day * 23),
+                source: .reminderCaughtUp,
+                channel: .whatsapp
+            )
+            let earlier = InteractionLog(
+                contactId: leia.id,
+                occurredAt: now.addingTimeInterval(-day * 58),
+                source: .manual,
+                channel: .phoneCall
+            )
+            interactions[recent.id] = recent
+            interactions[earlier.id] = earlier
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = window.timeZone
+        let startOfToday = calendar.startOfDay(for: now)
+
+        if let shmi = contacts.values.first(where: { $0.systemContactRef == "sys-shmi" }),
+           let birthdayDay = calendar.date(byAdding: .day, value: 1, to: startOfToday),
+           let birthdayTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: birthdayDay) {
+            let birthday = ScheduledReminder(
+                contactId: shmi.id,
+                kind: .birthday,
+                occasionDate: Self.monthDayString(for: birthdayTime, calendar: calendar),
+                occasionLabel: "Birthday",
+                scheduledFor: birthdayTime,
+                osNotificationId: "mock-birthday-\(shmi.id.uuidString)"
+            )
+            reminders[birthday.id] = birthday
+        }
+
+        if let obiWan = contacts.values.first(where: { $0.systemContactRef == "sys-obiwan" }),
+           let anniversaryDay = calendar.date(byAdding: .day, value: 4, to: startOfToday),
+           let anniversaryTime = calendar.date(
+               bySettingHour: 9,
+               minute: 0,
+               second: 0,
+               of: anniversaryDay
+           ) {
+            let anniversary = ScheduledReminder(
+                contactId: obiWan.id,
+                kind: .anniversary,
+                occasionDate: Self.monthDayString(for: anniversaryTime, calendar: calendar),
+                occasionLabel: "Jedi Order anniversary",
+                scheduledFor: anniversaryTime,
+                osNotificationId: "mock-anniversary-\(obiWan.id.uuidString)"
+            )
+            reminders[anniversary.id] = anniversary
+        }
+
+        return (contacts, groups, reminders, interactions)
+    }
+
+    private nonisolated static func monthDayString(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.month, .day], from: date)
+        return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
     }
 
     static func seedCast(

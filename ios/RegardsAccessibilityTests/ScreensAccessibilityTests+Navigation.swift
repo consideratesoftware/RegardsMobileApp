@@ -199,11 +199,15 @@ extension ScreensAccessibilityTests {
             let rows = app.descendants(matching: .any)
                 .matching(identifier: identifier)
                 .allElementsBoundByIndex
-            guard rows.indices.contains(index),
-                  waitUntilLiveAndHittable(rows[index]) else {
+            guard rows.indices.contains(index) else {
                 continue
             }
-            activate(rows[index], attempt: attempt)
+            let row = rows[index]
+            if !row.isHittable {
+                source.swipeUp()
+            }
+            guard waitUntilLiveAndHittable(row) else { continue }
+            activate(row, attempt: attempt)
             if detail.waitForExistence(timeout: 10),
                source.waitForNonExistence(timeout: 10) {
                 return

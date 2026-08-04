@@ -2,7 +2,17 @@ import Foundation
 import Observation
 
 public struct UpcomingRowState: Sendable, Identifiable, Equatable {
-    public let id: UUID
+    public struct RowID: Sendable, Hashable {
+        public let contactId: UUID
+        public let kind: ReminderKind
+
+        public init(contactId: UUID, kind: ReminderKind) {
+            self.contactId = contactId
+            self.kind = kind
+        }
+    }
+
+    public let id: RowID
     public let contactId: UUID
     public let name: String
     public let kind: ReminderKind
@@ -24,16 +34,19 @@ public final class UpcomingViewModel {
     public var horizonDays: Int = 14
 
     private let contacts: any ContactRepository
+    private let reminders: (any ReminderRepository)?
     private let engine: ReminderEngine
     private let window: ReminderWindow
     private let clock: () -> Date
     private var loadGeneration = 0
 
     public init(contacts: any ContactRepository,
+                reminders: (any ReminderRepository)? = nil,
                 engine: ReminderEngine = ReminderEngine(),
                 window: ReminderWindow = .defaultV1(),
                 clock: @escaping () -> Date = { Date() }) {
         self.contacts = contacts
+        self.reminders = reminders
         self.engine = engine
         self.window = window
         self.clock = clock
@@ -47,8 +60,13 @@ public final class UpcomingViewModel {
         }
         do {
             let tracked = try await contacts.fetchTracked()
+            let pendingReminders = try await reminders?.fetchAllPending() ?? []
             let now = clock()
-            let rows = buildRows(contacts: tracked, now: now)
+            let rows = buildRows(
+                contacts: tracked,
+                reminders: pendingReminders,
+                now: now
+            )
             guard generation == loadGeneration else { return }
             totalCount = rows.count
             groups = group(rows: rows)
@@ -126,7 +144,11 @@ public final class UpcomingViewModel {
         return calendar
     }
 
-    private func buildRows(contacts: [Contact], now: Date) -> [UpcomingRowState] {
+    private func buildRows(
+        contacts: [Contact],
+        reminders: [ScheduledReminder],
+        now: Date
+    ) -> [UpcomingRowState] {
         let horizonEnd = now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
@@ -151,7 +173,7 @@ public final class UpcomingViewModel {
                 // eligibility remains guarded by `nextAllowedSlot` itself.
                 if fires <= horizonEnd {
                     rows.append(UpcomingRowState(
-                        id: UUID(),
+                        id: .init(contactId: contact.id, kind: .cadence),
                         contactId: contact.id,
                         name: contact.displayName,
                         kind: .cadence,
@@ -166,7 +188,57 @@ public final class UpcomingViewModel {
             }
         }
 
-        return rows.sorted { $0.scheduledFor < $1.scheduledFor }
+        // Occasion rows are seeded in the Phase 0 mock repository so their
+        // birthday/anniversary states remain reachable and auditable. TF-07
+        // replaces this bounded fetch with the persisted ValueObservation
+        // pipeline that owns every Upcoming row (§14 PR25 / R10).
+        let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
+        for reminder in reminders where reminder.kind != .cadence {
+            guard reminder.scheduledFor <= horizonEnd,
+                  let contact = contactsByID[reminder.contactId] else { continue }
+            rows.append(UpcomingRowState(
+                id: .init(contactId: contact.id, kind: reminder.kind),
+                contactId: contact.id,
+                name: contact.displayName,
+                kind: reminder.kind,
+                scheduledFor: reminder.scheduledFor,
+                channel: contact.preferredChannel,
+                cadenceText: nil,
+                occasionText: Self.occasionText(for: reminder),
+                timeOfDayText: Self.format(
+                    time: reminder.scheduledFor,
+                    timezone: window.timeZone
+                ),
+                dayHeader: Self.format(
+                    dayHeader: reminder.scheduledFor,
+                    now: now,
+                    timezone: window.timeZone
+                )
+            ))
+        }
+
+        return rows.sorted {
+            if $0.scheduledFor != $1.scheduledFor {
+                return $0.scheduledFor < $1.scheduledFor
+            }
+            if $0.contactId != $1.contactId {
+                return $0.contactId.uuidString < $1.contactId.uuidString
+            }
+            return $0.kind.rawValue < $1.kind.rawValue
+        }
+    }
+
+    private static func occasionText(for reminder: ScheduledReminder) -> String {
+        if let label = reminder.occasionLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !label.isEmpty {
+            return label
+        }
+        return switch reminder.kind {
+        case .birthday: "Birthday"
+        case .anniversary: "Anniversary"
+        case .customOccasion: "Occasion"
+        case .cadence: ""
+        }
     }
 
     private func group(rows: [UpcomingRowState]) -> [(header: String, rows: [UpcomingRowState])] {

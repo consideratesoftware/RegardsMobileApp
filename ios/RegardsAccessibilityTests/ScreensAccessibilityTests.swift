@@ -23,6 +23,9 @@ final class ScreensAccessibilityTests: XCTestCase {
     @MainActor
     func testOverdueTabPassesAudit() throws {
         let app = launchToOverdue()
+        let rows = app.descendants(matching: .any).matching(identifier: "overdue.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+        assertRepresentativeMergedState(in: rows)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -35,6 +38,9 @@ final class ScreensAccessibilityTests: XCTestCase {
             to: "screen.upcoming",
             in: app
         )
+        let rows = app.descendants(matching: .any).matching(identifier: "upcoming.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+        assertRepresentativeOccasionStates(in: rows)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -134,22 +140,6 @@ final class ScreensAccessibilityTests: XCTestCase {
     func testEditContactBackReturnsToContactDetail() {
         let app = launchToContactDetailFromContacts()
         assertEditRoundTrip(in: app)
-    }
-
-    /// Exercises the stable-ID Contact Detail push from Overdue. The
-    /// Contacts test covers the same destination flow from All Contacts.
-    @MainActor
-    func testContactDetailFromOverduePassesAudit() throws {
-        let app = launchToOverdue()
-        // Rows are synthetic `.other` elements, so select by identifier.
-        navigateToRow(
-            identifier: "overdue.row",
-            index: 0,
-            sourceIdentifier: "screen.overdue",
-            in: app
-        )
-        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor

@@ -120,7 +120,12 @@ struct RegardsTabRoot: View {
     init(env: AppEnvironment) {
         self.env = env
         self._overdueVM = State(initialValue: OverdueViewModel(contacts: env.contacts))
-        self._upcomingVM = State(initialValue: UpcomingViewModel(contacts: env.contacts))
+        self._upcomingVM = State(
+            initialValue: UpcomingViewModel(
+                contacts: env.contacts,
+                reminders: env.reminders
+            )
+        )
         self._mergeDuplicatesVM = State(
             initialValue: MergeDuplicatesViewModel(contacts: env.contacts)
         )

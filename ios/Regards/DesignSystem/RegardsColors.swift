@@ -1,14 +1,9 @@
 import Foundation
 
-/// sRGB components (0-1) for every color the design system exposes. The asset
-/// catalog (Assets.xcassets) holds the rendered values; this struct is the
-/// Swift-level source of truth for the **contrast tests** that run in CI —
-/// they compute WCAG ratios from these tuples without having to crack open
-/// the xcassets JSON.
-///
-/// Keep this file in sync with `ios/Regards/Resources/Assets.xcassets/*` —
-/// PR2's `ColorContrastTests` asserts the pairs listed in
-/// `ios/docs/accessibility.md`.
+/// sRGB components (0-1) for every color the design system exposes. These
+/// values are the single source of truth for both rendered SwiftUI colors and
+/// the contrast tests that run in CI. `ColorContrastTests` asserts the pairs
+/// listed in `ios/docs/accessibility.md`.
 public enum RegardsPalette {
 
     public struct SRGB: Sendable, Equatable {
