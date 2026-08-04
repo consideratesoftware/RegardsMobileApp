@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ "$#" -ne 5 ]] ||
+  [[ "$1" != "xccov" ]] ||
+  [[ "$2" != "view" ]] ||
+  [[ "$3" != "--report" ]] ||
+  [[ "$4" != "--json" ]]; then
+  echo "unexpected xcrun invocation: $*" >&2
+  exit 64
+fi
+
+cat "${DOMAIN_COVERAGE_FIXTURE:?}"
