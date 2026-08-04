@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: guards-${{ github.ref }}
   cancel-in-progress: true
@@ -50,13 +53,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Check iOS documentation links
-        uses: tcort/github-action-markdown-link-check@v1
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225 # v1.1.2
         with:
           config-file: .github/markdown-link-check.json
           folder-path: "ios/docs"
           file-extension: ".md"
       - name: Check root documentation links
-        uses: tcort/github-action-markdown-link-check@v1
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225 # v1.1.2
         with:
           config-file: .github/markdown-link-check.json
           folder-path: "."
