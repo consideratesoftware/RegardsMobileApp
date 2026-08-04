@@ -12,9 +12,9 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Active work: `TF-01` PR19 CI/reproducibility slice on
   `codex/tf-01-ci-repro`
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #39 (`codex/tf-01-ci-repro`, ready; exact-head
-  local staged review approved, hosted review and required checks running,
-  auto-merge off)
+- Open pull request: GitHub PR #39 (`codex/tf-01-ci-repro`, ready; hosted
+  feedback repair committed locally; exact-head local and hosted reviews plus
+  required checks must approve before merge; auto-merge off)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
