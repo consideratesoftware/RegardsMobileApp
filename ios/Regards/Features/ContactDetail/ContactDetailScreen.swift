@@ -252,7 +252,7 @@ public struct ContactDetailScreen: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("\(entry.dateLabel), \(entry.descriptionLabel)")
+                            .accessibilityLabel(interactionAccessibilityLabel(entry))
                             .accessibilityIdentifier("contact-detail.interaction-row")
                             if idx < viewModel.interactions.count - 1 {
                                 Hair(inset: 16)
@@ -262,6 +262,16 @@ public struct ContactDetailScreen: View {
                 }
             }
         }
+    }
+
+    private func interactionAccessibilityLabel(
+        _ entry: ContactDetailViewModel.InteractionEntry
+    ) -> String {
+        let spokenDescription = entry.descriptionLabel.replacingOccurrences(
+            of: " · ",
+            with: ", "
+        )
+        return "\(entry.dateLabel), \(spokenDescription)"
     }
 
     private func notesCard(contact: Contact) -> some View {

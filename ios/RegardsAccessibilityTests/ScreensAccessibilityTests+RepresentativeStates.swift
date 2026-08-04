@@ -65,7 +65,7 @@ extension ScreensAccessibilityTests {
             .matching(identifier: "contact-detail.interaction-row")
             .allElementsBoundByIndex
         XCTAssertTrue(
-            interactions.contains { $0.label.contains("WhatsApp · reminder caught up") },
+            interactions.contains { $0.label.contains("WhatsApp, reminder caught up") },
             "The recent interaction must read as one natural-language accessibility element."
         )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
