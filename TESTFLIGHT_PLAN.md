@@ -12,8 +12,8 @@ This file replaces only the stale calendar dates and overloaded PR numbers in
 - Active work: `TF-01` PR19 CI/reproducibility slice on
   `codex/tf-01-ci-repro`
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: none yet; publish the current branch after its exact-head
-  gates and staged review pass
+- Open pull request: GitHub PR #39 (`codex/tf-01-ci-repro`, draft while its
+  exact-head staged review completes)
 - Internal TestFlight gate: after `TF-08`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -190,7 +190,8 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    Motion off, and Increased Contrast off after the smoke. Exact-main iOS CI
    run `30858964352`, including the one-run accessibility audit, and 5× stress
    run `30858964211` both passed after merge.
-6. ACTIVE: finish the bounded PR19 CI and reproducibility scope: commit
+6. ACTIVE: finish the bounded PR19 CI and reproducibility scope in GitHub PR
+   #39: commit
    `Package.resolved`, remove placeholders, extend root Markdown checks, add
    the Domain coverage floor, remove the dead SwiftLint `function_body_length`
    configuration and stale audit-stress comment, and reconcile merge-method
@@ -203,8 +204,8 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
 
 Current gates:
 
-- No owner gate is active. The CI/reproducibility slice's publication, hosted
-  review, required checks, and guarded merge are agent-owned repository work.
+- No owner gate is active. PR #39's local and hosted reviews, publication,
+  required checks, and guarded merge are agent-owned repository work.
 
 ### PR #24 modernization accessibility evidence
 
