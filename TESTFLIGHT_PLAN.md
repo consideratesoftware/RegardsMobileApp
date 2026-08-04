@@ -259,6 +259,49 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    remained at large text with Reduce Motion and Increased Contrast off after
    the smoke.
 
+   Hosted-review repair (2026-08-04, verdict REQUEST_CHANGES on `44ba20a`:
+   1 blocker, 6 should-fix, 9 nits). Owner directed clearing the blocker and
+   every should-fix and leaving the nits. Closures:
+
+   - Blocker (`pr-tests`, ARCHITECTURE.md §13 "and failures"):
+     `UpcomingViewModelStateTests` now drives `loadState == .failed` from a
+     throwing contact fetch, from a throwing `fetchAllPending()` — the branch
+     `fetchAllPending` newly made reachable — and after a successful load, each
+     asserting empty groups and `totalCount == 0`. §13 names the suite instead
+     of claiming coverage generically.
+   - §9 contract 6 no-double-up: owner directed deferral to TF-07. The
+     deviation is now explicit at the `buildRows` call site and in
+     ARCHITECTURE.md §9 contract 6, both naming `SchedulingPass` (PR25 / TF-07,
+     R6) as the owner and noting the rows keep distinct IDs (R36) meanwhile.
+   - Spoken occasion label: the derivation moved off the view onto
+     `UpcomingRowState.accessibilityLabel`, so it is assertable without
+     instantiating `UpcomingRow`. Tests pin "Leia Organa, Jedi Order
+     anniversary at {time}" verbatim, assert the raw `customOccasion` case name
+     is absent, cover the cadence row, and cover the text-less row.
+   - Duplicate fakes: `BoundaryReminderRepository` and
+     `StaticReminderRepository` collapsed into
+     `RegardsTests/Support/RepositoryFakes.swift`
+     (`StubContactRepository`/`StubReminderRepository`, each with a `failing()`
+     variant), reused by both files.
+   - Coverage holes: a zero-capacity window drops cadence rows but keeps
+     occasion rows; an untracked contact's pending occasion never reaches
+     Upcoming; `Contact+Accessibility`'s `isVirtualMerged` branch gets direct
+     Domain tests for tracked/untracked and inner-circle/acquaintance in the
+     new `ContactMergeAccessibilityTests` (split out to keep
+     `ContactAccessibilityTests` under the type-body-length limit).
+
+   Repair evidence on the pinned iOS 26.5 iPhone 17 Pro: 187 unit tests pass
+   (was 175); Domain coverage 843/870 lines = 96.90% against the 95% floor;
+   strict SwiftLint zero violations across 82 files; domain-purity,
+   no-network, Android domain/manifest/network, and review-parity guards pass;
+   XcodeGen regenerated and deterministic. Focused XCUI
+   `testUpcomingTabPassesAudit`, `testOverdueTabPassesAudit`, and
+   `testContactDetailFromUpcomingPassesAudit` pass. One earlier trio run
+   reported `testContactDetailFromUpcomingPassesAudit` as failing with zero
+   test assertions failing: the runner exited during app launch and the
+   harness restarted, which is a runner crash, not a product regression. The
+   test passes in isolation and in the clean rerun.
+
 ## Owner gates
 
 Current gates:

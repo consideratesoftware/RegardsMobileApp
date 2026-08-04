@@ -197,10 +197,7 @@ struct UpcomingRow: View {
             .monospacedDigit()
     }
 
-    private var accessibilityLabel: String {
-        let what = row.kind == .cadence
-            ? (row.cadenceText ?? "")
-            : (row.occasionText ?? "")
-        return "\(row.name), \(what) at \(row.timeOfDayText)"
-    }
+    // The label is derived on `UpcomingRowState` so it can be asserted in unit
+    // tests without instantiating the view.
+    private var accessibilityLabel: String { row.accessibilityLabel }
 }

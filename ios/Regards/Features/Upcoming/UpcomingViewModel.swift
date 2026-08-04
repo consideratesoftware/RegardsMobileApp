@@ -24,6 +24,23 @@ public struct UpcomingRowState: Sendable, Identifiable, Equatable {
     public let occasionText: String?
     public let timeOfDayText: String
     public let dayHeader: String
+
+    /// The spoken VoiceOver label for this row, e.g.
+    /// "Leia Organa, Jedi Order anniversary at 6:00 pm".
+    ///
+    /// This lives on the state, not in the view, so it is unit-testable: the
+    /// row previously interpolated `kind` directly and VoiceOver read the raw
+    /// enum case name ("customOccasion") instead of the occasion's label.
+    /// Cadence rows speak their cadence text; every other kind speaks its
+    /// occasion text. A row with neither omits the phrase rather than
+    /// speaking an empty fragment.
+    public var accessibilityLabel: String {
+        let what = kind == .cadence ? cadenceText : occasionText
+        guard let what, !what.isEmpty else {
+            return "\(name) at \(timeOfDayText)"
+        }
+        return "\(name), \(what) at \(timeOfDayText)"
+    }
 }
 
 @Observable @MainActor
@@ -195,6 +212,17 @@ public final class UpcomingViewModel {
         // birthday/anniversary states remain reachable and auditable. TF-07
         // replaces this bounded fetch with the persisted ValueObservation
         // pipeline that owns every Upcoming row (§14 PR25 / R10).
+        //
+        // Known deviation: §9 contract 6 (an occasion suppresses a same-day
+        // cadence reminder for the same contact) is NOT enforced here. This
+        // view model computes cadence rows independently of the persisted
+        // reminders it reads, so it cannot be the place that decides which of
+        // two candidate reminders survives without duplicating the scheduler.
+        // SchedulingPass is the sole idempotent reminder writer and owns
+        // no-double-up (§14 PR25 / TF-07, R6). Until it lands, a contact whose
+        // cadence falls on the same local day as an occasion can appear twice
+        // in Upcoming. The rows carry distinct IDs (R36), so the duplicate is
+        // visible rather than corrupting identity or ordering.
         let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
         let startOfToday = calendar.startOfDay(for: now)
         for reminder in reminders where reminder.kind != .cadence {

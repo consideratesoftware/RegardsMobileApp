@@ -2,25 +2,8 @@ import Foundation
 import Testing
 @testable import Regards
 
-private actor StaticReminderRepository: ReminderRepository {
-    let reminders: [ScheduledReminder]
-
-    init(_ reminders: [ScheduledReminder]) {
-        self.reminders = reminders
-    }
-
-    func fetchAllPending() async throws -> [ScheduledReminder] { reminders }
-
-    func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder] {
-        reminders.filter { $0.contactId == contactId }
-    }
-
-    func upsert(_ reminder: ScheduledReminder) async throws {}
-
-    func updateState(id: UUID, state: ReminderState) async throws {}
-
-    func delete(id: UUID) async throws {}
-}
+// The repository fakes live in Support/RepositoryFakes.swift so this file and
+// UpcomingViewModelBoundaryTests.swift share one implementation.
 
 struct MockRepositoriesTests {
 
@@ -173,7 +156,7 @@ struct MockRepositoriesTests {
         ]
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StaticReminderRepository(reminders),
+            reminders: StubReminderRepository(reminders),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -222,7 +205,7 @@ struct MockRepositoriesTests {
         ]
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StaticReminderRepository(reminders),
+            reminders: StubReminderRepository(reminders),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -283,7 +266,7 @@ struct MockRepositoriesTests {
         )
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StaticReminderRepository([reminder]),
+            reminders: StubReminderRepository([reminder]),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
         )
@@ -320,7 +303,7 @@ struct MockRepositoriesTests {
         )
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StaticReminderRepository([visible, excluded]),
+            reminders: StubReminderRepository([visible, excluded]),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )

@@ -2,38 +2,8 @@ import Foundation
 import Testing
 @testable import Regards
 
-private actor BoundaryContactRepository: ContactRepository {
-    let contacts: [Contact]
-
-    init(_ contacts: [Contact]) {
-        self.contacts = contacts
-    }
-
-    func fetchAll() async throws -> [Contact] { contacts }
-    func fetchTracked() async throws -> [Contact] { contacts.filter(\.tracked) }
-    func fetch(id: UUID) async throws -> Contact? { contacts.first { $0.id == id } }
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        contacts.filter { $0.contactGroupId == groupId }
-    }
-    func upsert(_ contact: Contact) async throws {}
-    func archive(id: UUID, at: Date) async throws {}
-}
-
-private actor BoundaryReminderRepository: ReminderRepository {
-    let reminders: [ScheduledReminder]
-
-    init(_ reminders: [ScheduledReminder]) {
-        self.reminders = reminders
-    }
-
-    func fetchAllPending() async throws -> [ScheduledReminder] { reminders }
-    func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder] {
-        reminders.filter { $0.contactId == contactId }
-    }
-    func upsert(_ reminder: ScheduledReminder) async throws {}
-    func updateState(id: UUID, state: ReminderState) async throws {}
-    func delete(id: UUID) async throws {}
-}
+// The repository fakes live in Support/RepositoryFakes.swift so this file and
+// MockRepositoriesTests.swift share one implementation.
 
 @MainActor
 struct UpcomingViewModelBoundaryTests {
@@ -270,7 +240,7 @@ struct UpcomingViewModelBoundaryTests {
             timezoneIdentifier: timezone.identifier
         )
         let viewModel = UpcomingViewModel(
-            contacts: BoundaryContactRepository([inside, boundary]),
+            contacts: StubContactRepository([inside, boundary]),
             window: window,
             clock: { nowDate }
         )
@@ -311,8 +281,8 @@ struct UpcomingViewModelBoundaryTests {
         timezone: TimeZone
     ) -> UpcomingViewModel {
         UpcomingViewModel(
-            contacts: BoundaryContactRepository(contacts),
-            reminders: BoundaryReminderRepository(reminders),
+            contacts: StubContactRepository(contacts),
+            reminders: StubReminderRepository(reminders),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )

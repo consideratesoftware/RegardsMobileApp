@@ -375,7 +375,7 @@ scheduledFor = slot.start                                // snapped to slot STAR
 5. **Batching = slot-start snapping (decision #30, R6).** All reminders landing in the same window slot share the **same `scheduledFor` = slot start**, so digest grouping is exact-equality by construction and one OS notification per slot exists (`osNotificationId = "digest-{slotStartEpoch}"` for the batch; single-contact slots use `"contact-{uuid}-{kind}"`). Digest copy: *"3 people are overdue: Leia, Luke, Padmé."* Tap → Overdue view. Per-contact nags are the #1 reason this category gets silenced.
    - An already-overdue contact may join the slot currently in progress; the past slot start represents an immediate delivery and a stable digest identity.
    - A contact whose cadence expires later inside the current slot must walk to the next slot start. It may never fire before `overdueAt` (R48).
-6. **No double-up.** If a contact has both an overdue cadence reminder and an occasion today, the occasion wins; the cadence reminder is marked `user_caught_up` when the user acts on the occasion (a birthday call counts as staying in touch).
+6. **No double-up.** If a contact has both an overdue cadence reminder and an occasion today, the occasion wins; the cadence reminder is marked `user_caught_up` when the user acts on the occasion (a birthday call counts as staying in touch). **Known Phase-0 deviation:** `UpcomingViewModel` computes cadence rows independently of the persisted occasion rows it reads, so it does not apply this rule and a same-day pair can appear twice in Upcoming. `SchedulingPass` is the sole idempotent reminder writer and owns the suppression (PR25 / TF-07, R6); the deviation is documented at the `buildRows` call site and closes there, not in the view model.
 
 ### Re-evaluation triggers (all route through SchedulingPass, §9a)
 
@@ -596,7 +596,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-04):** the unit target executes 175 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
+**Shipped suites (census 2026-08-04):** the unit target executes 187 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
 
 **Standing requirements:**
 
@@ -608,8 +608,12 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 - **Repositories:** contract tests run against both `MockRepositories` and GRDB implementations (shared assertions) so mocks can't drift from production semantics (R23).
 - **ViewModels:** every VM gets a unit suite. PR #42 added focused Upcoming
   behavior coverage for representative reminders, stable identity, ordering,
-  boundaries, and failures; ContactDetail and the remaining Upcoming behaviors
-  stay open under R24.
+  boundaries (`UpcomingViewModelBoundaryTests`), and the states that leave the
+  happy path (`UpcomingViewModelStateTests`: a throwing contact fetch, a
+  throwing `fetchAllPending`, a failure after a successful load, a
+  zero-capacity window that keeps occasion rows, an untracked contact's
+  occasion, and the spoken row label). ContactDetail and the remaining Upcoming
+  behaviors stay open under R24.
 - **Snapshot tests (PR34, decision #34):** adopt `pointfreeco/swift-snapshot-testing` (test-target-only dependency — it never enters app sources, so no privacy-grep implications) for the 9 screens × key states (empty / populated / all-caught-up / trial-expired / post-purchase). The `ios-ci.yml` snapshot placeholder comment becomes a real job.
 - **StoreKit (PR32):** StoreKitTest configuration file + sandbox smoke: purchase, restore-from-fresh-install, trial expiry math.
 - **Accessibility:** run the focused `RegardsAccessibilityTests` cases affected by a UI or UI-test diff. Do not require a repeated local sweep for routine PRs. In CI both broad audits live off the pull-request path (see §10): the 1x audit runs on merges to main, the 5x sweep runs on merges, nightly, and on demand before a release. Use `ios/scripts/audit-stress.sh` only to investigate a reproduced flake or an explicitly requested release candidate. Test-pattern rule (learned the hard way, PR #11/#12): don't `waitForExistence` on predicate-matched queries; plain element queries for waits, predicates for read-after-known.
