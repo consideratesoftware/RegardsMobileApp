@@ -196,8 +196,13 @@ public final class UpcomingViewModel {
         // replaces this bounded fetch with the persisted ValueObservation
         // pipeline that owns every Upcoming row (§14 PR25 / R10).
         let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
+        let startOfToday = calendar.startOfDay(for: now)
         for reminder in reminders where reminder.kind != .cadence {
-            guard reminder.scheduledFor >= now,
+            // A morning-of occasion remains actionable for the rest of its
+            // local calendar day even after its notification time has passed
+            // (§9 contract 4 / R5). Older days and the exclusive horizon end
+            // stay out of the forward-looking list.
+            guard reminder.scheduledFor >= startOfToday,
                   reminder.scheduledFor < horizonEnd,
                   let contact = contactsByID[reminder.contactId] else { continue }
             let occasionText: String

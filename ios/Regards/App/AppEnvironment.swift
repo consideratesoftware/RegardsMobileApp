@@ -67,26 +67,30 @@ public struct AppEnvironment: Sendable {
 }
 
 /// Complete root composition. Repositories and every time-derived screen use
-/// the same window, clock, and calendar so the Phase 0 fixture cannot disagree
-/// across tabs and the Phase 1 production swap cannot retain mock timing.
+/// the same clock, while scheduling uses the persisted window timezone and
+/// user-facing elapsed-day labels use the device calendar. That preserves the
+/// intentional user-local versus scheduling-timezone split documented by the
+/// Overdue and Contact Detail view models.
 public struct AppRuntime: Sendable {
     public let environment: AppEnvironment
     public let window: ReminderWindow
-    public let calendar: Calendar
+    public let userCalendar: Calendar
     public let clock: @Sendable () -> Date
 
     public init(
         environment: AppEnvironment,
         window: ReminderWindow,
-        calendar: Calendar,
+        userCalendar: Calendar,
         clock: @escaping @Sendable () -> Date
     ) {
         self.environment = environment
         self.window = window
-        self.calendar = calendar
+        self.userCalendar = userCalendar
         self.clock = clock
     }
 
+    /// Phase 0 intentionally uses the same frozen fixture in every build
+    /// configuration. The production runtime remains dormant until TF-02.
     public static func makeMock(includeDuplicateFixture: Bool = false) -> AppRuntime {
         let now = MockRepositories.defaultNow
         let window = MockRepositories.defaultWindow
@@ -97,18 +101,22 @@ public struct AppRuntime: Sendable {
                 includeDuplicateFixture: includeDuplicateFixture
             ),
             window: window,
-            calendar: calendar(for: window.timeZone),
+            userCalendar: calendar(for: .current),
             clock: { now }
         )
     }
 
+    /// Loads the authoritative local singleton for the launch snapshot.
+    /// Missing or invalid persisted state is deliberately thrown to the TF-02
+    /// launch coordinator instead of silently restoring defaults. TF-05 owns
+    /// rebuilding observable screen state after a saved window edit.
     public static func makeProduction(database: DatabaseQueue) async throws -> AppRuntime {
         let environment = AppEnvironment.makeProduction(database: database)
         let window = try await environment.window.fetchGlobal()
         return AppRuntime(
             environment: environment,
             window: window,
-            calendar: calendar(for: window.timeZone),
+            userCalendar: calendar(for: .current),
             clock: { Date() }
         )
     }

@@ -139,7 +139,7 @@ struct RegardsTabRoot: View {
         OverdueViewModel(
             contacts: runtime.environment.contacts,
             clock: runtime.clock,
-            calendar: runtime.calendar
+            calendar: runtime.userCalendar
         )
     }
 
@@ -171,7 +171,7 @@ struct RegardsTabRoot: View {
             contacts: runtime.environment.contacts,
             interactionsRepo: runtime.environment.interactions,
             clock: runtime.clock,
-            calendar: runtime.calendar
+            calendar: runtime.userCalendar
         )
     }
 

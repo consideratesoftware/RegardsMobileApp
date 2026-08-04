@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GRDB
 @testable import Regards
 
 struct AppRuntimeTests {
@@ -74,8 +75,45 @@ struct AppRuntimeTests {
         let runtime = try await AppRuntime.makeProduction(database: database)
 
         #expect(runtime.window == persistedWindow)
-        #expect(runtime.calendar.timeZone.identifier == persistedWindow.timezoneIdentifier)
+        #expect(runtime.userCalendar.timeZone.identifier == TimeZone.current.identifier)
         #expect(runtime.clock() != MockRepositories.defaultNow)
         #expect(try await runtime.environment.window.fetchGlobal() == runtime.window)
+    }
+
+    @Test("Production runtime propagates a missing persisted window")
+    func productionRuntimeRejectsMissingWindow() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        try await database.write { db in
+            try db.execute(sql: "DELETE FROM ReminderWindow WHERE id = 1")
+        }
+
+        do {
+            _ = try await AppRuntime.makeProduction(database: database)
+            Issue.record("Expected the missing singleton to fail production composition")
+        } catch DataError.notFound {
+            // Expected: launch owns the visible recovery path in TF-02.
+        } catch {
+            Issue.record("Expected DataError.notFound, got \(error)")
+        }
+    }
+
+    @Test("Production runtime rejects an invalid persisted window")
+    func productionRuntimeRejectsInvalidWindow() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        try await database.write { db in
+            try db.execute(
+                sql: "UPDATE ReminderWindow SET timezone = ? WHERE id = 1",
+                arguments: ["Not/A_Timezone"]
+            )
+        }
+
+        do {
+            _ = try await AppRuntime.makeProduction(database: database)
+            Issue.record("Expected the invalid singleton to fail production composition")
+        } catch ReminderWindow.ValidationError.invalidTimezoneIdentifier("Not/A_Timezone") {
+            // Expected: corrupt timing state must never silently change zones.
+        } catch {
+            Issue.record("Expected invalidTimezoneIdentifier, got \(error)")
+        }
     }
 }

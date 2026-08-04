@@ -596,7 +596,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-04):** the unit target has 164 declared tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22). Exact execution totals can be higher when parameterized Swift Testing cases expand their arguments.
+**Shipped suites (census 2026-08-04):** the unit target executes 175 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
 
 **Standing requirements:**
 
@@ -666,7 +666,7 @@ boundaries.
 
 | PR | Scope | Key acceptance criteria |
 |---|---|---|
-| **PR20** | Flip `@main` to `AppEnvironment.makeProduction(database: DatabaseFactory.makeDatabase())`; migration `v2` (§7 columns); first-launch import flow; onboarding gate via `onboardingCompletedAt`; splash transitions on actual load completion | Fresh install on device: onboarding → Contacts permission → import → populated tabs. Mock path stays for previews/UI tests via launch argument |
+| **PR20** | Build `AppRuntime.makeProduction(database:)` during launch; migration `v2` (§7 columns); first-launch import flow; onboarding gate via `onboardingCompletedAt`; splash transitions on actual load completion | Fresh install on device: onboarding → Contacts permission → import → populated tabs. Mock path stays for previews/UI tests via launch argument |
 | **PR21** | Reconciliation: launch/foreground + `CNContactStoreDidChange` re-import; archive-on-delete; refresh names/photos/handles (`phonesJson`/`emailsJson`); importer per-row fault tolerance (R35); move Contacts enumeration off the cooperative pool with a synthetic 5k regression (R25) | Delete/re-add/rename a contact in the system app → Regards reflects it next foreground; history survives archive; synthetic 5k import does not block the cooperative pool |
 | **PR22** | The core loop: Caught up / Snooze / Log-other wired everywhere (Detail buttons, Overdue+Upcoming swipe actions) → `InteractionRepository.append` + `lastInteractedAt` + targeted SchedulingPass stub (DB-only until PR25); stable row identities (R36) | Marking caught-up moves the contact out of Overdue instantly and logs an interaction; snooze pushes 7 days; VM tests |
 | **PR23** | Reminder-window persistence: ReminderWindows screen becomes a live editor (days/ranges/quiet-hours/occasion-time/horizon), writes via `ReminderWindowRepository`, zero-capacity refuses save; Upcoming/Overdue read the real global window + per-contact overrides (R9) | Edited windows survive relaunch and visibly re-shape Upcoming |

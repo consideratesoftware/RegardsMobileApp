@@ -130,9 +130,9 @@ struct MockRepositoriesTests {
         )
     }
 
-    @Test("Past pending occasions stay out of Upcoming")
+    @Test("Previous-day pending occasions stay out of Upcoming")
     @MainActor
-    func pastOccasionsAreExcluded() async throws {
+    func previousDayOccasionsAreExcluded() async throws {
         let timezone = try #require(TimeZone(secondsFromGMT: 0))
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timezone
@@ -145,7 +145,7 @@ struct MockRepositoriesTests {
         try await assertOccasion(
             timezoneID: timezone.identifier,
             nowDate: now,
-            scheduledFor: now.addingTimeInterval(-60),
+            scheduledFor: try #require(calendar.date(byAdding: .day, value: -1, to: now)),
             isVisible: false
         )
     }

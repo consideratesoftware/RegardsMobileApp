@@ -10,22 +10,6 @@ public struct ContactDetailScreen: View {
         self._viewModel = State(initialValue: viewModel)
     }
 
-    public init(contactId: UUID,
-                contacts: any ContactRepository,
-                interactionsRepo: any InteractionRepository,
-                clock: @escaping () -> Date = { Date() },
-                calendar: Calendar = .current) {
-        self.init(
-            viewModel: ContactDetailViewModel(
-                contactId: contactId,
-                contacts: contacts,
-                interactionsRepo: interactionsRepo,
-                clock: clock,
-                calendar: calendar
-            )
-        )
-    }
-
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {

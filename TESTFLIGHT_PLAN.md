@@ -248,7 +248,7 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    finds nothing safely prunable. The patch-equivalent Android branch and
    empty `.git/t9FBrGy` are removable only after their active worktree is
    switched and the exact targets are rechecked; unique work stays preserved.
-   Current-source evidence on the pinned iOS 26.5 iPhone 17 Pro: all 164 unit
+   Current-source evidence on the pinned iOS 26.5 iPhone 17 Pro: all 175 unit
    tests pass; the Overdue, Upcoming, Contact Detail representative-state
    audits and `testAccessibility5AdaptiveContentDoesNotOverlap` pass; strict
    SwiftLint, privacy/domain/Android guards, source-boundary fixtures, review

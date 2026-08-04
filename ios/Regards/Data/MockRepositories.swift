@@ -198,7 +198,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 14,
                 priorityTier: .innerCircle,
                 preferredChannel: .whatsapp,
-                preferredChannelValue: "+91 98765 43210",
+                preferredChannelValue: "+1 415 555 0140",
                 lastInteractedAt: now.addingTimeInterval(-day * 23),
                 notes: "Son is Ben. Ask about the diplomatic posting on Chandrila."),
             Contact(
@@ -231,7 +231,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 30,
                 priorityTier: .regular,
                 preferredChannel: .whatsapp,
-                preferredChannelValue: "+234 809 555 0122",
+                preferredChannelValue: "+1 415 555 0141",
                 lastInteractedAt: now.addingTimeInterval(-day * 28)),
             Contact(
                 systemContactRef: "sys-anakin",
@@ -247,7 +247,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 42,
                 priorityTier: .regular,
                 preferredChannel: .signal,
-                preferredChannelValue: "+92 300 5550132",
+                preferredChannelValue: "+1 415 555 0142",
                 lastInteractedAt: now.addingTimeInterval(-day * 42)),
             Contact(
                 systemContactRef: "sys-shmi",
@@ -271,7 +271,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 90,
                 priorityTier: .close,
                 preferredChannel: .phoneCall,
-                preferredChannelValue: "+91 98100 00000",
+                preferredChannelValue: "+1 415 555 0143",
                 lastInteractedAt: now.addingTimeInterval(-day * 87)),
         ]
         if includeDuplicateFixture {
