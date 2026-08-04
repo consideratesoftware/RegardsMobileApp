@@ -12,7 +12,6 @@ name: Audit stress
 # accessibility.
 #
 # So it moved off the PR path:
-#   - every push to the default branch, so main always has a fresh 5x result
 #   - nightly, to accumulate flake evidence over time
 #   - workflow_dispatch, to run it on demand before cutting a release
 #
@@ -27,8 +26,6 @@ name: Audit stress
 # required check blocks the merge.
 
 on:
-  push:
-    branches: [main]
   schedule:
     # 09:00 UTC daily. Cron here is always UTC, never local.
     - cron: "0 9 * * *"
