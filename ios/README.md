@@ -54,9 +54,6 @@ The `test` action runs:
   sweep. See [`docs/accessibility.md`](docs/accessibility.md) for the standing
   rules.
 
-`RegardsUITests` is a separate target for general UI automation and is not
-wired into the default test plan yet.
-
 ## Execution plan
 
 See [`../TESTFLIGHT_PLAN.md`](../TESTFLIGHT_PLAN.md) for the live queue and

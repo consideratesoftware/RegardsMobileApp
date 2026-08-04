@@ -1,7 +1,6 @@
 included:
   - ios/Regards
   - ios/RegardsTests
-  - ios/RegardsUITests
   - ios/RegardsAccessibilityTests
 
 excluded:
