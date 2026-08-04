@@ -1,0 +1,14 @@
+{
+  "targets": [
+    {
+      "name": "Regards.app",
+      "files": [
+        {
+          "path": "/workspace/ios/Regards/Domain/Contact.swift",
+          "coveredLines": 100,
+          "executableLines": 100
+        }
+      ]
+    }
+  ]
+}

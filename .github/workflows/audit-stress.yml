@@ -34,6 +34,9 @@ on:
     - cron: "0 9 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: audit-stress-${{ github.ref }}
   # Never cancel the in-flight run. GitHub keeps one running and only the latest
@@ -80,6 +83,7 @@ jobs:
             -destination "$SIMULATOR" \
             -configuration Debug \
             -only-testing:RegardsAccessibilityTests \
+            -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -98,6 +102,7 @@ jobs:
                 -destination "$SIMULATOR" \
                 -configuration Debug \
                 -only-testing:RegardsAccessibilityTests \
+                -onlyUsePackageVersionsFromResolvedFile \
                 CODE_SIGNING_ALLOWED=NO \
                 CODE_SIGNING_REQUIRED=NO \
                 CODE_SIGN_IDENTITY="" \

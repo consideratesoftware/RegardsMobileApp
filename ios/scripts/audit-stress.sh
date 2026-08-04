@@ -45,6 +45,7 @@ xcodebuild \
   -destination "$DESTINATION" \
   -configuration Debug \
   -only-testing:RegardsAccessibilityTests \
+  -onlyUsePackageVersionsFromResolvedFile \
   build-for-testing \
   | eval $PIPE
 
@@ -58,6 +59,7 @@ for run in $(seq 1 "$RUNS"); do
       -destination "$DESTINATION" \
       -configuration Debug \
       -only-testing:RegardsAccessibilityTests \
+      -onlyUsePackageVersionsFromResolvedFile \
       test-without-building \
       | eval $PIPE
   then

@@ -782,7 +782,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 **Definition of done for every PR:**
 1. `cd ios && xcodegen generate` — commit `project.yml` *and* the regenerated xcodeproj (CI diffs them).
 2. `swiftlint --strict` clean.
-3. Full test action green locally: `xcodebuild -project Regards.xcodeproj -scheme Regards -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test`.
+3. Full test action green locally: `xcodebuild -project Regards.xcodeproj -scheme Regards -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -onlyUsePackageVersionsFromResolvedFile test`.
 4. UI/test-code touched → focused affected accessibility regressions green; repeated stress is owned by post-merge/nightly automation unless investigating a reproduced flake or validating a release candidate.
 5. New/changed screens → accessibility audit test + row in `ios/docs/accessibility.md` + VoiceOver smoke.
 6. §14 acceptance criteria for the PR demonstrably met (device test where the criteria say "on device").
@@ -907,7 +907,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R39 | Migrator seeds `Optional` top-level JSON (`jsonStringEncoded(window.quietHours)`) — inserts `"null"` / throws if the default ever ships nil quiet hours | `DatabaseMigrator.swift:106,124-129`, `Records.swift:247-248` | Encode non-optional or store SQL NULL | PR20 (with v2) |
 | R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift:9-11`, `accessibility.md:50-52` | Delete or wire; fix comments | PR19 |
 | R41 | Contrast registry incomplete vs UI reality (white-on-accentInk CTAs, accentInk-on-surface, danger-on-surface unlisted) | `RegardsColors.swift:70-83` | Extend `contrastPairs` + tests | PR34 |
-| R42 | `audit-stress.yml` documentation described obsolete PR-trigger behavior | `audit-stress.yml` | Describe the current post-merge, nightly, and release-candidate signals | GitHub PR #39 (pending) |
+| R42 | `audit-stress.yml` header described obsolete PR-trigger behavior | `audit-stress.yml` | Header ✅ **closed by TF-01 scheduling-policy commit `f563915`**; GitHub PR #39 clarifies pending-run coalescing | ✅ **closed on current `main`** |
 | R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | ✅ **closed by TF-01 slice 1** |
 | R44 | `LSApplicationCategoryType` = social-networking in project.yml while the listing plan says Productivity primary | `project.yml:94` | Align with §20 category decision | PR34 |
 | R45 | 8.4 MB `Substack_banner.png` sitting at repo root (ignored but clutter); `.DS_Store` files | repo root | Move banner to journal assets outside the repo; OS files stay ignored | anytime |
@@ -961,7 +961,7 @@ Created 2026-04-15: name **"Regards: Stay in Touch"** (bare "Regards" was taken)
 4. `PrivacyInfo.xcprivacy` required-reason entries verified against Apple's current list (R18).
 5. VoiceOver full-flow smoke; Dynamic Type accessibility5 spot pass.
 6. DB migration test from a v1-schema store (simulating a Phase-0-era TestFlight install upgrading).
-7. Archive builds reproducibly from a clean checkout (`xcodegen generate && xcodebuild archive`).
+7. Archive builds reproducibly from a clean checkout (`xcodegen generate && xcodebuild -onlyUsePackageVersionsFromResolvedFile archive`).
 
 ### Rejection playbook
 
