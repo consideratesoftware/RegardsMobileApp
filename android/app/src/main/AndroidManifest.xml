@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ARCHITECTURE.md §11, nuclear tier: Regards must NEVER hold INTERNET or
+         ACCESS_NETWORK_STATE. tools:node="remove" strips the permission at
+         manifest merge even if a library manifest injects it. Enforced by
+         scripts/check-android-manifest.sh — do not delete these two lines. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
+
+    <!-- allowBackup=false: nothing leaves the device, including via the Google
+         backup transport. Open question Q2 in ANDROID_PORT.md before AN-11. -->
+    <application
+        android:allowBackup="false"
+        android:label="Regards"
+        android:supportsRtl="true">
+        <!-- Activity arrives with the app shell (AN-07). Receivers arrive with
+             SchedulingPass wiring (AN-12): BOOT_COMPLETED, TIMEZONE_CHANGED,
+             TIME_SET each trigger SchedulingPass.runFull(). -->
+    </application>
+</manifest>

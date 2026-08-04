@@ -205,7 +205,7 @@ Two layer boundaries are **CI-enforced** by grep guards in `.github/workflows/gu
 - **Toolchain:** CI pins the runner's stable Xcode (currently 26.6; simulator pinned to iPhone 17 Pro with the latest installed iOS runtime). `project.yml` declares `xcodeVersion: "26.0"` for local work on Xcode 26. Before Phase 3, pin CI to the exact Xcode version used for App Store submission, run the full suite on the current iOS beta, and record the choice in the decisions log (see §21 "OS-beta season").
 - **Lint:** SwiftLint `--strict`. Custom rule `button_requires_accessibility` flags `Button { Image/Spacer/EmptyView }` without `.accessibilityLabel`.
 
-### Android (follow-on port; `android/` does not exist yet)
+### Android (follow-on port; scaffold landed — see `ANDROID_PORT.md`, decision #41)
 
 - Kotlin 2.x, Jetpack Compose + Material 3, Room + SQLCipher, Coroutines/Flow, `NotificationManagerCompat` + `AlarmManager.setExactAndAllowWhileIdle` (WorkManager fallback if exact alarms refused), ContactsContract, Play Billing 7. Min SDK 28.
 - The Swift domain layer + its test suite is the porting reference. No KMP — we port, not share (decision #2, #20).
@@ -481,7 +481,7 @@ The claim: **"no data collected, no call-home, ever."** Stacked technical, legal
 
 ### Technical anti-call-home guarantees
 
-**Android — nuclear tier:** no `android.permission.INTERNET` in the manifest → the kernel denies socket creation to the app's UID. Rules out any networked SDK forever. Enforced in code review + a manifest CI guard when `android/` exists.
+**Android — nuclear tier:** no `android.permission.INTERNET` in the manifest → the kernel denies socket creation to the app's UID. Rules out any networked SDK forever. Enforced in code review + the `android-manifest-guard` CI job (`scripts/check-android-manifest.sh`), which also requires the app manifest's `tools:node="remove"` strip lines so a library-injected permission dies at manifest merge.
 
 **iOS — strongest available:**
 - No networking symbols in our modules; **CI-enforced** by privacy-grep (§5). StoreKit is OS-provided and exempt.
@@ -772,6 +772,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 | 38 | TestFlight execution uses stable `TF-##` IDs and readiness gates, not a fixed public date | 2026-07-29 | The 2026-08-31 anchor expired before the production loop existed. Durable Git/GitHub checkpoints survive agent context and capacity resets; beta throughput determines the public date. |
 | 39 | Broad accessibility audits run after merge, nightly, and before release; pull requests use focused regressions, manual smoke, and staged accessibility review | 2026-08-03 | The former PR-time 1× and 5× jobs each occupied a billed macOS runner for about 33 minutes and unrelated flakes blocked feature throughput. Scheduled runs preserve broad detection; a failed current-main run must be triaged before new feature work, while `audit-stress.sh` remains available for reproduced flakes and release candidates. |
 | 40 | Showcase the latest shippable iOS platform in one dedicated compatibility-gated refactor; keep iOS 17 minimum and exclude beta-only APIs | 2026-07-30 | Xcode 26.6 / iOS 26 is the stable TestFlight baseline. iOS 18 and iOS 26 enhancements can be additive without abandoning supported users; iOS 27 beta APIs would make the release branch and CI unstable. |
+| 41 | Android scaffold carve-out: `ANDROID_PORT.md`, the `android/` module skeleton, the Android CI guards, and the shared golden-vector infrastructure (AN-00–AN-02) may land ahead of the §21 iOS-health gate; Kotlin domain porting and all Android feature work stay gated | 2026-08-03 | The gate protects iOS focus, not groundwork. Landing architecture and guards first keeps the no-INTERNET invariant enforced from the first Android commit, and the golden vectors pay iOS back immediately with the transition-day engine coverage §18 found missing. `ANDROID_PORT.md` owns the `AN-##` queue; promotion past the gate line is a recorded owner edit, not an agent call. |
 
 ## 17. Working rules for implementation agents
 

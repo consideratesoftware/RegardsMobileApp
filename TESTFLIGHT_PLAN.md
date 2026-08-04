@@ -5,6 +5,11 @@ TestFlight. `ARCHITECTURE.md` remains the product and technical source of truth.
 This file replaces only the stale calendar dates and overloaded PR numbers in
 §14 with stable work IDs, live state, and a restart protocol.
 
+The Android track has its own queue (`AN-##`) in `ANDROID_PORT.md`. Nothing in
+this file governs `android/`, TF items never depend on AN items, and the
+Android gate line is decision #41 — an agent resuming from this file should
+never pick up Android work.
+
 ## Current checkpoint
 
 - Updated: 2026-08-04

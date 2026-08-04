@@ -16,7 +16,7 @@ never be renumbered.
 
 Regards is a **local-first, no-backend, no-network** mobile app. Privacy is a merge-gated invariant (see the privacy-grep guard below), not a marketing claim.
 
-Status: pre-alpha, iOS-first. The `android/` directory does not exist yet. PRs are not currently accepted (solo project under PolyForm Noncommercial 1.0.0).
+Status: pre-alpha, iOS-first. The `android/` directory is a scaffold only: architecture, port map, and the `AN-##` execution queue live in `ANDROID_PORT.md`, and Android feature work is gated by decision #41 (§16). PRs are not currently accepted (solo project under PolyForm Noncommercial 1.0.0).
 
 ## iOS — the only live platform today
 
@@ -126,7 +126,7 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 ## CI map
 
 - `.github/workflows/ios-ci.yml` — xcodegen determinism → build → unit tests with a ≥95% Domain coverage floor; the post-merge accessibility audit runs separately. No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
-- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, project.yml YAML syntax, and Markdown link checks for root docs plus `ios/docs/`.
+- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, the three Android guards (manifest network-permission strip, network-free sources, `:domain` purity), project.yml YAML syntax, and Markdown link checks for root docs plus `ios/docs/`.
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
 - `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× (flake detector). Since 2026-08-02 it runs on merges to `main`, nightly, and `workflow_dispatch`, not on pull requests; dispatch it and require green before cutting a release.
 - `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from

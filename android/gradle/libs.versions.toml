@@ -1,0 +1,57 @@
+# Regards Android version catalog.
+# RULE (decision #37 / R21): exact versions only — never ranges, never "+".
+# TODO(AN-01): audit every coordinate against current stable at first sync
+# and generate dependency-verification metadata. (Wrapper already pinned.)
+
+[versions]
+agp = "8.10.0"                 # TODO(AN-01) verify
+kotlin = "2.2.0"               # TODO(AN-01) verify
+ksp = "2.2.0-1.0.29"           # TODO(AN-01) verify (tracks kotlin version)
+composeBom = "2025.06.00"      # TODO(AN-01) verify
+activityCompose = "1.10.0"     # TODO(AN-01) verify
+coreKtx = "1.16.0"             # TODO(AN-01) verify
+room = "2.7.1"                 # TODO(AN-01) verify
+sqlcipher = "4.6.1"            # TODO(AN-01) verify (net.zetetic:sqlcipher-android)
+androidxSqlite = "2.5.0"       # TODO(AN-01) verify
+coroutines = "1.10.1"          # TODO(AN-01) verify
+serializationJson = "1.8.0"    # TODO(AN-01) verify — :domain TEST-ONLY (golden vectors)
+kotest = "5.9.1"               # TODO(AN-01) verify
+robolectric = "4.14.1"         # TODO(AN-01) verify
+kover = "0.9.1"                # TODO(AN-01) verify
+detekt = "1.23.7"              # TODO(AN-01) verify
+
+[libraries]
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
+androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "androidxSqlite" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }
+
+kotest-runner = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+
+[bundles]
+compose = ["androidx-compose-ui", "androidx-compose-material3", "androidx-compose-ui-tooling-preview"]

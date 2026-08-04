@@ -42,21 +42,26 @@ Regards makes a strong privacy claim and backs it up with technical, legal, and 
 - **Source is available for audit.** Every line of code is publicly readable under the license below.
 - **App Store declaration:** "Data Not Collected" across the board.
 
-The planned Android port will preserve the same posture with no `INTERNET`
-manifest permission, but no Android app exists in this repository today.
+The Android port preserves the same posture with no `INTERNET` manifest
+permission. The scaffold in `android/` already strips the permission at
+manifest merge and CI enforces its absence; no shippable Android app exists
+yet (see [`ANDROID_PORT.md`](./ANDROID_PORT.md)).
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) §11 for the full privacy stack.
 
 ## Repository layout
 
-The repository contains the iOS app and its canonical design document. A native
-Android port is planned only after iOS stabilizes.
+The repository contains the iOS app, its canonical design document, and the
+scaffold for the native Android port (feature work gated until iOS stabilizes).
 
 ```
 .
 ├── ARCHITECTURE.md        Design doc. The source of truth for what we're building and why.
-├── TESTFLIGHT_PLAN.md     Live execution queue and recovery checkpoint.
+├── TESTFLIGHT_PLAN.md     Live iOS execution queue and recovery checkpoint.
+├── ANDROID_PORT.md        Android architecture, port map, and the AN-## execution queue.
 ├── ios/                   Swift / SwiftUI app, tests, generated Xcode project, and iOS docs.
+├── android/               Kotlin / Compose scaffold: 17 Gradle modules, no feature code yet.
+├── shared/                Cross-platform golden test vectors (seeded at AN-02).
 ├── LICENSE                PolyForm Noncommercial 1.0.0.
 └── README.md              You are here.
 ```
@@ -66,9 +71,11 @@ Android port is planned only after iOS stabilizes.
 **iOS (in development)**
 Swift 6 with strict concurrency, SwiftUI, GRDB.swift for persistence, StoreKit 2 for billing, WidgetKit for widgets. Minimum target: iOS 17.
 
-The future Android app will be a native port rather than a shared runtime. See
+The Android app is a native port rather than a shared runtime: Kotlin 2.x,
+Jetpack Compose, Room + SQLCipher, minimum SDK 28. See
 [`ARCHITECTURE.md`](./ARCHITECTURE.md) §6 and §14 for the start gate and
-rationale.
+rationale, and [`ANDROID_PORT.md`](./ANDROID_PORT.md) for the module map and
+execution queue.
 
 ## Roadmap
 

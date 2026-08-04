@@ -95,3 +95,10 @@ journal/
 # ---------- Large binary assets that live elsewhere ----------
 # Substack banner lives in the published post; no need to track the 8MB source
 Substack_banner.png
+
+# ---------- Android build outputs ----------
+android/.gradle/
+android/build-logic/.gradle/
+android/**/build/
+android/local.properties
+android/.kotlin/
