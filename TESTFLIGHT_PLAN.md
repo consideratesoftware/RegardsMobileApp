@@ -23,16 +23,21 @@ never pick up Android work.
   determinism repair (below). GitHub PR #42 merged as `d8193ff` after five
   hosted review rounds; GitHub PR #39 merged as `ade40e3`; GitHub PR #41
   merged as `bbd7c93` on the separate Android track and is not TF work.
-- Known defect landed and repaired in PR #43: PR #42 committed nine
-  byte-identical `"* 2.swift"` duplicates of its new test files. A file-sync
-  process created them in the worktree and `git add -A` swept them in. The
-  committed `project.pbxproj` did not reference them, so local builds and CI's
-  build and test jobs all passed against the committed project — only the
-  XcodeGen determinism gate caught it, by regenerating from the tree and
-  finding nine extra files. That gate is the reason a silent divergence
-  between the source tree and the project file did not survive on `main`.
-  Every duplicate was verified byte-identical to its tracked original before
-  deletion; no unique work was discarded.
+- Worktree hazard found and contained inside PR #43, never on `main`: a
+  file-sync process in this worktree creates byte-identical `"* 2"` copies of
+  recently written files, and `git add -A` sweeps them into the commit. PR
+  #43's first commit `e1d0e5e` carried twelve — nine `"* 2.swift"` test copies
+  and three `"* 2.sh"` guard-script copies. `git ls-tree d8193ff` confirms
+  `main` has none, so no merged commit was ever affected.
+  The XcodeGen determinism gate caught the Swift copies immediately: the
+  committed `project.pbxproj` did not reference them, so every build and test
+  job passed against the committed project while a fresh `xcodegen` from the
+  same tree produced nine extra files. The hosted review caught the three
+  shell copies. Each was verified byte-identical to its tracked original
+  before deletion; no unique work was discarded.
+  Standing mitigation for any agent working in this worktree: never
+  `git add -A`. Stage explicit paths, and check `find . -name "* 2.*"`
+  before committing.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
