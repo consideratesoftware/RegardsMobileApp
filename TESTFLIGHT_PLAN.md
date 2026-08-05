@@ -415,6 +415,53 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    pass (was 197); Domain coverage holds at 96.90%; strict SwiftLint zero
    violations across 86 files.
 
+   Fifth hosted review (2026-08-05, verdict APPROVE on `107a9e4`: no blockers,
+   7 should-fix, 10 nits). The first attempt failed closed for an
+   infrastructure reason, not a verdict: the reviewer errored after one turn
+   and produced no artifact, so `require-hosted-review-output.sh` refused to
+   publish. Re-running the failed jobs produced the verdict above.
+
+   Three findings were corrections to this round's own work and are closed:
+
+   - The zero-capacity guard's comment still claimed the window "always has
+     capacity, so nil never happens today". False once R9a made the window
+     caller-supplied, and this slice's own test drives that branch. The
+     comment now says so and warns against deleting the guard as dead code,
+     which would silently reintroduce R4.
+   - `shippedFixtureHasNoSameDayDuplicate` built its window with
+     `.defaultV1(timezone: UTC)` instead of the shipped
+     `MockRepositories.defaultWindow` (Asia/Kolkata), so it did not guard the
+     fixture it claimed to. Now uses the shipped window; still passes.
+   - R9a overclaimed. `AppRuntime.makeProduction` resolves the persisted
+     window, but the shipping app still boots `makeMock`, so the production
+     path has zero callers until TF-02. The register now says what is actually
+     closed — the hardcode and the silent-default hazard — and names the boot
+     flip as TF-02 work, which removes the contradiction with §18.
+
+   Four are consciously deferred, with owners, because they are other queue
+   items' scope rather than this slice's:
+
+   - Threading `isVirtualMerged` into Upcoming and All Contacts rows so a
+     merged contact is announced consistently on every tab. Virtual merge is
+     TF-10's subject (R11–R12); doing it here would mean inventing the
+     grouped-row semantics TF-10 exists to define.
+   - A wiring test for `OverdueViewModel.makeOverdueRow` asserting a
+     non-grouped contact reports `isVirtualMerged == false`. The Domain branch
+     is covered; the missing piece is the Overdue VM's own suite, which R24
+     assigns to TF-04/TF-07.
+   - Strengthening `assertCadenceBoundary` to distinguish calendar-day from
+     elapsed-seconds horizon arithmetic. Worth doing, and it belongs with
+     TF-07's rewrite of this code path rather than as a late addition to a
+     hygiene slice.
+   - Asserting the resulting `occasionDate`/`monthDayString` for Feb-29 and
+     year-crossing offsets in the seeding helper. Annual recurrence is
+     engine-owned and already covered there; the seeding helper's contract is
+     non-nil, which is what its tests assert.
+
+   Fifth-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 203 unit tests
+   still pass with the fixture guard now running under the shipped
+   Asia/Kolkata window.
+
 ## Owner gates
 
 Current gates:

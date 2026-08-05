@@ -225,10 +225,13 @@ public final class UpcomingViewModel {
                 let last = contact.lastInteractedAt ?? contact.createdAt
                 let overdueAt = last.addingTimeInterval(TimeInterval(cadence) * 86_400)
                 let target = max(now, overdueAt)
-                // `nextAllowedSlot` now returns nil for a zero-capacity window
-                // (R4). This VM's `.defaultV1()` window always has capacity, so
-                // nil never happens today, but skip the row rather than crash if
-                // a future override wires a degenerate window through here.
+                // `nextAllowedSlot` returns nil for a zero-capacity window
+                // (R4). This is a live path, not a defensive one: the window is
+                // now caller-supplied (R9a), and
+                // `UpcomingViewModelStateTests.zeroCapacityWindowKeepsOccasions`
+                // drives exactly this branch. Skipping the cadence row while
+                // leaving occasion rows intact is the correct degradation —
+                // do not delete this guard as unreachable.
                 guard let fires = engine.nextAllowedSlot(
                     from: target,
                     in: window,

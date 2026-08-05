@@ -114,13 +114,16 @@ struct MockOccasionSeedingTests {
         // shipped mock build must not create the duplicate itself. A future
         // edit to a seeded cadence or occasion offset could silently
         // reintroduce a doubled row in every screenshot and demo; this pins it.
-        let timezone = try #require(TimeZone(secondsFromGMT: 0))
+        // The shipped window, not a UTC stand-in: guarding the fixture means
+        // guarding it under the timezone the app actually boots with.
+        let window = MockRepositories.defaultWindow
+        let timezone = window.timeZone
         let now = MockRepositories.defaultNow
-        let mocks = MockRepositories(now: now, window: .defaultV1(timezone: timezone))
+        let mocks = MockRepositories(now: now, window: window)
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
-            window: .defaultV1(timezone: timezone),
+            window: window,
             clock: { now }
         )
 
