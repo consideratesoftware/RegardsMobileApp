@@ -66,8 +66,10 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; PR #23, PR #37, and PR #24 are complete. Start no additional
-   work while the current TF-01 repair branch or pull request is unresolved.
+   checkpoint`. All of `TF-01`'s slices are merged: GitHub PRs #23, #37, #24,
+   #39, and #42. Start no additional work while any TF branch, worktree, or
+   pull request is unresolved — that general rule already opens this step, and
+   it is the gate, not a hardcoded list of PR numbers that goes stale.
 5. Otherwise, fast-forward `main` and reconcile this queue against merged pull
    requests carrying a `TF-##` marker. If either scheduled accessibility run
    failed on the current `main`, triage that failure before taking new feature
@@ -150,7 +152,7 @@ numbers.
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
 | TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
-| TF-02 | READY | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
+| TF-02 | READY | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35 |
 | TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |

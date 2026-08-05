@@ -826,10 +826,10 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-08-04
+## 18. Current state — ground truth as of 2026-08-05
 
-`main` = `bbd7c93` (Android-only GitHub PR #41, 2026-08-03); the latest iOS
-source change is `87fa055` (GitHub PR #40). The engine contract,
+`main` = `d8193ff` (GitHub PR #42, the final TF-01 slice, 2026-08-05); it is
+also the latest iOS source change. The engine contract,
 section-header accessibility fix, sample-data refresh, channel-validation
 contract, bundle-namespace migration, durable TestFlight queue, and
 cross-provider review parity guard have landed. The trusted staged reviewer now
@@ -933,13 +933,13 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R31 | Domain coverage floor absent (§13 promises near-total); coverage collected but unenforced | `ios-ci.yml` | ≥95% xccov gate on the complete `Domain/**` source set (96.88% on merged head) | ✅ **closed by GitHub PR #39** |
 | R32 | Guard gaps: domain-purity misses `@preconcurrency import` / `import class Contacts.X` / `import Network`; privacy-grep misses `NSURLConnection`, `CFSocket` | `guards.yml:33,46` | Shared source-boundary scripts reject every listed form, and canonical plus trusted-review workflows call those scripts | ✅ **closed by TF-01 trusted gate prerequisite (GitHub PR #26)** |
 | R33 | Dead SwiftLint config: `function_body_length` threshold block while the rule is disabled | `.swiftlint.yml` | Remove the unreachable threshold block | ✅ **closed by GitHub PR #39** |
-| R34 | Mock seeds miss ContactGroup/InteractionLog/occasion — merged chip, interactions card, occasion tags unreachable & unauditable; `UpcomingRowState.id = UUID()` per build breaks diffing (R36) | `MockRepositories.swift`, `UpcomingViewModel.swift` | Seed all three; stable cadence ids use `contactId+kind`, while persisted occasion rows use their reminder id to prevent same-kind collisions | GitHub PR #42 (active; pending merge) |
+| R34 | Mock seeds miss ContactGroup/InteractionLog/occasion — merged chip, interactions card, occasion tags unreachable & unauditable; `UpcomingRowState.id = UUID()` per build breaks diffing (R36) | `MockRepositories.swift`, `UpcomingViewModel.swift` | Seed all three; stable cadence ids use `contactId+kind`, while persisted occasion rows use their reminder id to prevent same-kind collisions | ✅ **closed by GitHub PR #42** |
 | R35 | Importer aborts mid-batch on first row error | `ContactsImporter.swift:56-64` | Per-row tolerance + counts | PR21 |
-| R36 | (folded into R34) | — | — | GitHub PR #42 (active; pending merge) |
+| R36 | (folded into R34) | — | — | ✅ **closed by GitHub PR #42** |
 | R37 | `LSApplicationQueriesSchemes: []` while builder already emits `discord://` | `project.yml:80`, `DeepLinkBuilder.swift:43-45` | Add `discord` when deep links go live | PR26 |
 | R38 | `TimeOfDay` precondition bypassed by synthesized `Decodable` — corrupt DB JSON can materialize minute=2000 into calendar math | `TimeOfDay.swift:10-13` | Custom `init(from:)` enforcing range | ✅ **closed by PR16** |
 | R39 | Migrator seeds `Optional` top-level JSON (`jsonStringEncoded(window.quietHours)`) — inserts `"null"` / throws if the default ever ships nil quiet hours | `DatabaseMigrator.swift:106,124-129`, `Records.swift:247-248` | Encode non-optional or store SQL NULL | PR20 (with v2) |
-| R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift`, `accessibility.md` | Delete or wire; fix comments | GitHub PR #42 (active; pending merge) |
+| R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift`, `accessibility.md` | Delete or wire; fix comments | ✅ **closed by GitHub PR #42** |
 | R41 | Contrast registry incomplete vs UI reality (white-on-accentInk CTAs, accentInk-on-surface, danger-on-surface unlisted) | `RegardsColors.swift:70-83` | Extend `contrastPairs` + tests | PR34 |
 | R42 | `audit-stress.yml` header described obsolete PR-trigger behavior | `audit-stress.yml` | Header ✅ **closed by TF-01 scheduling-policy commit `f563915`**; GitHub PR #39 clarifies pending-run coalescing | ✅ **closed on current `main`** |
 | R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | ✅ **closed by TF-01 slice 1** |
