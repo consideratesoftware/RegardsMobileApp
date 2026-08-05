@@ -78,6 +78,21 @@ public final class UpcomingViewModel {
             loadState = .loading
         }
         do {
+            // Two independent awaits, deliberately not a consistent snapshot.
+            // A write landing between them can produce a list built from a
+            // tracked set and a reminder set taken microseconds apart — a
+            // contact untracked in that gap keeps its occasion row for one
+            // render. The accepted staleness is bounded by the next `load()`,
+            // and every mutation path already triggers one, so the window is
+            // one frame and self-healing rather than persistent.
+            //
+            // The invariant TF-07's `ValueObservation` swap must preserve: a
+            // row may only appear for a contact present in the same read's
+            // tracked set (`contactsByID` below enforces it), and no partially
+            // applied write may ever be rendered as a stable state. A single
+            // observation over the joined query satisfies both by
+            // construction; anything that reintroduces two reads must keep the
+            // filter on the join, not on the reminder set alone.
             let tracked = try await contacts.fetchTracked()
             let pendingReminders = try await reminders?.fetchAllPending() ?? []
             let now = clock()

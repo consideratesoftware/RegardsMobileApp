@@ -146,8 +146,12 @@ actor MockStore {
         let startOfToday = calendar.startOfDay(for: now)
 
         if let shmi = contacts.values.first(where: { $0.systemContactRef == "sys-shmi" }),
-           let birthdayDay = calendar.date(byAdding: .day, value: 1, to: startOfToday),
-           let birthdayTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: birthdayDay) {
+           let birthdayTime = Self.occasionInstant(
+               daysAfter: startOfToday,
+               offset: 1,
+               hour: 9,
+               calendar: calendar
+           ) {
             let birthday = ScheduledReminder(
                 contactId: shmi.id,
                 kind: .birthday,
@@ -160,12 +164,11 @@ actor MockStore {
         }
 
         if let obiWan = contacts.values.first(where: { $0.systemContactRef == "sys-obiwan" }),
-           let anniversaryDay = calendar.date(byAdding: .day, value: 4, to: startOfToday),
-           let anniversaryTime = calendar.date(
-               bySettingHour: 9,
-               minute: 0,
-               second: 0,
-               of: anniversaryDay
+           let anniversaryTime = Self.occasionInstant(
+               daysAfter: startOfToday,
+               offset: 4,
+               hour: 9,
+               calendar: calendar
            ) {
             let anniversary = ScheduledReminder(
                 contactId: obiWan.id,
@@ -179,6 +182,41 @@ actor MockStore {
         }
 
         return (contacts, groups, reminders, interactions)
+    }
+
+    /// The seeded occasion instant `offset` days after `startOfToday`, at the
+    /// given local `hour`.
+    ///
+    /// `date(bySettingHour:)` is `Optional`, and the seeding used to sit
+    /// inside an `if let` chain that silently dropped the birthday and
+    /// anniversary whenever it returned nil. That would make the
+    /// representative occasion states R34 exists to guarantee unreachable and
+    /// unauditable, with no failure anywhere to say so.
+    ///
+    /// Measured on a real DST gap (US Pacific, 2026-03-08, hour 2): the API
+    /// does not return nil — it forgives the missing hour and snaps forward to
+    /// 03:00. So this is a defensive guard against API surface rather than a
+    /// reproduced drop. It stays because the seeds must never depend on that
+    /// leniency: fall forward to the first instant that does exist, and fall
+    /// back to the day start if even that fails.
+    nonisolated static func occasionInstant(
+        daysAfter startOfToday: Date,
+        offset: Int,
+        hour: Int,
+        calendar: Calendar
+    ) -> Date? {
+        guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else {
+            return nil
+        }
+        if let exact = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) {
+            return exact
+        }
+        return calendar.nextDate(
+            after: day,
+            matching: DateComponents(hour: hour, minute: 0, second: 0),
+            matchingPolicy: .nextTime,
+            direction: .forward
+        ) ?? day
     }
 
     private nonisolated static func monthDayString(for date: Date, calendar: Calendar) -> String {

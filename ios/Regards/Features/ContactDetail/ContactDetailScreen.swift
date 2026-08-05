@@ -264,14 +264,12 @@ public struct ContactDetailScreen: View {
         }
     }
 
+    // The label is derived on `InteractionEntry` so it can be asserted in unit
+    // tests without instantiating the view.
     private func interactionAccessibilityLabel(
         _ entry: ContactDetailViewModel.InteractionEntry
     ) -> String {
-        let spokenDescription = entry.descriptionLabel.replacingOccurrences(
-            of: " · ",
-            with: ", "
-        )
-        return "\(entry.dateLabel), \(spokenDescription)"
+        entry.accessibilityLabel
     }
 
     private func notesCard(contact: Contact) -> some View {

@@ -8,6 +8,20 @@ public final class ContactDetailViewModel {
         public let id: UUID
         public let dateLabel: String
         public let descriptionLabel: String
+
+        /// The spoken VoiceOver label for this interaction row, e.g.
+        /// "3 days ago, Caught up, WhatsApp".
+        ///
+        /// The visual `descriptionLabel` separates its parts with a middle
+        /// dot; VoiceOver reads that character aloud, so the spoken form
+        /// substitutes a comma to get a natural pause instead. This lives on
+        /// the entry, not in the view, so it is unit-testable — matching
+        /// `UpcomingRowState.accessibilityLabel`.
+        public var accessibilityLabel: String {
+            let spoken = descriptionLabel.replacingOccurrences(of: " · ", with: ", ")
+            guard !spoken.isEmpty else { return dateLabel }
+            return "\(dateLabel), \(spoken)"
+        }
     }
 
     public private(set) var contact: Contact?

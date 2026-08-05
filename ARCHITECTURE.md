@@ -352,7 +352,7 @@ The user picks:
 
 ### Per-contact override
 
-`Contact.reminderWindowOverride` (full `ReminderWindow` JSON) replaces the global window when non-null. Resolution happens in **one** place — SchedulingPass computes `effectiveWindow = contact.reminderWindowOverride ?? global` and passes it down; the engine never reaches around its inputs. (Shipped gap: `UpcomingViewModel` hardcodes `.defaultV1()` and ignores both the repository and the override — R9.)
+`Contact.reminderWindowOverride` (full `ReminderWindow` JSON) replaces the global window when non-null. Resolution happens in **one** place — SchedulingPass computes `effectiveWindow = contact.reminderWindowOverride ?? global` and passes it down; the engine never reaches around its inputs. (R9, now split: the **global** half is closed — `AppRuntime` composes `UpcomingViewModel` with the persisted window, so the view model no longer hardcodes `.defaultV1()`. The **per-contact override** half stays open, along with live refresh when the stored window changes; both land with the reminder-window editor and SchedulingPass.)
 
 ### Scheduling algorithm
 
@@ -596,7 +596,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-04):** the unit target executes 187 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
+**Shipped suites (census 2026-08-04):** the unit target executes 195 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
 
 **Standing requirements:**
 
@@ -607,12 +607,15 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 - **Migrations:** fresh-create and v1→v2 upgrade round-trips for every table; migration tests may never be deleted, only added.
 - **Repositories:** contract tests run against both `MockRepositories` and GRDB implementations (shared assertions) so mocks can't drift from production semantics (R23).
 - **ViewModels:** every VM gets a unit suite. PR #42 added focused Upcoming
-  behavior coverage for representative reminders, stable identity, ordering,
-  boundaries (`UpcomingViewModelBoundaryTests`), and the states that leave the
-  happy path (`UpcomingViewModelStateTests`: a throwing contact fetch, a
-  throwing `fetchAllPending`, a failure after a successful load, a
-  zero-capacity window that keeps occasion rows, an untracked contact's
-  occasion, and the spoken row label). ContactDetail and the remaining Upcoming
+  coverage across three files: representative reminder seeds, stable row
+  identity, and ordering live in `MockRepositoriesTests`; horizon, DST, and
+  same-day boundaries live in `UpcomingViewModelBoundaryTests`; the states that
+  leave the happy path live in `UpcomingViewModelStateTests` (a throwing
+  contact fetch, a throwing `fetchAllPending`, a failure after a successful
+  load, a zero-capacity window that keeps occasion rows, an untracked contact's
+  occasion, the documented §9 contract-6 duplicate, and the spoken row label).
+  `ContactDetailInteractionLabelTests` covers the Contact Detail interaction
+  row's spoken label; the rest of ContactDetail and the remaining Upcoming
   behaviors stay open under R24.
 - **Snapshot tests (PR34, decision #34):** adopt `pointfreeco/swift-snapshot-testing` (test-target-only dependency — it never enters app sources, so no privacy-grep implications) for the 9 screens × key states (empty / populated / all-caught-up / trial-expired / post-purchase). The `ios-ci.yml` snapshot placeholder comment becomes a real job.
 - **StoreKit (PR32):** StoreKitTest configuration file + sandbox smoke: purchase, restore-from-fresh-install, trial expiry math.
@@ -893,7 +896,8 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R6 | **Batching groups by exact Date equality**; reminders in the same window minutes apart never batch | `ReminderEngine.swift:271-275` | Decision #30 slot-start snapping; digest identity `digest-{slotStartEpoch}`; tests | ✅ **semantics closed by PR16** / PR25 (plumbing) |
 | R7 | **Channel validation contradicts §8:** telegram `@handle` rejected; messenger m.me URLs rejected; `custom` limited to http(s) killing `slack://` etc. | `ChannelCatalog.swift:48-55, 91-93, 133-138` | Normalize/strip per §8 table; any-scheme custom URLs; parametric + property tests | ✅ **closed by PR17** |
 | R8 | **Never-contacted semantics diverge:** engine says due-now; VMs say `?? createdAt` — same contact "not overdue" on screen, "scheduled" by engine | `ReminderEngine.swift:126-129` vs `OverdueViewModel.swift:82`, `UpcomingViewModel.swift:124` | Decision #29: engine adopts `?? createdAt`; divergence test | ✅ **closed by PR16** |
-| R9 | **Reminder windows are fiction in the UI:** `UpcomingViewModel` hardcodes `.defaultV1()` ignoring `env.window` AND per-contact overrides; ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `UpcomingViewModel.swift:32,127`, `ReminderWindowsScreen.swift:7,226` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | PR23 |
+| R9a | **Global window injection — CLOSED.** `UpcomingViewModel` no longer hardcodes `.defaultV1()`; `AppRuntime` composes it with the persisted window, and `AppRuntimeTests` proves the production runtime loads the stored window and rejects a missing or invalid one | `UpcomingViewModel.swift`, `AppRuntime.swift` | — | ✅ **closed by GitHub PR #42** |
+| R9b | **Per-contact override and live refresh — OPEN.** Overrides are still unresolved anywhere in the UI, a stored-window change does not refresh an open Upcoming, and the ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `ReminderWindowsScreen.swift:7,226`, `UpcomingViewModel.swift` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | TF-05 (PR23) |
 | R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
 | R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; Contact Detail's Caught up/Snooze/Log-other and channel action plus Overdue channel actions are muted, unavailable content pending TF-04/TF-08; inert Merge "Skip"; no-op Onboarding permission button | `ContactDetailScreen.swift`, `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift`, `MergeDuplicatesScreen.swift:108-112`, `OnboardingScreen.swift:3-5` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | Horizon/All stubs removed ✅ **closed by TF-01 modernization / GitHub PR #24**; remaining PR22–PR29 |
 | R12 | **Merge never persists** (no `ContactGroup` written; `env.groups` unused) and detector sees only `preferredChannelValue` instead of full handle sets | `MergeDuplicatesViewModel.swift:44-55` | PR28 scope + `phonesJson`/`emailsJson` inputs | PR28 |

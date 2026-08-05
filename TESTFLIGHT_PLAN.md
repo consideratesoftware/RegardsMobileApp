@@ -302,6 +302,50 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    harness restarted, which is a runner crash, not a product regression. The
    test passes in isolation and in the clean rerun.
 
+   Second hosted review (2026-08-04, verdict APPROVE on `b58e9d9`: no
+   blockers, 7 should-fix, 8 nits). Owner directed clearing every should-fix
+   and leaving the nits. Closures:
+
+   - R9 split. `AppRuntime` now composes `UpcomingViewModel` with the
+     persisted window, so the global half is closed as R9a; per-contact
+     override resolution and live refresh stay open as R9b against TF-05.
+     §9 "Per-contact override" prose matches.
+   - The documented §9 contract-6 deviation is now pinned by a test: one
+     contact with both a cadence-eligible slot and a same-local-day occasion
+     yields two rows with non-colliding IDs. TF-07 replaces the expectation
+     with suppression.
+   - `load()`'s two independent awaits are documented as accepted, one-frame,
+     self-healing staleness, with the invariant TF-07's `ValueObservation`
+     swap must preserve stated explicitly.
+   - §13 attributes representative-state and stable-identity coverage to
+     `MockRepositoriesTests`, boundaries to `UpcomingViewModelBoundaryTests`,
+     and off-happy-path states to `UpcomingViewModelStateTests`.
+   - `navigateToRow` polls for hittability before scrolling and adds a bounded
+     scroll-back, so a row that is on screen but not yet settled is no longer
+     scrolled out of the viewport. All six dependent XCUI regressions were run
+     locally: `testContactDetailFromOverduePassesAudit`,
+     `testContactDetailFromUpcomingPassesAudit`,
+     `testEditContactBackReturnsToOverdueContactDetail`,
+     `testEditContactBackReturnsToUpcomingContactDetail`,
+     `testOverdueNavigationShowsDistinctContacts`, and
+     `testUnavailableActionsAreDescribedAndNoninteractive`.
+   - Occasion seeding routes through `MockStore.occasionInstant`, which
+     handles a nil wall-clock instant instead of silently dropping the
+     birthday and anniversary. Measured finding worth recording: the reported
+     DST-gap drop does not reproduce — `date(bySettingHour:)` forgives a
+     skipped hour and snaps forward (verified on US Pacific 2026-03-08, hour
+     2), so the guard is defensive against API surface, not a fixed bug. The
+     tests assert the invariant the seeds actually depend on: both occasions
+     seed across four DST-transition days in three zones.
+   - `ContactDetailScreen.interactionAccessibilityLabel` moved onto
+     `InteractionEntry.accessibilityLabel`, matching the
+     `UpcomingRowState.accessibilityLabel` move, and gained four unit tests
+     including one over every `InteractionSource`.
+
+   Second-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 195 unit tests
+   pass (was 187); Domain coverage holds at 843/870 = 96.90%; strict SwiftLint
+   zero violations across 84 files.
+
 ## Owner gates
 
 Current gates:

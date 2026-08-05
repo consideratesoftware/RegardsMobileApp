@@ -175,6 +175,51 @@ struct UpcomingViewModelStateTests {
         #expect(!rows.contains { $0.kind == .cadence })
     }
 
+    // MARK: - Documented §9 contract 6 deviation
+
+    @Test("A same-day cadence and occasion pair produces two distinct rows")
+    func sameDayCadenceAndOccasionBothAppear() async throws {
+        // §9 contract 6 says the occasion should suppress the cadence
+        // reminder. `SchedulingPass` owns that rule (PR25 / TF-07, R6) and it
+        // is documented as unenforced here. This test pins the current
+        // behavior so the deviation is visible rather than silent: both rows
+        // appear, and — critically — their IDs do not collide, so the
+        // duplicate cannot corrupt identity, diffing, or ordering while it
+        // lasts. TF-07 will replace this expectation with suppression.
+        let contact = Self.contact(
+            systemRef: "same-day-double-up",
+            displayName: "Padmé Amidala",
+            cadenceDays: 1
+        )
+        let occasion = ScheduledReminder(
+            contactId: contact.id,
+            kind: .birthday,
+            scheduledFor: Self.now.addingTimeInterval(3_600),
+            osNotificationId: "same-day-double-up-occasion"
+        )
+        let viewModel = UpcomingViewModel(
+            contacts: StubContactRepository([contact]),
+            reminders: StubReminderRepository([occasion]),
+            window: .allDayEveryDay(timezone: Self.utc),
+            clock: { Self.now }
+        )
+
+        await viewModel.load()
+
+        let rows = viewModel.groups.flatMap(\.rows)
+        let forContact = rows.filter { $0.contactId == contact.id }
+        #expect(forContact.count == 2)
+        #expect(Set(forContact.map(\.kind)) == [.cadence, .birthday])
+        #expect(Set(forContact.map(\.id)).count == 2)
+
+        // Both land on the same local calendar day, which is what makes this
+        // the contract-6 case rather than two unrelated rows.
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Self.utc
+        let days = Set(forContact.map { calendar.startOfDay(for: $0.scheduledFor) })
+        #expect(days.count == 1)
+    }
+
     // MARK: - Untracked contacts
 
     @Test("A pending occasion for an untracked contact never reaches Upcoming")

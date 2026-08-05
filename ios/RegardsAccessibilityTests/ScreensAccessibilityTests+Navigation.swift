@@ -203,12 +203,23 @@ extension ScreensAccessibilityTests {
                 continue
             }
             let row = rows[index]
-            if !row.isHittable {
+            // `isHittable` is a one-shot read. Immediately after a relaunch or
+            // a tab switch it can be false for a row that is already on screen
+            // and about to settle, and scrolling on that reading pushes a
+            // perfectly good target out of the viewport — the flake this
+            // helper kept reintroducing across its seven call sites. Poll
+            // first; only scroll once the row is genuinely off-screen.
+            if !waitUntilLiveAndHittable(row) {
                 // Representative states add enough rows to place the target
                 // below the viewport at accessibility Dynamic Type sizes.
                 source.swipeUp()
+                if !waitUntilLiveAndHittable(row) {
+                    // Bounded scroll-back: an earlier attempt, or a row above
+                    // the viewport to begin with, leaves the target behind us.
+                    source.swipeDown()
+                    guard waitUntilLiveAndHittable(row) else { continue }
+                }
             }
-            guard waitUntilLiveAndHittable(row) else { continue }
             activate(row, attempt: attempt)
             if detail.waitForExistence(timeout: 10),
                source.waitForNonExistence(timeout: 10) {
