@@ -12,23 +12,38 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-08-04
-- Baseline: `main` at `bbd7c93` (merged Android-only GitHub PR #41); the latest
-  iOS source change is `87fa055` (merged GitHub PR #40)
-- Active work: `TF-01` PR19 mock and code-hygiene slice on
-  `codex/tf-01-mock-hygiene`, published as ready GitHub PR #42 and synchronized
-  with current `main`.
-- Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open TF pull request: GitHub PR #42 (ready; local staged review repairs and
-  hosted checks in progress; auto-merge off). GitHub PR #39 merged as
-  `ade40e3`; GitHub PR #41 merged as `bbd7c93` on the separate Android track
-  and is not TF work.
+- Updated: 2026-08-05
+- Baseline: `main` at `d8193ff` (merged GitHub PR #42, the final TF-01 slice)
+- Active work: none. `TF-01` is complete.
+- Next ready work: `TF-02` — production DB v2, shared repository contracts, a
+  real environment at launch, resumable first import, and a basic onboarding
+  gate. Its first job is flipping the boot path from `AppRuntime.makeMock` to
+  `makeProduction`, which is the remaining half of R9a.
+- Open TF pull request: GitHub PR #43, the post-merge checkpoint close plus a
+  determinism repair (below). GitHub PR #42 merged as `d8193ff` after five
+  hosted review rounds; GitHub PR #39 merged as `ade40e3`; GitHub PR #41
+  merged as `bbd7c93` on the separate Android track and is not TF work.
+- Worktree hazard found and contained inside PR #43, never on `main`: a
+  file-sync process in this worktree creates byte-identical `"* 2"` copies of
+  recently written files, and `git add -A` sweeps them into the commit. PR
+  #43's first commit `e1d0e5e` carried twelve — nine `"* 2.swift"` test copies
+  and three `"* 2.sh"` guard-script copies. `git ls-tree d8193ff` confirms
+  `main` has none, so no merged commit was ever affected.
+  The XcodeGen determinism gate caught the Swift copies immediately: the
+  committed `project.pbxproj` did not reference them, so every build and test
+  job passed against the committed project while a fresh `xcodegen` from the
+  same tree produced nine extra files. The hosted review caught the three
+  shell copies. Each was verified byte-identical to its tracked original
+  before deletion; no unique work was discarded.
+  Standing mitigation for any agent working in this worktree: never
+  `git add -A`. Stage explicit paths, and check `find . -name "* 2.*"`
+  before committing.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. The mock/code-hygiene slice is agent-owned;
-  no product, legal, signing, or App Store decision is required.
+- Owner action needed now: none. `TF-02` is agent-owned; no product, legal,
+  signing, or App Store decision is required before its exit.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -51,8 +66,10 @@ Every fresh or scheduled agent run follows this order:
    check out its branch when needed, address review findings, repair CI, run
    the Regards multi-agent review, and merge only when every required check is
    green and no blocker remains. Follow the dependency order in `Current
-   checkpoint`; PR #23, PR #37, and PR #24 are complete. Start no additional
-   work while the current TF-01 repair branch or pull request is unresolved.
+   checkpoint`. All of `TF-01`'s slices are merged: GitHub PRs #23, #37, #24,
+   #39, and #42. Start no additional work while any TF branch, worktree, or
+   pull request is unresolved — that general rule already opens this step, and
+   it is the gate, not a hardcoded list of PR numbers that goes stale.
 5. Otherwise, fast-forward `main` and reconcile this queue against merged pull
    requests carrying a `TF-##` marker. If either scheduled accessibility run
    failed on the current `main`, triage that failure before taking new feature
@@ -134,8 +151,8 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
-| TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
+| TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
+| TF-02 | READY | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35 |
 | TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
@@ -237,11 +254,12 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    `30870019501`, hosted review run `30870018471`, and every required check
    passed. Post-merge iOS CI run `30870432645` and 5× stress run
    `30870432634` also passed.
-7. ACTIVE in ready GitHub PR #42 on `codex/tf-01-mock-hygiene`: seed representative group,
-   interaction, and occasion states; use stable Upcoming row IDs; remove dead
-   assets and correct their comments. These are pending R34/R36/R40 closures,
-   not closed until the follow-up merges. R30 remains open: 18 merged remote
-   and 38 merged local branches were removed and automatic source-branch
+7. DONE: GitHub PR #42 merged as `d8193ff`, completing TF-01. It seeded
+   representative group, interaction, and occasion states, gave Upcoming rows
+   stable IDs, and removed dead assets and their misleading comments, closing
+   R34, R36, and R40. Five hosted review rounds ran against it; the repairs and
+   the four consciously deferred findings are recorded below. R30 remains open:
+   18 merged remote and 38 merged local branches were removed and automatic source-branch
    deletion was enabled, but the live `crazy-franklin-75fc28` worktree still
    contains 32 untracked files and `codex/pr24-pre-stack-rebase-20260730` has
    three patch-inequivalent commits. `git worktree prune --dry-run --verbose`
@@ -466,9 +484,9 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
 
 Current gates:
 
-- No owner gate is active. The R34/R36/R40 implementation, verification,
-  publication, and guarded merge are agent-owned. R30 is intentionally open;
-  no unique work may be removed merely to close a hygiene row.
+- No owner gate is active. `TF-02` is agent-owned repository work. R30 stays
+  intentionally open; no unique work may be removed merely to close a hygiene
+  row.
 
 ### PR #24 modernization accessibility evidence
 
