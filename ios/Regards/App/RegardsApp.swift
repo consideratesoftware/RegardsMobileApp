@@ -3,22 +3,22 @@ import SwiftUI
 
 @main
 struct RegardsApp: App {
-    // Phase 0 runs against MockRepositories. Phase 1 swaps in GRDBRepositories
-    // here without touching any view code.
-    private let env: AppEnvironment = {
+    // Phase 0 uses one mock runtime. Phase 1 builds the async production
+    // runtime during launch without touching view code.
+    private let runtime: AppRuntime = {
 #if DEBUG
-        AppEnvironment.makeMock(
+        AppRuntime.makeMock(
             includeDuplicateFixture:
                 ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1"
         )
 #else
-        AppEnvironment.makeMock()
+        AppRuntime.makeMock()
 #endif
     }()
 
     var body: some Scene {
         WindowGroup {
-            RootView(env: env)
+            RootView(runtime: runtime)
                 .modifier(UITestDynamicTypeOverride())
         }
     }
@@ -48,14 +48,18 @@ private struct UITestDynamicTypeOverride: ViewModifier {
 /// The first SwiftUI view the user sees. Shows the splash for a brief brand
 /// moment, then crossfades into the real tab root once `.task` fires.
 struct RootView: View {
-    let env: AppEnvironment
+    let runtime: AppRuntime
     @State private var isReady = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(runtime: AppRuntime) {
+        self.runtime = runtime
+    }
 
     var body: some View {
         ZStack {
             if isReady {
-                RegardsTabRoot(env: env)
+                RegardsTabRoot(runtime: runtime)
                     .transition(.opacity)
             } else {
                 SplashView()
@@ -107,7 +111,7 @@ struct SplashView: View {
 /// four tabs. Each tab wraps its content in a `NavigationStack` so pushes
 /// (Contact Detail, Edit, Transparency, …) stay local to the tab.
 struct RegardsTabRoot: View {
-    let env: AppEnvironment
+    let runtime: AppRuntime
     @State private var navigation = RegardsNavigationState()
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
@@ -117,12 +121,72 @@ struct RegardsTabRoot: View {
     @Namespace private var upcomingContactTransition
     @Namespace private var contactsContactTransition
 
-    init(env: AppEnvironment) {
-        self.env = env
-        self._overdueVM = State(initialValue: OverdueViewModel(contacts: env.contacts))
-        self._upcomingVM = State(initialValue: UpcomingViewModel(contacts: env.contacts))
+    init(runtime: AppRuntime) {
+        self.runtime = runtime
+        self._overdueVM = State(
+            initialValue: Self.makeOverdueViewModel(runtime: runtime)
+        )
+        self._upcomingVM = State(
+            initialValue: Self.makeUpcomingViewModel(runtime: runtime)
+        )
         self._mergeDuplicatesVM = State(
-            initialValue: MergeDuplicatesViewModel(contacts: env.contacts)
+            initialValue: MergeDuplicatesViewModel(contacts: runtime.environment.contacts)
+        )
+    }
+
+    // MARK: - View model composition
+    //
+    // These factories each have one production call site, below the repo's
+    // three-call-site bar for extracting a helper. They stay anyway, and the
+    // justification is specific rather than stylistic: composition is the
+    // thing being tested. `AppRuntimeTests` calls every one of them to prove
+    // the production runtime injects the persisted window (R9a), shares one
+    // clock across screens, and never retains mock timing — assertions that
+    // are impossible to make against a view model constructed inline inside a
+    // `State` initializer, because no test can reach it. Inlining these would
+    // trade a named seam for silently untested composition, which is how R9
+    // survived as long as it did. Each factory is also the single place a new
+    // dependency has to be threaded, so a missed injection fails in one
+    // place instead of two.
+
+    @MainActor
+    static func makeOverdueViewModel(runtime: AppRuntime) -> OverdueViewModel {
+        OverdueViewModel(
+            contacts: runtime.environment.contacts,
+            clock: runtime.clock,
+            calendar: runtime.userCalendar
+        )
+    }
+
+    @MainActor
+    static func makeUpcomingViewModel(runtime: AppRuntime) -> UpcomingViewModel {
+        UpcomingViewModel(
+            contacts: runtime.environment.contacts,
+            reminders: runtime.environment.reminders,
+            window: runtime.window,
+            clock: runtime.clock
+        )
+    }
+
+    @MainActor
+    static func makeAllContactsViewModel(runtime: AppRuntime) -> AllContactsViewModel {
+        AllContactsViewModel(
+            contacts: runtime.environment.contacts,
+            clock: runtime.clock
+        )
+    }
+
+    @MainActor
+    static func makeContactDetailViewModel(
+        contactId: UUID,
+        runtime: AppRuntime
+    ) -> ContactDetailViewModel {
+        ContactDetailViewModel(
+            contactId: contactId,
+            contacts: runtime.environment.contacts,
+            interactionsRepo: runtime.environment.interactions,
+            clock: runtime.clock,
+            calendar: runtime.userCalendar
         )
     }
 
@@ -235,7 +299,7 @@ struct RegardsTabRoot: View {
     private var contactsRoot: some View {
         NavigationStack(path: $navigation.contactsPath) {
             AllContactsScreen(
-                env: env,
+                viewModel: Self.makeAllContactsViewModel(runtime: runtime),
                 searchText: $navigation.contactsSearchText
             )
             .navigationDestination(for: UUID.self) { contactId in
@@ -281,9 +345,10 @@ struct RegardsTabRoot: View {
     @ViewBuilder
     private func contactDetail(for contactId: UUID) -> some View {
         ContactDetailScreen(
-            contactId: contactId,
-            contacts: env.contacts,
-            interactionsRepo: env.interactions
+            viewModel: Self.makeContactDetailViewModel(
+                contactId: contactId,
+                runtime: runtime
+            )
         )
     }
 }
@@ -304,5 +369,5 @@ private struct RegardsTabBarBehavior: ViewModifier {
 }
 
 #Preview("Tab root") {
-    RegardsTabRoot(env: AppEnvironment.makeMock())
+    RegardsTabRoot(runtime: .makeMock())
 }

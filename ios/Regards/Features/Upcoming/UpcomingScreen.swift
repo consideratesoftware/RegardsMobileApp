@@ -77,12 +77,17 @@ public struct UpcomingScreen: View {
         case .loaded where viewModel.groups.isEmpty:
             empty
         case .loaded:
+            let transitionSources = viewModel.transitionSourceRowIDs
             ForEach(Array(viewModel.groups.enumerated()), id: \.offset) { _, group in
                 SectionHeader(group.header)
                 RegardsCard {
                     VStack(spacing: 0) {
                         ForEach(Array(group.rows.enumerated()), id: \.element.id) { idx, row in
-                            UpcomingRow(row: row, onTap: { onTapContact(row.contactId) })
+                            UpcomingRow(
+                                row: row,
+                                ownsTransitionSource: transitionSources.contains(row.id),
+                                onTap: { onTapContact(row.contactId) }
+                            )
                             if idx < group.rows.count - 1 {
                                 Hair(inset: 68)
                             }
@@ -125,6 +130,9 @@ public struct UpcomingScreen: View {
 
 struct UpcomingRow: View {
     let row: UpcomingRowState
+    /// Only one row per contact may declare the zoom source; see
+    /// `UpcomingViewModel.transitionSourceRowIDs`.
+    let ownsTransitionSource: Bool
     let onTap: () -> Void
 
     var body: some View {
@@ -168,7 +176,7 @@ struct UpcomingRow: View {
         // specifically (vs. nav-bar actions or segmented-control
         // buttons that also live on this screen).
         .accessibilityIdentifier("upcoming.row")
-        .regardsContactTransitionSource(id: row.contactId)
+        .regardsContactTransitionSource(id: row.contactId, isActive: ownsTransitionSource)
     }
 
     private var nameAndTag: some View {
@@ -197,10 +205,7 @@ struct UpcomingRow: View {
             .monospacedDigit()
     }
 
-    private var accessibilityLabel: String {
-        let what = row.kind == .cadence
-            ? (row.cadenceText ?? "")
-            : String(describing: row.kind)
-        return "\(row.name), \(what) at \(row.timeOfDayText)"
-    }
+    // The label is derived on `UpcomingRowState` so it can be asserted in unit
+    // tests without instantiating the view.
+    private var accessibilityLabel: String { row.accessibilityLabel }
 }

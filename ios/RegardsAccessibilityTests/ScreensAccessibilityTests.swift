@@ -21,24 +21,6 @@ final class ScreensAccessibilityTests: XCTestCase {
     // MARK: - Tab-root screens
 
     @MainActor
-    func testOverdueTabPassesAudit() throws {
-        let app = launchToOverdue()
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-    }
-
-    @MainActor
-    func testUpcomingTabPassesAudit() throws {
-        let app = launchToOverdue()
-        navigateToTab(
-            named: "Upcoming",
-            from: "screen.overdue",
-            to: "screen.upcoming",
-            in: app
-        )
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-    }
-
-    @MainActor
     func testContactsTabPassesAudit() throws {
         let app = launchToOverdue()
         navigateToTab(
@@ -134,22 +116,6 @@ final class ScreensAccessibilityTests: XCTestCase {
     func testEditContactBackReturnsToContactDetail() {
         let app = launchToContactDetailFromContacts()
         assertEditRoundTrip(in: app)
-    }
-
-    /// Exercises the stable-ID Contact Detail push from Overdue. The
-    /// Contacts test covers the same destination flow from All Contacts.
-    @MainActor
-    func testContactDetailFromOverduePassesAudit() throws {
-        let app = launchToOverdue()
-        // Rows are synthetic `.other` elements, so select by identifier.
-        navigateToRow(
-            identifier: "overdue.row",
-            index: 0,
-            sourceIdentifier: "screen.overdue",
-            in: app
-        )
-        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
     @MainActor

@@ -15,10 +15,12 @@ public struct MockRepositories: Sendable {
 
     public init(
         now: Date = MockRepositories.defaultNow,
+        window: ReminderWindow = MockRepositories.defaultWindow,
         includeDuplicateFixture: Bool = false
     ) {
         let store = MockStore(
             now: now,
+            window: window,
             includeDuplicateFixture: includeDuplicateFixture
         )
         self.contacts = MockContactRepository(store: store)
@@ -37,6 +39,10 @@ public struct MockRepositories: Sendable {
         comps.timeZone = TimeZone(identifier: "Asia/Kolkata")
         return Calendar(identifier: .gregorian).date(from: comps) ?? Date()
     }()
+
+    public static let defaultWindow = ReminderWindow.defaultV1(
+        timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current
+    )
 }
 
 // MARK: - Shared in-memory store
@@ -50,8 +56,8 @@ actor MockStore {
     var window: ReminderWindow
     var profile: UserProfile
 
-    init(now: Date, includeDuplicateFixture: Bool) {
-        self.window = ReminderWindow.defaultV1(timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current)
+    init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
+        self.window = window
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
                                     entitlementTier: .trial,
                                     entitlementRefreshedAt: now)
@@ -62,6 +68,160 @@ actor MockStore {
         ) {
             self.contacts[contact.id] = contact
         }
+
+        let representative = Self.seedRepresentativeStates(
+            now: now,
+            window: window,
+            contacts: contacts
+        )
+        contacts = representative.contacts
+        groups = representative.groups
+        reminders = representative.reminders
+        interactions = representative.interactions
+    }
+
+    /// Phase 0 deliberately renders representative persisted states so the
+    /// corresponding UI does not exist only as unreachable implementation:
+    /// a virtual merge marker, recent interactions, and both occasion tags.
+    /// Production scheduling still belongs to TF-07; these rows are local
+    /// in-memory fixtures only.
+    private nonisolated static func seedRepresentativeStates(
+        now: Date,
+        window: ReminderWindow,
+        contacts seededContacts: [UUID: Contact]
+    ) -> (
+        contacts: [UUID: Contact],
+        groups: [UUID: ContactGroup],
+        reminders: [UUID: ScheduledReminder],
+        interactions: [UUID: InteractionLog]
+    ) {
+        let day: TimeInterval = 86_400
+        var contacts = seededContacts
+        var groups: [UUID: ContactGroup] = [:]
+        var reminders: [UUID: ScheduledReminder] = [:]
+        var interactions: [UUID: InteractionLog] = [:]
+
+        if var leia = contacts.values.first(where: { $0.systemContactRef == "sys-leia" }) {
+            let group = ContactGroup(
+                displayName: "Leia Organa",
+                primaryContactId: leia.id,
+                createdAt: now.addingTimeInterval(-day * 120),
+                createdBy: .suggestionAccepted
+            )
+            groups[group.id] = group
+            leia.contactGroupId = group.id
+            contacts[leia.id] = leia
+
+            let archivedDuplicate = Contact(
+                systemContactRef: "sys-leia-archived-duplicate",
+                displayName: "Leia Organa",
+                tracked: false,
+                priorityTier: .innerCircle,
+                preferredChannel: .email,
+                preferredChannelValue: "leia@alderaan.example",
+                contactGroupId: group.id,
+                createdAt: now.addingTimeInterval(-day * 400),
+                archivedAt: now.addingTimeInterval(-day * 90)
+            )
+            contacts[archivedDuplicate.id] = archivedDuplicate
+
+            let recent = InteractionLog(
+                contactId: leia.id,
+                occurredAt: now.addingTimeInterval(-day * 23),
+                source: .reminderCaughtUp,
+                channel: .whatsapp
+            )
+            let earlier = InteractionLog(
+                contactId: leia.id,
+                occurredAt: now.addingTimeInterval(-day * 58),
+                source: .manual,
+                channel: .phoneCall
+            )
+            interactions[recent.id] = recent
+            interactions[earlier.id] = earlier
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = window.timeZone
+        let startOfToday = calendar.startOfDay(for: now)
+
+        if let shmi = contacts.values.first(where: { $0.systemContactRef == "sys-shmi" }),
+           let birthdayTime = Self.occasionInstant(
+               daysAfter: startOfToday,
+               offset: 1,
+               hour: 9,
+               calendar: calendar
+           ) {
+            let birthday = ScheduledReminder(
+                contactId: shmi.id,
+                kind: .birthday,
+                occasionDate: Self.monthDayString(for: birthdayTime, calendar: calendar),
+                occasionLabel: "Birthday",
+                scheduledFor: birthdayTime,
+                osNotificationId: "contact-\(shmi.id.uuidString)-\(ReminderKind.birthday.rawValue)"
+            )
+            reminders[birthday.id] = birthday
+        }
+
+        if let obiWan = contacts.values.first(where: { $0.systemContactRef == "sys-obiwan" }),
+           let anniversaryTime = Self.occasionInstant(
+               daysAfter: startOfToday,
+               offset: 4,
+               hour: 9,
+               calendar: calendar
+           ) {
+            let anniversary = ScheduledReminder(
+                contactId: obiWan.id,
+                kind: .anniversary,
+                occasionDate: Self.monthDayString(for: anniversaryTime, calendar: calendar),
+                occasionLabel: "Jedi Order anniversary",
+                scheduledFor: anniversaryTime,
+                osNotificationId: "contact-\(obiWan.id.uuidString)-\(ReminderKind.anniversary.rawValue)"
+            )
+            reminders[anniversary.id] = anniversary
+        }
+
+        return (contacts, groups, reminders, interactions)
+    }
+
+    /// The seeded occasion instant `offset` days after `startOfToday`, at the
+    /// given local `hour`.
+    ///
+    /// `date(bySettingHour:)` is `Optional`, and the seeding used to sit
+    /// inside an `if let` chain that silently dropped the birthday and
+    /// anniversary whenever it returned nil. That would make the
+    /// representative occasion states R34 exists to guarantee unreachable and
+    /// unauditable, with no failure anywhere to say so.
+    ///
+    /// Measured on a real DST gap (US Pacific, 2026-03-08, hour 2): the API
+    /// does not return nil — it forgives the missing hour and snaps forward to
+    /// 03:00. So this is a defensive guard against API surface rather than a
+    /// reproduced drop. It stays because the seeds must never depend on that
+    /// leniency: fall forward to the first instant that does exist, and fall
+    /// back to the day start if even that fails.
+    nonisolated static func occasionInstant(
+        daysAfter startOfToday: Date,
+        offset: Int,
+        hour: Int,
+        calendar: Calendar
+    ) -> Date? {
+        guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else {
+            return nil
+        }
+        if let exact = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) {
+            return exact
+        }
+        return calendar.nextDate(
+            after: day,
+            matching: DateComponents(hour: hour, minute: 0, second: 0),
+            matchingPolicy: .nextTime,
+            direction: .forward
+        ) ?? day
+    }
+
+    private nonisolated static func monthDayString(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.month, .day], from: date)
+        return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
     }
 
     static func seedCast(
@@ -76,7 +236,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 14,
                 priorityTier: .innerCircle,
                 preferredChannel: .whatsapp,
-                preferredChannelValue: "+91 98765 43210",
+                preferredChannelValue: "+1 415 555 0140",
                 lastInteractedAt: now.addingTimeInterval(-day * 23),
                 notes: "Son is Ben. Ask about the diplomatic posting on Chandrila."),
             Contact(
@@ -109,7 +269,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 30,
                 priorityTier: .regular,
                 preferredChannel: .whatsapp,
-                preferredChannelValue: "+234 809 555 0122",
+                preferredChannelValue: "+1 415 555 0141",
                 lastInteractedAt: now.addingTimeInterval(-day * 28)),
             Contact(
                 systemContactRef: "sys-anakin",
@@ -125,7 +285,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 42,
                 priorityTier: .regular,
                 preferredChannel: .signal,
-                preferredChannelValue: "+92 300 5550132",
+                preferredChannelValue: "+1 415 555 0142",
                 lastInteractedAt: now.addingTimeInterval(-day * 42)),
             Contact(
                 systemContactRef: "sys-shmi",
@@ -141,7 +301,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 90,
                 priorityTier: .regular,
                 preferredChannel: .email,
-                preferredChannelValue: "obiwan@jeditemple.org",
+                preferredChannelValue: "obiwan@jeditemple.example",
                 lastInteractedAt: now.addingTimeInterval(-day * 84)),
             Contact(
                 systemContactRef: "sys-ahsoka",
@@ -149,7 +309,7 @@ actor MockStore {
                 tracked: true, cadenceDays: 90,
                 priorityTier: .close,
                 preferredChannel: .phoneCall,
-                preferredChannelValue: "+91 98100 00000",
+                preferredChannelValue: "+1 415 555 0143",
                 lastInteractedAt: now.addingTimeInterval(-day * 87)),
         ]
         if includeDuplicateFixture {

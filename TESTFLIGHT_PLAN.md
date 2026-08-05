@@ -13,18 +13,21 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-08-04
-- Baseline: `main` at `3e391c6` (merged GitHub PR #38 R49 repair)
-- Active work: `TF-01` PR19 CI/reproducibility slice on
-  `codex/tf-01-ci-repro`
+- Baseline: `main` at `bbd7c93` (merged Android-only GitHub PR #41); the latest
+  iOS source change is `87fa055` (merged GitHub PR #40)
+- Active work: `TF-01` PR19 mock and code-hygiene slice on
+  `codex/tf-01-mock-hygiene`, published as ready GitHub PR #42 and synchronized
+  with current `main`.
 - Next ready work: none (`TF-02` follows completed `TF-01`)
-- Open pull request: GitHub PR #39 (`codex/tf-01-ci-repro`, ready; hosted
-  feedback repair committed locally; exact-head local and hosted reviews plus
-  required checks must approve before merge; auto-merge off)
-- Internal TestFlight gate: after `TF-08`
+- Open TF pull request: GitHub PR #42 (ready; local staged review repairs and
+  hosted checks in progress; auto-merge off). GitHub PR #39 merged as
+  `ade40e3`; GitHub PR #41 merged as `bbd7c93` on the separate Android track
+  and is not TF work.
+- Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. The CI/reproducibility slice is agent-owned;
+- Owner action needed now: none. The mock/code-hygiene slice is agent-owned;
   no product, legal, signing, or App Store decision is required.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
@@ -55,9 +58,11 @@ Every fresh or scheduled agent run follows this order:
    failed on the current `main`, triage that failure before taking new feature
    work and create the smallest repair PR when it is reproducible. Otherwise
    take the first `READY` item whose dependencies are `DONE`.
-6. Work on exactly one queue item. Use a branch named after its stable ID, keep
-   the diff reviewable, meet its architecture acceptance criteria, and include
-   its `TF-##`, §14 scope alias, and R-items in the pull-request body.
+6. Maintain at most three implementation lanes, and start a lane only when every
+   dependency listed in this queue is `DONE`. Use linked worktrees for
+   independent lanes and stacked pull requests within a dependent lane. Keep
+   each diff reviewable and include its `TF-##`, §14 scope alias, and R-items
+   in the pull-request body. Review and CI monitoring do not consume a lane.
 7. Run proportionate local checks before push. Every pull request must pass the
    repository gates and `$regards-pr-review` (or `/pr-review`) before merge.
 8. Update this checkpoint in the same pull request. Never mark an item `DONE`
@@ -90,8 +95,8 @@ consciously defer every blocker before merging. It must not:
 - invent signing, legal, pricing, privacy-label, or App Store answers;
 - upload a build, change App Store Connect, contact testers, publish content,
   or perform a physical-device check without the required owner access;
-- start a second work item while another branch, worktree, or pull request is
-  unresolved.
+- exceed the three-lane implementation WIP limit or bypass an explicit queue
+  dependency. Review and CI monitoring may continue alongside all three lanes.
 
 When an owner-only action blocks the next acceptance criterion, mark the item
 `OWNER`, write one exact checklist under `Owner gates`, and continue any
@@ -105,7 +110,8 @@ The first internal build is useful when production storage and import are live,
 the core caught-up/snooze flow persists, reminder windows shape persisted
 notifications, notification actions round-trip, deep links execute, onboarding
 has grant and denial paths, all visible controls are real, and CI plus the
-structural accessibility audit are green. That is the exit of `TF-08`.
+structural accessibility audit are green. Both `TF-08` and `TF-11` must be
+`DONE` before this internal gate opens.
 
 The owner then supplies signing/App Store access and performs the device-only
 checks. Internal feedback may add P0/P1 fixes ahead of `TF-09`; it does not
@@ -128,28 +134,55 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: finish the still-open doc/audit/CI/package/mock-seed work; adopt the latest stable iOS composition with explicit fallbacks; current-state prose and checks agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
+| TF-01 | ACTIVE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
 | TF-02 | BLOCKED | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs | PR20; R23, R39 |
-| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, and per-row import tolerance | PR21; R35 |
-| TF-04 | BLOCKED | TF-03 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
+| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35 |
+| TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
-| TF-06 | BLOCKED | TF-05 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |
-| TF-07 | BLOCKED | TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved | PR25; R4–R6, R10–R11, R24 |
+| TF-06 | BLOCKED | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |
+| TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved | PR25; R4–R6, R10–R11, R24 |
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; interaction logging and routing tests pass | PR26; R11, R37 |
-| TF-09 | BLOCKED | TF-08 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
-| TF-10 | BLOCKED | TF-09 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
-| TF-11 | BLOCKED | TF-10 | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls | PR29; R11, R14 |
-| TF-12 | BLOCKED | TF-11 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
+| TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
+| TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
+| TF-11 | BLOCKED | TF-03, TF-06 | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls | PR29; R11, R14 |
+| TF-12 | BLOCKED | TF-09, TF-10 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
 | TF-13 | BLOCKED | TF-12 | Widget target and App Group migration preserve the DB; read-only small/medium/lock widgets refresh from SchedulingPass | PR31 |
-| TF-14 | BLOCKED | TF-13 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
-| TF-15 | BLOCKED | TF-14 | Settings export/delete/support/transparency/entitlement surfaces work; JSON covers every table and delete returns to onboarding | PR33; R11, R15 |
-| TF-16 | BLOCKED | TF-15 | Full accessibility categories and 5× stress pass, snapshot gate, contrast registry, privacy required-reason entries, category/export keys, and Dynamic Type smoke | PR34; R18, R41, R44 |
-| TF-17 | BLOCKED | TF-16 | 5k-contact path is off the cooperative pool and meets the device budget; strings/copy and launch polish are complete | PR35; R25 |
-| TF-18 | BLOCKED | TF-17 | Clean archive, monotonic build number, internal feedback triage, device matrix, privacy/network evidence, beta metadata, signing, upload, processing, and external-group approval | §20 release playbook |
+| TF-14 | BLOCKED | TF-02, TF-11 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
+| TF-15 | BLOCKED | TF-11, TF-13, TF-14 | Settings export/delete/support/transparency/entitlement surfaces work; JSON covers every table and delete returns to onboarding | PR33; R11, R15 |
+| TF-16 | BLOCKED | TF-08, TF-09, TF-15, TF-17 | Full accessibility categories and 5× stress pass, snapshot gate, contrast registry, privacy required-reason entries, category/export keys, and Dynamic Type smoke | PR34; R18, R41, R44 |
+| TF-17 | BLOCKED | TF-15 | String Catalog, final copy, and launch polish are complete before snapshot and accessibility baselines freeze | PR35 |
+| TF-18 | BLOCKED | TF-16 | Clean archive, monotonic build number, internal feedback triage, A15 performance confirmation, device matrix, privacy/network evidence, beta metadata, signing, upload, processing, and external-group approval | §20 release playbook |
 
 `BLOCKED` in this queue normally means “waiting on the listed dependency,” not
 an implementation problem. Promote the next item to `READY` when its dependency
-is merged.
+is merged. The owner-authorized default implementation WIP limit is three, but
+the current dependency column remains authoritative until a reviewed DAG change
+promotes independent items. Linked worktrees isolate independent lanes;
+dependent changes use stacked pull requests in one lane.
+
+### Three-lane dependency waves
+
+The queue is a dependency graph, not a blanket sequence. A lane starts as soon
+as its row's dependencies are `DONE`, without waiting for unrelated work in a
+nominal wave. Expected concurrency is: TF-02 alone; TF-03 + TF-04; then TF-03
+may continue while TF-05 + TF-06 occupy the other two lanes; TF-07 + TF-11;
+TF-08 with TF-14 when ready; TF-09 + TF-10 + TF-14; TF-12 with TF-14 when
+needed; then the TF-13 → TF-15 → TF-17 → TF-16 → TF-18 joins. Joins branch
+from the combined current `main`, never from only one parent. Independent
+siblings use separate linked worktrees. Stacks are reserved for real
+dependency edges and are rebased and retargeted to `main` after their parent
+merges.
+
+Treat shared schema/location transitions and high-collision composition as
+locks, not artificial global dependencies. Only one lane may own a schema or
+database-location transition. Coordinate ownership before concurrent edits to
+`AppEnvironment`, `RegardsApp`, repository/migration files, SchedulingPass,
+Upcoming/Overdue/Contact Detail, Onboarding/Settings, `project.yml` and its
+generated Xcode project, shared accessibility helpers, or execution docs.
+Simulator-heavy gates run serially unless lanes use distinct simulator clones
+and DerivedData paths. A staged six-role review may temporarily consume all
+subagent capacity; implementation lanes yield at a filesystem-safe checkpoint
+and resume after review consolidation.
 
 ### TF-01 serial chain
 
@@ -196,22 +229,246 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    Motion off, and Increased Contrast off after the smoke. Exact-main iOS CI
    run `30858964352`, including the one-run accessibility audit, and 5× stress
    run `30858964211` both passed after merge.
-6. ACTIVE: finish the bounded PR19 CI and reproducibility scope in GitHub PR
-   #39: commit
-   `Package.resolved`, remove placeholders, extend root Markdown checks, add
-   the Domain coverage floor, remove the dead SwiftLint `function_body_length`
-   configuration and stale audit-stress comment, and reconcile merge-method
-   documentation.
-7. Finish mock and code hygiene: seed group, interaction, and occasion states;
-   use stable Upcoming row IDs; remove or wire dead assets and comments; prune
-   obsolete worktrees and merged branches after exact-target verification.
+6. DONE: GitHub PR #39 merged as `ade40e3`, closing R19, R21, R22, R31, and
+   R33. It committed `Package.resolved`, removed the ownerless placeholders,
+   extended root Markdown checks, installed a fail-closed 95% Domain coverage
+   floor (96.88% on the merged head), removed dead SwiftLint configuration,
+   and reconciled audit and merge-method documentation. Exact-head iOS CI run
+   `30870019501`, hosted review run `30870018471`, and every required check
+   passed. Post-merge iOS CI run `30870432645` and 5× stress run
+   `30870432634` also passed.
+7. ACTIVE in ready GitHub PR #42 on `codex/tf-01-mock-hygiene`: seed representative group,
+   interaction, and occasion states; use stable Upcoming row IDs; remove dead
+   assets and correct their comments. These are pending R34/R36/R40 closures,
+   not closed until the follow-up merges. R30 remains open: 18 merged remote
+   and 38 merged local branches were removed and automatic source-branch
+   deletion was enabled, but the live `crazy-franklin-75fc28` worktree still
+   contains 32 untracked files and `codex/pr24-pre-stack-rebase-20260730` has
+   three patch-inequivalent commits. `git worktree prune --dry-run --verbose`
+   finds nothing safely prunable. The patch-equivalent Android branch and
+   empty `.git/t9FBrGy` are removable only after their active worktree is
+   switched and the exact targets are rechecked; unique work stays preserved.
+   Current-source evidence on the pinned iOS 26.5 iPhone 17 Pro: all 175 unit
+   tests pass; the Overdue, Upcoming, Contact Detail representative-state
+   audits and `testAccessibility5AdaptiveContentDoesNotOverlap` pass; strict
+   SwiftLint, privacy/domain/Android guards, source-boundary fixtures, review
+   parity, workflow YAML, diff checks, and temporary-copy XcodeGen determinism
+   pass. Accessibility Inspector targeted the final Regards process and
+   reported no warnings; hierarchy traversal confirmed the merged-contact,
+   birthday, anniversary, and combined interaction narration. The simulator
+   remained at large text with Reduce Motion and Increased Contrast off after
+   the smoke.
+
+   Hosted-review repair (2026-08-04, verdict REQUEST_CHANGES on `44ba20a`:
+   1 blocker, 6 should-fix, 9 nits). Owner directed clearing the blocker and
+   every should-fix and leaving the nits. Closures:
+
+   - Blocker (`pr-tests`, ARCHITECTURE.md §13 "and failures"):
+     `UpcomingViewModelStateTests` now drives `loadState == .failed` from a
+     throwing contact fetch, from a throwing `fetchAllPending()` — the branch
+     `fetchAllPending` newly made reachable — and after a successful load, each
+     asserting empty groups and `totalCount == 0`. §13 names the suite instead
+     of claiming coverage generically.
+   - §9 contract 6 no-double-up: owner directed deferral to TF-07. The
+     deviation is now explicit at the `buildRows` call site and in
+     ARCHITECTURE.md §9 contract 6, both naming `SchedulingPass` (PR25 / TF-07,
+     R6) as the owner and noting the rows keep distinct IDs (R36) meanwhile.
+   - Spoken occasion label: the derivation moved off the view onto
+     `UpcomingRowState.accessibilityLabel`, so it is assertable without
+     instantiating `UpcomingRow`. Tests pin "Leia Organa, Jedi Order
+     anniversary at {time}" verbatim, assert the raw `customOccasion` case name
+     is absent, cover the cadence row, and cover the text-less row.
+   - Duplicate fakes: `BoundaryReminderRepository` and
+     `StaticReminderRepository` collapsed into
+     `RegardsTests/Support/RepositoryFakes.swift`
+     (`StubContactRepository`/`StubReminderRepository`, each with a `failing()`
+     variant), reused by both files.
+   - Coverage holes: a zero-capacity window drops cadence rows but keeps
+     occasion rows; an untracked contact's pending occasion never reaches
+     Upcoming; `Contact+Accessibility`'s `isVirtualMerged` branch gets direct
+     Domain tests for tracked/untracked and inner-circle/acquaintance in the
+     new `ContactMergeAccessibilityTests` (split out to keep
+     `ContactAccessibilityTests` under the type-body-length limit).
+
+   Repair evidence on the pinned iOS 26.5 iPhone 17 Pro: 187 unit tests pass
+   (was 175); Domain coverage 843/870 lines = 96.90% against the 95% floor;
+   strict SwiftLint zero violations across 82 files; domain-purity,
+   no-network, Android domain/manifest/network, and review-parity guards pass;
+   XcodeGen regenerated and deterministic. Focused XCUI
+   `testUpcomingTabPassesAudit`, `testOverdueTabPassesAudit`, and
+   `testContactDetailFromUpcomingPassesAudit` pass. One earlier trio run
+   reported `testContactDetailFromUpcomingPassesAudit` as failing with zero
+   test assertions failing: the runner exited during app launch and the
+   harness restarted, which is a runner crash, not a product regression. The
+   test passes in isolation and in the clean rerun.
+
+   Second hosted review (2026-08-04, verdict APPROVE on `b58e9d9`: no
+   blockers, 7 should-fix, 8 nits). Owner directed clearing every should-fix
+   and leaving the nits. Closures:
+
+   - R9 split. `AppRuntime` now composes `UpcomingViewModel` with the
+     persisted window, so the global half is closed as R9a; per-contact
+     override resolution and live refresh stay open as R9b against TF-05.
+     §9 "Per-contact override" prose matches.
+   - The documented §9 contract-6 deviation is now pinned by a test: one
+     contact with both a cadence-eligible slot and a same-local-day occasion
+     yields two rows with non-colliding IDs. TF-07 replaces the expectation
+     with suppression.
+   - `load()`'s two independent awaits are documented as accepted, one-frame,
+     self-healing staleness, with the invariant TF-07's `ValueObservation`
+     swap must preserve stated explicitly.
+   - §13 attributes representative-state and stable-identity coverage to
+     `MockRepositoriesTests`, boundaries to `UpcomingViewModelBoundaryTests`,
+     and off-happy-path states to `UpcomingViewModelStateTests`.
+   - `navigateToRow` polls for hittability before scrolling and adds a bounded
+     scroll-back, so a row that is on screen but not yet settled is no longer
+     scrolled out of the viewport. All six dependent XCUI regressions were run
+     locally: `testContactDetailFromOverduePassesAudit`,
+     `testContactDetailFromUpcomingPassesAudit`,
+     `testEditContactBackReturnsToOverdueContactDetail`,
+     `testEditContactBackReturnsToUpcomingContactDetail`,
+     `testOverdueNavigationShowsDistinctContacts`, and
+     `testUnavailableActionsAreDescribedAndNoninteractive`.
+   - Occasion seeding routes through `MockStore.occasionInstant`, which
+     handles a nil wall-clock instant instead of silently dropping the
+     birthday and anniversary. Measured finding worth recording: the reported
+     DST-gap drop does not reproduce — `date(bySettingHour:)` forgives a
+     skipped hour and snaps forward (verified on US Pacific 2026-03-08, hour
+     2), so the guard is defensive against API surface, not a fixed bug. The
+     tests assert the invariant the seeds actually depend on: both occasions
+     seed across four DST-transition days in three zones.
+   - `ContactDetailScreen.interactionAccessibilityLabel` moved onto
+     `InteractionEntry.accessibilityLabel`, matching the
+     `UpcomingRowState.accessibilityLabel` move, and gained four unit tests
+     including one over every `InteractionSource`.
+
+   Second-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 195 unit tests
+   pass (was 187); Domain coverage holds at 843/870 = 96.90%; strict SwiftLint
+   zero violations across 84 files.
+
+   Third hosted review (2026-08-05, verdict APPROVE on `c4fb052`: no blockers,
+   4 should-fix, 7 nits). Owner directed clearing every should-fix. Two of the
+   four were defects this slice's own work exposed:
+
+   - `matchedTransitionSource` was keyed by contact id while this slice's seeds
+     and the documented §9 contract-6 deviation let one contact hold both a
+     cadence and an occasion row inside the horizon. Two rows therefore
+     declared the same id in one namespace and the zoom into Contact Detail
+     resolved against an arbitrary row. `UpcomingViewModel` now elects one
+     owner per contact in display order, the row modifier takes an `isActive`
+     flag, and two tests assert exactly one owner per contact — including in
+     the duplicate case.
+   - The consolidated `StubContactRepository.fetchTracked()` filtered on
+     `tracked` alone while both production implementations also exclude
+     `archivedAt != nil`. Since that fake now backs the whole Upcoming suite,
+     an archived-but-tracked contact would have kept rows in every fake-driven
+     test — the exact R23 mock/production drift. Filter aligned, regression
+     added.
+   - The horizon-end fallback collapsed to `now`, which silently empties the
+     screen and is indistinguishable from "nothing upcoming". It now degrades
+     to elapsed time: a visible superset instead of a hidden subset.
+   - The `make*ViewModel` factories keep their single production call site
+     with a written justification: `AppRuntimeTests` calls each one to prove
+     window injection (R9a), shared clock, and no retained mock timing, and
+     none of that is reachable against a view model constructed inline inside
+     a `State` initializer. Inlining would trade a named seam for silently
+     untested composition, which is how R9 survived.
+
+   Third-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 197 unit tests
+   pass (was 195); Domain coverage holds at 96.90%; strict SwiftLint zero
+   violations across 84 files.
+
+   Fourth hosted review (2026-08-05, verdict APPROVE on `fb8176a`: no
+   blockers, 7 should-fix, 7 nits). Owner standing direction is to clear every
+   should-fix. Closures:
+
+   - `UpcomingViewModel.init` no longer defaults `reminders:` or `window:`. A
+     defaulted window is exactly how R9 shipped — a call site that forgot to
+     inject the persisted window fell back to `.defaultV1()` and the feature
+     became fiction with nothing failing. A missed injection is now a compile
+     error. Four test call sites updated.
+   - `StubReminderRepository` filters on `state == .pending` like both
+     production repositories, with a parametric regression over every
+     `ReminderState` proving a fired, cancelled, or caught-up reminder keeps
+     no row.
+   - `transitionSourceRowIDs` gains the cross-day-group case: one contact
+     whose cadence and occasion rows land in different sections still elects
+     exactly one owner, and the non-owning row keeps its tap target.
+   - The shipped mock fixture is now guarded against silently reintroducing a
+     §9 contract-6 same-day duplicate through a future offset edit.
+   - Seeded occasion `osNotificationId`s use the §9 contract-5
+     `contact-{uuid}-{kind}` identity instead of a mock-only shape TF-07's
+     reconcile and orphan-cancellation logic would not recognize.
+   - `MockStore.occasionInstant`'s terminal fallback is exercised directly,
+     plus a parametric proof that no plausible seed offset yields nil.
+   - The R24 register row distinguishes ContactDetail's spoken-label coverage
+     from its still-absent VM-behavior suite, so §13 and §19 no longer
+     contradict each other.
+
+   `UpcomingViewModelStateTests` was split: the duplicate-row and
+   transition-source cases moved to `UpcomingViewModelDuplicateRowTests` and
+   the shared contacts, clock, and windows moved to
+   `Support/UpcomingFixtures.swift`, keeping both suites under the
+   type-body-length limit without duplicating fixtures.
+
+   Fourth-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 203 unit tests
+   pass (was 197); Domain coverage holds at 96.90%; strict SwiftLint zero
+   violations across 86 files.
+
+   Fifth hosted review (2026-08-05, verdict APPROVE on `107a9e4`: no blockers,
+   7 should-fix, 10 nits). The first attempt failed closed for an
+   infrastructure reason, not a verdict: the reviewer errored after one turn
+   and produced no artifact, so `require-hosted-review-output.sh` refused to
+   publish. Re-running the failed jobs produced the verdict above.
+
+   Three findings were corrections to this round's own work and are closed:
+
+   - The zero-capacity guard's comment still claimed the window "always has
+     capacity, so nil never happens today". False once R9a made the window
+     caller-supplied, and this slice's own test drives that branch. The
+     comment now says so and warns against deleting the guard as dead code,
+     which would silently reintroduce R4.
+   - `shippedFixtureHasNoSameDayDuplicate` built its window with
+     `.defaultV1(timezone: UTC)` instead of the shipped
+     `MockRepositories.defaultWindow` (Asia/Kolkata), so it did not guard the
+     fixture it claimed to. Now uses the shipped window; still passes.
+   - R9a overclaimed. `AppRuntime.makeProduction` resolves the persisted
+     window, but the shipping app still boots `makeMock`, so the production
+     path has zero callers until TF-02. The register now says what is actually
+     closed — the hardcode and the silent-default hazard — and names the boot
+     flip as TF-02 work, which removes the contradiction with §18.
+
+   Four are consciously deferred, with owners, because they are other queue
+   items' scope rather than this slice's:
+
+   - Threading `isVirtualMerged` into Upcoming and All Contacts rows so a
+     merged contact is announced consistently on every tab. Virtual merge is
+     TF-10's subject (R11–R12); doing it here would mean inventing the
+     grouped-row semantics TF-10 exists to define.
+   - A wiring test for `OverdueViewModel.makeOverdueRow` asserting a
+     non-grouped contact reports `isVirtualMerged == false`. The Domain branch
+     is covered; the missing piece is the Overdue VM's own suite, which R24
+     assigns to TF-04/TF-07.
+   - Strengthening `assertCadenceBoundary` to distinguish calendar-day from
+     elapsed-seconds horizon arithmetic. Worth doing, and it belongs with
+     TF-07's rewrite of this code path rather than as a late addition to a
+     hygiene slice.
+   - Asserting the resulting `occasionDate`/`monthDayString` for Feb-29 and
+     year-crossing offsets in the seeding helper. Annual recurrence is
+     engine-owned and already covered there; the seeding helper's contract is
+     non-nil, which is what its tests assert.
+
+   Fifth-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 203 unit tests
+   still pass with the fixture guard now running under the shipped
+   Asia/Kolkata window.
 
 ## Owner gates
 
 Current gates:
 
-- No owner gate is active. PR #39's local and hosted reviews, publication,
-  required checks, and guarded merge are agent-owned repository work.
+- No owner gate is active. The R34/R36/R40 implementation, verification,
+  publication, and guarded merge are agent-owned. R30 is intentionally open;
+  no unique work may be removed merely to close a hygiene row.
 
 ### PR #24 modernization accessibility evidence
 

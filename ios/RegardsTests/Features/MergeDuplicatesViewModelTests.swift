@@ -171,6 +171,68 @@ struct MergeDuplicatesViewModelTests {
         #expect(viewModel.candidates.first { $0.id == untouchedID } == untouchedBefore)
     }
 
+    @Test("Archived contacts are excluded from duplicate candidates")
+    func archivedContactsAreExcluded() async {
+        let active = Self.duplicateContacts[0]
+        var archived = Self.duplicateContacts[1]
+        archived.archivedAt = Date()
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success([active, archived]),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+
+        #expect(viewModel.candidates.isEmpty)
+    }
+
+    @Test("Members of the same virtual group are excluded")
+    func sameGroupContactsAreExcluded() async {
+        let groupID = UUID()
+        var groupedPrimary = Self.duplicateContacts[0]
+        var groupedMember = Self.duplicateContacts[1]
+        groupedPrimary.contactGroupId = groupID
+        groupedMember.contactGroupId = groupID
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success([groupedPrimary, groupedMember]),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+
+        #expect(viewModel.candidates.isEmpty)
+    }
+
+    @Test("One grouped contact remains eligible against an ungrouped duplicate")
+    func asymmetricGroupMembershipRemainsEligible() async {
+        var grouped = Self.duplicateContacts[0]
+        grouped.contactGroupId = UUID()
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success([grouped, Self.duplicateContacts[1]]),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+
+        #expect(viewModel.candidates.count == 1)
+    }
+
+    @Test("Contacts in different virtual groups remain eligible")
+    func differentGroupContactsRemainEligible() async {
+        var first = Self.duplicateContacts[0]
+        var second = Self.duplicateContacts[1]
+        first.contactGroupId = UUID()
+        second.contactGroupId = UUID()
+        let repository = MergeDuplicatesTestContactRepository(steps: [
+            .success([first, second]),
+        ])
+        let viewModel = MergeDuplicatesViewModel(contacts: repository)
+
+        await viewModel.load()
+
+        #expect(viewModel.candidates.count == 1)
+    }
+
     // MARK: - Loading lifecycle
 
     @Test("A repeated load preserves in-progress duplicate choices")

@@ -60,9 +60,9 @@ audited* table.
 
 ## Contrast-pair registry
 
-PR1 ships the color assets only (Background, Ink, Muted, AccentColor,
-LaunchBackground). Ratios computed from the sRGB values in
-`Regards/Resources/Assets.xcassets/*.colorset/Contents.json`.
+`RegardsPalette` is the single source of truth for rendered design-system
+colors and their sRGB contrast inputs. The asset catalog retains only colors
+used by system-owned surfaces (`AccentColor` and `LaunchBackground`).
 
 | Foreground | Background | Ratio (light) | Ratio (dark) | Required | OK |
 |---|---|---|---|---|---|

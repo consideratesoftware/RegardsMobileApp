@@ -148,6 +148,8 @@ struct RegardsLoadStateTests {
         ])
         let viewModel = UpcomingViewModel(
             contacts: repository,
+            reminders: nil,
+            window: .defaultV1(),
             clock: { Self.now }
         )
 
@@ -193,6 +195,7 @@ struct RegardsLoadStateTests {
         let repository = ScriptedContactRepository(steps: [.success([contact])])
         let viewModel = UpcomingViewModel(
             contacts: repository,
+            reminders: nil,
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -266,7 +269,12 @@ struct RegardsLoadStateTests {
     @Test("Upcoming ignores a stale failed load after a newer load succeeds")
     func upcomingIgnoresStaleFailure() async {
         let repository = ControllableContactRepository()
-        let viewModel = UpcomingViewModel(contacts: repository, clock: { Self.now })
+        let viewModel = UpcomingViewModel(
+            contacts: repository,
+            reminders: nil,
+            window: .defaultV1(),
+            clock: { Self.now }
+        )
 
         let firstLoad = Task { await viewModel.load() }
         await repository.waitForRequestCount(1)
@@ -348,7 +356,12 @@ struct RegardsLoadStateTests {
     @Test("Upcoming keeps loaded content visible while refreshing")
     func upcomingKeepsLoadedContentWhileRefreshing() async {
         let repository = ControllableContactRepository()
-        let viewModel = UpcomingViewModel(contacts: repository, clock: { Self.now })
+        let viewModel = UpcomingViewModel(
+            contacts: repository,
+            reminders: nil,
+            window: .defaultV1(),
+            clock: { Self.now }
+        )
 
         let initialLoad = Task { await viewModel.load() }
         await repository.waitForRequestCount(1)

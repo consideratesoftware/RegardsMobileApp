@@ -148,12 +148,15 @@ release-blocking rather than merge-blocking (ARCHITECTURE.md §10).
 
 Every autonomous run begins with the restart protocol in
 `TESTFLIGHT_PLAN.md`. Resume dirty work and open pull requests before taking a
-new item. Work on one stable `TF-##` item at a time and update its checkpoint
-in the same pull request. Git branches, the worktree, pull-request checks, and
-the plan file are the durable handoff; never depend on chat history. Scheduled
-runs also inspect the latest completed default-branch accessibility audit and
-5× stress workflows. A reproducible failure on current `main` becomes the next
-repair before new feature work.
+new item. Maintain at most three implementation lanes whose listed dependencies
+are complete. Independent lanes use linked worktrees; dependent work stays in
+one lane and may use stacked pull requests. Review, CI monitoring, and comment
+repair do not consume a lane. Update every active lane's checkpoint in its pull
+request. Git branches, worktrees, pull-request checks, and the plan file are
+the durable handoff; never depend on chat history. Scheduled runs also inspect
+the latest completed default-branch accessibility audit and 5× stress
+workflows. A reproducible failure on current `main` becomes the next repair
+before new feature work.
 
 ## PR review
 

@@ -104,7 +104,8 @@ public final class OverdueViewModel {
             now: now,
             effectiveLastInteractedAt: contact.lastInteractedAt,
             isOverdue: overdueDays > 0,
-            overdueDays: overdueDays
+            overdueDays: overdueDays,
+            isVirtualMerged: contact.contactGroupId != nil
         )
 
         return OverdueRowState(

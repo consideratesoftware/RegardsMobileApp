@@ -10,18 +10,6 @@ public struct ContactDetailScreen: View {
         self._viewModel = State(initialValue: viewModel)
     }
 
-    public init(contactId: UUID,
-                contacts: any ContactRepository,
-                interactionsRepo: any InteractionRepository) {
-        self.init(
-            viewModel: ContactDetailViewModel(
-                contactId: contactId,
-                contacts: contacts,
-                interactionsRepo: interactionsRepo
-            )
-        )
-    }
-
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -263,6 +251,9 @@ public struct ContactDetailScreen: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(interactionAccessibilityLabel(entry))
+                            .accessibilityIdentifier("contact-detail.interaction-row")
                             if idx < viewModel.interactions.count - 1 {
                                 Hair(inset: 16)
                             }
@@ -271,6 +262,14 @@ public struct ContactDetailScreen: View {
                 }
             }
         }
+    }
+
+    // The label is derived on `InteractionEntry` so it can be asserted in unit
+    // tests without instantiating the view.
+    private func interactionAccessibilityLabel(
+        _ entry: ContactDetailViewModel.InteractionEntry
+    ) -> String {
+        entry.accessibilityLabel
     }
 
     private func notesCard(contact: Contact) -> some View {

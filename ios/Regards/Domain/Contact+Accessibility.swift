@@ -12,15 +12,18 @@ public extension Contact {
         public let effectiveLastInteractedAt: Date?
         public let isOverdue: Bool
         public let overdueDays: Int
+        public let isVirtualMerged: Bool
 
         public init(now: Date,
                     effectiveLastInteractedAt: Date?,
                     isOverdue: Bool,
-                    overdueDays: Int) {
+                    overdueDays: Int,
+                    isVirtualMerged: Bool = false) {
             self.now = now
             self.effectiveLastInteractedAt = effectiveLastInteractedAt
             self.isOverdue = isOverdue
             self.overdueDays = overdueDays
+            self.isVirtualMerged = isVirtualMerged
         }
     }
 
@@ -33,6 +36,10 @@ public extension Contact {
     /// today / yesterday / N days ago / N weeks ago / N months ago / N years ago.
     func accessibilityLabel(context: AccessibilityContext) -> String {
         var parts: [String] = [displayName]
+
+        if context.isVirtualMerged {
+            parts.append("merged contact")
+        }
 
         if !tracked {
             parts.append("not tracked")
