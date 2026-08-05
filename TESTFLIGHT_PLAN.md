@@ -346,6 +346,38 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    pass (was 187); Domain coverage holds at 843/870 = 96.90%; strict SwiftLint
    zero violations across 84 files.
 
+   Third hosted review (2026-08-05, verdict APPROVE on `c4fb052`: no blockers,
+   4 should-fix, 7 nits). Owner directed clearing every should-fix. Two of the
+   four were defects this slice's own work exposed:
+
+   - `matchedTransitionSource` was keyed by contact id while this slice's seeds
+     and the documented §9 contract-6 deviation let one contact hold both a
+     cadence and an occasion row inside the horizon. Two rows therefore
+     declared the same id in one namespace and the zoom into Contact Detail
+     resolved against an arbitrary row. `UpcomingViewModel` now elects one
+     owner per contact in display order, the row modifier takes an `isActive`
+     flag, and two tests assert exactly one owner per contact — including in
+     the duplicate case.
+   - The consolidated `StubContactRepository.fetchTracked()` filtered on
+     `tracked` alone while both production implementations also exclude
+     `archivedAt != nil`. Since that fake now backs the whole Upcoming suite,
+     an archived-but-tracked contact would have kept rows in every fake-driven
+     test — the exact R23 mock/production drift. Filter aligned, regression
+     added.
+   - The horizon-end fallback collapsed to `now`, which silently empties the
+     screen and is indistinguishable from "nothing upcoming". It now degrades
+     to elapsed time: a visible superset instead of a hidden subset.
+   - The `make*ViewModel` factories keep their single production call site
+     with a written justification: `AppRuntimeTests` calls each one to prove
+     window injection (R9a), shared clock, and no retained mock timing, and
+     none of that is reachable against a view model constructed inline inside
+     a `State` initializer. Inlining would trade a named seam for silently
+     untested composition, which is how R9 survived.
+
+   Third-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 197 unit tests
+   pass (was 195); Domain coverage holds at 96.90%; strict SwiftLint zero
+   violations across 84 files.
+
 ## Owner gates
 
 Current gates:

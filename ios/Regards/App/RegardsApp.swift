@@ -134,6 +134,21 @@ struct RegardsTabRoot: View {
         )
     }
 
+    // MARK: - View model composition
+    //
+    // These factories each have one production call site, below the repo's
+    // three-call-site bar for extracting a helper. They stay anyway, and the
+    // justification is specific rather than stylistic: composition is the
+    // thing being tested. `AppRuntimeTests` calls every one of them to prove
+    // the production runtime injects the persisted window (R9a), shares one
+    // clock across screens, and never retains mock timing — assertions that
+    // are impossible to make against a view model constructed inline inside a
+    // `State` initializer, because no test can reach it. Inlining these would
+    // trade a named seam for silently untested composition, which is how R9
+    // survived as long as it did. Each factory is also the single place a new
+    // dependency has to be threaded, so a missed injection fails in one
+    // place instead of two.
+
     @MainActor
     static func makeOverdueViewModel(runtime: AppRuntime) -> OverdueViewModel {
         OverdueViewModel(

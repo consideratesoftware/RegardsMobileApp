@@ -52,6 +52,24 @@ public final class UpcomingViewModel {
 
     public var horizonDays: Int = 14
 
+    /// The row that owns the zoom-transition source for each contact.
+    ///
+    /// `matchedTransitionSource` pairs a source with a destination by id, and
+    /// Contact Detail's destination is keyed by contact — so the source id has
+    /// to be the contact's. A contact can hold both a cadence row and an
+    /// occasion row inside the horizon (the §9 contract-6 deviation below), so
+    /// without electing an owner the same id is declared twice in one
+    /// namespace and the zoom animates from an arbitrary row. The first row
+    /// per contact in display order wins.
+    public var transitionSourceRowIDs: Set<UpcomingRowState.RowID> {
+        var seenContacts: Set<UUID> = []
+        var owners: Set<UpcomingRowState.RowID> = []
+        for row in groups.flatMap(\.rows) where seenContacts.insert(row.contactId).inserted {
+            owners.insert(row.id)
+        }
+        return owners
+    }
+
     private let contacts: any ContactRepository
     private let reminders: (any ReminderRepository)?
     private let engine: ReminderEngine
@@ -184,7 +202,14 @@ public final class UpcomingViewModel {
         now: Date
     ) -> [UpcomingRowState] {
         let calendar = Self.gregorianCalendar(for: window.timeZone)
-        let horizonEnd = calendar.date(byAdding: .day, value: horizonDays, to: now) ?? now
+        // Falling back to `now` would collapse the horizon to zero width and
+        // silently empty the screen — the worst failure shape, because it is
+        // indistinguishable from "nothing is coming up". Degrade to elapsed
+        // time instead: a superset that may include an extra row across a DST
+        // boundary, which is visible and harmless, rather than a subset that
+        // hides real reminders.
+        let horizonEnd = calendar.date(byAdding: .day, value: horizonDays, to: now)
+            ?? now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
         for contact in contacts {

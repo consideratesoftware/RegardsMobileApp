@@ -218,6 +218,84 @@ struct UpcomingViewModelStateTests {
         calendar.timeZone = Self.utc
         let days = Set(forContact.map { calendar.startOfDay(for: $0.scheduledFor) })
         #expect(days.count == 1)
+
+        // Exactly one of the two may declare the zoom-transition source, or
+        // the duplicate contact id is registered twice in one namespace and
+        // the animation resolves against an arbitrary row.
+        let owners = viewModel.transitionSourceRowIDs
+        #expect(forContact.filter { owners.contains($0.id) }.count == 1)
+    }
+
+    @Test("Every contact owns exactly one transition source")
+    func everyContactOwnsOneTransitionSource() async throws {
+        let first = Self.contact(
+            systemRef: "transition-first",
+            displayName: "Leia Organa",
+            cadenceDays: 1
+        )
+        let second = Self.contact(
+            systemRef: "transition-second",
+            displayName: "Luke Skywalker",
+            cadenceDays: 1
+        )
+        let occasions = [first, second].enumerated().map { index, contact in
+            ScheduledReminder(
+                contactId: contact.id,
+                kind: .birthday,
+                scheduledFor: Self.now.addingTimeInterval(TimeInterval(3_600 * (index + 1))),
+                osNotificationId: "transition-occasion-\(index)"
+            )
+        }
+        let viewModel = UpcomingViewModel(
+            contacts: StubContactRepository([first, second]),
+            reminders: StubReminderRepository(occasions),
+            window: .allDayEveryDay(timezone: Self.utc),
+            clock: { Self.now }
+        )
+
+        await viewModel.load()
+
+        let rows = viewModel.groups.flatMap(\.rows)
+        let owners = viewModel.transitionSourceRowIDs
+        #expect(rows.count > owners.count)
+        #expect(owners.count == 2)
+        for contactId in [first.id, second.id] {
+            let owned = rows.filter { $0.contactId == contactId && owners.contains($0.id) }
+            #expect(owned.count == 1)
+        }
+    }
+
+    // MARK: - Archived contacts
+
+    @Test("An archived but still tracked contact produces no rows")
+    func archivedContactProducesNoRows() async throws {
+        // The shared fake must match both production implementations, which
+        // filter on `tracked && archivedAt == nil`. Filtering on `tracked`
+        // alone would leave archived contacts visible in every fake-driven
+        // test (R23 mock/production drift).
+        var archived = Self.contact(
+            systemRef: "archived-but-tracked",
+            displayName: "Archived Contact",
+            cadenceDays: 1
+        )
+        archived.archivedAt = Self.now.addingTimeInterval(-86_400)
+        let occasion = ScheduledReminder(
+            contactId: archived.id,
+            kind: .birthday,
+            scheduledFor: Self.now.addingTimeInterval(3_600),
+            osNotificationId: "archived-occasion"
+        )
+        let viewModel = UpcomingViewModel(
+            contacts: StubContactRepository([archived]),
+            reminders: StubReminderRepository([occasion]),
+            window: .allDayEveryDay(timezone: Self.utc),
+            clock: { Self.now }
+        )
+
+        await viewModel.load()
+
+        #expect(viewModel.groups.isEmpty)
+        #expect(viewModel.totalCount == 0)
     }
 
     // MARK: - Untracked contacts

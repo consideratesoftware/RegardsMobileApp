@@ -35,9 +35,15 @@ actor StubContactRepository: ContactRepository {
         return contacts
     }
 
+    /// Mirrors both production implementations: `tracked == true` **and**
+    /// `archivedAt == nil`. The GRDB repository filters on both columns and
+    /// `MockStore.tracked()` does the same. Filtering on `tracked` alone here
+    /// would let an archived-but-tracked contact keep rows in every
+    /// fake-driven test — exactly the mock/production drift R23 exists to
+    /// prevent, and this fake now backs the whole Upcoming suite.
     func fetchTracked() async throws -> [Contact] {
         try requireSuccess()
-        return contacts.filter(\.tracked)
+        return contacts.filter { $0.tracked && $0.archivedAt == nil }
     }
 
     func fetch(id: UUID) async throws -> Contact? {

@@ -596,7 +596,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-04):** the unit target executes 195 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
+**Shipped suites (census 2026-08-04):** the unit target executes 197 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
 
 **Standing requirements:**
 
