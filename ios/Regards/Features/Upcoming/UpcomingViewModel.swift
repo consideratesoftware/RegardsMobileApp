@@ -77,10 +77,18 @@ public final class UpcomingViewModel {
     private let clock: () -> Date
     private var loadGeneration = 0
 
+    /// `reminders` and `window` are deliberately undefaulted.
+    ///
+    /// A defaulted `window` is exactly how R9 shipped: a call site that forgot
+    /// to inject the persisted window silently fell back to `.defaultV1()` and
+    /// the reminder-window feature became fiction on screen with nothing
+    /// failing. A defaulted `reminders` would drop every persisted occasion
+    /// just as quietly. Requiring both makes a missed injection a compile
+    /// error instead of a screen that lies.
     public init(contacts: any ContactRepository,
-                reminders: (any ReminderRepository)? = nil,
+                reminders: (any ReminderRepository)?,
                 engine: ReminderEngine = ReminderEngine(),
-                window: ReminderWindow = .defaultV1(),
+                window: ReminderWindow,
                 clock: @escaping () -> Date = { Date() }) {
         self.contacts = contacts
         self.reminders = reminders

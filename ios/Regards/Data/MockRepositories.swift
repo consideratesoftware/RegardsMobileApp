@@ -158,7 +158,7 @@ actor MockStore {
                 occasionDate: Self.monthDayString(for: birthdayTime, calendar: calendar),
                 occasionLabel: "Birthday",
                 scheduledFor: birthdayTime,
-                osNotificationId: "mock-birthday-\(shmi.id.uuidString)"
+                osNotificationId: "contact-\(shmi.id.uuidString)-\(ReminderKind.birthday.rawValue)"
             )
             reminders[birthday.id] = birthday
         }
@@ -176,7 +176,7 @@ actor MockStore {
                 occasionDate: Self.monthDayString(for: anniversaryTime, calendar: calendar),
                 occasionLabel: "Jedi Order anniversary",
                 scheduledFor: anniversaryTime,
-                osNotificationId: "mock-anniversary-\(obiWan.id.uuidString)"
+                osNotificationId: "contact-\(obiWan.id.uuidString)-\(ReminderKind.anniversary.rawValue)"
             )
             reminders[anniversary.id] = anniversary
         }

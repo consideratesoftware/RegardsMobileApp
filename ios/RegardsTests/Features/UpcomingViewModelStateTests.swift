@@ -18,8 +18,8 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository.failing(),
             reminders: StubReminderRepository(),
-            window: .defaultV1(timezone: Self.utc),
-            clock: { Self.now }
+            window: .defaultV1(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -34,10 +34,10 @@ struct UpcomingViewModelStateTests {
         // `fetchAllPending()` made the catch branch reachable for the first
         // time: contacts can load fine and the reminder read can still throw.
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([Self.contact(systemRef: "reminder-failure")]),
+            contacts: StubContactRepository([UpcomingFixtures.contact(systemRef: "reminder-failure")]),
             reminders: StubReminderRepository.failing(),
-            window: .defaultV1(timezone: Self.utc),
-            clock: { Self.now }
+            window: .defaultV1(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -49,12 +49,12 @@ struct UpcomingViewModelStateTests {
 
     @Test("A failure after a successful load discards the stale rows")
     func failureAfterSuccessDiscardsRows() async throws {
-        let contact = Self.contact(systemRef: "loaded-then-failed", cadenceDays: 1)
+        let contact = UpcomingFixtures.contact(systemRef: "loaded-then-failed", cadenceDays: 1)
         let loaded = UpcomingViewModel(
             contacts: StubContactRepository([contact]),
             reminders: StubReminderRepository(),
-            window: .allDayEveryDay(timezone: Self.utc),
-            clock: { Self.now }
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
         await loaded.load()
         #expect(loaded.loadState == .loaded)
@@ -63,8 +63,8 @@ struct UpcomingViewModelStateTests {
         let failing = UpcomingViewModel(
             contacts: StubContactRepository.failing(),
             reminders: StubReminderRepository(),
-            window: .allDayEveryDay(timezone: Self.utc),
-            clock: { Self.now }
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
         await failing.load()
 
@@ -76,19 +76,19 @@ struct UpcomingViewModelStateTests {
 
     @Test("An occasion row speaks its label, never the raw enum case")
     func occasionRowSpeaksItsLabel() async throws {
-        let contact = Self.contact(systemRef: "spoken-occasion", displayName: "Leia Organa")
+        let contact = UpcomingFixtures.contact(systemRef: "spoken-occasion", displayName: "Leia Organa")
         let reminder = ScheduledReminder(
             contactId: contact.id,
             kind: .customOccasion,
             occasionLabel: "Jedi Order anniversary",
-            scheduledFor: Self.now.addingTimeInterval(3_600),
+            scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "spoken-occasion"
         )
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([contact]),
             reminders: StubReminderRepository([reminder]),
-            window: .defaultV1(timezone: Self.utc),
-            clock: { Self.now }
+            window: .defaultV1(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -102,7 +102,7 @@ struct UpcomingViewModelStateTests {
 
     @Test("A cadence row speaks its cadence text")
     func cadenceRowSpeaksItsCadenceText() async throws {
-        let contact = Self.contact(
+        let contact = UpcomingFixtures.contact(
             systemRef: "spoken-cadence",
             displayName: "Han Solo",
             cadenceDays: 14
@@ -110,8 +110,8 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([contact]),
             reminders: StubReminderRepository(),
-            window: .allDayEveryDay(timezone: Self.utc),
-            clock: { Self.now }
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -129,7 +129,7 @@ struct UpcomingViewModelStateTests {
             contactId: UUID(),
             name: "Chewbacca",
             kind: .cadence,
-            scheduledFor: Self.now,
+            scheduledFor: UpcomingFixtures.now,
             channel: .phoneCall,
             cadenceText: nil,
             occasionText: nil,
@@ -149,11 +149,11 @@ struct UpcomingViewModelStateTests {
         // every cadence row is skipped. Occasions are persisted, not computed
         // from the window, so they must still populate Upcoming rather than
         // leaving the screen falsely empty.
-        let contact = Self.contact(systemRef: "zero-capacity", cadenceDays: 1)
+        let contact = UpcomingFixtures.contact(systemRef: "zero-capacity", cadenceDays: 1)
         let reminder = ScheduledReminder(
             contactId: contact.id,
             kind: .birthday,
-            scheduledFor: Self.now.addingTimeInterval(3_600),
+            scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "zero-capacity-occasion"
         )
         let viewModel = UpcomingViewModel(
@@ -162,9 +162,9 @@ struct UpcomingViewModelStateTests {
             window: ReminderWindow(
                 allowedDays: [],
                 allowedTimeRanges: [],
-                timezoneIdentifier: Self.utc.identifier
+                timezoneIdentifier: UpcomingFixtures.utc.identifier
             ),
-            clock: { Self.now }
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -175,94 +175,31 @@ struct UpcomingViewModelStateTests {
         #expect(!rows.contains { $0.kind == .cadence })
     }
 
-    // MARK: - Documented §9 contract 6 deviation
+    // MARK: - Reminder state
 
-    @Test("A same-day cadence and occasion pair produces two distinct rows")
-    func sameDayCadenceAndOccasionBothAppear() async throws {
-        // §9 contract 6 says the occasion should suppress the cadence
-        // reminder. `SchedulingPass` owns that rule (PR25 / TF-07, R6) and it
-        // is documented as unenforced here. This test pins the current
-        // behavior so the deviation is visible rather than silent: both rows
-        // appear, and — critically — their IDs do not collide, so the
-        // duplicate cannot corrupt identity, diffing, or ordering while it
-        // lasts. TF-07 will replace this expectation with suppression.
-        let contact = Self.contact(
-            systemRef: "same-day-double-up",
-            displayName: "Padmé Amidala",
-            cadenceDays: 1
-        )
-        let occasion = ScheduledReminder(
+    @Test("Only pending reminders reach Upcoming", arguments: ReminderState.allCases)
+    func onlyPendingRemindersReachUpcoming(state: ReminderState) async throws {
+        let contact = UpcomingFixtures.contact(systemRef: "state-\(state.rawValue)")
+        var reminder = ScheduledReminder(
             contactId: contact.id,
             kind: .birthday,
-            scheduledFor: Self.now.addingTimeInterval(3_600),
-            osNotificationId: "same-day-double-up-occasion"
+            scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
+            osNotificationId: "state-\(state.rawValue)"
         )
+        reminder.state = state
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([contact]),
-            reminders: StubReminderRepository([occasion]),
-            window: .allDayEveryDay(timezone: Self.utc),
-            clock: { Self.now }
+            reminders: StubReminderRepository([reminder]),
+            window: .defaultV1(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
 
-        let rows = viewModel.groups.flatMap(\.rows)
-        let forContact = rows.filter { $0.contactId == contact.id }
-        #expect(forContact.count == 2)
-        #expect(Set(forContact.map(\.kind)) == [.cadence, .birthday])
-        #expect(Set(forContact.map(\.id)).count == 2)
-
-        // Both land on the same local calendar day, which is what makes this
-        // the contract-6 case rather than two unrelated rows.
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = Self.utc
-        let days = Set(forContact.map { calendar.startOfDay(for: $0.scheduledFor) })
-        #expect(days.count == 1)
-
-        // Exactly one of the two may declare the zoom-transition source, or
-        // the duplicate contact id is registered twice in one namespace and
-        // the animation resolves against an arbitrary row.
-        let owners = viewModel.transitionSourceRowIDs
-        #expect(forContact.filter { owners.contains($0.id) }.count == 1)
-    }
-
-    @Test("Every contact owns exactly one transition source")
-    func everyContactOwnsOneTransitionSource() async throws {
-        let first = Self.contact(
-            systemRef: "transition-first",
-            displayName: "Leia Organa",
-            cadenceDays: 1
-        )
-        let second = Self.contact(
-            systemRef: "transition-second",
-            displayName: "Luke Skywalker",
-            cadenceDays: 1
-        )
-        let occasions = [first, second].enumerated().map { index, contact in
-            ScheduledReminder(
-                contactId: contact.id,
-                kind: .birthday,
-                scheduledFor: Self.now.addingTimeInterval(TimeInterval(3_600 * (index + 1))),
-                osNotificationId: "transition-occasion-\(index)"
-            )
-        }
-        let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([first, second]),
-            reminders: StubReminderRepository(occasions),
-            window: .allDayEveryDay(timezone: Self.utc),
-            clock: { Self.now }
-        )
-
-        await viewModel.load()
-
-        let rows = viewModel.groups.flatMap(\.rows)
-        let owners = viewModel.transitionSourceRowIDs
-        #expect(rows.count > owners.count)
-        #expect(owners.count == 2)
-        for contactId in [first.id, second.id] {
-            let owned = rows.filter { $0.contactId == contactId && owners.contains($0.id) }
-            #expect(owned.count == 1)
-        }
+        let reminderIDs = viewModel.groups.flatMap(\.rows).compactMap(\.id.reminderId)
+        // Both production repositories filter on state == .pending; a fired,
+        // cancelled, or caught-up reminder must not keep a row.
+        #expect(reminderIDs == (state == .pending ? [reminder.id] : []))
     }
 
     // MARK: - Archived contacts
@@ -273,23 +210,23 @@ struct UpcomingViewModelStateTests {
         // filter on `tracked && archivedAt == nil`. Filtering on `tracked`
         // alone would leave archived contacts visible in every fake-driven
         // test (R23 mock/production drift).
-        var archived = Self.contact(
+        var archived = UpcomingFixtures.contact(
             systemRef: "archived-but-tracked",
             displayName: "Archived Contact",
             cadenceDays: 1
         )
-        archived.archivedAt = Self.now.addingTimeInterval(-86_400)
+        archived.archivedAt = UpcomingFixtures.now.addingTimeInterval(-86_400)
         let occasion = ScheduledReminder(
             contactId: archived.id,
             kind: .birthday,
-            scheduledFor: Self.now.addingTimeInterval(3_600),
+            scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "archived-occasion"
         )
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([archived]),
             reminders: StubReminderRepository([occasion]),
-            window: .allDayEveryDay(timezone: Self.utc),
-            clock: { Self.now }
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -302,8 +239,8 @@ struct UpcomingViewModelStateTests {
 
     @Test("A pending occasion for an untracked contact never reaches Upcoming")
     func untrackedContactOccasionsAreExcluded() async throws {
-        let tracked = Self.contact(systemRef: "tracked", displayName: "Leia Organa")
-        let untracked = Self.contact(
+        let tracked = UpcomingFixtures.contact(systemRef: "tracked", displayName: "Leia Organa")
+        let untracked = UpcomingFixtures.contact(
             systemRef: "untracked",
             displayName: "Archived Contact",
             tracked: false
@@ -311,20 +248,20 @@ struct UpcomingViewModelStateTests {
         let visible = ScheduledReminder(
             contactId: tracked.id,
             kind: .birthday,
-            scheduledFor: Self.now.addingTimeInterval(3_600),
+            scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "tracked-occasion"
         )
         let orphaned = ScheduledReminder(
             contactId: untracked.id,
             kind: .birthday,
-            scheduledFor: Self.now.addingTimeInterval(3_600),
+            scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "untracked-occasion"
         )
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([tracked, untracked]),
             reminders: StubReminderRepository([visible, orphaned]),
-            window: .defaultV1(timezone: Self.utc),
-            clock: { Self.now }
+            window: .defaultV1(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
@@ -332,44 +269,5 @@ struct UpcomingViewModelStateTests {
         let rows = viewModel.groups.flatMap(\.rows)
         #expect(rows.compactMap(\.id.reminderId) == [visible.id])
         #expect(!rows.contains { $0.contactId == untracked.id })
-    }
-
-    // MARK: - Fixtures
-
-    private static let now = Date(timeIntervalSince1970: 1_800_000_000)
-
-    private static var utc: TimeZone {
-        TimeZone(secondsFromGMT: 0) ?? .gmt
-    }
-
-    private static func contact(
-        systemRef: String,
-        displayName: String = "State Contact",
-        tracked: Bool = true,
-        cadenceDays: Int? = nil
-    ) -> Contact {
-        Contact(
-            systemContactRef: systemRef,
-            displayName: displayName,
-            tracked: tracked,
-            cadenceDays: cadenceDays,
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+14155550199",
-            lastInteractedAt: now.addingTimeInterval(-30 * 86_400)
-        )
-    }
-}
-
-private extension ReminderWindow {
-    /// A window that always has capacity, so cadence rows are never dropped
-    /// for window reasons in tests that are about something else.
-    static func allDayEveryDay(timezone: TimeZone) -> ReminderWindow {
-        ReminderWindow(
-            allowedDays: .allDays,
-            allowedTimeRanges: [
-                TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59)),
-            ],
-            timezoneIdentifier: timezone.identifier
-        )
     }
 }

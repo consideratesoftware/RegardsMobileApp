@@ -378,6 +378,43 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    pass (was 195); Domain coverage holds at 96.90%; strict SwiftLint zero
    violations across 84 files.
 
+   Fourth hosted review (2026-08-05, verdict APPROVE on `fb8176a`: no
+   blockers, 7 should-fix, 7 nits). Owner standing direction is to clear every
+   should-fix. Closures:
+
+   - `UpcomingViewModel.init` no longer defaults `reminders:` or `window:`. A
+     defaulted window is exactly how R9 shipped — a call site that forgot to
+     inject the persisted window fell back to `.defaultV1()` and the feature
+     became fiction with nothing failing. A missed injection is now a compile
+     error. Four test call sites updated.
+   - `StubReminderRepository` filters on `state == .pending` like both
+     production repositories, with a parametric regression over every
+     `ReminderState` proving a fired, cancelled, or caught-up reminder keeps
+     no row.
+   - `transitionSourceRowIDs` gains the cross-day-group case: one contact
+     whose cadence and occasion rows land in different sections still elects
+     exactly one owner, and the non-owning row keeps its tap target.
+   - The shipped mock fixture is now guarded against silently reintroducing a
+     §9 contract-6 same-day duplicate through a future offset edit.
+   - Seeded occasion `osNotificationId`s use the §9 contract-5
+     `contact-{uuid}-{kind}` identity instead of a mock-only shape TF-07's
+     reconcile and orphan-cancellation logic would not recognize.
+   - `MockStore.occasionInstant`'s terminal fallback is exercised directly,
+     plus a parametric proof that no plausible seed offset yields nil.
+   - The R24 register row distinguishes ContactDetail's spoken-label coverage
+     from its still-absent VM-behavior suite, so §13 and §19 no longer
+     contradict each other.
+
+   `UpcomingViewModelStateTests` was split: the duplicate-row and
+   transition-source cases moved to `UpcomingViewModelDuplicateRowTests` and
+   the shared contacts, clock, and windows moved to
+   `Support/UpcomingFixtures.swift`, keeping both suites under the
+   type-body-length limit without duplicating fixtures.
+
+   Fourth-round evidence on the pinned iOS 26.5 iPhone 17 Pro: 203 unit tests
+   pass (was 197); Domain coverage holds at 96.90%; strict SwiftLint zero
+   violations across 86 files.
+
 ## Owner gates
 
 Current gates:

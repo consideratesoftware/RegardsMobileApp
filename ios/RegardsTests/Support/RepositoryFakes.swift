@@ -83,14 +83,19 @@ actor StubReminderRepository: ReminderRepository {
         if let failure { throw failure }
     }
 
+    /// Mirrors both production implementations, which filter on
+    /// `state == .pending`. Returning every reminder regardless of state would
+    /// let a fired, cancelled, or caught-up reminder keep a row in Upcoming
+    /// throughout the fake-driven suite while production quietly excludes it
+    /// (R23 mock/production drift).
     func fetchAllPending() async throws -> [ScheduledReminder] {
         try requireSuccess()
-        return reminders
+        return reminders.filter { $0.state == .pending }
     }
 
     func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder] {
         try requireSuccess()
-        return reminders.filter { $0.contactId == contactId }
+        return reminders.filter { $0.contactId == contactId && $0.state == .pending }
     }
 
     func upsert(_ reminder: ScheduledReminder) async throws {
