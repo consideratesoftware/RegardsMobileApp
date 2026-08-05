@@ -19,9 +19,20 @@ never pick up Android work.
   real environment at launch, resumable first import, and a basic onboarding
   gate. Its first job is flipping the boot path from `AppRuntime.makeMock` to
   `makeProduction`, which is the remaining half of R9a.
-- Open TF pull request: none. GitHub PR #42 merged as `d8193ff` after five
+- Open TF pull request: GitHub PR #43, the post-merge checkpoint close plus a
+  determinism repair (below). GitHub PR #42 merged as `d8193ff` after five
   hosted review rounds; GitHub PR #39 merged as `ade40e3`; GitHub PR #41
   merged as `bbd7c93` on the separate Android track and is not TF work.
+- Known defect landed and repaired in PR #43: PR #42 committed nine
+  byte-identical `"* 2.swift"` duplicates of its new test files. A file-sync
+  process created them in the worktree and `git add -A` swept them in. The
+  committed `project.pbxproj` did not reference them, so local builds and CI's
+  build and test jobs all passed against the committed project — only the
+  XcodeGen determinism gate caught it, by regenerating from the tree and
+  finding nine extra files. That gate is the reason a silent divergence
+  between the source tree and the project file did not survive on `main`.
+  Every duplicate was verified byte-identical to its tracked original before
+  deletion; no unique work was discarded.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
