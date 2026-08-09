@@ -128,7 +128,7 @@ are temporarily off and tracked in the "Sensory-audit carve-outs" section of
 `accessibility.md`; PR34 (ARCHITECTURE.md §14) flips the constant to all
 categories.
 
-UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; repeated 5× stress belongs to the post-merge, nightly, and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
+UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; the single broad audit runs after merges, while repeated 5× stress belongs to nightly and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
 
 Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is expected before any UI-touching merge.
 
@@ -151,7 +151,7 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 - `.github/workflows/ios-ci.yml` — xcodegen determinism → build → unit tests with a ≥95% Domain coverage floor; the post-merge accessibility audit runs separately. No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
 - `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, the three Android guards (manifest network-permission strip, network-free sources, `:domain` purity), project.yml YAML syntax, and Markdown link checks for root docs plus `ios/docs/`.
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
-- `.github/workflows/audit-stress.yml` — builds the a11y bundle once, runs it 5× (flake detector). Since 2026-08-02 it runs on merges to `main`, nightly, and `workflow_dispatch`, not on pull requests; dispatch it and require green before cutting a release.
+- `.github/workflows/audit-stress.yml` — builds the a11y bundle once and runs it 5× (flake detector). It runs nightly and through `workflow_dispatch`, not on pull requests or every merge; dispatch it and require green before cutting a release. The single-run `Accessibility audit` in `ios-ci.yml` runs after merges to `main`.
 - `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from
   default-branch policy, gives the model only sanitized regular-file review
   data with a read-only token, then validates and publishes the typed verdict

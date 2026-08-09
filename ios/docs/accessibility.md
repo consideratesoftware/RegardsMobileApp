@@ -20,11 +20,11 @@ audited* table.
 ## Standing rules (every UI change)
 
 1. **Automated audit.** `XCUIApplication.performAccessibilityAudit()` runs in
-   `RegardsAccessibilityTests` after merges to `main`, nightly, and on demand
-   before release. It catches missing labels, contrast failures, too-small
-   touch targets (<44×44pt), elements trapped from VoiceOver focus, duplicate
-   traits, and dynamic-type clipping. A failing sweep blocks release and must
-   be repaired before the next TestFlight build.
+   `RegardsAccessibilityTests`: once after merges to `main`, five times nightly,
+   and five times by manual dispatch before release. It catches missing labels,
+   contrast failures, too-small touch targets (<44×44pt), elements trapped from
+   VoiceOver focus, duplicate traits, and dynamic-type clipping. A failing
+   sweep blocks release and must be repaired before the next TestFlight build.
 2. **VoiceOver label completeness.** Every interactive element has an
    `.accessibilityLabel`. Decorative glyphs (channel icons inside labeled rows)
    are `.accessibilityHidden(true)` so they don't pollute the rotor. Compound
@@ -256,7 +256,8 @@ The script builds once and runs the audit suite N times via
 `test-without-building`, exits non-zero on any failure. Total runtime
 on a recent Mac: ~3 min.
 
-CI runs the audit 5x after merges to `main`, nightly, and through
-`workflow_dispatch` in `.github/workflows/audit-stress.yml`. Those runs own
-broad flake detection. A failure blocks the next release and becomes the next
-repair item; it does not justify rerunning the full suite during every PR.
+CI runs one audit after merges through `.github/workflows/ios-ci.yml`. The 5x
+sweep runs nightly and through `workflow_dispatch` in
+`.github/workflows/audit-stress.yml`. Those runs own broad flake detection. A
+failure blocks the next release and becomes the next repair item; it does not
+justify rerunning the full suite during every PR.
