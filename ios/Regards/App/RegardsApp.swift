@@ -40,8 +40,10 @@ private struct UITestDynamicTypeOverride: ViewModifier {
 struct RootView: View {
     @State var launch: AppLaunchCoordinator
     @State private var showsTransparency = false
+    @State private var launchFailureEffectGeneration = 0
     @AccessibilityFocusState private var launchFailureFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var launchFailureAccessibilityEffects = LaunchFailureAccessibilityEffects.live
 
     var body: some View {
         ZStack {
@@ -85,17 +87,21 @@ struct RootView: View {
             await launch.start()
         }
         .onChange(of: launchFailureMessage, initial: true) { _, message in
+            launchFailureEffectGeneration &+= 1
+            let effectGeneration = launchFailureEffectGeneration
             guard let message else {
                 launchFailureFocused = false
                 return
             }
+            let effects = launchFailureAccessibilityEffects
             Task { @MainActor in
-                await Task.yield()
-                guard launchFailureMessage == message else { return }
-                AccessibilityNotification.Announcement(message).post()
-                await Task.yield()
-                guard launchFailureMessage == message else { return }
+                await effects.yieldControl()
+                guard launchFailureEffectGeneration == effectGeneration else { return }
+                effects.announce(message)
+                await effects.yieldControl()
+                guard launchFailureEffectGeneration == effectGeneration else { return }
                 launchFailureFocused = true
+                effects.didFocusRetry()
             }
         }
         .sheet(isPresented: $showsTransparency) {
@@ -142,6 +148,27 @@ struct RootView: View {
         }
         return launch.statusMessage ?? "Regards couldn't open its local data. Try again."
     }
+}
+
+struct LaunchFailureAccessibilityEffects {
+    let announce: @MainActor (String) -> Void
+    let didFocusRetry: @MainActor () -> Void
+    let yieldControl: @MainActor () async -> Void
+
+    init(
+        announce: @escaping @MainActor (String) -> Void,
+        didFocusRetry: @escaping @MainActor () -> Void,
+        yieldControl: @escaping @MainActor () async -> Void = { await Task.yield() }
+    ) {
+        self.announce = announce
+        self.didFocusRetry = didFocusRetry
+        self.yieldControl = yieldControl
+    }
+
+    static let live = LaunchFailureAccessibilityEffects(
+        announce: { AccessibilityNotification.Announcement($0).post() },
+        didFocusRetry: {}
+    )
 }
 
 /// Splash shown while the production database, runtime, and profile load.
