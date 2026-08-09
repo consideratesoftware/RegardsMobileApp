@@ -131,9 +131,9 @@ struct UpcomingViewModelBoundaryTests {
             contacts: [contact],
             reminders: [inside, boundary],
             now: now,
-            timezone: timezone
+            timezone: timezone,
+            horizonDays: horizonDays
         )
-        viewModel.horizonDays = horizonDays
 
         await viewModel.load()
 
@@ -279,12 +279,26 @@ struct UpcomingViewModelBoundaryTests {
         contacts: [Contact],
         reminders: [ScheduledReminder],
         now: Date,
-        timezone: TimeZone
+        timezone: TimeZone,
+        horizonDays: Int = ReminderWindow.defaultDigestHorizonDays
     ) -> UpcomingViewModel {
-        UpcomingViewModel(
+        let window = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 12), end: TimeOfDay(hour: 13)),
+                TimeRange(start: TimeOfDay(hour: 18), end: TimeOfDay(hour: 22)),
+            ],
+            quietHours: TimeRange(
+                start: TimeOfDay(hour: 22, minute: 30),
+                end: TimeOfDay(hour: 7, minute: 30)
+            ),
+            timezoneIdentifier: timezone.identifier,
+            digestHorizonDays: horizonDays
+        )
+        return UpcomingViewModel(
             contacts: StubContactRepository(contacts),
             reminders: StubReminderRepository(reminders),
-            window: .defaultV1(timezone: timezone),
+            window: window,
             clock: { now }
         )
     }

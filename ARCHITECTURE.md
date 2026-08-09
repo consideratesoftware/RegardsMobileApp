@@ -442,12 +442,13 @@ returning through that path.
 
 1. **Overdue (Home)** — overdue contacts sectioned by priority tier. Row: photo, name, "2 weeks overdue", channel icon (tap = open deep link), merged-group chip where applicable. Swipe: **Caught up** / **Snooze 1 wk**. Footer shows the live next-digest time (from persisted reminders — the shipped hardcoded "6:00 pm" strings are R11). Empty state: "All caught up."
 2. **Upcoming** — reminders in the next `digestHorizonDays` (7/14/30, user-set), grouped by day, from **persisted** `ScheduledReminder` rows via `ValueObservation` (R10). Rows show contact, channel, kind tag (birthday/anniversary), scheduled time. Swipe: **Reach out now** (opens deep link + logs interaction + advances cadence) / **Mark caught up**. The former inert nav-bar Horizon control is removed; the real horizon editor lands with persisted Reminder Windows in TF-05.
-3. **All Contacts** — every tracked contact; system search-role destination on
-   iOS 18+ with `.searchable` scoped to this screen, native
-   `ContentUnavailableView` search/empty states, sections by priority tier,
-   group-membership indicator, tap → Contact Detail. Untracked imports
-   reachable via a filter toggle (Phase 1B) so users can start tracking someone
-   new.
+3. **All Contacts** — every active local contact, including untracked rows from
+   the first import so a fresh production launch is immediately useful; system
+   search-role destination on iOS 18+ with `.searchable` scoped to this screen,
+   native `ContentUnavailableView` search/empty states, sections by priority
+   tier, group-membership indicator, tap → Contact Detail. TF-03 adds the
+   tracked/all filter alongside reconciliation so users can narrow the list
+   without hiding a first import by default.
 4. **Contact Detail** — hero (photo/name/priority), cadence card (cadence, **live** next reminder, last interaction, status), channel card with **working "Open [channel]"** button, actions: **Caught up** (logs + reschedules), **Snooze 1 wk**, **Log other channel…**; interactions list (last 8); Regards-local notes with "private to Regards" footnote; **Edit contact** (→ screen 5); reminder-window override editor entry; "Merged with…" disclosure when grouped (→ screen 6 context).
 5. **Edit Contact** — real form (`TextField`s) mirroring system-contact fields: name, phones, emails, postal addresses, birthday, anniversary. Save = partial-field `CNSaveRequest` write-back of touched fields only; Cancel/back always available. The interim screen now has a standard Back escape route and no inert Save/Cancel controls; the real form lands in TF-09 (PR27). Regards-local `notes` visible but labeled not-written-back. Write-permission-denied state links to Settings.
 6. **Merge Duplicates** (Settings entry) — ranked candidate pairs (§7 heuristic) with side-by-side preview; user picks the primary face; **Confirm creates a `ContactGroup` row** (shipped gap R12: nothing persists); one-tap Undo (delete group); **Skip** dismisses a pair persistently (store dismissed pair hashes locally); manual "link two contacts…" flow for heuristic misses.
@@ -667,7 +668,7 @@ boundaries.
 | **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
 | **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test for link-bearing channels; parametric covers `allCases` | R2, R7 closed |
 | **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R27, and R28 closed; README half of R19 closed (root link guard remains PR19); R20 was closed by GitHub PR #22; R29 was closed by PR16 plus PR20–PR22 stress runs; historical acceptance evidence passed 5/5 ×3 consecutive stress runs. Under decision #39, later UI follow-ups pass focused regressions and manual smoke before merge; scheduled runs own repeated stress. |
-| **PR19** | Repo + CI hygiene, delivered as bounded TF-01 slices: commit `Package.resolved`; remove placeholder tests; check root Markdown; enforce a ≥95% Domain coverage floor; remove dead SwiftLint configuration; reconcile workflow and merge-method docs. Follow with exact-target stale-worktree cleanup, representative mock seeds, stable row IDs, and dead-asset cleanup. Guard hardening (R32) was completed by the trusted-gate prerequisite. | GitHub PR #39 merged as `ade40e3`, closing R19, R21, R22, R31, and R33 with all required checks green. Ready GitHub PR #42 targets R34/R36 and R40; those remain pending until merge. R30 remains open where exact-target verification finds unique work. |
+| **PR19** | Repo + CI hygiene, delivered as bounded TF-01 slices: commit `Package.resolved`; remove placeholder tests; check root Markdown; enforce a ≥95% Domain coverage floor; remove dead SwiftLint configuration; reconcile workflow and merge-method docs. Follow with exact-target stale-worktree cleanup, representative mock seeds, stable row IDs, and dead-asset cleanup. Guard hardening (R32) was completed by the trusted-gate prerequisite. | GitHub PR #39 merged as `ade40e3`, closing R19, R21, R22, R31, and R33. GitHub PR #42 merged as `d8193ff`, closing R34/R36 and R40. GitHub PR #43 closed the TF-01 checkpoint and XcodeGen determinism repair at `8adeb0d`. R30 remains open where exact-target verification finds unique work. |
 
 ### Phase 1B — Production wiring (Jul 13–17) — the mock era ends
 
@@ -826,20 +827,19 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-08-05
+## 18. Current state — ground truth as of 2026-08-07
 
-`main` = `d8193ff` (GitHub PR #42, the final TF-01 slice, 2026-08-05); it is
-also the latest iOS source change. The engine contract,
+The TF-02 branch started from `main` = `8adeb0d` (GitHub PR #43, the TF-01
+checkpoint and determinism repair). The engine contract,
 section-header accessibility fix, sample-data refresh, channel-validation
 contract, bundle-namespace migration, durable TestFlight queue, and
 cross-provider review parity guard have landed. The trusted staged reviewer now
 uses a dedicated GitHub App check, shared source-boundary guards, and
 check-output delivery. Automated accessibility audits run after merges,
 nightly, and before release. The post-PR39 one-run audit (`30870432645`) and
-5× stress run (`30870432634`) both passed. The `87fa055` one-run audit
-(`30871968000`) also passed; its PR #40 change removed the redundant
-audit-stress push trigger. PR #41 belongs to the separate Android track and
-does not advance or block TF.
+5× stress run (`30870432634`) both passed. Current-baseline iOS CI run
+`30991317165` and nightly 5× stress run `31168311659` passed at `8adeb0d`.
+PR #41 belongs to the separate Android track and does not advance or block TF.
 `TESTFLIGHT_PLAN.md` records the live pull-request state and next executable
 work.
 
@@ -857,16 +857,33 @@ work.
 - **CI:** pull requests require xcodegen determinism, build, unit tests with coverage, strict SwiftLint, project syntax, shared privacy and Domain-purity guards, Markdown links, review-agent parity, and the App-authored `Regards staged review`, which is pinned in branch protection to the dedicated App's identity (app id `4461672`) so a same-repository Actions job cannot forge it. That check asserts a valid review ran for the current head, not that the reviewer approved: a missing, malformed or stale-head artifact fails it, while a `REQUEST_CHANGES` verdict publishes its blockers in the check output and passes, leaving the call to the author. The 1x accessibility audit runs after merges to `main`; the 5x sweep runs after merges, nightly, and on demand before release.
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
 
-### What exists but is dormant (Phase 1 fragments, PRs #9–#10)
+### What TF-02 activates (Phase 1B production foundation)
 
-- `AppRuntime.makeProduction` + `DatabaseFactory.makeDatabase()`: **zero callers.** `@main` injects one `AppRuntime.makeMock()` composition.
-- `CNContactsSource` + `ContactsImporter` (additive first-import only): **zero app callers**; exercised by 13 unit tests. Fetches birthdays, then drops them in mapping.
-- Of 6 injected repositories the UI reads **3** (`contacts`,
-  `interactions.fetchRecent`, and `reminders.fetchAllPending`). The bounded
+- `@main` now opens the file-backed GRDB database, runs the append-only `v2`
+  migration, builds `AppRuntime.makeProduction`, and gates the tab root on the
+  persisted profile. Debug previews and deterministic UI tests keep an
+  explicit `--regards-mock-runtime` launch argument; Release has no mock
+  fallback.
+- A fresh profile starts its trial timestamp once, shows the Contacts
+  pre-prompt, imports the authorized or limited system-visible set additively,
+  and records `onboardingCompletedAt` only after the pass succeeds. Relaunch
+  resumes an interrupted pass by skipping existing `systemContactRef` values.
+  Denied/restricted access has a functional browse-without-importing path, and
+  database/import failures remain visible and retryable.
+- The `v2` migration preserves the shipped `v1` registration and adds contact
+  phone/email arrays, reminder occasion time and digest horizon, and the
+  profile trial timestamp. Its v1→v2 test carries representative data through
+  all six tables and normalizes legacy JSON `null` quiet hours to SQL NULL.
+- Shared repository contracts now run against both mock and GRDB backends,
+  including persistence values, ordering, validation, referential failures,
+  duplicate identifiers, and timestamp normalization.
+- Of 6 injected repositories the UI/runtime reads **5** (`contacts`,
+  `interactions.fetchRecent`, `reminders.fetchAllPending`, `window`, and
+  `profile`). The bounded
   Phase 0 mock path seeds pending birthday and anniversary reminders so those
   states remain visible and auditable; no production scheduling pass or
-  reactive observation exists until TF-07. `window`, `profile`, and `groups`
-  still have no direct UI consumers. No interaction is ever written (`append`
+  reactive observation exists until TF-07. `groups` still has no direct UI
+  consumer. No interaction is ever written (`append`
   uncalled). No production `ScheduledReminder` row is created, no notification
   is scheduled, and no deep link is opened.
 
@@ -878,7 +895,13 @@ pipeline; merge and onboarding flows do not persist.
 
 ### What does not exist at all
 
-SchedulingPass, notifications, deep-link execution, reconciliation/re-import, write-back, merge persistence, onboarding-in-launch-path, calendar ingestion, window persistence, widgets, StoreKit/paywall/trial, export/delete, snapshot tests, App Store listing metadata (name/bundle/SKU reserved 2026-04-15: `Regards: Stay in Touch`, `com.consideratesoftware.regards`, `regards-ios` — fields empty otherwise).
+SchedulingPass, notifications, deep-link execution, reconciliation/re-import,
+write-back, merge persistence, the full three-screen starter-contact and
+notification onboarding flow, calendar ingestion, window editing,
+widgets, StoreKit/paywall enforcement, export/delete, snapshot tests, App Store
+listing metadata (name/bundle/SKU reserved 2026-04-15: `Regards: Stay in
+Touch`, `com.consideratesoftware.regards`, `regards-ios` — fields empty
+otherwise).
 
 ## 19. Remediation register
 
@@ -896,13 +919,13 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R6 | **Batching groups by exact Date equality**; reminders in the same window minutes apart never batch | `ReminderEngine.swift:271-275` | Decision #30 slot-start snapping; digest identity `digest-{slotStartEpoch}`; tests | ✅ **semantics closed by PR16** / PR25 (plumbing) |
 | R7 | **Channel validation contradicts §8:** telegram `@handle` rejected; messenger m.me URLs rejected; `custom` limited to http(s) killing `slack://` etc. | `ChannelCatalog.swift:48-55, 91-93, 133-138` | Normalize/strip per §8 table; any-scheme custom URLs; parametric + property tests | ✅ **closed by PR17** |
 | R8 | **Never-contacted semantics diverge:** engine says due-now; VMs say `?? createdAt` — same contact "not overdue" on screen, "scheduled" by engine | `ReminderEngine.swift:126-129` vs `OverdueViewModel.swift:82`, `UpcomingViewModel.swift:124` | Decision #29: engine adopts `?? createdAt`; divergence test | ✅ **closed by PR16** |
-| R9a | **Global window injection — CLOSED at the seam, not yet at runtime.** `UpcomingViewModel` no longer hardcodes `.defaultV1()` and its `window:` parameter is undefaulted, so no call site can silently fall back. `AppRuntime.makeProduction` resolves the persisted window singleton and `AppRuntimeTests` proves it loads the stored window and rejects a missing or invalid one. The shipping app still boots `AppRuntime.makeMock`, which supplies `MockRepositories.defaultWindow` — the production path stays dormant with zero callers until TF-02 wires real storage at launch (§18). What is closed is the hardcode and the silent-default hazard; what remains is switching the boot path | `UpcomingViewModel.swift`, `AppEnvironment.swift` | Flip the boot path to `makeProduction` with TF-02 | ✅ **seam closed by GitHub PR #42**; boot path TF-02 |
+| R9a | **Global window injection.** `UpcomingViewModel` has no silent default; production launch opens GRDB and `AppRuntime.makeProduction` resolves the persisted singleton before tabs appear. Missing or invalid storage produces a visible retry state, never a mock fallback | `UpcomingViewModel.swift`, `AppEnvironment.swift`, `AppLaunchCoordinator.swift` | Production launch uses the stored global window; mock launch is explicit and DEBUG-only | Seam closed by GitHub PR #42; TF-02 closes the runtime half on merge |
 | R9b | **Per-contact override and live refresh — OPEN.** Overrides are still unresolved anywhere in the UI, a stored-window change does not refresh an open Upcoming, and the ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `ReminderWindowsScreen.swift:7,226`, `UpcomingViewModel.swift` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | TF-05 (PR23) |
 | R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
 | R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; Contact Detail's Caught up/Snooze/Log-other and channel action plus Overdue channel actions are muted, unavailable content pending TF-04/TF-08; inert Merge "Skip"; no-op Onboarding permission button | `ContactDetailScreen.swift`, `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift`, `MergeDuplicatesScreen.swift:108-112`, `OnboardingScreen.swift:3-5` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | Horizon/All stubs removed ✅ **closed by TF-01 modernization / GitHub PR #24**; remaining PR22–PR29 |
 | R12 | **Merge never persists** (no `ContactGroup` written; `env.groups` unused) and detector sees only `preferredChannelValue` instead of full handle sets | `MergeDuplicatesViewModel.swift:44-55` | PR28 scope + `phonesJson`/`emailsJson` inputs | PR28 |
 | R13 | **Edit Contact shipped as a navigation trap and remains a read-only stub:** the hidden Back button and mixed navigation APIs made Edit unreachable or inescapable; the interim screen now removes inert form actions | `EditContactScreen.swift`, `ContactDetailScreen.swift` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | escape route ✅ **closed by TF-01 slice 1**; real form PR27 |
-| R14 | **Onboarding not in launch path** (single screen, Settings-preview only; `onboardingCompletedAt` never consulted) | `OnboardingScreen.swift`, `RegardsApp.swift:23-40` | 3-screen flow gated at launch per §10.8 | PR29 |
+| R14 | **Full onboarding remains incomplete.** TF-02 adds the persisted launch gate, Contacts pre-prompt, resumable first import, denial/retry paths, and non-inert proof link. Starter-contact selection and the notification step remain absent | `OnboardingScreen.swift`, `RegardsApp.swift`, `AppLaunchCoordinator.swift` | Complete the 3-screen starter-contact and notification flow per §10.8 | PR29 |
 | R15 | **Transparency screen's 3 "Open" links inert**; repo URL hardcoded — verify before launch | `TransparencyScreen.swift:123, 183-187` | Wire `openURL`; confirm `github.com/consideratesoftware/RegardsMobileApp` is the public repo URL | PR33 |
 | R49 | **Upcoming drops already-overdue contacts during an active reminder slot.** `ReminderEngine` intentionally returns the slot start for deterministic batching, but the ViewModel rejects it when that start is earlier than `now` | `UpcomingViewModel.swift` | Keep the active-slot row while preserving its slot-start identity; pin a regression at 18:30 for an 18:00–22:00 slot | ✅ **closed by TF-01 scheduled-audit follow-up** |
 
@@ -917,7 +940,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R20 | **CLAUDE.md misroutes agents (5 stale claims):** iPhone 15 destinations (CI uses 16 Pro); "Platform/ currently empty" (has Contacts adapter); PrivacyInfo said to live in `Resources/`; `pr3AuditCategories`/"PR3 follow-ups" naming (actual: `structuralAuditCategories`, "Sensory-audit carve-outs"); "snapshot job declared `if: false`" (it's a comment, no job) | `CLAUDE.md:37,41,78,80,92,111` | Rewrite (done in the same change set as this doc v1.0); future edits follow sibling-PR rule | ✅ **closed by TF-00 / GitHub PR #22** |
 | R21 | `Package.resolved` gitignored while GRDB floats `from: 6.29.0` — contradicts reproducible-build claim | `.gitignore`, `project.yml` | Commit the resolved GRDB revision | ✅ **closed by GitHub PR #39** |
 | R22 | `RegardsUITests` placeholder target in no scheme/workflow; `PlaceholderTests.swift` in unit bundle | `ios/RegardsUITests/`, `RegardsTests/PlaceholderTests.swift` | Delete both placeholders and the ownerless target | ✅ **closed by GitHub PR #39** |
-| R23 | Mock and GRDB repositories share no contract tests — mocks can drift from production semantics | `RegardsTests/Data/RepositoriesTests.swift` | Shared contract-test suite run against both | PR20 |
+| R23 | Mock and GRDB repositories previously had no shared contract tests | `RegardsTests/Data/RepositoriesTests.swift` | Shared contracts cover all six protocols on both backends, including failure and normalization semantics | TF-02 closes on merge |
 | R24 | Upcoming has focused representative-state, identity, ordering, boundary, failure, and transition-source tests but not its complete behavior suite. ContactDetail has spoken-label coverage only (`ContactDetailInteractionLabelTests`); its load, error, and derived-string behavior still has no unit suite. MergeDuplicates was also missing a suite at rebaseline. | `ios/RegardsTests/Features/` | Add the remaining coverage with the PRs that touch each VM | Upcoming/ContactDetail PR22/PR25; MergeDuplicates ✅ **closed by TF-01 modernization / GitHub PR #24** |
 | R25 | `CNContactsSource.fetchAllContacts` blocks a cooperative-pool thread for the full enumeration (5k-contact stall); `@unchecked Sendable` justified only by comment | `ContactsSource.swift:69, 98-125` | Move enumeration off the pool; synthetic 5k regression in PR21, physical A15 budget confirmation at TF-18 | PR21 / TF-18 |
 | R26 | Force-unwrapped calendar math in the engine (`date(byAdding:)!`) | `ReminderEngine.swift:162,203-205` | Eliminated by the R1 rewrite (incl. `resolveFeb29Fallback`) | ✅ **closed by PR16** |
@@ -938,7 +961,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R36 | (folded into R34) | — | — | ✅ **closed by GitHub PR #42** |
 | R37 | `LSApplicationQueriesSchemes: []` while builder already emits `discord://` | `project.yml:80`, `DeepLinkBuilder.swift:43-45` | Add `discord` when deep links go live | PR26 |
 | R38 | `TimeOfDay` precondition bypassed by synthesized `Decodable` — corrupt DB JSON can materialize minute=2000 into calendar math | `TimeOfDay.swift:10-13` | Custom `init(from:)` enforcing range | ✅ **closed by PR16** |
-| R39 | Migrator seeds `Optional` top-level JSON (`jsonStringEncoded(window.quietHours)`) — inserts `"null"` / throws if the default ever ships nil quiet hours | `DatabaseMigrator.swift:106,124-129`, `Records.swift:247-248` | Encode non-optional or store SQL NULL | PR20 (with v2) |
+| R39 | Migrator seeded top-level Optional JSON as the text `"null"` instead of SQL NULL | `DatabaseMigrator.swift`, `Records.swift` | Append-only v2 normalizes legacy rows; new writes use SQL NULL; decoding remains defensive | TF-02 closes on merge |
 | R40 | Unused asset colorsets (`Ink`,`Muted`,`Background`) + two comments describing a code↔xcassets sync that doesn't exist | `Resources/Assets.xcassets`, `RegardsColors.swift`, `accessibility.md` | Delete or wire; fix comments | ✅ **closed by GitHub PR #42** |
 | R41 | Contrast registry incomplete vs UI reality (white-on-accentInk CTAs, accentInk-on-surface, danger-on-surface unlisted) | `RegardsColors.swift:70-83` | Extend `contrastPairs` + tests | PR34 |
 | R42 | `audit-stress.yml` header described obsolete PR-trigger behavior | `audit-stress.yml` | Header ✅ **closed by TF-01 scheduling-policy commit `f563915`**; GitHub PR #39 clarifies pending-run coalescing | ✅ **closed on current `main`** |

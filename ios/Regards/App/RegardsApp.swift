@@ -1,24 +1,13 @@
 import Foundation
 import SwiftUI
 
-@main
+@main @MainActor
 struct RegardsApp: App {
-    // Phase 0 uses one mock runtime. Phase 1 builds the async production
-    // runtime during launch without touching view code.
-    private let runtime: AppRuntime = {
-#if DEBUG
-        AppRuntime.makeMock(
-            includeDuplicateFixture:
-                ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1"
-        )
-#else
-        AppRuntime.makeMock()
-#endif
-    }()
+    @State private var launch = AppLaunchCoordinator.configuredForCurrentProcess()
 
     var body: some Scene {
         WindowGroup {
-            RootView(runtime: runtime)
+            RootView(launch: launch)
                 .modifier(UITestDynamicTypeOverride())
         }
     }
@@ -45,39 +34,93 @@ private struct UITestDynamicTypeOverride: ViewModifier {
     }
 }
 
-/// The first SwiftUI view the user sees. Shows the splash for a brief brand
-/// moment, then crossfades into the real tab root once `.task` fires.
+/// The first SwiftUI view the user sees. The splash remains visible until the
+/// persisted runtime has loaded, then the profile decides whether onboarding
+/// or the tab root is next.
 struct RootView: View {
-    let runtime: AppRuntime
-    @State private var isReady = false
+    @State var launch: AppLaunchCoordinator
+    @State private var showsTransparency = false
+    @AccessibilityFocusState private var launchFailureFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(runtime: AppRuntime) {
-        self.runtime = runtime
-    }
 
     var body: some View {
         ZStack {
-            if isReady {
-                RegardsTabRoot(runtime: runtime)
-                    .transition(.opacity)
-            } else {
+            switch launch.phase {
+            case .loading:
                 SplashView()
+                    .transition(.opacity)
+            case .onboarding:
+                OnboardingScreen(
+                    isBusy: launch.isImporting,
+                    statusMessage: launch.statusMessage,
+                    canContinueWithoutContacts: launch.canContinueWithoutContacts,
+                    onAllow: {
+                        Task { await launch.requestContactsAndImport() }
+                    },
+                    onContinueWithoutContacts: {
+                        Task { await launch.continueWithoutContacts() }
+                    },
+                    onWhyWeAsk: { showsTransparency = true }
+                )
+                .transition(.opacity)
+            case .ready:
+                if let runtime = launch.runtime {
+                    RegardsTabRoot(runtime: runtime)
+                        .transition(.opacity)
+                } else {
+                    launchFailure
+                }
+            case .failed:
+                launchFailure
                     .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: isReady)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: launch.phase)
         .task {
-            // Give the splash a single beat before cutting to content —
-            // enough to feel intentional, short enough not to feel slow.
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            isReady = true
+            await launch.start()
         }
+        .onChange(of: launch.phase) { _, phase in
+            guard phase == .failed else { return }
+            let message = launch.statusMessage ?? "Regards couldn't open its local data."
+            Task { @MainActor in
+                await Task.yield()
+                launchFailureFocused = true
+                AccessibilityNotification.Announcement(message).post()
+            }
+        }
+        .sheet(isPresented: $showsTransparency) {
+            NavigationStack {
+                TransparencyScreen()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showsTransparency = false }
+                        }
+                    }
+            }
+        }
+    }
+
+    private var launchFailure: some View {
+        ContentUnavailableView {
+            Label("Unable to open Regards", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(launch.statusMessage ?? "Regards couldn't open its local data.")
+        } actions: {
+            Button("Try Again") {
+                Task { await launch.retry() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(RegardsDS.accentInk)
+            .accessibilityFocused($launchFailureFocused)
+            .accessibilityIdentifier("launch.try-again")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RegardsDS.background.ignoresSafeArea())
+        .accessibilityIdentifier("launch.failure")
     }
 }
 
-/// Splash shown during the app's first render pass. Phase 1 will drive the
-/// transition off actual loading completion; Phase 0 just waits briefly.
+/// Splash shown while the production database, runtime, and profile load.
 struct SplashView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var wordmarkWidth: CGFloat = 240
 
@@ -217,6 +260,7 @@ struct RegardsTabRoot: View {
             async let upcomingLoad: Void = upcomingVM.load()
             _ = await (overdueLoad, upcomingLoad)
         }
+        .accessibilityIdentifier("root.tabs")
     }
 
     @available(iOS 18.0, *)
@@ -334,7 +378,12 @@ struct RegardsTabRoot: View {
         case .transparency:
             TransparencyScreen()
         case .onboarding:
-            OnboardingScreen()
+            OnboardingScreen(
+                showsPermissionAction: false,
+                onWhyWeAsk: {
+                    navigation.settingsPath.append(RegardsSettingsRoute.transparency)
+                }
+            )
         }
     }
 

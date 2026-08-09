@@ -24,11 +24,14 @@ public protocol ContactGroupRepository: Sendable {
     func fetchAll() async throws -> [ContactGroup]
     func fetch(id: UUID) async throws -> ContactGroup?
     func upsert(_ group: ContactGroup) async throws
+    /// Deletes the virtual group and clears `contactGroupId` on every member.
     func delete(id: UUID) async throws
 }
 
 public protocol ReminderRepository: Sendable {
+    /// Pending reminders ordered by `scheduledFor`, then `id`, ascending.
     func fetchAllPending() async throws -> [ScheduledReminder]
+    /// The contact's pending reminders ordered by `scheduledFor`, then `id`, ascending.
     func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder]
     func upsert(_ reminder: ScheduledReminder) async throws
     func updateState(id: UUID, state: ReminderState) async throws
@@ -36,12 +39,14 @@ public protocol ReminderRepository: Sendable {
 }
 
 public protocol InteractionRepository: Sendable {
+    /// The contact's logs ordered by `occurredAt` descending, then `id` ascending.
     func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog]
     func append(_ log: InteractionLog) async throws
 }
 
 public protocol ReminderWindowRepository: Sendable {
     func fetchGlobal() async throws -> ReminderWindow
+    /// Validates the window before replacing the persisted singleton.
     func saveGlobal(_ window: ReminderWindow) async throws
 }
 
@@ -144,6 +149,9 @@ struct GRDBContactGroupRepository: ContactGroupRepository {
 
     func delete(id: UUID) async throws {
         try await dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE Contact SET contactGroupId = NULL WHERE contactGroupId = ?",
+                arguments: [id.uuidString])
             _ = try ContactGroupRecord.deleteOne(db, key: id.uuidString)
         }
     }
@@ -156,7 +164,7 @@ struct GRDBReminderRepository: ReminderRepository {
         try await dbQueue.read { db in
             try ScheduledReminderRecord
                 .filter(Column("state") == ReminderState.pending.rawValue)
-                .order(Column("scheduledFor"))
+                .order(Column("scheduledFor"), Column("id"))
                 .fetchAll(db)
                 .map { try $0.toDomain() }
         }
@@ -167,7 +175,7 @@ struct GRDBReminderRepository: ReminderRepository {
             try ScheduledReminderRecord
                 .filter(Column("contactId") == contactId.uuidString
                         && Column("state") == ReminderState.pending.rawValue)
-                .order(Column("scheduledFor"))
+                .order(Column("scheduledFor"), Column("id"))
                 .fetchAll(db)
                 .map { try $0.toDomain() }
         }
@@ -200,7 +208,7 @@ struct GRDBInteractionRepository: InteractionRepository {
         try await dbQueue.read { db in
             try InteractionLogRecord
                 .filter(Column("contactId") == contactId.uuidString)
-                .order(Column("occurredAt").desc)
+                .order(Column("occurredAt").desc, Column("id"))
                 .limit(limit)
                 .fetchAll(db)
                 .map { try $0.toDomain() }
@@ -226,6 +234,7 @@ struct GRDBReminderWindowRepository: ReminderWindowRepository {
     }
 
     func saveGlobal(_ window: ReminderWindow) async throws {
+        try window.validate()
         let record = try ReminderWindowRecord(from: window)
         try await dbQueue.write { db in try record.save(db) }
     }

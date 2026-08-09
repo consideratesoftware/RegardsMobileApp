@@ -14,7 +14,35 @@ public enum RegardsSchema {
             try createV1Indexes(db)
             try seedSingletonRows(db)
         }
+        m.registerMigration("v2") { db in
+            try migrateToV2(db)
+        }
         return m
+    }
+
+    // MARK: - v2 columns
+
+    private static func migrateToV2(_ db: Database) throws {
+        try db.alter(table: "Contact") { t in
+            t.add(column: "phonesJson", .text).notNull().defaults(to: "[]")
+            t.add(column: "emailsJson", .text).notNull().defaults(to: "[]")
+        }
+        try db.alter(table: "ReminderWindow") { t in
+            t.add(column: "occasionTime", .text).notNull().defaults(to: "09:00")
+            t.add(column: "digestHorizonDays", .integer).notNull().defaults(to: 14)
+        }
+        try db.alter(table: "UserProfile") { t in
+            t.add(column: "trialStartedAt", .integer)
+        }
+
+        // v1's seed encoded an Optional at the top level. A nil quiet-hours
+        // value therefore became the JSON text `null` instead of SQL NULL
+        // (R39). Normalize any such row while v2 is touching the singleton.
+        try db.execute(sql: """
+            UPDATE ReminderWindow
+            SET quietHoursJson = NULL
+            WHERE quietHoursJson = 'null'
+            """)
     }
 
     // MARK: - v1 tables

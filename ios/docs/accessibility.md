@@ -106,7 +106,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
 | Merge Duplicates | PR3 / TF-01 | Reached via Settings → Find duplicate contacts; candidate choices survive a tab-root round trip. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
-| Onboarding | PR3 | Reached via Settings → Onboarding preview. |
+| Onboarding | PR3 / TF-02 | First-launch Contacts pre-prompt plus Settings preview. TF-02 audits the fresh flow at `accessibility5` before import and verifies the production-backed tab transition. |
 
 ## Sensory-audit carve-outs
 

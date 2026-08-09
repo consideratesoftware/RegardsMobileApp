@@ -26,6 +26,7 @@ extension ScreensAccessibilityTests {
         includeDuplicateFixture: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments.append("--regards-mock-runtime")
         if let dynamicTypeSize {
             app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
         }

@@ -1,15 +1,35 @@
 import SwiftUI
 
-/// Pre-permission-prompt onboarding (screen-misc.jsx::OnboardingScreen). In
-/// Phase 0 the "Allow contacts access" button is a no-op placeholder; Phase 1
-/// wires the real `CNContactStore.requestAccess` flow.
+/// Pre-permission-prompt onboarding (screen-misc.jsx::OnboardingScreen).
 public struct OnboardingScreen: View {
+    private enum RecoveryAction: Hashable {
+        case allowContacts
+        case continueWithoutContacts
+    }
+
+    @AccessibilityFocusState private var focusedRecoveryAction: RecoveryAction?
+
+    let showsPermissionAction: Bool
+    let isBusy: Bool
+    let statusMessage: String?
+    let canContinueWithoutContacts: Bool
     let onAllow: () -> Void
+    let onContinueWithoutContacts: (() -> Void)?
     let onWhyWeAsk: () -> Void
 
-    public init(onAllow: @escaping () -> Void = {},
+    public init(showsPermissionAction: Bool = true,
+                isBusy: Bool = false,
+                statusMessage: String? = nil,
+                canContinueWithoutContacts: Bool = false,
+                onAllow: @escaping () -> Void = {},
+                onContinueWithoutContacts: (() -> Void)? = nil,
                 onWhyWeAsk: @escaping () -> Void = {}) {
+        self.showsPermissionAction = showsPermissionAction
+        self.isBusy = isBusy
+        self.statusMessage = statusMessage
+        self.canContinueWithoutContacts = canContinueWithoutContacts
         self.onAllow = onAllow
+        self.onContinueWithoutContacts = onContinueWithoutContacts
         self.onWhyWeAsk = onWhyWeAsk
     }
 
@@ -30,9 +50,36 @@ public struct OnboardingScreen: View {
                         .padding(.top, 24)
                         .padding(.horizontal, 24)
 
-                    allowButton
-                        .padding(.top, 20)
-                        .padding(.horizontal, 24)
+                    if showsPermissionAction {
+                        allowButton
+                            .padding(.top, 20)
+                            .padding(.horizontal, 24)
+                    }
+
+                    if let statusMessage {
+                        Text(statusMessage)
+                            .font(.footnote)
+                            .foregroundStyle(RegardsDS.muted)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 12)
+                            .padding(.horizontal, 28)
+                            .accessibilityIdentifier("onboarding.status")
+                    }
+
+                    if canContinueWithoutContacts, let onContinueWithoutContacts {
+                        Button("Continue without contacts", action: onContinueWithoutContacts)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(RegardsDS.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                            .padding(.top, 4)
+                            .disabled(isBusy)
+                            .accessibilityFocused(
+                                $focusedRecoveryAction,
+                                equals: .continueWithoutContacts
+                            )
+                            .accessibilityIdentifier("onboarding.continue-without-contacts")
+                    }
 
                     Button("Why we ask · read the proofs", action: onWhyWeAsk)
                         .font(.subheadline.weight(.medium))
@@ -40,7 +87,11 @@ public struct OnboardingScreen: View {
                         // body-sized tappable text, so `accentInk` for AA
                         // against the light background.
                         .foregroundStyle(RegardsDS.accentInk)
-                        .padding(.top, 14)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                        .padding(.top, 4)
+                        .disabled(isBusy)
+                        .accessibilityIdentifier("onboarding.why-we-ask")
 
                     Color.clear.frame(height: 40)
                 }
@@ -49,6 +100,16 @@ public struct OnboardingScreen: View {
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .accessibilityIdentifier("screen.onboarding")
+        .onChange(of: statusMessage) { _, message in
+            guard let message else { return }
+            AccessibilityNotification.Announcement(message).post()
+            Task { @MainActor in
+                await Task.yield()
+                focusedRecoveryAction = canContinueWithoutContacts
+                    ? .continueWithoutContacts
+                    : .allowContacts
+            }
+        }
     }
 
     private var wordmarkHeader: some View {
@@ -85,8 +146,9 @@ public struct OnboardingScreen: View {
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(
-                "Name, photo, phone, email, address, birthday, anniversary. "
-                + "Nothing else. It stays on this phone — never sent anywhere, ever."
+                "Names, phone numbers, email addresses, and the Contacts identifier used "
+                + "to resume imports without duplicates. Nothing else is copied into "
+                + "Regards. It stays on this phone and is never sent anywhere."
             )
             .font(.subheadline)
             .foregroundStyle(RegardsDS.muted)
@@ -99,13 +161,7 @@ public struct OnboardingScreen: View {
     private var permissionBullets: some View {
         VStack(spacing: 0) {
             bullet(title: "Read contacts",
-                   body: "Needed. Without it, Regards has nothing to remind you about.")
-            Hair(inset: 17)
-            bullet(title: "Write contacts",
-                   body: "Optional. Only when you edit someone from inside the app.")
-            Hair(inset: 17)
-            bullet(title: "Read calendar",
-                   body: "Optional. Catches birthdays stored in your calendar.")
+                   body: "Used for the first import. Regards does not write to Contacts.")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -138,7 +194,7 @@ public struct OnboardingScreen: View {
 
     private var allowButton: some View {
         Button(action: onAllow) {
-            Text("Allow contacts access")
+            Text(isBusy ? "Importing contacts…" : "Allow contacts access")
                 .font(.headline)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -147,6 +203,9 @@ public struct OnboardingScreen: View {
                 .background(RegardsDS.accentInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(isBusy)
+        .accessibilityFocused($focusedRecoveryAction, equals: .allowContacts)
         .accessibilityHint("Opens the system Contacts permission prompt.")
+        .accessibilityIdentifier("onboarding.allow-contacts")
     }
 }
