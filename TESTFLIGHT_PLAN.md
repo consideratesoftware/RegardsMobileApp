@@ -20,18 +20,19 @@ never pick up Android work.
   `Regards Mobile App Audit Repair`. The production fresh-install, manual
   accessibility smoke, and §14 physical-device acceptance pass are complete.
   PR #44 merged only after its exact-head hosted semantic review and all
-  required checks approved. The post-merge one-run accessibility job exposed
-  one intermittent XCTest action-delivery failure in the audited launch-retry
-  fixture; exact-main focused reproduction passed 5/5 and the original case
-  passed on the failed-job rerun. That rerun instead caught an iOS **Ready for
-  Apple Intelligence** notification as “Potentially inaccessible text”; the
-  failure screenshot proves the reported element was system UI, not Regards.
-  Exact-main 5× stress then passed all five suites. Neither failure meets §17's
-  ≥2/5 repair threshold. An experimental bounded second tap in the
-  launch-retry Try Again fixture was rejected because it could conceal one
-  genuine failed runtime retry; no source repair is committed or published.
-  Diagnosed failed-job rerun attempt 3 passed all 29 accessibility tests,
-  completing TF-02's post-merge evidence.
+  required checks approved. Final post-merge authority is green: diagnosed
+  failed-job rerun attempt 3 passed 29/29, and exact-main stress passed all 5
+  suites. The first one-run job exposed an intermittent XCTest action-delivery
+  failure in the audited launch-retry fixture; exact-main focused reproduction
+  passed 5/5 and the original case passed on the failed-job rerun. That failure
+  reproduced 0/5, below §17's repair threshold. The rerun instead caught an iOS
+  **Ready for Apple Intelligence** notification as “Potentially inaccessible
+  text”; its xcresult targeted system UI, so it is outside the product-finding
+  threshold. The existing `tap(_:until:message:)` helper remains limited to
+  onboarding controls whose first auto-scroll tap may not dispatch. Applying
+  its bounded second tap to the launch-retry Try Again fixture was rejected
+  because it could conceal one genuine failed runtime retry. No source repair
+  is committed or published.
 - Next ready work: `TF-03` and `TF-04` are independent lanes. Branch both from
   the same exact `main` after this close checkpoint merges, then respect the
   collision locks below.
@@ -61,7 +62,8 @@ never pick up Android work.
 - Owner action needed now: none for TF-02. The connected-device permission,
   import, file-protection, populated-tabs, and accessibility acceptance pass is
   complete. No product, legal, signing, or App Store decision is required.
-- Current-main automation: iOS CI run `31334462438` passed determinism, build,
+- Current-main automation is green on exact `b10f9ac`. iOS CI run
+  `31334462438` passed determinism, build,
   unit tests, and coverage at exact `b10f9ac`, then failed its one-run
   accessibility job only in
   `testProductionOpenFailurePassesAuditAndRetryRecovers`. Its recording and

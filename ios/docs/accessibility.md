@@ -21,10 +21,11 @@ audited* table.
 
 1. **Automated audit.** `XCUIApplication.performAccessibilityAudit()` runs in
    `RegardsAccessibilityTests`: once after merges to `main`, five times nightly,
-   and five times by manual dispatch before release. It catches missing labels,
-   contrast failures, too-small touch targets (<44×44pt), elements trapped from
-   VoiceOver focus, duplicate traits, and dynamic-type clipping. A failing
-   sweep blocks release and must be repaired before the next TestFlight build.
+   and five times by manual dispatch before release. The enabled structural
+   categories catch missing descriptions, elements trapped from VoiceOver
+   focus, and incorrect traits. The sensory categories remain carved out below.
+   A failing sweep blocks release and must be repaired before the next
+   TestFlight build.
 2. **VoiceOver label completeness.** Every interactive element has an
    `.accessibilityLabel`. Decorative glyphs (channel icons inside labeled rows)
    are `.accessibilityHidden(true)` so they don't pollute the rotor. Compound
@@ -111,6 +112,20 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Transparency | PR3 | Reached via Settings → Transparency. |
 | Onboarding | PR3 / TF-02 | First-launch Contacts pre-prompt plus Settings preview. TF-02 audits the fresh flow at `accessibility5` before import and verifies the production-backed tab transition. |
 
+## Known system-UI audit interruption
+
+Every automated finding defaults to an app finding. The iOS **Ready for Apple
+Intelligence** notification can overlay the simulator during an audit. Run
+`31334462438` attempt 2 captured "Potentially inaccessible text" against that
+banner; its xcresult screenshot and failure attachment identified the targeted
+element inside the iOS notification rather than the Regards hierarchy.
+
+Classify a future finding as system UI only when the failed xcresult identifies
+the targeted element inside an operating-system banner or hierarchy and the
+screenshot shows that overlay. Inspect both artifacts and rerun the exact
+failed job. Without both proofs, or when an app-owned failure repeats under
+§17, treat it as a product finding.
+
 ## Sensory-audit carve-outs
 
 The enabled automated audit set uses the **structural** categories
@@ -119,15 +134,6 @@ post-merge audit and the five-run nightly or pre-release sweep. The **sensory**
 categories — `contrast`, `hitRegion`, `dynamicType`, `textClipped` — are not
 part of that release gate. The residual findings after PR4's sweep fall into
 two buckets, both intentional:
-
-### Known system-UI audit interruption
-
-The iOS **Ready for Apple Intelligence** notification can overlay the
-simulator during an audit. Run `31334462438` attempt 2 captured
-"Potentially inaccessible text" against that system banner; its xcresult
-screenshot showed the finding belonged to iOS rather than Regards. Inspect the
-failed xcresult and rerun the exact failed job before classifying this message.
-Treat an app-owned element or a repeated failure under §17 as a product finding.
 
 ### Bucket 1 — fixed
 
