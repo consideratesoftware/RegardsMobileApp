@@ -25,9 +25,9 @@ under a **Manual accessibility smoke** heading.
 - [ ] On a fresh install, VoiceOver reaches the Contacts pre-prompt heading,
       benefit cards, permission CTA, and proofs link in reading order.
 - [ ] Activate "Why we ask" and return with Done; neither route traps focus.
-- [ ] Grant, deny, and retry states expose only working controls. Importing
-      disables duplicate activation, and the browse-without-importing action
-      reaches the tab root.
+- [ ] Grant, deny (both before and during launch), and retry states expose only
+      working controls. Importing disables duplicate activation, and the
+      browse-without-importing action reaches the tab root.
 - [ ] After the splash fades, focus can reach the Overdue heading and all four
       tab buttons.
 - [ ] No VoiceOver focus trap. You can move through the tab root and back.

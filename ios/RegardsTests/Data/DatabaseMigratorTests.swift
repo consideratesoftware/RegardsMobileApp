@@ -64,6 +64,64 @@ struct DatabaseMigratorTests {
 }
 
 extension DatabaseMigratorTests {
+    @Test("File-backed production database creates protected storage and survives reopen")
+    func fileBackedDatabaseCreatesProtectedStorageAndReopens() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("RegardsDatabaseFactory-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        // Best-effort teardown must not replace a more useful migration or
+        // persistence failure with a temporary-directory cleanup error.
+        defer { try? fileManager.removeItem(at: root) }
+
+        let fileName = "production-path.sqlite"
+        let databaseURL = root
+            .appendingPathComponent("Regards", isDirectory: true)
+            .appendingPathComponent(fileName)
+        let onboardingDate = Date(timeIntervalSince1970: 1_800_000_000)
+
+        func seedDatabase() async throws {
+            let queue = try DatabaseFactory.makeDatabase(
+                applicationSupportDirectory: root,
+                fileName: fileName,
+                fileManager: fileManager
+            )
+            let repository = GRDBRepositories(dbQueue: queue).profile
+            var profile = try await repository.fetch()
+            profile.onboardingCompletedAt = onboardingDate
+            try await repository.save(profile)
+        }
+
+        func reopenDatabase() async throws -> UserProfile {
+            let queue = try DatabaseFactory.makeDatabase(
+                applicationSupportDirectory: root,
+                fileName: fileName,
+                fileManager: fileManager
+            )
+            return try await GRDBRepositories(dbQueue: queue).profile.fetch()
+        }
+
+        try await seedDatabase()
+
+        #expect(fileManager.fileExists(atPath: databaseURL.path))
+        #if !targetEnvironment(simulator)
+        // The simulator accepts the protection write but does not expose the
+        // attribute on its host-backed filesystem. A device does, so keep the
+        // value assertion on the platform where the OS enforces it; this test
+        // still executes the exact production setter on every simulator run.
+        let directoryAttributes = try fileManager.attributesOfItem(
+            atPath: databaseURL.deletingLastPathComponent().path
+        )
+        #expect(
+            directoryAttributes[.protectionKey] as? FileProtectionType
+                == .completeUntilFirstUserAuthentication
+        )
+        #endif
+
+        let reopenedProfile = try await reopenDatabase()
+        #expect(reopenedProfile.onboardingCompletedAt == onboardingDate)
+    }
+
     @Test("Fresh latest schema has v2 columns and defaults")
     func freshLatestSchemaHasV2Defaults() async throws {
         let queue = try DatabaseFactory.makeInMemoryDatabase()
@@ -263,6 +321,81 @@ extension DatabaseMigratorTests {
         #expect(profile.entitlementTier == .trial)
         #expect(profile.entitlementRefreshedAt == Date(timeIntervalSince1970: 1_700_000_400))
         #expect(profile.trialStartedAt == nil)
+    }
+
+    @Test("v1 upgrade preserves a legacy contact override and non-null quiet hours")
+    func v1UpgradePreservesLegacyWindowJSON() async throws {
+        let queue = try DatabaseQueue()
+        let migrator = RegardsSchema.migrator()
+        try migrator.migrate(queue, upTo: "v1")
+
+        let contactID = try #require(
+            UUID(uuidString: "50000000-0000-0000-0000-000000000005")
+        )
+        let override = ReminderWindow(
+            allowedDays: .weekends,
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 10), end: TimeOfDay(hour: 12)),
+            ],
+            quietHours: nil,
+            timezoneIdentifier: "Asia/Kolkata"
+        )
+        let quietHours = TimeRange(
+            start: TimeOfDay(hour: 22, minute: 30),
+            end: TimeOfDay(hour: 7, minute: 30)
+        )
+        let encoder = JSONEncoder()
+        let encodedOverride = try encoder.encode(override)
+        guard var legacyObject = try JSONSerialization.jsonObject(with: encodedOverride)
+            as? [String: Any] else {
+            throw DataError.invalidJSONEncoding
+        }
+        legacyObject.removeValue(forKey: "occasionTime")
+        legacyObject.removeValue(forKey: "digestHorizonDays")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
+        let quietData = try encoder.encode(quietHours)
+        guard let legacyJSON = String(data: legacyData, encoding: .utf8),
+              let quietJSON = String(data: quietData, encoding: .utf8) else {
+            throw DataError.invalidJSONEncoding
+        }
+
+        try await queue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO Contact
+                        (id, systemContactRef, displayName, tracked, preferredChannel,
+                         reminderWindowOverride, createdAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    contactID.uuidString,
+                    "legacy-window-contact",
+                    "Legacy Window Contact",
+                    true,
+                    Channel.phoneCall.rawValue,
+                    legacyJSON,
+                    1_700_000_000,
+                ]
+            )
+            try db.execute(
+                sql: "UPDATE ReminderWindow SET quietHoursJson = ? WHERE id = 1",
+                arguments: [quietJSON]
+            )
+        }
+
+        try migrator.migrate(queue)
+
+        let repositories = GRDBRepositories(dbQueue: queue)
+        let loadedContact = try #require(try await repositories.contacts.fetch(id: contactID))
+        let loadedOverride = try #require(loadedContact.reminderWindowOverride)
+        let loadedGlobal = try await repositories.window.fetchGlobal()
+
+        #expect(loadedOverride.allowedDays == override.allowedDays)
+        #expect(loadedOverride.allowedTimeRanges == override.allowedTimeRanges)
+        #expect(loadedOverride.timezoneIdentifier == override.timezoneIdentifier)
+        #expect(loadedOverride.occasionTime == ReminderWindow.defaultOccasionTime)
+        #expect(loadedOverride.digestHorizonDays == ReminderWindow.defaultDigestHorizonDays)
+        #expect(loadedGlobal.quietHours == quietHours)
     }
 
     @Test("A Contact round-trips through the GRDB repository")

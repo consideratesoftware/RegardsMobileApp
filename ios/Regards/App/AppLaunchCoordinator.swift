@@ -24,6 +24,7 @@ final class AppLaunchCoordinator {
     private(set) var isImporting = false
     private(set) var statusMessage: String?
     private(set) var canContinueWithoutContacts = false
+    private(set) var onboardingCompletionPending = false
 
     @ObservationIgnored private let dependencies: Dependencies?
     @ObservationIgnored private var didStart = false
@@ -190,6 +191,7 @@ final class AppLaunchCoordinator {
         isImporting = true
         statusMessage = nil
         canContinueWithoutContacts = false
+        onboardingCompletionPending = false
         defer { isImporting = false }
 
         do {
@@ -206,11 +208,13 @@ final class AppLaunchCoordinator {
                 clock: dependencies.clock
             )
             _ = try await importer.runFirstLaunchImport()
-            try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
         } catch {
             statusMessage = Self.importFailureMessage
             canContinueWithoutContacts = true
+            return
         }
+
+        await completeOnboardingAfterImport(runtime: runtime, clock: dependencies.clock)
     }
 
     func continueWithoutContacts() async {
@@ -222,7 +226,10 @@ final class AppLaunchCoordinator {
         do {
             try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
         } catch {
-            statusMessage = "Regards couldn't save onboarding progress. Try again."
+            statusMessage = onboardingCompletionPending
+                ? Self.postImportCompletionFailureMessage
+                : "Regards couldn't save onboarding progress. Try again."
+            canContinueWithoutContacts = true
         }
     }
 
@@ -235,6 +242,7 @@ final class AppLaunchCoordinator {
         try await runtime.environment.profile.save(profile)
         statusMessage = nil
         canContinueWithoutContacts = false
+        onboardingCompletionPending = false
         phase = .ready
     }
 
@@ -246,6 +254,7 @@ final class AppLaunchCoordinator {
         isImporting = true
         statusMessage = nil
         canContinueWithoutContacts = false
+        onboardingCompletionPending = false
         defer { isImporting = false }
 
         do {
@@ -255,21 +264,39 @@ final class AppLaunchCoordinator {
                 clock: dependencies.clock
             )
             _ = try await importer.runFirstLaunchImport()
-            try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
         } catch {
             statusMessage = Self.importFailureMessage
+            canContinueWithoutContacts = true
+            return
+        }
+
+        await completeOnboardingAfterImport(runtime: runtime, clock: dependencies.clock)
+    }
+
+    private func completeOnboardingAfterImport(
+        runtime: AppRuntime,
+        clock: @Sendable () -> Date
+    ) async {
+        onboardingCompletionPending = true
+        do {
+            try await completeOnboarding(runtime: runtime, clock: clock)
+        } catch {
+            statusMessage = Self.postImportCompletionFailureMessage
             canContinueWithoutContacts = true
         }
     }
 
     private static let importFailureMessage =
         "Regards couldn't finish importing contacts. Retry to resume, or continue without contacts."
+    private static let postImportCompletionFailureMessage =
+        "Contacts were imported, but Regards couldn't finish setup. Try again."
 }
 
 #if DEBUG
 private enum FirstLaunchUITestContactsOutcome: String {
     case authorized
     case denied
+    case deniedAtLaunch = "denied-at-launch"
     case importFailsOnce = "import-fails-once"
 }
 
@@ -301,13 +328,16 @@ private actor FirstLaunchUITestContactsSource: ContactsSource {
 
     init(outcome: FirstLaunchUITestContactsOutcome) {
         self.outcome = outcome
+        if outcome == .deniedAtLaunch {
+            self.status = .denied
+        }
         self.remainingFetchFailures = outcome == .importFailsOnce ? 1 : 0
     }
 
     func currentAuthorization() async -> ContactsAuthorizationStatus { status }
 
     func requestAccess() async throws -> ContactsAuthorizationStatus {
-        status = outcome == .denied ? .denied : .authorized
+        status = outcome == .denied || outcome == .deniedAtLaunch ? .denied : .authorized
         return status
     }
 

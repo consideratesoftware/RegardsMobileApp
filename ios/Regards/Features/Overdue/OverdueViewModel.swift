@@ -71,7 +71,7 @@ public final class OverdueViewModel {
             loadState = .loaded
         } catch {
             guard generation == loadGeneration else { return }
-            Self.log.error("failed to load tracked contacts: \(error, privacy: .public)")
+            Self.log.error("failed to load tracked contacts: \(error, privacy: .private)")
             rows = []
             loadState = .failed
         }

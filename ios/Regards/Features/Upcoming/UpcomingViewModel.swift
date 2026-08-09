@@ -134,7 +134,7 @@ public final class UpcomingViewModel {
             loadState = .loaded
         } catch {
             guard generation == loadGeneration else { return }
-            Self.log.error("failed to load upcoming reminders: \(error, privacy: .public)")
+            Self.log.error("failed to load upcoming reminders: \(error, privacy: .private)")
             groups = []
             totalCount = 0
             loadState = .failed

@@ -6,6 +6,7 @@ import SwiftUI
 public struct AllContactsScreen: View {
     @State private var viewModel: AllContactsViewModel
     @Binding private var searchText: String
+    var rowConstructionObserver: (@MainActor (UUID) -> Void)?
 
     init(viewModel: AllContactsViewModel,
          searchText: Binding<String>) {
@@ -14,6 +15,12 @@ public struct AllContactsScreen: View {
     }
 
     public var body: some View {
+        // Filter once per body evaluation. Keeping this value local is
+        // important for a production-sized address book: reading a computed
+        // filter from every row turns an otherwise linear search into
+        // quadratic work while SwiftUI builds the list.
+        let visibleContacts = viewModel.filtered(searchText: searchText)
+
         ScrollView {
             VStack(spacing: 0) {
                 Text(viewModel.summary)
@@ -24,7 +31,7 @@ public struct AllContactsScreen: View {
                     .padding(.top, 4)
                     .padding(.bottom, 8)
 
-                listContent
+                listContent(visibleContacts)
 
                 Color.clear.frame(height: 40)
             }
@@ -41,7 +48,7 @@ public struct AllContactsScreen: View {
     }
 
     @ViewBuilder
-    private var listContent: some View {
+    private func listContent(_ visibleContacts: [Contact]) -> some View {
         switch viewModel.loadState {
         case .loading:
             ProgressView("Loading contacts")
@@ -49,18 +56,18 @@ public struct AllContactsScreen: View {
                 .padding(.top, 40)
         case .failed:
             loadError
-        case .loaded where filteredContacts.isEmpty:
+        case .loaded where visibleContacts.isEmpty:
             emptyState
         case .loaded:
             RegardsCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(filteredContacts.enumerated()), id: \.element.id) { idx, contact in
+                LazyVStack(spacing: 0) {
+                    ForEach(visibleContacts) { contact in
                         NavigationLink(value: contact.id) {
                             contactRow(contact)
                         }
                         .buttonStyle(.plain)
                         .regardsContactTransitionSource(id: contact.id)
-                        if idx < filteredContacts.count - 1 { Hair(inset: 72) }
+                        if contact.id != visibleContacts.last?.id { Hair(inset: 72) }
                     }
                 }
             }
@@ -102,12 +109,10 @@ public struct AllContactsScreen: View {
         .padding(.top, 32)
     }
 
-    private var filteredContacts: [Contact] {
-        viewModel.filtered(searchText: searchText)
-    }
-
     private func contactRow(_ contact: Contact) -> some View {
-        HStack(spacing: 12) {
+        rowConstructionObserver?(contact.id)
+
+        return HStack(spacing: 12) {
             Avatar(name: contact.displayName, size: 40,
                    hasAccentRing: contact.priorityTier == .innerCircle)
             VStack(alignment: .leading, spacing: 2) {

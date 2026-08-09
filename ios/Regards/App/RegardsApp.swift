@@ -51,9 +51,13 @@ struct RootView: View {
                     .transition(.opacity)
             case .onboarding:
                 OnboardingScreen(
+                    showsPermissionAction: !launch.onboardingCompletionPending,
                     isBusy: launch.isImporting,
                     statusMessage: launch.statusMessage,
                     canContinueWithoutContacts: launch.canContinueWithoutContacts,
+                    continueActionTitle: launch.onboardingCompletionPending
+                        ? "Finish setup"
+                        : "Continue without contacts",
                     onAllow: {
                         Task { await launch.requestContactsAndImport() }
                     },
@@ -69,6 +73,7 @@ struct RootView: View {
                         .transition(.opacity)
                 } else {
                     launchFailure
+                        .transition(.opacity)
                 }
             case .failed:
                 launchFailure
@@ -109,13 +114,20 @@ struct RootView: View {
         ContentUnavailableView {
             Label("Unable to open Regards", systemImage: "exclamationmark.triangle")
         } description: {
-            Text(launch.statusMessage ?? "Regards couldn't open its local data.")
+            Text(launch.statusMessage ?? "Regards couldn't open its local data. Try again.")
         } actions: {
-            Button("Try Again") {
+            Button {
                 Task { await launch.retry() }
+            } label: {
+                Text("Try Again")
+                    .font(.headline)
+                    .foregroundStyle(RegardsDS.background)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .background(RegardsDS.accentInk, in: Capsule())
             }
-            .buttonStyle(.bordered)
-            .tint(RegardsDS.accentInk)
+            .buttonStyle(.plain)
             .accessibilityFocused($launchFailureFocused)
             .accessibilityIdentifier("launch.try-again")
         }

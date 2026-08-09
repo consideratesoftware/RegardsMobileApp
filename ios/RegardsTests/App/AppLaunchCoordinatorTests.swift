@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct AppLaunchCoordinatorTests {
-    private let now = Date(timeIntervalSince1970: 1_785_600_000)
+    let now = Date(timeIntervalSince1970: 1_785_600_000)
 
     @Test("Completed onboarding opens the production runtime without Contacts access")
     func completedProfileBypassesContacts() async throws {
@@ -317,7 +317,7 @@ struct AppLaunchCoordinatorTests {
         #expect(await runtimeFactory.attemptCount() == 2)
     }
 
-    private func coordinator(
+    func coordinator(
         database: DatabaseQueue,
         source: any ContactsSource
     ) -> AppLaunchCoordinator {
@@ -333,7 +333,7 @@ struct AppLaunchCoordinatorTests {
         )
     }
 
-    private static let systemContact = SystemContact(
+    static let systemContact = SystemContact(
         identifier: "launch-contact",
         givenName: "Leia",
         familyName: "Organa",
@@ -347,7 +347,7 @@ private enum LaunchTestError: Error {
     case fetchFailed
 }
 
-private actor ScriptedLaunchContactsSource: ContactsSource {
+actor ScriptedLaunchContactsSource: ContactsSource {
     struct Counts: Equatable {
         let current: Int
         let requests: Int

@@ -19,6 +19,22 @@ public enum DatabaseFactory {
                               in: .userDomainMask,
                               appropriateFor: nil,
                               create: true)
+        return try makeDatabase(
+            applicationSupportDirectory: root,
+            fileName: fileName,
+            fileManager: fm
+        )
+    }
+
+    /// Shared production-path implementation. The injectable Application
+    /// Support root keeps directory creation, file protection, migration, and
+    /// reopen behavior covered without writing unit-test databases into the
+    /// app's real container.
+    static func makeDatabase(
+        applicationSupportDirectory root: URL,
+        fileName: String,
+        fileManager fm: FileManager = .default
+    ) throws -> DatabaseQueue {
         let dir = root.appendingPathComponent("Regards", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
 

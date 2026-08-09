@@ -85,25 +85,48 @@ The app follows a strict layered design (ARCHITECTURE.md §5). Two of those laye
 
 Layout inside `ios/Regards/`:
 
-- `App/` — `@main` app entry (`RegardsApp.swift`) and `AppEnvironment` (the repository bundle injected at the root view).
+- `App/` — `@main` app entry (`RegardsApp.swift`), the production-first
+  `AppLaunchCoordinator`, and `AppEnvironment` (the repository bundle injected
+  at the root view).
 - `Domain/` — pure-Swift entities (`Contact`, `Channel`, `TimeOfDay`, `DayOfWeek`, `ReminderWindow`, …), the `ReminderEngine`, `DuplicateDetector`, `ChannelCatalog`, `DeepLinkBuilder`. Unit-tested in isolation.
 - `Data/` — GRDB records, migrations, repositories, and `MockRepositories` (seeded with the JSX-mock cast for Phase 0).
-- `Platform/` — Apple-framework adapters. `Contacts/` exists (`ContactsSource` CNContactStore adapter + `ContactsImporter`, landed PR #10, currently dormant — no app callers). `Notifications/`, `Calendar/`, `DeepLinks/`, `Billing/` arrive in Phases 1C–2 (ARCHITECTURE.md §12).
+- `Platform/` — Apple-framework adapters. `Contacts/` provides the read-only
+  `CNContactStore` source and resumable importer used by TF-02's first-launch
+  flow; TF-03 owns ongoing reconciliation. `Notifications/`, `Calendar/`,
+  `DeepLinks/`, and `Billing/` arrive in Phases 1C–2 (ARCHITECTURE.md §12).
 - `DesignSystem/` — `RegardsDS` tokens (colors, typography, WCAG contrast helpers) and shared primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`).
 - `Features/` — one folder per screen (`Overdue`, `Upcoming`, `Contacts`, `ContactDetail`, `EditContact`, `MergeDuplicates`, `ReminderWindows`, `Onboarding`, `Settings`, `Shared`). Each screen owns its `*Screen.swift` view and a `*ViewModel.swift` where stateful.
 - `Resources/` — `Info.plist`, asset catalog. (`PrivacyInfo.xcprivacy` lives at `ios/Regards/PrivacyInfo.xcprivacy`, not under `Resources/` — it's added as an explicit resource in `project.yml`.)
 
-### Phase 0 → Phase 1 dependency injection
+### Production runtime and dependency injection
 
-`AppEnvironment` holds the six repositories the UI needs. In Phase 0 it's wired with `MockRepositories` (`AppEnvironment.makeMock()`) — **the real GRDB stack exists but isn't wired in yet**. The Phase 1 switch is a one-line change at the `@main` struct in `RegardsApp.swift`; no view code needs to move. Keep all new feature code talking to the `any *Repository` protocols, not concrete types.
+`AppEnvironment` holds the six repositories the UI needs. Production launch is
+coordinated by `AppLaunchCoordinator`, which opens the file-backed GRDB store,
+runs migrations, loads the persisted runtime, and gates tabs on onboarding.
+`AppEnvironment.makeMock()` remains available only for previews and explicit
+DEBUG/UI-test launch fixtures. Keep all new feature code talking to the
+`any *Repository` protocols, not concrete types.
 
 Navigation uses **one `NavigationStack` per tab** with per-tab `NavigationPath` state, so a push inside Overdue doesn't bleed into Upcoming and tab state is preserved. `ContactDetailScreen` is constructed by a factory (`contactDetail(for:)`) so each push gets a fresh VM — don't rely on SwiftUI view identity to reset it.
 
-## Accessibility is merge-blocking
+## Accessibility is release-blocking
 
-`RegardsAccessibilityTests` runs `XCUIApplication.performAccessibilityAudit()` on every screen and fails CI on any audit finding. See `ios/docs/accessibility.md` for the standing rules (VoiceOver label completeness, Dynamic Type through `accessibility5`, WCAG AA contrast, Reduce Motion, 44×44pt touch targets, focus order). Every new screen gets a row in the "screens audited" table in that doc.
+`RegardsAccessibilityTests` runs `XCUIApplication.performAccessibilityAudit()`
+across the registered screens. Pull requests run focused regressions and the
+manual smoke for changed flows; the one-run audit after merges plus nightly and
+pre-release 5× stress workflows are release-blocking. See
+`ios/docs/accessibility.md` for the standing rules (VoiceOver label
+completeness, Dynamic Type through `accessibility5`, WCAG AA contrast, Reduce
+Motion, 44×44pt touch targets, focus order). Every new screen gets a row in the
+"screens audited" table in that doc.
 
-The **structural** audit categories gate merges today (`elementDetection`, `sufficientElementDescription`, `trait`) via the `structuralAuditCategories` constant in `ScreensAccessibilityTests`. The **sensory** categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`) are temporarily off and tracked in the "Sensory-audit carve-outs" section of `accessibility.md`; PR34 (ARCHITECTURE.md §14) flips the constant to all categories.
+The active release audit currently uses the **structural** categories
+(`elementDetection`, `sufficientElementDescription`, `trait`) through the
+`structuralAuditCategories` constant in `ScreensAccessibilityTests`. The
+**sensory** categories (`contrast`, `hitRegion`, `dynamicType`, `textClipped`)
+are temporarily off and tracked in the "Sensory-audit carve-outs" section of
+`accessibility.md`; PR34 (ARCHITECTURE.md §14) flips the constant to all
+categories.
 
 UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; repeated 5× stress belongs to the post-merge, nightly, and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
 

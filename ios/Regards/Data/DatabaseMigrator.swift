@@ -150,7 +150,13 @@ public enum RegardsSchema {
 
 extension JSONEncoder {
     fileprivate func jsonStringEncoded<T: Encodable>(_ value: T) throws -> String {
-        let data = try encode(value)
-        return String(data: data, encoding: .utf8) ?? ""
+        try Self.regardsJSONString(from: encode(value))
+    }
+
+    static func regardsJSONString(from data: Data) throws -> String {
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw DataError.invalidJSONEncoding
+        }
+        return json
     }
 }
