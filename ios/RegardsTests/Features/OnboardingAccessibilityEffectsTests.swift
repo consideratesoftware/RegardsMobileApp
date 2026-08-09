@@ -80,6 +80,49 @@ struct OnboardingAccessibilityEffectsTests {
         window.isHidden = true
     }
 
+    @Test("A repeated launch failure cancels stale announcement and focus effects")
+    func repeatedLaunchFailureCancelsStaleEffects() async {
+        let recorder = RecoveryEffectsRecorder()
+        let suspension = RecoveryEffectsSuspension()
+        let runtimeFactory = RepeatedLaunchFailureRuntimeFactory()
+        let launch = AppLaunchCoordinator(
+            dependencies: .init(
+                makeRuntime: { try await runtimeFactory.makeRuntime() },
+                contactsSource: UnusedLaunchFailureContactsSource(),
+                clock: { Date(timeIntervalSince1970: 1_785_600_000) }
+            )
+        )
+        var root = RootView(launch: launch)
+        root.launchFailureAccessibilityEffects = LaunchFailureAccessibilityEffects(
+            announce: { recorder.announcements.append($0) },
+            didFocusRetry: { recorder.focusAssignments += 1 },
+            yieldControl: { await suspension.pause() }
+        )
+        let host = UIHostingController(rootView: root)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+        window.rootViewController = host
+        window.isHidden = false
+        host.view.layoutIfNeeded()
+
+        #expect(await eventually { suspension.arrivalCount == 1 })
+        await launch.retry()
+        #expect(await eventually { suspension.arrivalCount == 2 })
+
+        suspension.resumeNext()
+        await Task.yield()
+        #expect(recorder.announcements.isEmpty)
+        #expect(recorder.focusAssignments == 0)
+
+        suspension.resumeNext()
+        #expect(await eventually { suspension.arrivalCount == 3 })
+        #expect(recorder.announcements == ["Regards couldn't open its local data. Try again."])
+        #expect(recorder.focusAssignments == 0)
+
+        suspension.resumeNext()
+        #expect(await eventually { recorder.focusAssignments == 1 })
+        window.isHidden = true
+    }
+
     private func eventually(_ condition: @escaping @MainActor () -> Bool) async -> Bool {
         for _ in 0..<100 {
             if condition() { return true }
@@ -138,4 +181,20 @@ private final class RecoveryEffectsRecorder {
     var isComplete: Bool {
         announcements.count == 1 && focusAssignments == 1
     }
+}
+
+private enum RepeatedLaunchFailure: Error {
+    case openFailed
+}
+
+private actor RepeatedLaunchFailureRuntimeFactory {
+    func makeRuntime() throws -> AppRuntime {
+        throw RepeatedLaunchFailure.openFailed
+    }
+}
+
+private struct UnusedLaunchFailureContactsSource: ContactsSource {
+    func currentAuthorization() async -> ContactsAuthorizationStatus { .notDetermined }
+    func requestAccess() async throws -> ContactsAuthorizationStatus { .notDetermined }
+    func fetchAllContacts() async throws -> [SystemContact] { [] }
 }

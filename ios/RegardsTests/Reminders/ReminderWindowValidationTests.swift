@@ -122,6 +122,28 @@ struct ReminderWindowValidationTests {
         }
     }
 
+    @Test("A persisted out-of-range occasion minute is rejected at the data boundary")
+    func persistedOutOfRangeMinuteOccasionTimeRejected() throws {
+        var record = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        record.occasionTime = "09:60"
+
+        #expect(throws: DataError.invalidTimeOfDay("09:60")) {
+            try record.toDomain()
+        }
+    }
+
+    @Test("A persisted wrong-length occasion time is rejected at the data boundary")
+    func persistedWrongLengthOccasionTimeRejected() throws {
+        var record = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        record.occasionTime = "9:00"
+
+        #expect(throws: DataError.invalidTimeOfDay("9:00")) {
+            try record.toDomain()
+        }
+    }
+
     @Test("A persisted non-canonical occasion time is rejected at the data boundary")
     func persistedNonCanonicalOccasionTimeRejected() throws {
         var record = try ReminderWindowRecord(from: .defaultV1(

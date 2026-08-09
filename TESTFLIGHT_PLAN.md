@@ -21,16 +21,17 @@ never pick up Android work.
   onboarding gate are implemented in one schema-locked lane. The production
   fresh-install, manual accessibility smoke, and §14 physical-device acceptance
   pass are complete. GitHub PR #44 is published. Required checks passed on
-  pushed head `52487b0`, but hosted semantic review run `31328636788`
-  correctly requested one accessibility blocker before merge. Its repair and
-  final local evidence are complete in the worktree, and the exact-worktree
-  `$regards-pr-review` verdict is `APPROVE`. Guarded auto-merge remains off
-  until the repair is pushed, fresh required checks pass, and the hosted typed
-  verdict is `APPROVE`.
+  pushed head `dab40f8`, and hosted semantic review run `31332360018`
+  returned `APPROVE` with no blockers. Its seven directly applicable
+  should-fixes are closed in the worktree with focused and full-suite evidence,
+  and the exact-worktree `$regards-pr-review` verdict is `APPROVE` across all
+  six roles. Guarded auto-merge remains off until this final candidate is
+  pushed, fresh required checks pass, and the exact-head hosted typed verdict
+  remains `APPROVE`.
 - Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
   independent ready lanes from the same exact merged `main`.
 - Open TF pull request: GitHub PR #44, `codex/tf-02-production-runtime` into
-  `main`. Auto-merge is off until the current repair head passes every required
+  `main`. Auto-merge is off until the final follow-up head passes every required
   check and receives a hosted semantic `APPROVE` verdict. GitHub PR #43 merged
   as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
@@ -59,7 +60,7 @@ never pick up Android work.
   Accessibility-stress run `31250952214` had one Apple audit timeout in its
   first attempt, then its exact failed-job rerun passed 5/5 at the same head;
   newer stress run `31306380612` also passed 5/5 at exact current `main`.
-- Current TF-02 local evidence: the 257-test unit suite passes; the
+- Current TF-02 local evidence: the 266-test unit suite passes; the
   append-only v1→v2 path carries representative rows through all six tables;
   the shared mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/
   Android guards, review-agent parity, source-boundary fixtures, diff checks, and
@@ -249,6 +250,26 @@ never pick up Android work.
   accessibility findings. Five optional file-organization nits remain
   consciously deferred because they do not change behavior. The exact-source
   Release simulator build also passes after the final composition seam.
+- Hosted semantic review run `31332360018` approved pushed head `dab40f8`
+  without blockers and surfaced seven should-fixes. All seven are closed in
+  the final worktree candidate. The PR20 architecture row now names the real
+  production runtime and truthfully allows empty Overdue and Upcoming tabs
+  until TF-11 / PR29 adds starter selection and marks those contacts tracked;
+  R14 explicitly leaves imported rows untracked until that work lands. A v1 invalid
+  per-contact override remains present and fails visibly after migration rather
+  than being silently normalized. Direct GRDB tests cover a missing and a
+  corrupt ReminderWindow singleton. Persisted occasion-time decoding rejects
+  out-of-range minutes and wrong-length values. Saving nil quiet hours writes
+  SQL NULL and round-trips nil. RootView launch-failure effects now carry a
+  generation token across both suspension points, and a deterministic hosting
+  regression proves that a repeated same-copy failure suppresses stale
+  announcement and focus work. The focused data, validation, contract, and
+  hosting slice passes 35/35; the complete unit bundle passes 266/266; and the
+  two affected launch-failure accessibility audits and retry flows pass 2/2 on
+  the pinned iOS 26.5 simulator. Strict SwiftLint, privacy/domain/Android
+  guards, source-boundary fixtures, review-agent parity, workflow YAML, diff
+  checks, duplicate-file scanning, temporary-copy XcodeGen determinism, and the
+  exact-source generic Release simulator build pass.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
