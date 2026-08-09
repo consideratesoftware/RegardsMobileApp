@@ -95,6 +95,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Screen | PR | Notes |
 |---|---|---|
 | Launch / root placeholder | PR1 (`9501d57`) | One-view smoke — superseded by the Overdue landing check in PR3. |
+| Launch failure | TF-02 / PR20 | Triggered by a production database-open failure; audits `launch.failure` and verifies “Try Again” recovers into onboarding. |
 | Overdue (landing after splash) | PR3 / TF-01 | Default tab after splash; native large title and iOS 26 route-control glass. |
 | Upcoming | PR3 / TF-01 | Native large title and modern empty state. |
 | All Contacts | PR3 / TF-01 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. |

@@ -205,7 +205,8 @@ struct GRDBInteractionRepository: InteractionRepository {
     let dbQueue: DatabaseQueue
 
     func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
-        try await dbQueue.read { db in
+        guard limit > 0 else { return [] }
+        return try await dbQueue.read { db in
             try InteractionLogRecord
                 .filter(Column("contactId") == contactId.uuidString)
                 .order(Column("occurredAt").desc, Column("id"))

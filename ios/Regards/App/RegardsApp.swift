@@ -84,8 +84,8 @@ struct RootView: View {
             let message = launch.statusMessage ?? "Regards couldn't open its local data."
             Task { @MainActor in
                 await Task.yield()
-                launchFailureFocused = true
                 AccessibilityNotification.Announcement(message).post()
+                launchFailureFocused = true
             }
         }
         .sheet(isPresented: $showsTransparency) {

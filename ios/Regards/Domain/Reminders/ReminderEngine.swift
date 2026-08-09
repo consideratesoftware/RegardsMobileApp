@@ -84,8 +84,9 @@ public struct MonthDay: Sendable, Equatable, Hashable {
 public struct ReminderEngine: Sendable {
 
     /// Morning-of notification time for birthdays + anniversaries
-    /// (default 09:00 local per §9). Stored on `UserProfile`/Settings in
-    /// production; passed in here to keep the engine pure.
+    /// (default 09:00 local per §9). Passed explicitly to keep the engine pure;
+    /// TF-07 wires the persisted `ReminderWindow.occasionTime` into the
+    /// production scheduling pass.
     public let occasionNotificationTime: TimeOfDay
 
     /// Injected clock — tests pass a fixed date.

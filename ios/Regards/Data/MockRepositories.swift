@@ -419,7 +419,8 @@ extension MockStore {
     func deleteReminder(id: UUID) { reminders.removeValue(forKey: id) }
 
     func recentInteractions(forContact id: UUID, limit: Int) -> [InteractionLog] {
-        interactions.values.filter { $0.contactId == id }
+        guard limit > 0 else { return [] }
+        return interactions.values.filter { $0.contactId == id }
             .sorted {
                 if $0.occurredAt != $1.occurredAt { return $0.occurredAt > $1.occurredAt }
                 return $0.id.uuidString < $1.id.uuidString
@@ -486,7 +487,6 @@ struct MockInteractionRepository: InteractionRepository {
     }
     func append(_ log: InteractionLog) async throws { try await store.appendInteraction(log) }
 }
-
 struct MockReminderWindowRepository: ReminderWindowRepository {
     let store: MockStore
     func fetchGlobal() async throws -> ReminderWindow { await store.getWindow() }

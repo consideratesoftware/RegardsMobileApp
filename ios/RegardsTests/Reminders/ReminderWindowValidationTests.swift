@@ -111,6 +111,17 @@ struct ReminderWindowValidationTests {
         }
     }
 
+    @Test("A persisted malformed occasion time is rejected at the data boundary")
+    func persistedInvalidOccasionTimeRejected() throws {
+        var record = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        record.occasionTime = "24:00"
+
+        #expect(throws: DataError.invalidTimeOfDay("24:00")) {
+            try record.toDomain()
+        }
+    }
+
     @Test("Persisted JSON null quiet hours decode as nil (R39)")
     func persistedJSONNullQuietHoursDecodeAsNil() throws {
         var record = try ReminderWindowRecord(from: .defaultV1(
