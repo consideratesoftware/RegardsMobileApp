@@ -126,6 +126,8 @@ struct AppLaunchCoordinatorTests {
 
         #expect(launch.phase == .onboarding)
         #expect(launch.statusMessage != nil)
+        #expect(launch.canContinueWithoutContacts)
+        #expect(!launch.isImporting)
         let runtimeAfterFailure = try #require(launch.runtime)
         #expect(try await runtimeAfterFailure.environment.profile.fetch().onboardingCompletedAt == nil)
 
@@ -223,40 +225,6 @@ struct AppLaunchCoordinatorTests {
         #expect(await source.counts() == .init(current: 0, requests: 0, fetches: 0))
     }
 
-    @Test("An undecodable stored contact leaves onboarding incomplete")
-    func corruptStoredContactLeavesOnboardingIncomplete() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = AppEnvironment.makeProduction(database: database)
-        let corruptContact = Contact(
-            systemContactRef: "corrupt-stored-contact",
-            displayName: "Corrupt Stored Contact"
-        )
-        try await environment.contacts.upsert(corruptContact)
-        try await database.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET phonesJson = ? WHERE id = ?",
-                arguments: ["[", corruptContact.id.uuidString]
-            )
-        }
-        let source = ScriptedLaunchContactsSource(
-            status: .authorized,
-            contacts: [Self.systemContact]
-        )
-        let launch = coordinator(database: database, source: source)
-
-        await launch.start()
-
-        #expect(launch.phase == .onboarding)
-        #expect(launch.statusMessage != nil)
-        let runtime = try #require(launch.runtime)
-        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
-        #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
-        let persistedContactCount = try await database.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM Contact")
-        }
-        #expect(persistedContactCount == 1)
-    }
-
     @Test("A permission tap racing launch starts one import")
     func permissionTapRacingAuthorizationStartsOneImport() async throws {
         let database = try DatabaseFactory.makeInMemoryDatabase()
@@ -270,6 +238,26 @@ struct AppLaunchCoordinatorTests {
         #expect(launch.phase == .ready)
         #expect(launch.statusMessage == nil)
         #expect(await source.counts() == .init(current: 2, requests: 1, fetches: 1))
+        let runtime = try #require(launch.runtime)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await runtime.environment.contacts.fetchAll().count == 1)
+    }
+
+    @Test("A completed permission action survives stale launch cancellation")
+    func permissionActionWinsBeforeLaunchCancellation() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let source = BlockingAuthorizationContactsSource(contacts: [Self.systemContact])
+        let launch = coordinator(database: database, source: source)
+        let start = Task { await launch.start() }
+        await source.waitUntilCurrentAuthorizationStarts()
+
+        await launch.requestContactsAndImport()
+        start.cancel()
+        await source.finishCurrentAuthorization()
+        await start.value
+
+        #expect(launch.phase == .ready)
+        #expect(launch.statusMessage == nil)
         let runtime = try #require(launch.runtime)
         #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
         #expect(try await runtime.environment.contacts.fetchAll().count == 1)

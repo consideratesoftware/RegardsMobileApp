@@ -20,16 +20,17 @@ never pick up Android work.
   contracts, production-first launch, resumable first import, and the basic
   onboarding gate are implemented in one schema-locked lane. The production
   fresh-install and manual accessibility smoke are complete. GitHub PR #44 is
-  published. Its first hosted semantic review requested three blockers and
-  eight should-fixes; the verified repair is being committed and pushed while
-  guarded auto-merge remains off.
+  published. Hosted semantic review run `31298203075` requested one blocker and
+  follow-up hardening on pushed head `d2e65a5`. The verified repair is complete;
+  guarded auto-merge remains off until fresh repair-head checks and the hosted
+  semantic verdict approve.
 - Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
   independent ready lanes from the same exact merged `main`.
 - Open TF pull request: GitHub PR #44, `codex/tf-02-production-runtime` into
-  `main`. Its published head `e7808d9` passed iOS CI, Guards, Lint, XcodeGen
-  determinism, and the dedicated App-authored review gate; auto-merge is off
-  until the repair head receives a hosted semantic `APPROVE` verdict. GitHub
-  PR #43 merged as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
+  `main`. Its published head is `d2e65a5`; auto-merge is off until the next
+  repair head passes every required check and receives a hosted semantic
+  `APPROVE` verdict. GitHub PR #43 merged as `8adeb0d`; GitHub PR #42 merged as
+  `d8193ff`.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
   file-sync process in this worktree creates byte-identical `"* 2"` copies of
   recently written files, and `git add -A` sweeps them into the commit. PR
@@ -54,31 +55,25 @@ never pick up Android work.
 - Current-main automation: iOS CI run `30991317165` passed at `8adeb0d`.
   Accessibility-stress run `31250952214` had one Apple audit timeout in its
   first attempt, then its exact failed-job rerun passed 5/5 at the same head.
-- Current TF-02 local evidence: the baseline 232-test unit suite passes; the
+- Current TF-02 local evidence: the 248-test unit suite passes; the
   append-only v1→v2 path carries representative rows through all six tables;
-  22 shared
-  mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/Android
-  guards, review-agent parity, source-boundary fixtures, diff checks, and
+  the shared mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/
+  Android guards, review-agent parity, source-boundary fixtures, diff checks, and
   temporary-copy XcodeGen determinism pass. The exact-source Release simulator
-  build also passes. The exact-source five-state launch
+  build also passes. The exact-source seven-state launch
   accessibility slice passes on the dedicated iOS 26.5 iPhone 17 Pro
   simulator (`D06660F8-D261-46FE-8CF4-8D8190104F80`), covering a successful
   import, denial plus browse-only recovery, one import failure plus retry, a
-  recoverable database-open failure, and the mock launch audit. Its fail-once
-  regression now waits for the CTA's real
+  recoverable database-open failure, the mock launch audit, import failure plus
+  browse-only recovery, and the defensive ready-without-runtime recovery. Its
+  fail-once regression now waits for the CTA's real
   enabled state before retrying, closing a status-render timing race found by
   the final slice. Final staged review also found that rapid repeated launch
   retries could overlap. Retry accepts the failed phase plus the defensive
   ready-without-runtime recovery, and marks loading before suspending; its
   blocking-factory regression proves one retry runtime attempt and a stable
-  final phase. The exact current 233-test bundle
-  executed directly inside a fresh iOS 26.5 simulator: all 231 functional and
-  data tests passed, including the complete launch and reminder-window suites.
-  The only two failures were the pre-existing asset-catalog lookups, because
-  direct `xctest` has no app-host `Bundle.main`; the normal Xcode runner had
-  wedged while materializing its install and launch workers. Hosted CI remains
-  the exact-head full app-host confirmation. The simulator was created for the
-  production smoke, so no existing simulator data needed deletion or reuse.
+  final phase. The simulator was created for the production smoke, so no
+  existing simulator data needed deletion or reuse.
 - PR #44 hosted-review repair: the birthday blocker was a documentation-truth
   issue, not a reason to fetch unused personal data. Architecture now states
   that TF-02 reads only identifiers, names, phones, and emails, and PR30 must
@@ -96,10 +91,30 @@ never pick up Android work.
   against TF-07/PR29 instead of overstated. The hosted suggestion to silently
   replace an invalid reminder-window singleton was not taken: R9a/R47 require
   visible failure because changing reminder timing without consent is unsafe.
-  All 39 focused launch, persistence, repository-contract, and contrast cases
-  pass on iOS 26.5; strict SwiftLint reports zero violations. The only hosted
+  Its focused launch, persistence, repository-contract, and contrast cases pass
+  on iOS 26.5; strict SwiftLint reports zero violations. The only hosted
   test-fake preference was consciously left local because that fake records
   `fetchAll` versus `fetchTracked`, which the shared stub does not model.
+- PR #44 exact-head hosted review run `31298203075` found that an import
+  exception exposed Retry but not the promised browse-only escape. Both import
+  failure paths now expose **Continue without contacts**, retain a retry path,
+  and use truthful resumable-copy; cancellation also becomes a visible retry
+  state. Focused coordinator regressions cover cancellation, profile-save
+  failure, repeated import/continue taps, and a corrupt stored contact. Mock and
+  GRDB reminder-window reads now reject the same invalid stored value; required
+  JSON arrays fail on SQL NULL; noncanonical occasion times fail decoding; and
+  All Contacts ordering has deterministic priority/name/id tie-breaks. The
+  ready-without-runtime recovery is now an audited fixture, failure
+  announcement precedes focus, onboarding announcement/focus sequencing is
+  stale-task-safe, and the changed CTA foreground/background pairs are in the
+  contrast registry. Cancellation is evaluated only after stale startup work
+  yields to a completed onboarding action; the 19 coordinator recovery and
+  launch tests cover both a non-cooperative canceled runtime open and the
+  cancellation-plus-user-action race without elapsed-time sleeps. R25's
+  off-cooperative-pool 5k import remains in PR21 /
+  TF-03, where §14 and §19 assign the Contacts enumeration redesign and its
+  synthetic regression; TF-02 does not widen its schema-foundation scope to
+  close that later item.
 - TF-02 production smoke completed 2026-08-08 with the exact Release simulator
   product from `/tmp/RegardsTF02ShippingDerivedData` on the dedicated iOS 26.5
   iPhone 17 Pro (`D06660F8-D261-46FE-8CF4-8D8190104F80`). The old task-only

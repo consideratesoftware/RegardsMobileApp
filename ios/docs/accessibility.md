@@ -70,6 +70,8 @@ used by system-owned surfaces (`AccentColor` and `LaunchBackground`).
 | Muted | Background | ~5.6:1 | ~5.8:1 | 4.5:1 | ✅ |
 | Muted | Hair Soft | ~4.7:1 | ~6.0:1 | 4.5:1 | ✅ |
 | Accent Ink | Accent Soft | ~6.9:1 | ~6.6:1 | 4.5:1 | ✅ |
+| Accent Ink | Background | ~7.8:1 | ~8.6:1 | 4.5:1 | ✅ |
+| Background | Accent Ink | ~7.8:1 | ~8.6:1 | 4.5:1 | ✅ |
 | White | AccentColor | ~3.4:1 | ~3.1:1 | 3:1 (large/icon) | ✅ |
 
 PR2 adds `ColorContrastTests` so these ratios are asserted automatically; the

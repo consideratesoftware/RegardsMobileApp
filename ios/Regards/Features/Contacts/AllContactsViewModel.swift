@@ -43,7 +43,14 @@ final class AllContactsViewModel {
         let loadedAt = clock()
         do {
             var loadedContacts = try await repository.fetchAll().filter(\.isActive)
-            loadedContacts.sort { $0.priorityTier.rawValue < $1.priorityTier.rawValue }
+            loadedContacts.sort { lhs, rhs in
+                if lhs.priorityTier != rhs.priorityTier {
+                    return lhs.priorityTier.rawValue < rhs.priorityTier.rawValue
+                }
+                let nameOrder = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
+                if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
             guard generation == loadGeneration else { return }
             now = loadedAt
             contacts = loadedContacts

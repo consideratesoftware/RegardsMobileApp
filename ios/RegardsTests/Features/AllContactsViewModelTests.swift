@@ -54,12 +54,48 @@ struct AllContactsViewModelTests {
         #expect(viewModel.summary == "1 contact")
     }
 
+    @Test("All Contacts sorts by priority, name, then identifier")
+    func loadUsesStableUserVisibleOrdering() async throws {
+        let close = Self.contact(
+            id: try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000004")),
+            name: "Zeta Close",
+            tracked: false,
+            priority: .close
+        )
+        let alphaSecond = Self.contact(
+            id: try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000002")),
+            name: "alpha",
+            tracked: false
+        )
+        let beta = Self.contact(
+            id: try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000003")),
+            name: "Beta",
+            tracked: false
+        )
+        let alphaFirst = Self.contact(
+            id: try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000001")),
+            name: "Alpha",
+            tracked: false
+        )
+        let repository = RecordingAllContactsRepository([
+            beta, alphaSecond, close, alphaFirst,
+        ])
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        await viewModel.load()
+
+        #expect(viewModel.contacts.map(\.id) == [
+            close.id, alphaFirst.id, alphaSecond.id, beta.id,
+        ])
+    }
+
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private static func contact(
         id: UUID,
         name: String,
         tracked: Bool,
+        priority: PriorityTier = .regular,
         archivedAt: Date? = nil
     ) -> Contact {
         Contact(
@@ -67,6 +103,7 @@ struct AllContactsViewModelTests {
             systemContactRef: "system-\(id.uuidString)",
             displayName: name,
             tracked: tracked,
+            priorityTier: priority,
             archivedAt: archivedAt
         )
     }

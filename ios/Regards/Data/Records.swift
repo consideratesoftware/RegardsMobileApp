@@ -56,8 +56,8 @@ struct ContactRecord: Codable, FetchableRecord, PersistableRecord {
             throw DataError.invalidChannel(preferredChannel)
         }
         let tier = PriorityTier(rawValue: priorityTier) ?? .regular
-        let phoneNumbers = try decodeOptionalJSON([String].self, from: phonesJson) ?? []
-        let emailAddresses = try decodeOptionalJSON([String].self, from: emailsJson) ?? []
+        let phoneNumbers = try decodeJSON([String].self, from: phonesJson)
+        let emailAddresses = try decodeJSON([String].self, from: emailsJson)
         let windowOverride = try decodeOptionalJSON(
             ReminderWindow.self, from: reminderWindowOverride)
         try windowOverride?.validate()
@@ -255,8 +255,7 @@ struct ReminderWindowRecord: Codable, FetchableRecord, PersistableRecord {
     }
 
     func toDomain() throws -> ReminderWindow {
-        let ranges: [TimeRange] = try JSONDecoder().decode(
-            [TimeRange].self, from: Data(allowedTimeRangesJson.utf8))
+        let ranges = try decodeJSON([TimeRange].self, from: allowedTimeRangesJson)
         let quiet = try decodeOptionalJSON(TimeRange.self, from: quietHoursJson)
         let window = ReminderWindow(
             allowedDays: DayOfWeekMask(rawValue: allowedDaysMask),
@@ -280,6 +279,7 @@ struct ReminderWindowRecord: Codable, FetchableRecord, PersistableRecord {
               parts.count == 2,
               parts[0].count == 2,
               parts[1].count == 2,
+              parts.joined().allSatisfy({ "0123456789".contains($0) }),
               let hour = Int(parts[0]),
               let minute = Int(parts[1]),
               (0..<24).contains(hour),
@@ -288,6 +288,13 @@ struct ReminderWindowRecord: Codable, FetchableRecord, PersistableRecord {
         }
         return TimeOfDay(hour: hour, minute: minute)
     }
+}
+
+private func decodeJSON<Value: Decodable>(
+    _ type: Value.Type,
+    from json: String
+) throws -> Value {
+    try JSONDecoder().decode(Value.self, from: Data(json.utf8))
 }
 
 private func decodeOptionalJSON<Value: Decodable>(

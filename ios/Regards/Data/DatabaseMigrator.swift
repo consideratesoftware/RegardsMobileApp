@@ -7,8 +7,6 @@ public enum RegardsSchema {
 
     public static func migrator() -> DatabaseMigrator {
         var m = DatabaseMigrator()
-        // In production we enable forward-only migrations; in tests the
-        // in-memory DB doesn't care.
         m.registerMigration("v1") { db in
             try createV1Tables(db)
             try createV1Indexes(db)
@@ -125,7 +123,8 @@ public enum RegardsSchema {
     // MARK: - Singleton rows
 
     private static func seedSingletonRows(_ db: Database) throws {
-        // Default ReminderWindow — a placeholder; Onboarding overwrites it.
+        // v1 encoded nil quiet hours as JSON `null`; the append-only v2
+        // migration below normalizes that legacy seed to SQL NULL (R39).
         let window = ReminderWindow.defaultV1(timezone: TimeZone.current)
         try db.execute(literal: """
             INSERT INTO ReminderWindow (id, allowedDaysMask, allowedTimeRangesJson, quietHoursJson, timezone)

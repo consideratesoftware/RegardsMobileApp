@@ -79,12 +79,17 @@ struct RootView: View {
         .task {
             await launch.start()
         }
-        .onChange(of: launch.phase) { _, phase in
-            guard phase == .failed else { return }
-            let message = launch.statusMessage ?? "Regards couldn't open its local data."
+        .onChange(of: launchFailureMessage, initial: true) { _, message in
+            guard let message else {
+                launchFailureFocused = false
+                return
+            }
             Task { @MainActor in
                 await Task.yield()
+                guard launchFailureMessage == message else { return }
                 AccessibilityNotification.Announcement(message).post()
+                await Task.yield()
+                guard launchFailureMessage == message else { return }
                 launchFailureFocused = true
             }
         }
@@ -109,7 +114,7 @@ struct RootView: View {
             Button("Try Again") {
                 Task { await launch.retry() }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
             .tint(RegardsDS.accentInk)
             .accessibilityFocused($launchFailureFocused)
             .accessibilityIdentifier("launch.try-again")
@@ -117,6 +122,13 @@ struct RootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(RegardsDS.background.ignoresSafeArea())
         .accessibilityIdentifier("launch.failure")
+    }
+
+    private var launchFailureMessage: String? {
+        guard launch.phase == .failed || (launch.phase == .ready && launch.runtime == nil) else {
+            return nil
+        }
+        return launch.statusMessage ?? "Regards couldn't open its local data. Try again."
     }
 }
 

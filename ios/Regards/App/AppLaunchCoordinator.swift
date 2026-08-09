@@ -101,6 +101,19 @@ final class AppLaunchCoordinator {
                 )
             )
         }
+        if arguments.contains("--regards-ready-without-runtime") {
+            return AppLaunchCoordinator(
+                dependencies: Dependencies(
+                    makeRuntime: {
+                        let database = try DatabaseFactory.makeInMemoryDatabase()
+                        return try await AppRuntime.makeProduction(database: database)
+                    },
+                    contactsSource: FirstLaunchUITestContactsSource(outcome: .authorized),
+                    clock: { Date(timeIntervalSince1970: 1_785_600_000) }
+                ),
+                testingPhase: .ready
+            )
+        }
         return production()
     }
 #else
@@ -117,7 +130,9 @@ final class AppLaunchCoordinator {
 
         do {
             let runtime = try await dependencies.makeRuntime()
+            try Task.checkCancellation()
             var profile = try await runtime.environment.profile.fetch()
+            try Task.checkCancellation()
             let now = dependencies.clock()
             if profile.trialStartedAt == nil {
                 profile.trialStartedAt = now
@@ -126,6 +141,7 @@ final class AppLaunchCoordinator {
                     profile.entitlementRefreshedAt = now
                 }
                 try await runtime.environment.profile.save(profile)
+                try Task.checkCancellation()
             }
 
             self.runtime = runtime
@@ -140,6 +156,7 @@ final class AppLaunchCoordinator {
             guard phase == .onboarding,
                   !isImporting,
                   onboardingActionGeneration == actionGeneration else { return }
+            try Task.checkCancellation()
             switch authorization {
             case .authorized, .limited:
                 await importAuthorizedContacts(runtime: runtime, dependencies: dependencies)
@@ -149,6 +166,10 @@ final class AppLaunchCoordinator {
             case .notDetermined:
                 break
             }
+        } catch is CancellationError {
+            runtime = nil
+            statusMessage = "Regards couldn't finish opening its local data. Try again."
+            phase = .failed
         } catch {
             statusMessage = "Regards couldn't open its local data. Try again."
             phase = .failed
@@ -187,7 +208,8 @@ final class AppLaunchCoordinator {
             _ = try await importer.runFirstLaunchImport()
             try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
         } catch {
-            statusMessage = "Regards couldn't finish importing contacts. Try again to resume."
+            statusMessage = Self.importFailureMessage
+            canContinueWithoutContacts = true
         }
     }
 
@@ -235,9 +257,13 @@ final class AppLaunchCoordinator {
             _ = try await importer.runFirstLaunchImport()
             try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
         } catch {
-            statusMessage = "Regards couldn't finish importing contacts. Try again to resume."
+            statusMessage = Self.importFailureMessage
+            canContinueWithoutContacts = true
         }
     }
+
+    private static let importFailureMessage =
+        "Regards couldn't finish importing contacts. Retry to resume, or continue without contacts."
 }
 
 #if DEBUG
