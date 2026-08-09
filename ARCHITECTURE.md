@@ -597,7 +597,7 @@ Each screen folder owns `*Screen.swift` + `*ViewModel.swift` where stateful. All
 
 ## 13. Testing strategy
 
-**Shipped suites (census 2026-08-04):** the unit target executes 203 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, and Merge Duplicates ViewModel behavior. The accessibility target has 22 XCUI tests: 15 structural accessibility audits and 7 navigation, layout, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
+**Shipped suites (census 2026-08-09):** the unit target executes 257 tests across ReminderEngine, annual recurrence, DST, reminder-window validation, Contacts import, repositories and migrations, production launch coordination, duplicate detection, deep links, App Intent routing, feature load states, contact accessibility, color and asset hygiene, and Overdue, Upcoming, All Contacts, and Merge Duplicates ViewModel behavior. The accessibility target has 29 XCUI tests: screen audits plus navigation, layout, launch-recovery, and accessibility-contract regressions. The unused general UI-test placeholder target and its one placeholder unit test were removed in TF-01 (R22).
 
 **Standing requirements:**
 
@@ -827,7 +827,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-08-08
+## 18. Current state — ground truth as of 2026-08-09
 
 The TF-02 branch started from `main` = `8adeb0d` (GitHub PR #43, the TF-01
 checkpoint and determinism repair). The engine contract,
@@ -843,17 +843,23 @@ PR #41 belongs to the separate Android track and does not advance or block TF.
 `TESTFLIGHT_PLAN.md` records the live pull-request state and next executable
 work.
 
-### What exists and works (Phase 0 complete, PRs #1–#5)
+### What exists and works
 
 - **Domain layer, pure and tested:** all §7 entities; `ReminderEngine` (cadence walk, quiet hours, annual recurrence + Feb-29, batching helper); `DuplicateDetector`; `ChannelCatalog` + `DeepLinkBuilder` for all 13 channels; `MonthDay` with round-trip validation.
-- **Data layer, tested, dormant:** GRDB `v1` migration (all 6 tables + indexes + singleton seeds), records, 6 repository implementations, `DatabaseFactory` (file-protected prod DB + in-memory test DB), actor-backed `MockRepositories`.
-- **9-screen SwiftUI shell** on mock data with real `@MainActor @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab `NavigationStack`; fresh-VM-per-push factory (regression-tested); design system with WCAG-verified palette pairs.
+- **Production data layer:** file-backed GRDB `v1` + `v2` migrations, records,
+  6 repository implementations, and `DatabaseFactory` with protected
+  production storage plus in-memory tests. Actor-backed `MockRepositories`
+  remain explicit preview and DEBUG/UI-test fixtures.
+- **9-screen SwiftUI shell** on the production runtime with real `@MainActor
+  @Observable` VMs for Overdue/Upcoming/ContactDetail/MergeDuplicates; per-tab
+  `NavigationStack`; fresh-VM-per-push factory (regression-tested); design
+  system with WCAG-verified palette pairs.
 - **Modern platform composition landed in GitHub PR #24:** native navigation/empty-state semantics on
   the iOS 17 baseline; iOS 18 value-based adaptive/search tabs and
   Reduce-Motion-aware matched navigation; iOS 26 restrained Liquid Glass,
   scroll-aware tab chrome, and a local open-section App Shortcut. The exact
   adoption and fallback matrix lives in `ios/docs/modern-ios.md`.
-- **Accessibility harness:** 22 XCUI audit, navigation, layout, and accessibility-contract tests, audit-stress tooling (script + workflow), documented test patterns, and a smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
+- **Accessibility harness:** 29 XCUI audit, navigation, layout, launch-recovery, and accessibility-contract tests, audit-stress tooling (script + workflow), documented test patterns, and a smoke script. The hosted accessibility reviewer and manual smoke gate UI pull requests; automated audits run after merge, nightly, and before release.
 - **CI:** pull requests require xcodegen determinism, build, unit tests with coverage, strict SwiftLint, project syntax, shared privacy and Domain-purity guards, Markdown links, review-agent parity, and the App-authored `Regards staged review`, which is pinned in branch protection to the dedicated App's identity (app id `4461672`) so a same-repository Actions job cannot forge it. That check asserts a valid review ran for the current head, not that the reviewer approved: a missing, malformed or stale-head artifact fails it, while a `REQUEST_CHANGES` verdict publishes its blockers in the check output and passes, leaving the call to the author. The 1x accessibility audit runs after merges to `main`; the 5x sweep runs after merges, nightly, and on demand before release.
 - **Privacy posture in place:** ATS pinned, empty `LSApplicationQueriesSchemes`, `PrivacyInfo.xcprivacy` (tracking=false, nothing collected), read-only Contacts usage string, zero networking call sites (verified with CI's own pattern).
 
@@ -878,8 +884,10 @@ work.
   phone/email arrays, persisted reminder occasion time and digest horizon, and
   the profile trial timestamp. `AppRuntime` decodes the global window, but no
   production scheduling path consumes `occasionTime` yet. Its v1→v2 test
-  carries representative data through all six tables and normalizes legacy JSON
-  `null` quiet hours to SQL NULL.
+  carries representative data through all six tables, preserves a pre-v2
+  per-contact override and non-null quiet-hours object, and normalizes legacy
+  JSON `null` quiet hours to SQL NULL. A file-backed production-path regression
+  covers protected-directory creation, migration, persistence, and reopen.
 - Shared repository contracts now run against both mock and GRDB backends,
   including persistence values, ordering, validation, referential failures,
   duplicate identifiers, and timestamp normalization.
@@ -934,6 +942,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R14 | **Full onboarding remains incomplete.** TF-02 adds the persisted launch gate, Contacts pre-prompt, resumable first import, denial/retry paths, and non-inert proof link. Starter-contact selection, the notification step, and Contacts re-entry after **Continue without contacts** remain absent | `OnboardingScreen.swift`, `RegardsApp.swift`, `AppLaunchCoordinator.swift` | Complete the 3-screen starter-contact and notification flow, including Settings re-entry for Contacts, per §10.8 | PR29 |
 | R15 | **Transparency screen's 3 "Open" links inert**; repo URL hardcoded — verify before launch | `TransparencyScreen.swift:123, 183-187` | Wire `openURL`; confirm `github.com/consideratesoftware/RegardsMobileApp` is the public repo URL | PR33 |
 | R49 | **Upcoming drops already-overdue contacts during an active reminder slot.** `ReminderEngine` intentionally returns the slot start for deterministic batching, but the ViewModel rejects it when that start is earlier than `now` | `UpcomingViewModel.swift` | Keep the active-slot row while preserving its slot-start identity; pin a regression at 18:30 for an 18:00–22:00 slot | ✅ **closed by TF-01 scheduled-audit follow-up** |
+| R50 | **One corrupt stored Contact makes All Contacts unavailable indefinitely.** The fail-closed repository read preserves the raw row and prevents silent data loss, but the screen has no way to show healthy rows alongside a visible corruption warning | `Repositories.swift`, `AllContactsViewModel.swift` | Add a corruption-aware read path that returns healthy contacts plus surfaced diagnostic state; never delete or silently skip the corrupt row; prove healthy contacts remain usable and the raw row survives | TF-03 / PR21 |
 
 ### P1 — spec/doc integrity
 

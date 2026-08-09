@@ -84,7 +84,46 @@ struct AppLaunchCoordinatorRecoveryTests {
         #expect(launch.phase == .ready)
         #expect(await source.counts() == .init(current: 2, requests: 1, fetches: 1))
         let runtime = try #require(launch.runtime)
-        #expect(try await runtime.environment.contacts.fetchAll().count == 1)
+        #expect(try await runtime.environment.contacts.fetchAll().filter {
+            $0.systemContactRef == Self.systemContact.identifier
+        }.count == 1)
+    }
+
+    @Test("A successful import retries profile completion without importing twice")
+    func successfulImportThenProfileSaveFailureCanBrowseAndRetry() async throws {
+        let profile = RetryingRecoveryProfileRepository(
+            profile: Self.startedTrialProfile,
+            failuresRemaining: 1
+        )
+        let source = RecoveryContactsSource(
+            status: .authorized,
+            contacts: [Self.systemContact]
+        )
+        let runtime = runtime(profile: profile)
+        let launch = coordinator(runtime: runtime, source: source)
+
+        await launch.start()
+
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingCompletionPending)
+        #expect(launch.canContinueWithoutContacts)
+        #expect(launch.statusMessage == "Contacts were imported, but Regards couldn't finish setup. Try again.")
+        #expect(try await runtime.environment.contacts.fetchAll().filter {
+            $0.systemContactRef == Self.systemContact.identifier
+        }.count == 1)
+        #expect(try await profile.fetch().onboardingCompletedAt == nil)
+        #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
+
+        await launch.continueWithoutContacts()
+
+        #expect(launch.phase == .ready)
+        #expect(!launch.onboardingCompletionPending)
+        #expect(try await runtime.environment.contacts.fetchAll().filter {
+            $0.systemContactRef == Self.systemContact.identifier
+        }.count == 1)
+        #expect(try await profile.fetch().onboardingCompletedAt == Self.now)
+        #expect(await profile.saveCount() == 2)
+        #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
     }
 
     @Test("Double-tapping continue starts one profile save")

@@ -12,25 +12,25 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-08-08
+- Updated: 2026-08-09
 - Baseline: `main` at `8adeb0d` (merged GitHub PR #43, the TF-01 checkpoint
   close and determinism repair)
 - Active work: `TF-02` on `codex/tf-02-production-runtime` in the linked
   worktree `Regards Mobile App TF02`. Production DB v2, shared repository
   contracts, production-first launch, resumable first import, and the basic
   onboarding gate are implemented in one schema-locked lane. The production
-  fresh-install and manual accessibility smoke are complete. GitHub PR #44 is
-  published. Hosted semantic review run `31298203075` requested one blocker and
-  follow-up hardening on pushed head `d2e65a5`. The verified repair is complete;
-  guarded auto-merge remains off until fresh repair-head checks and the hosted
-  semantic verdict approve.
+  fresh-install, manual accessibility smoke, and §14 physical-device acceptance
+  pass are complete. GitHub PR #44 is published. Hosted semantic review run
+  `31300926594` requested one blocker and follow-up hardening on pushed head
+  `ed6023b`; the source repair and exact-source device evidence are complete.
+  Guarded auto-merge remains off until the repair head receives fresh required
+  checks and a hosted semantic `APPROVE` verdict.
 - Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
   independent ready lanes from the same exact merged `main`.
 - Open TF pull request: GitHub PR #44, `codex/tf-02-production-runtime` into
-  `main`. Its published head is `d2e65a5`; auto-merge is off until the next
-  repair head passes every required check and receives a hosted semantic
-  `APPROVE` verdict. GitHub PR #43 merged as `8adeb0d`; GitHub PR #42 merged as
-  `d8193ff`.
+  `main`. Auto-merge is off until the current repair head passes every required
+  check and receives a hosted semantic `APPROVE` verdict. GitHub PR #43 merged
+  as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
   file-sync process in this worktree creates byte-identical `"* 2"` copies of
   recently written files, and `git add -A` sweeps them into the commit. PR
@@ -50,25 +50,29 @@ never pick up Android work.
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. No product, legal, signing, or App Store
-  decision is required.
+- Owner action needed now: none for TF-02. The connected-device permission,
+  import, file-protection, populated-tabs, and accessibility acceptance pass is
+  complete. No product, legal, signing, or App Store decision is required.
 - Current-main automation: iOS CI run `30991317165` passed at `8adeb0d`.
   Accessibility-stress run `31250952214` had one Apple audit timeout in its
-  first attempt, then its exact failed-job rerun passed 5/5 at the same head.
-- Current TF-02 local evidence: the 248-test unit suite passes; the
+  first attempt, then its exact failed-job rerun passed 5/5 at the same head;
+  newer stress run `31306380612` also passed 5/5 at exact current `main`.
+- Current TF-02 local evidence: the 257-test unit suite passes; the
   append-only v1→v2 path carries representative rows through all six tables;
   the shared mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/
   Android guards, review-agent parity, source-boundary fixtures, diff checks, and
   temporary-copy XcodeGen determinism pass. The exact-source Release simulator
-  build also passes. The exact-source seven-state launch
-  accessibility slice passes on the dedicated iOS 26.5 iPhone 17 Pro
+  build also passes. The exact-source launch accessibility slice passes 8/8 on
+  the dedicated iOS 26.5 iPhone 17 Pro
   simulator (`D06660F8-D261-46FE-8CF4-8D8190104F80`), covering a successful
   import, denial plus browse-only recovery, one import failure plus retry, a
   recoverable database-open failure, the mock launch audit, import failure plus
   browse-only recovery, and the defensive ready-without-runtime recovery. Its
-  fail-once regression now waits for the CTA's real
-  enabled state before retrying, closing a status-render timing race found by
-  the final slice. Final staged review also found that rapid repeated launch
+  accessibility5 CTA helper retries one tap only when XCTest's automatic
+  scroll completes without delivering the first synthesized action. The
+  fail-once regression also waits for the CTA's real enabled state before
+  retrying, closing a status-render timing race found by the final slice. Final
+  staged review found that rapid repeated launch
   retries could overlap. Retry accepts the failed phase plus the defensive
   ready-without-runtime recovery, and marks loading before suspending; its
   blocking-factory regression proves one retry runtime attempt and a stable
@@ -115,6 +119,38 @@ never pick up Android work.
   TF-03, where §14 and §19 assign the Contacts enumeration redesign and its
   synthetic regression; TF-02 does not widen its schema-foundation scope to
   close that later item.
+- PR #44 exact-head hosted review run `31300926594` then found one blocker on
+  `ed6023b`: All Contacts recomputed its O(N) filter from every eager row,
+  producing quadratic first-render work once the production import populated a
+  real address book. The repair hoists one filtered value per SwiftUI body
+  evaluation and renders rows in a `LazyVStack`; a 750-contact screen-render
+  regression proves one projection per body evaluation and constructs fewer
+  than the ten filtered rows in a bounded viewport. The directly applicable
+  hardening is also complete: current `.limited` and `.restricted` launch
+  states are covered, a pre-existing denial is announced/focused through a
+  hosting regression and audited on first render, the exact file-backed
+  database path creates its protected
+  directory and survives reopen, v1→v2 preserves a legacy per-contact override
+  plus non-null quiet hours, and migration JSON encoding now has a direct
+  invalid-UTF-8 fail-closed regression.
+  The remaining hosted suggestions keep their authoritative owners: §3/§7
+  explicitly require first-launch `entitlementTier = trial`; §9 defines a
+  per-contact override as a full `ReminderWindow`; PR21 / TF-03 owns R25's
+  off-pool 5k enumeration and R35's per-row import tolerance; R9a requires
+  visible failure rather than silently resetting reminder timing; and TF-07
+  owns production `occasionTime` injection. Stored-row corruption continues to
+  fail visibly instead of silently hiding local user data.
+- Hosted semantic rerun `31303643205` approved the still-published `ed6023b`
+  head and surfaced four should-fixes. The newer worktree now splits successful
+  import from onboarding-profile completion so a save failure reports the
+  truthful cause and retries without importing twice; the launch retry uses an
+  explicit token-colored 44-point surface backed by the registered contrast
+  pair; `AGENTS.md` and the mock-runtime comment describe production-first
+  launch and the release-blocking audit policy; and R50 assigns
+  corruption-aware partial display to TF-03 without silently discarding a raw
+  row. Exact regressions prove both the post-import save recovery and the
+  current fail-visible stored-row behavior. All production-reachable arbitrary
+  errors and contact identifiers now use private OSLog interpolation.
 - TF-02 production smoke completed 2026-08-08 with the exact Release simulator
   product from `/tmp/RegardsTF02ShippingDerivedData` on the dedicated iOS 26.5
   iPhone 17 Pro (`D06660F8-D261-46FE-8CF4-8D8190104F80`). The old task-only
@@ -137,6 +173,30 @@ never pick up Android work.
   off; navigation remained coherent and text, icons, cards, and the priority
   treatment stayed legible. Accessibility Inspector was restored to standard
   Dynamic Type, Reduce Motion off, and Increased Contrast off. Findings: none.
+- TF-02 physical-device acceptance completed 2026-08-09 on the connected
+  `Comm Link 17` iPhone running iOS 26.6. The exact current-source Release app
+  built with automatic development signing, installed when Regards was absent,
+  and launched through the real Contacts pre-prompt and system limited-access
+  chooser. One selected contact imported, onboarding completed, and the
+  production tabs loaded. A privacy-preserving database check read counts and
+  state only: one Contact, one trial UserProfile, one ReminderWindow, and a
+  completed onboarding flag. Accessibility Inspector produced no warnings on
+  the populated All Contacts state at default Dynamic Type or at its maximum
+  Dynamic Type override with Reduce Motion and Increased Contrast enabled.
+  The owner then completed the VoiceOver pass through the imported row, Contact
+  Detail, Back path, and tab controls and reported the labels, order, focus,
+  and layout usable. A read-only LLDB `FileManager` query inside the signed
+  device process returned
+  `NSFileProtectionCompleteUntilFirstUserAuthentication` for both the Regards
+  Application Support directory and `regards.sqlite`. The app was detached and
+  the Accessibility Inspector overrides were verified back at defaults.
+  Findings: none.
+- The final exact-worktree `$regards-pr-review` rerule is `APPROVE` across
+  correctness, security/privacy, code quality, tests, accessibility, and
+  fit/finish. The physical-device and file-protection coverage holes are
+  cleared; no blocker, should-fix, question, or confirmed test hole remains.
+  Five optional code-organization nits about adding `MARK` sections to long
+  launch and test files were consciously left as non-semantic preferences.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -246,7 +306,7 @@ numbers.
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
 | TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R22, R27–R34, R40, R42–R43 |
 | TF-02 | ACTIVE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
-| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35 |
+| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
 | TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
 | TF-06 | BLOCKED | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |

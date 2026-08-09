@@ -90,13 +90,11 @@ final class LaunchAccessibilityTests: XCTestCase {
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
         let allow = app.buttons["onboarding.allow-contacts"]
-        XCTAssertTrue(allow.waitForExistence(timeout: 5))
-        allow.tap()
-
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        XCTAssertTrue(
-            overdue.waitForExistence(timeout: 10),
-            "A completed import should reveal the production-backed tabs."
+        tap(
+            allow,
+            until: overdue,
+            message: "A completed import should reveal the production-backed tabs."
         )
         let contacts = app.descendants(matching: .any)["screen.contacts"]
         selectTab(named: "Contacts", destination: contacts, in: app)
@@ -114,11 +112,8 @@ final class LaunchAccessibilityTests: XCTestCase {
         let onboarding = app.descendants(matching: .any)["screen.onboarding"]
         XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
         let allow = app.buttons["onboarding.allow-contacts"]
-        XCTAssertTrue(allow.waitForExistence(timeout: 5))
-        allow.tap()
-
         let status = app.staticTexts["onboarding.status"]
-        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        tap(allow, until: status, message: "Permission denial should reveal recovery copy.")
         let browse = app.buttons["onboarding.continue-without-contacts"]
         XCTAssertTrue(browse.waitForExistence(timeout: 5))
         XCTAssertGreaterThanOrEqual(browse.frame.height, 44)
@@ -136,6 +131,24 @@ final class LaunchAccessibilityTests: XCTestCase {
     }
 
     @MainActor
+    func testPreviouslyDeniedPermissionPassesAuditOnFirstRender() throws {
+        let app = firstLaunchApp(contactsOutcome: "denied-at-launch")
+        app.launch()
+
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        let status = app.staticTexts["onboarding.status"]
+        XCTAssertTrue(
+            status.waitForExistence(timeout: 5),
+            "A persisted denial should expose recovery on the first onboarding render."
+        )
+        let browse = app.buttons["onboarding.continue-without-contacts"]
+        XCTAssertTrue(browse.waitForExistence(timeout: 5))
+        XCTAssertTrue(browse.isEnabled)
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+    }
+
+    @MainActor
     func testFirstLaunchImportFailurePassesAuditAndRetryCompletes() throws {
         let app = firstLaunchApp(contactsOutcome: "import-fails-once")
         app.launch()
@@ -143,11 +156,8 @@ final class LaunchAccessibilityTests: XCTestCase {
         let onboarding = app.descendants(matching: .any)["screen.onboarding"]
         XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
         let allow = app.buttons["onboarding.allow-contacts"]
-        XCTAssertTrue(allow.waitForExistence(timeout: 5))
-        allow.tap()
-
         let status = app.staticTexts["onboarding.status"]
-        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        tap(allow, until: status, message: "Import failure should reveal retry copy.")
         let enabled = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "enabled == true"),
             object: allow
@@ -175,11 +185,8 @@ final class LaunchAccessibilityTests: XCTestCase {
         let onboarding = app.descendants(matching: .any)["screen.onboarding"]
         XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
         let allow = app.buttons["onboarding.allow-contacts"]
-        XCTAssertTrue(allow.waitForExistence(timeout: 5))
-        allow.tap()
-
         let status = app.staticTexts["onboarding.status"]
-        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        tap(allow, until: status, message: "Import failure should reveal recovery copy.")
         let browse = app.buttons["onboarding.continue-without-contacts"]
         XCTAssertTrue(
             browse.waitForExistence(timeout: 5),
@@ -211,6 +218,24 @@ final class LaunchAccessibilityTests: XCTestCase {
         app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = "accessibility5"
         app.launchEnvironment["REGARDS_UI_TEST_CONTACTS_OUTCOME"] = contactsOutcome
         return app
+    }
+
+    @MainActor
+    private func tap(
+        _ button: XCUIElement,
+        until destination: XCUIElement,
+        message: String
+    ) {
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.tap()
+        if !destination.waitForExistence(timeout: 5) {
+            // At accessibility5 XCTest must auto-scroll this CTA. The first
+            // synthesized tap can finish that scroll without delivering the
+            // action, so retry once against the now-visible plain element.
+            XCTAssertTrue(button.exists)
+            button.tap()
+        }
+        XCTAssertTrue(destination.waitForExistence(timeout: 5), message)
     }
 
     @MainActor

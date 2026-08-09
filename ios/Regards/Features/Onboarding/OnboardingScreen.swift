@@ -13,14 +13,17 @@ public struct OnboardingScreen: View {
     let isBusy: Bool
     let statusMessage: String?
     let canContinueWithoutContacts: Bool
+    let continueActionTitle: String
     let onAllow: () -> Void
     let onContinueWithoutContacts: (() -> Void)?
     let onWhyWeAsk: () -> Void
+    var accessibilityEffects = OnboardingAccessibilityEffects.live
 
     public init(showsPermissionAction: Bool = true,
                 isBusy: Bool = false,
                 statusMessage: String? = nil,
                 canContinueWithoutContacts: Bool = false,
+                continueActionTitle: String = "Continue without contacts",
                 onAllow: @escaping () -> Void = {},
                 onContinueWithoutContacts: (() -> Void)? = nil,
                 onWhyWeAsk: @escaping () -> Void = {}) {
@@ -28,6 +31,7 @@ public struct OnboardingScreen: View {
         self.isBusy = isBusy
         self.statusMessage = statusMessage
         self.canContinueWithoutContacts = canContinueWithoutContacts
+        self.continueActionTitle = continueActionTitle
         self.onAllow = onAllow
         self.onContinueWithoutContacts = onContinueWithoutContacts
         self.onWhyWeAsk = onWhyWeAsk
@@ -67,7 +71,7 @@ public struct OnboardingScreen: View {
                     }
 
                     if canContinueWithoutContacts, let onContinueWithoutContacts {
-                        Button("Continue without contacts", action: onContinueWithoutContacts)
+                        Button(continueActionTitle, action: onContinueWithoutContacts)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(RegardsDS.accentInk)
                             .frame(minHeight: 44)
@@ -100,7 +104,7 @@ public struct OnboardingScreen: View {
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .accessibilityIdentifier("screen.onboarding")
-        .onChange(of: statusMessage) { _, message in
+        .onChange(of: statusMessage, initial: true) { _, message in
             guard let message else { return }
             let recoveryAction: RecoveryAction = canContinueWithoutContacts
                 ? .continueWithoutContacts
@@ -108,10 +112,11 @@ public struct OnboardingScreen: View {
             Task { @MainActor in
                 await Task.yield()
                 guard statusMessage == message else { return }
-                AccessibilityNotification.Announcement(message).post()
+                accessibilityEffects.announce(message)
                 await Task.yield()
                 guard statusMessage == message else { return }
                 focusedRecoveryAction = recoveryAction
+                accessibilityEffects.didFocusRecovery()
             }
         }
     }
@@ -216,4 +221,14 @@ public struct OnboardingScreen: View {
         )
         .accessibilityIdentifier("onboarding.allow-contacts")
     }
+}
+
+struct OnboardingAccessibilityEffects {
+    let announce: @MainActor (String) -> Void
+    let didFocusRecovery: @MainActor () -> Void
+
+    static let live = OnboardingAccessibilityEffects(
+        announce: { AccessibilityNotification.Announcement($0).post() },
+        didFocusRecovery: {}
+    )
 }

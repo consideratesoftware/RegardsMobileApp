@@ -66,7 +66,9 @@ public final class ContactDetailViewModel {
             for log in logs { entries.append(Self.toEntry(log)) }
             interactions = entries
         } catch {
-            Self.log.error("failed to load contact \(self.contactId, privacy: .public): \(error, privacy: .public)")
+            Self.log.error(
+                "failed to load contact \(self.contactId, privacy: .private): \(error, privacy: .private)"
+            )
             contact = nil
             interactions = []
         }

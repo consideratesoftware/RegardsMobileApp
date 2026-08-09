@@ -9,12 +9,15 @@ final class AllContactsViewModel {
 
     private let repository: any ContactRepository
     private let clock: () -> Date
+    @ObservationIgnored private let filterObserver: (@MainActor () -> Void)?
     private var loadGeneration = 0
 
     init(contacts: any ContactRepository,
-         clock: @escaping () -> Date = { Date() }) {
+         clock: @escaping () -> Date = { Date() },
+         filterObserver: (@MainActor () -> Void)? = nil) {
         self.repository = contacts
         self.clock = clock
+        self.filterObserver = filterObserver
     }
 
     var summary: String {
@@ -27,6 +30,7 @@ final class AllContactsViewModel {
     }
 
     func filtered(searchText: String) -> [Contact] {
+        filterObserver?()
         guard !searchText.isEmpty else { return contacts }
         let query = searchText.lowercased()
         return contacts.filter {
@@ -57,7 +61,7 @@ final class AllContactsViewModel {
             loadState = .loaded
         } catch {
             guard generation == loadGeneration else { return }
-            Self.log.error("failed to load contacts: \(error, privacy: .public)")
+            Self.log.error("failed to load contacts: \(error, privacy: .private)")
             now = loadedAt
             contacts = []
             loadState = .failed

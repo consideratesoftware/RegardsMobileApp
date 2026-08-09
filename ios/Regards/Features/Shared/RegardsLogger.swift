@@ -8,7 +8,7 @@ import os
 /// Usage:
 /// ```
 /// static let log = RegardsLogger.feature("Overdue")
-/// log.error("failed to load contacts: \(error, privacy: .public)")
+/// log.error("failed to load contacts: \(error, privacy: .private)")
 /// ```
 public enum RegardsLogger {
 

@@ -44,7 +44,7 @@ public final class MergeDuplicatesViewModel {
             all = try await contacts.fetchAll()
         } catch {
             hasLoaded = false
-            Self.log.error("failed to fetch contacts for duplicate detection: \(error, privacy: .public)")
+            Self.log.error("failed to fetch contacts for duplicate detection: \(error, privacy: .private)")
             candidates = []
             loadState = .failed
             return

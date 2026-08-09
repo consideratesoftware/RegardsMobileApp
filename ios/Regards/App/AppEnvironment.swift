@@ -89,8 +89,8 @@ public struct AppRuntime: Sendable {
         self.clock = clock
     }
 
-    /// Phase 0 intentionally uses the same frozen fixture in every build
-    /// configuration. The production runtime remains dormant until TF-02.
+    /// The frozen mock fixture is reserved for previews and explicit DEBUG
+    /// launch arguments. Production launch always uses `makeProduction`.
     public static func makeMock(includeDuplicateFixture: Bool = false) -> AppRuntime {
         let now = MockRepositories.defaultNow
         let window = MockRepositories.defaultWindow
