@@ -130,5 +130,4 @@ public struct ContactsImporter: Sendable {
             emailAddresses: emailAddresses,
             createdAt: now)
     }
-
 }

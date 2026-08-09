@@ -122,6 +122,33 @@ struct ReminderWindowValidationTests {
         }
     }
 
+    @Test("A persisted non-canonical occasion time is rejected at the data boundary")
+    func persistedNonCanonicalOccasionTimeRejected() throws {
+        var record = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        record.occasionTime = "+9:00"
+
+        #expect(throws: DataError.invalidTimeOfDay("+9:00")) {
+            try record.toDomain()
+        }
+    }
+
+    @Test("Required persisted JSON arrays reject literal null")
+    func persistedRequiredJSONArraysRejectNull() throws {
+        var contact = try Self.contactRecord(override: nil)
+        contact.phonesJson = "null"
+        #expect(throws: DecodingError.self) {
+            try contact.toDomain()
+        }
+
+        var window = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        window.allowedTimeRangesJson = "null"
+        #expect(throws: DecodingError.self) {
+            try window.toDomain()
+        }
+    }
+
     @Test("Persisted JSON null quiet hours decode as nil (R39)")
     func persistedJSONNullQuietHoursDecodeAsNil() throws {
         var record = try ReminderWindowRecord(from: .defaultV1(

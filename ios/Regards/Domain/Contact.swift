@@ -61,7 +61,6 @@ public struct Contact: Sendable, Codable, Equatable, Hashable, Identifiable {
     }
 
     public var isActive: Bool { archivedAt == nil }
-    public var effectiveWindow: ReminderWindow? { reminderWindowOverride }
 }
 
 /// Virtual-merge target (ARCHITECTURE.md §7 `ContactGroup`). We never modify

@@ -52,6 +52,30 @@ final class LaunchAccessibilityTests: XCTestCase {
     }
 
     @MainActor
+    func testReadyWithoutRuntimePassesAuditAndRetryRecovers() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-ready-without-runtime")
+        app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = "accessibility5"
+        app.launch()
+
+        let failure = app.descendants(matching: .any)["launch.failure"]
+        XCTAssertTrue(
+            failure.waitForExistence(timeout: 10),
+            "A defensive ready-without-runtime state should reveal launch recovery."
+        )
+        let retry = app.buttons["Try Again"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
+        retry.tap()
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(
+            onboarding.waitForExistence(timeout: 10),
+            "Retry should create the production runtime and resume first launch."
+        )
+    }
+
+    @MainActor
     func testFirstLaunchImportsContactsAndReachesProductionTabs() throws {
         let app = XCUIApplication()
         app.launchArguments.append("--regards-first-launch-runtime")
@@ -140,6 +164,43 @@ final class LaunchAccessibilityTests: XCTestCase {
         XCTAssertTrue(
             overdue.waitForExistence(timeout: 10),
             "Retry should resume the import and reveal production-backed tabs."
+        )
+    }
+
+    @MainActor
+    func testFirstLaunchImportFailureCanBrowseWithoutContacts() throws {
+        let app = firstLaunchApp(contactsOutcome: "import-fails-once")
+        app.launch()
+
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        let allow = app.buttons["onboarding.allow-contacts"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+
+        let status = app.staticTexts["onboarding.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        let browse = app.buttons["onboarding.continue-without-contacts"]
+        XCTAssertTrue(
+            browse.waitForExistence(timeout: 5),
+            "A persistent import failure must offer a browse-only escape."
+        )
+        let enabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"),
+            object: browse
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [enabled], timeout: 5),
+            .completed,
+            "Browse-only recovery should enable after the failed import finishes."
+        )
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
+        browse.tap()
+        let overdue = app.descendants(matching: .any)["screen.overdue"]
+        XCTAssertTrue(
+            overdue.waitForExistence(timeout: 10),
+            "Browse-only recovery should reveal production-backed tabs."
         )
     }
 

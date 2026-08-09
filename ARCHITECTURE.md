@@ -827,7 +827,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 
 **When tests flake:** one flake across ~30 runs is noise — note it, don't "harden" (see journal post #5 for the scar). Reproduce ≥2/5 stress runs before writing a fix; prefer deleting cleverness over adding waits.
 
-## 18. Current state — ground truth as of 2026-08-07
+## 18. Current state — ground truth as of 2026-08-08
 
 The TF-02 branch started from `main` = `8adeb0d` (GitHub PR #43, the TF-01
 checkpoint and determinism repair). The engine contract,
@@ -974,7 +974,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R43 | Stale smoke-doc step ("Phase 0 scaffold" splash subtitle that no longer exists) | `accessibility-smoke.md:19-21` | Update script | ✅ **closed by TF-01 slice 1** |
 | R44 | `LSApplicationCategoryType` = social-networking in project.yml while the listing plan says Productivity primary | `project.yml:94` | Align with §20 category decision | PR34 |
 | R45 | 8.4 MB `Substack_banner.png` sitting at repo root (ignored but clutter); `.DS_Store` files | repo root | Move banner to journal assets outside the repo; OS files stay ignored | anytime |
-| R46 | `InteractionLog` doc comment references nonexistent `ContactRepository.markCaughtUp` API; `Channel.isAvailableOnIOS` always-true dead code; `Contact.effectiveWindow` misleading zero-caller helper | `InteractionLog.swift:11-12`, `Channel.swift:44`, `Contact.swift:58` | Fix comment; keep `isAvailableOnIOS` only if Android port will flip it (document), else delete; delete or repoint `effectiveWindow` at SchedulingPass | comment ✅ **closed by PR16**; `isAvailableOnIOS`/`effectiveWindow` → PR22 |
+| R46 | `InteractionLog` doc comment referenced nonexistent `ContactRepository.markCaughtUp`; `Channel.isAvailableOnIOS` remains an intentionally documented Android-port seam | `InteractionLog.swift`, `Channel.swift` | Keep the comment truthful and retain `isAvailableOnIOS` only while the Android port owns the divergent implementation | comment ✅ **closed by PR16**; zero-caller `Contact.effectiveWindow` removed by TF-02; Android seam remains owned by PR22 |
 | R47 | Invalid persisted timezone identifiers silently fall back to the device timezone, changing reminder timing without consent | `ReminderWindow.swift`, `Records.swift` | Validate IANA identifier and reject malformed persisted windows | ✅ **closed in PR16 review** |
 | R48 | Slot-start snapping can schedule a future-due contact before `overdueAt`; repeated-hour snapping can choose a boundary from the wrong UTC occurrence | `ReminderEngine.swift` | Distinguish already-overdue from future-due targets; resolve fall-back boundaries relative to the search instant; regression tests | ✅ **closed in PR16 review** |
 

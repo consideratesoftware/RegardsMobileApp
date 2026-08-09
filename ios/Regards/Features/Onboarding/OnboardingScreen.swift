@@ -102,12 +102,16 @@ public struct OnboardingScreen: View {
         .accessibilityIdentifier("screen.onboarding")
         .onChange(of: statusMessage) { _, message in
             guard let message else { return }
-            AccessibilityNotification.Announcement(message).post()
+            let recoveryAction: RecoveryAction = canContinueWithoutContacts
+                ? .continueWithoutContacts
+                : .allowContacts
             Task { @MainActor in
                 await Task.yield()
-                focusedRecoveryAction = canContinueWithoutContacts
-                    ? .continueWithoutContacts
-                    : .allowContacts
+                guard statusMessage == message else { return }
+                AccessibilityNotification.Announcement(message).post()
+                await Task.yield()
+                guard statusMessage == message else { return }
+                focusedRecoveryAction = recoveryAction
             }
         }
     }
@@ -196,10 +200,10 @@ public struct OnboardingScreen: View {
         Button(action: onAllow) {
             Text(isBusy ? "Importing contacts…" : "Allow contacts access")
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(RegardsDS.background)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
-                // `accentInk` so the white headline passes AA body contrast.
+                // Background-on-`accentInk` passes AA in both color schemes.
                 .background(RegardsDS.accentInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)

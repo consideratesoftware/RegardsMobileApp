@@ -93,7 +93,7 @@ public struct ReminderEngine: Sendable {
     private let clock: @Sendable () -> Date
 
     public init(
-        occasionNotificationTime: TimeOfDay = TimeOfDay(hour: 9),
+        occasionNotificationTime: TimeOfDay = ReminderWindow.defaultOccasionTime,
         clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.occasionNotificationTime = occasionNotificationTime
