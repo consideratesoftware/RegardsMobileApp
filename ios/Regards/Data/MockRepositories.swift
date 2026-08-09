@@ -47,6 +47,40 @@ public struct MockRepositories: Sendable {
 
 // MARK: - Shared in-memory store
 
+private func mockReminderPrecedes(
+    _ lhs: ScheduledReminder,
+    _ rhs: ScheduledReminder
+) -> Bool {
+    if lhs.scheduledFor != rhs.scheduledFor { return lhs.scheduledFor < rhs.scheduledFor }
+    return lhs.id.uuidString < rhs.id.uuidString
+}
+
+private enum MockRepositoryWriteError: Error {
+    case duplicateSystemContactRef, missingGroup, missingContact, duplicateInteraction
+}
+
+/// GRDB stores timestamps as integer epoch seconds. Mock writes use the same
+/// precision so round trips, filtering, and tie ordering agree.
+private func mockStoredDate(_ date: Date) -> Date {
+    Date(timeIntervalSince1970: TimeInterval(Int(date.timeIntervalSince1970)))
+}
+
+private func mockStoredContact(_ contact: Contact) throws -> Contact { try ContactRecord(from: contact).toDomain() }
+
+private func mockStoredGroup(_ group: ContactGroup) throws -> ContactGroup {
+    try ContactGroupRecord(from: group).toDomain()
+}
+
+private func mockStoredReminder(_ reminder: ScheduledReminder) throws -> ScheduledReminder {
+    try ScheduledReminderRecord(from: reminder).toDomain()
+}
+
+private func mockStoredInteraction(_ log: InteractionLog) throws -> InteractionLog {
+    try InteractionLogRecord(from: log).toDomain()
+}
+
+private func mockStoredProfile(_ profile: UserProfile) -> UserProfile { UserProfileRecord(from: profile).toDomain() }
+
 /// Actor serializes mutations so concurrent callers don't trample state.
 actor MockStore {
     var contacts: [UUID: Contact] = [:]
@@ -59,8 +93,8 @@ actor MockStore {
     init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
         self.window = window
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
-                                    entitlementTier: .trial,
-                                    entitlementRefreshedAt: now)
+                                   entitlementTier: .trial,
+                                   entitlementRefreshedAt: now)
 
         for contact in Self.seedCast(
             now: now,
@@ -327,6 +361,8 @@ actor MockStore {
         return contacts
     }
 
+}
+extension MockStore {
     func allContacts() -> [Contact] { Array(contacts.values) }
     func tracked() -> [Contact] {
         contacts.values.filter { $0.tracked && $0.archivedAt == nil }
@@ -335,26 +371,46 @@ actor MockStore {
     func membersOfGroup(_ groupId: UUID) -> [Contact] {
         contacts.values.filter { $0.contactGroupId == groupId }
     }
-    func upsertContact(_ c: Contact) { contacts[c.id] = c }
+    func upsertContact(_ c: Contact) throws {
+        try c.reminderWindowOverride?.validate()
+        guard !contacts.values.contains(where: {
+            $0.id != c.id && $0.systemContactRef == c.systemContactRef
+        }) else { throw MockRepositoryWriteError.duplicateSystemContactRef }
+        if let groupID = c.contactGroupId, groups[groupID] == nil {
+            throw MockRepositoryWriteError.missingGroup
+        }
+        contacts[c.id] = try mockStoredContact(c)
+    }
     func archiveContact(id: UUID, at: Date) {
         guard var c = contacts[id] else { return }
-        c.archivedAt = at
+        c.archivedAt = mockStoredDate(at)
         contacts[id] = c
     }
 
     func allGroups() -> [ContactGroup] { Array(groups.values) }
     func group(id: UUID) -> ContactGroup? { groups[id] }
-    func upsertGroup(_ g: ContactGroup) { groups[g.id] = g }
-    func deleteGroup(id: UUID) { groups.removeValue(forKey: id) }
+    func upsertGroup(_ g: ContactGroup) throws { groups[g.id] = try mockStoredGroup(g) }
+    func deleteGroup(id: UUID) {
+        groups.removeValue(forKey: id)
+        contacts = contacts.mapValues { contact in
+            var updated = contact
+            if updated.contactGroupId == id { updated.contactGroupId = nil }
+            return updated
+        }
+    }
 
     func pendingReminders() -> [ScheduledReminder] {
         reminders.values.filter { $0.state == .pending }
-            .sorted { $0.scheduledFor < $1.scheduledFor }
+            .sorted(by: mockReminderPrecedes)
     }
     func pendingReminders(forContact id: UUID) -> [ScheduledReminder] {
         reminders.values.filter { $0.contactId == id && $0.state == .pending }
+            .sorted(by: mockReminderPrecedes)
     }
-    func upsertReminder(_ r: ScheduledReminder) { reminders[r.id] = r }
+    func upsertReminder(_ r: ScheduledReminder) throws {
+        guard contacts[r.contactId] != nil else { throw MockRepositoryWriteError.missingContact }
+        reminders[r.id] = try mockStoredReminder(r)
+    }
     func updateReminderState(id: UUID, state: ReminderState) {
         guard var r = reminders[id] else { return }
         r.state = state
@@ -364,16 +420,26 @@ actor MockStore {
 
     func recentInteractions(forContact id: UUID, limit: Int) -> [InteractionLog] {
         interactions.values.filter { $0.contactId == id }
-            .sorted { $0.occurredAt > $1.occurredAt }
+            .sorted {
+                if $0.occurredAt != $1.occurredAt { return $0.occurredAt > $1.occurredAt }
+                return $0.id.uuidString < $1.id.uuidString
+            }
             .prefix(limit)
             .map { $0 }
     }
-    func appendInteraction(_ log: InteractionLog) { interactions[log.id] = log }
+    func appendInteraction(_ log: InteractionLog) throws {
+        guard contacts[log.contactId] != nil else { throw MockRepositoryWriteError.missingContact }
+        guard interactions[log.id] == nil else { throw MockRepositoryWriteError.duplicateInteraction }
+        interactions[log.id] = try mockStoredInteraction(log)
+    }
 
     func getWindow() -> ReminderWindow { window }
-    func setWindow(_ w: ReminderWindow) { window = w }
+    func setWindow(_ w: ReminderWindow) throws {
+        try w.validate()
+        window = w
+    }
     func getProfile() -> UserProfile { profile }
-    func setProfile(_ p: UserProfile) { profile = p }
+    func setProfile(_ p: UserProfile) { profile = mockStoredProfile(p) }
 }
 
 // MARK: - Protocol wrappers
@@ -386,7 +452,7 @@ struct MockContactRepository: ContactRepository {
     func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
         await store.membersOfGroup(groupId)
     }
-    func upsert(_ contact: Contact) async throws { await store.upsertContact(contact) }
+    func upsert(_ contact: Contact) async throws { try await store.upsertContact(contact) }
     func archive(id: UUID, at: Date) async throws { await store.archiveContact(id: id, at: at) }
 }
 
@@ -394,7 +460,7 @@ struct MockContactGroupRepository: ContactGroupRepository {
     let store: MockStore
     func fetchAll() async throws -> [ContactGroup] { await store.allGroups() }
     func fetch(id: UUID) async throws -> ContactGroup? { await store.group(id: id) }
-    func upsert(_ group: ContactGroup) async throws { await store.upsertGroup(group) }
+    func upsert(_ group: ContactGroup) async throws { try await store.upsertGroup(group) }
     func delete(id: UUID) async throws { await store.deleteGroup(id: id) }
 }
 
@@ -405,7 +471,7 @@ struct MockReminderRepository: ReminderRepository {
         await store.pendingReminders(forContact: contactId)
     }
     func upsert(_ reminder: ScheduledReminder) async throws {
-        await store.upsertReminder(reminder)
+        try await store.upsertReminder(reminder)
     }
     func updateState(id: UUID, state: ReminderState) async throws {
         await store.updateReminderState(id: id, state: state)
@@ -418,13 +484,13 @@ struct MockInteractionRepository: InteractionRepository {
     func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
         await store.recentInteractions(forContact: contactId, limit: limit)
     }
-    func append(_ log: InteractionLog) async throws { await store.appendInteraction(log) }
+    func append(_ log: InteractionLog) async throws { try await store.appendInteraction(log) }
 }
 
 struct MockReminderWindowRepository: ReminderWindowRepository {
     let store: MockStore
     func fetchGlobal() async throws -> ReminderWindow { await store.getWindow() }
-    func saveGlobal(_ window: ReminderWindow) async throws { await store.setWindow(window) }
+    func saveGlobal(_ window: ReminderWindow) async throws { try await store.setWindow(window) }
 }
 
 struct MockUserProfileRepository: UserProfileRepository {

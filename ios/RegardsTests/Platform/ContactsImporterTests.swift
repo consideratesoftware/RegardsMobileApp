@@ -77,7 +77,7 @@ struct ContactsImporterTests {
             givenName: "Alex",
             familyName: "",
             phoneNumbers: [],
-            emailAddresses: ["alex@example.com"])
+            emailAddresses: ["Alex@Example.COM"])
         let c = ContactsImporter.map(systemContact: sc, now: Self.now)
         #expect(c.preferredChannel == .email)
         #expect(c.preferredChannelValue == "alex@example.com")
@@ -102,6 +102,47 @@ struct ContactsImporterTests {
             phoneNumbers: ["+15555550400"], emailAddresses: [])
         let c = ContactsImporter.map(systemContact: sc, now: Self.now)
         #expect(c.systemContactRef == "ABCDEFGH-1234-5678-9012-ABCDEFGHIJKL")
+    }
+
+    @Test("Mapping normalizes parseable phones and lowercases every email")
+    func mapPersistsAllContactValues() {
+        let sc = SystemContact(
+            identifier: "id-all-values",
+            givenName: "Alex",
+            familyName: "Chen",
+            phoneNumbers: ["+1 555 010 0100", "+44 20 7946 0958"],
+            emailAddresses: ["Alex@Example.COM", "WORK@EXAMPLE.COM"]
+        )
+
+        let contact = ContactsImporter.map(systemContact: sc, now: Self.now)
+
+        #expect(contact.phoneNumbers == ["+15550100100", "+442079460958"])
+        #expect(contact.emailAddresses == ["alex@example.com", "work@example.com"])
+        #expect(contact.preferredChannelValue == "+15550100100")
+    }
+
+    @Test("Mapping preserves raw phones when an E.164 country code is unavailable")
+    func mapPreservesUnparseablePhoneValues() {
+        let rawPhones = [
+            "(415) 555-0100",
+            "extension 123",
+            "+1 415 555 0100 x123",
+            "+1 415 CALL-NOW",
+            "+١ ٤١٥ ٥٥٥ ٠١٠٠",
+            "+１ ４１５ ５５５ ０１００",
+        ]
+        let systemContact = SystemContact(
+            identifier: "id-local-values",
+            givenName: "Alex",
+            familyName: "Chen",
+            phoneNumbers: rawPhones,
+            emailAddresses: []
+        )
+
+        let contact = ContactsImporter.map(systemContact: systemContact, now: Self.now)
+
+        #expect(contact.phoneNumbers == rawPhones)
+        #expect(contact.preferredChannelValue == rawPhones.first)
     }
 
     // MARK: - runFirstLaunchImport — orchestration
@@ -138,6 +179,28 @@ struct ContactsImporterTests {
         let result = try await importer.runFirstLaunchImport()
         #expect(result == .init(imported: 3, skipped: 0))
         #expect(try await repo.fetchAll().count == 3)
+    }
+
+    @Test("Import persists all contact values through the repository")
+    func runImportPersistsAllContactValues() async throws {
+        let systemContact = SystemContact(
+            identifier: "id-persist-values",
+            givenName: "Alex",
+            familyName: "Chen",
+            phoneNumbers: ["+1 555 010 0100", "+44 20 7946 0958"],
+            emailAddresses: ["Alex@Example.COM", "WORK@EXAMPLE.COM"]
+        )
+        let source = FakeContactsSource(status: .authorized, contacts: [systemContact])
+        let repo = GRDBRepositories(
+            dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let importer = ContactsImporter(source: source, repo: repo,
+                                        clock: { Self.now })
+
+        _ = try await importer.runFirstLaunchImport()
+        let imported = try #require(try await repo.fetchAll().first)
+
+        #expect(imported.phoneNumbers == ["+15550100100", "+442079460958"])
+        #expect(imported.emailAddresses == ["alex@example.com", "work@example.com"])
     }
 
     @Test("Contacts already in the DB are skipped, not duplicated or modified")
@@ -178,6 +241,39 @@ struct ContactsImporterTests {
         #expect(reloaded?.cadenceDays == 14)
     }
 
+    @Test("Duplicate system identifiers in one fetch are imported once")
+    func runImportSkipsDuplicateSystemIdentifierInOnePass() async throws {
+        let duplicateIdentifier = "same-pass-duplicate"
+        let sources = [
+            SystemContact(
+                identifier: duplicateIdentifier,
+                givenName: "Leia",
+                familyName: "Organa",
+                phoneNumbers: ["+15555550602"],
+                emailAddresses: []
+            ),
+            SystemContact(
+                identifier: duplicateIdentifier,
+                givenName: "General",
+                familyName: "Organa",
+                phoneNumbers: ["+15555550603"],
+                emailAddresses: []
+            ),
+        ]
+        let source = FakeContactsSource(status: .authorized, contacts: sources)
+        let repo = GRDBRepositories(
+            dbQueue: try DatabaseFactory.makeInMemoryDatabase()
+        ).contacts
+        let importer = ContactsImporter(source: source, repo: repo, clock: { Self.now })
+
+        let result = try await importer.runFirstLaunchImport()
+
+        #expect(result == .init(imported: 1, skipped: 1))
+        let imported = try await repo.fetchAll()
+        #expect(imported.count == 1)
+        #expect(imported.first?.systemContactRef == duplicateIdentifier)
+    }
+
     @Test("Importer throws notAuthorized when current status isn't authorized or limited")
     func runImportThrowsWhenNotAuthorized() async throws {
         let queue = try DatabaseFactory.makeInMemoryDatabase()
@@ -213,6 +309,34 @@ struct ContactsImporterTests {
         #expect(result == .init(imported: 1, skipped: 0))
     }
 
+    @Test("A retry resumes after the last contact written before interruption")
+    func runImportResumesAfterInterruption() async throws {
+        let sources = [
+            SystemContact(identifier: "resume-A", givenName: "A", familyName: "",
+                          phoneNumbers: ["+15555550801"], emailAddresses: []),
+            SystemContact(identifier: "resume-B", givenName: "B", familyName: "",
+                          phoneNumbers: ["+15555550802"], emailAddresses: []),
+            SystemContact(identifier: "resume-C", givenName: "C", familyName: "",
+                          phoneNumbers: ["+15555550803"], emailAddresses: []),
+        ]
+        let source = FakeContactsSource(status: .authorized, contacts: sources)
+        let repo = InterruptingContactRepository(interruptBeforeWrite: 2)
+        let importer = ContactsImporter(source: source, repo: repo,
+                                        clock: { Self.now })
+
+        do {
+            _ = try await importer.runFirstLaunchImport()
+            Issue.record("Expected the first import attempt to be interrupted")
+        } catch ImportInterruption.interrupted {
+            #expect(try await repo.fetchAll().map(\.systemContactRef) == ["resume-A"])
+        }
+
+        let resumed = try await importer.runFirstLaunchImport()
+        #expect(resumed == .init(imported: 2, skipped: 1))
+        #expect(Set(try await repo.fetchAll().map(\.systemContactRef))
+                == Set(sources.map(\.identifier)))
+    }
+
     // MARK: - Helpers
 
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -220,10 +344,8 @@ struct ContactsImporterTests {
 
 // MARK: - FakeContactsSource
 
-/// In-memory `ContactsSource` for tests. Status is fixed at construction;
-/// call `setStatus` between import passes to simulate the user changing
-/// permission. `requestAccess` reports the current status without touching
-/// the system.
+/// In-memory `ContactsSource` for tests. Status is fixed at construction, and
+/// `requestAccess` reports it without touching the system.
 private final class FakeContactsSource: ContactsSource, @unchecked Sendable {
     private let lock = NSLock()
     private var status: ContactsAuthorizationStatus
@@ -244,5 +366,48 @@ private final class FakeContactsSource: ContactsSource, @unchecked Sendable {
 
     func fetchAllContacts() async throws -> [SystemContact] {
         lock.withLock { contacts }
+    }
+}
+
+private enum ImportInterruption: Error {
+    case interrupted
+}
+
+private actor InterruptingContactRepository: ContactRepository {
+    private var contacts: [Contact] = []
+    private let interruptBeforeWrite: Int
+    private var writeAttempts = 0
+
+    init(interruptBeforeWrite: Int) {
+        self.interruptBeforeWrite = interruptBeforeWrite
+    }
+
+    func fetchAll() async throws -> [Contact] {
+        contacts
+    }
+
+    func fetchTracked() async throws -> [Contact] {
+        contacts.filter { $0.tracked && $0.isActive }
+    }
+
+    func fetch(id: UUID) async throws -> Contact? {
+        contacts.first { $0.id == id }
+    }
+
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        contacts.filter { $0.contactGroupId == groupId }
+    }
+
+    func upsert(_ contact: Contact) async throws {
+        writeAttempts += 1
+        if writeAttempts == interruptBeforeWrite {
+            throw ImportInterruption.interrupted
+        }
+        contacts.append(contact)
+    }
+
+    func archive(id: UUID, at: Date) async throws {
+        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return }
+        contacts[index].archivedAt = at
     }
 }

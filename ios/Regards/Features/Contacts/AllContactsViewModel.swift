@@ -21,7 +21,8 @@ final class AllContactsViewModel {
         switch loadState {
         case .loading: "Loading…"
         case .failed: "Unavailable"
-        case .loaded: "\(contacts.count) tracked"
+        case .loaded:
+            contacts.count == 1 ? "1 contact" : "\(contacts.count) contacts"
         }
     }
 
@@ -41,7 +42,7 @@ final class AllContactsViewModel {
         }
         let loadedAt = clock()
         do {
-            var loadedContacts = try await repository.fetchTracked()
+            var loadedContacts = try await repository.fetchAll().filter(\.isActive)
             loadedContacts.sort { $0.priorityTier.rawValue < $1.priorityTier.rawValue }
             guard generation == loadGeneration else { return }
             now = loadedAt
@@ -49,7 +50,7 @@ final class AllContactsViewModel {
             loadState = .loaded
         } catch {
             guard generation == loadGeneration else { return }
-            Self.log.error("failed to load tracked contacts: \(error, privacy: .public)")
+            Self.log.error("failed to load contacts: \(error, privacy: .public)")
             now = loadedAt
             contacts = []
             loadState = .failed

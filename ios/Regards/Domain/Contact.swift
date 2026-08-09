@@ -13,6 +13,8 @@ public struct Contact: Sendable, Codable, Equatable, Hashable, Identifiable {
     public var priorityTier: PriorityTier
     public var preferredChannel: Channel
     public var preferredChannelValue: String
+    public var phoneNumbers: [String]
+    public var emailAddresses: [String]
     public var reminderWindowOverride: ReminderWindow?
     public var lastInteractedAt: Date?
     public var notes: String
@@ -30,6 +32,8 @@ public struct Contact: Sendable, Codable, Equatable, Hashable, Identifiable {
         priorityTier: PriorityTier = .regular,
         preferredChannel: Channel = .phoneCall,
         preferredChannelValue: String = "",
+        phoneNumbers: [String] = [],
+        emailAddresses: [String] = [],
         reminderWindowOverride: ReminderWindow? = nil,
         lastInteractedAt: Date? = nil,
         notes: String = "",
@@ -46,6 +50,8 @@ public struct Contact: Sendable, Codable, Equatable, Hashable, Identifiable {
         self.priorityTier = priorityTier
         self.preferredChannel = preferredChannel
         self.preferredChannelValue = preferredChannelValue
+        self.phoneNumbers = phoneNumbers
+        self.emailAddresses = emailAddresses
         self.reminderWindowOverride = reminderWindowOverride
         self.lastInteractedAt = lastInteractedAt
         self.notes = notes

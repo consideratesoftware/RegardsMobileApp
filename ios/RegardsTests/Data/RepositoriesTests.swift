@@ -1,351 +1,500 @@
 import Foundation
 import Testing
-import GRDB
 @testable import Regards
+/// Runs one behavior contract against the seeded in-memory mock and an
+/// in-memory production database. Tests compare their own rows with the
+/// pre-existing fixture so the shipping mock keeps its representative data.
+enum RepositoryContractBackend: String, CaseIterable, Sendable {
+    case grdb
+    case mock
 
-/// CRUD round-trip coverage for every `*Repository` protocol against an
-/// in-memory GRDB DB. `DatabaseMigratorTests` covers schema + migration plus
-/// the basic Contact / Reminder happy paths; this suite fills in the methods
-/// those don't exercise (fetchTracked, fetchMembers, archive, group CRUD,
-/// fetchPending(forContact:), reminder delete, interaction fetchRecent
-/// ordering, ReminderWindow + UserProfile singleton overwrites).
-struct RepositoriesTests {
+    func makeRepositories() throws -> RepositoryContractRepositories {
+        switch self {
+        case .grdb:
+            let repositories = GRDBRepositories(
+                dbQueue: try DatabaseFactory.makeInMemoryDatabase()
+            )
+            return RepositoryContractRepositories(
+                contacts: repositories.contacts,
+                groups: repositories.groups,
+                reminders: repositories.reminders,
+                interactions: repositories.interactions,
+                window: repositories.window,
+                profile: repositories.profile
+            )
+        case .mock:
+            let repositories = MockRepositories(
+                now: Date(timeIntervalSince1970: 1_800_000_000)
+            )
+            return RepositoryContractRepositories(
+                contacts: repositories.contacts,
+                groups: repositories.groups,
+                reminders: repositories.reminders,
+                interactions: repositories.interactions,
+                window: repositories.window,
+                profile: repositories.profile
+            )
+        }
+    }
+}
+struct RepositoryContractRepositories: Sendable {
+    let contacts: any ContactRepository
+    let groups: any ContactGroupRepository
+    let reminders: any ReminderRepository
+    let interactions: any InteractionRepository
+    let window: any ReminderWindowRepository
+    let profile: any UserProfileRepository
+}
+func contractUUID(_ suffix: Int) throws -> UUID {
+    try #require(UUID(uuidString: String(
+        format: "00000000-0000-0000-0000-%012d",
+        suffix
+    )))
+}
+private func contractStoredDate(_ date: Date) -> Date {
+    Date(timeIntervalSince1970: TimeInterval(Int(date.timeIntervalSince1970)))
+}
+private func contractStored(_ reminder: ScheduledReminder) -> ScheduledReminder {
+    var stored = reminder
+    stored.scheduledFor = contractStoredDate(reminder.scheduledFor)
+    return stored
+}
+private func contractStored(_ log: InteractionLog) -> InteractionLog {
+    InteractionLog(id: log.id, contactId: log.contactId,
+                   occurredAt: contractStoredDate(log.occurredAt),
+                   source: log.source, channel: log.channel)
+}
+private func contractStored(_ contact: Contact) throws -> Contact { try ContactRecord(from: contact).toDomain() }
+private func contractStored(_ g: ContactGroup) throws -> ContactGroup { try ContactGroupRecord(from: g).toDomain() }
+private func contractStored(_ profile: UserProfile) -> UserProfile { UserProfileRecord(from: profile).toDomain() }
+func expectWriteRejected(_ operation: () async throws -> Void) async {
+    do {
+        try await operation()
+        Issue.record("Expected repository write to fail")
+    } catch {}
+}
+func contractContact(
+    id: UUID,
+    suffix: String,
+    tracked: Bool = false,
+    groupID: UUID? = nil,
+    archivedAt: Date? = nil
+) -> Contact {
+    Contact(
+        id: id,
+        systemContactRef: "repository-contract-\(suffix)",
+        displayName: "Contract \(suffix)",
+        photoRef: "photo-\(suffix)",
+        tracked: tracked,
+        cadenceDays: tracked ? 14 : nil,
+        priorityTier: .close,
+        preferredChannel: .email,
+        preferredChannelValue: "\(suffix)@example.com",
+        phoneNumbers: ["+1 415 555 0100"],
+        emailAddresses: ["\(suffix)@example.com"],
+        reminderWindowOverride: ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 10), end: TimeOfDay(hour: 11)),
+            ],
+            timezoneIdentifier: "Etc/UTC",
+            occasionTime: TimeOfDay(hour: 10, minute: 30),
+            digestHorizonDays: 30
+        ),
+        lastInteractedAt: Date(timeIntervalSince1970: 1_700_000_100.875),
+        notes: "Repository contract fixture",
+        contactGroupId: groupID,
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000.875),
+        archivedAt: archivedAt
+    )
+}
+struct ContactRepositoryContractTests {
+    @Test("Contact timestamp normalization and full round-trip", arguments: RepositoryContractBackend.allCases)
+    func upsertAndFetch(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let baselineIDs = Set(try await repositories.contacts.fetchAll().map(\.id))
+        let contact = contractContact(
+            id: try contractUUID(101),
+            suffix: "upsert",
+            tracked: true
+        )
 
-    // MARK: - ContactRepository
+        try await repositories.contacts.upsert(contact)
 
-    @Test("fetchTracked filters out untracked and archived contacts")
-    func fetchTrackedFiltersUntrackedAndArchived() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repo = GRDBRepositories(dbQueue: queue).contacts
+        let fetched = try await repositories.contacts.fetch(id: contact.id)
+        #expect(fetched == (try contractStored(contact)))
+        let currentIDs = Set(try await repositories.contacts.fetchAll().map(\.id))
+        #expect(currentIDs.subtracting(baselineIDs) == [contact.id])
 
-        let tracked = Contact(
-            systemContactRef: "sys-tracked",
-            displayName: "Tracked Tina",
-            tracked: true, cadenceDays: 14,
-            preferredChannel: .phoneCall, preferredChannelValue: "+15555550100")
-        let untracked = Contact(
-            systemContactRef: "sys-untracked",
-            displayName: "Untracked Ulysses",
-            tracked: false,
-            preferredChannel: .phoneCall, preferredChannelValue: "+15555550101")
-        let archived = Contact(
-            systemContactRef: "sys-archived",
-            displayName: "Archived Aisha",
-            tracked: true, cadenceDays: 30,
-            preferredChannel: .sms, preferredChannelValue: "+15555550102")
+        var updated = contact
+        updated.displayName = "Updated contract contact"
+        updated.phoneNumbers.append("+1 415 555 0199")
+        try await repositories.contacts.upsert(updated)
+        #expect(try await repositories.contacts.fetch(id: contact.id) == (try contractStored(updated)))
 
-        try await repo.upsert(tracked)
-        try await repo.upsert(untracked)
-        try await repo.upsert(archived)
-        try await repo.archive(id: archived.id, at: Date(timeIntervalSince1970: 1_800_000_000))
-
-        let result = try await repo.fetchTracked()
-        #expect(result.map(\.id) == [tracked.id])
+        let duplicateRef = contractContact(id: try contractUUID(102), suffix: "upsert")
+        await expectWriteRejected { try await repositories.contacts.upsert(duplicateRef) }
+        #expect(try await repositories.contacts.fetch(id: duplicateRef.id) == nil)
     }
 
-    @Test("fetchMembers returns contacts in the group, including archived ones")
-    func fetchMembersByGroup() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repos = GRDBRepositories(dbQueue: queue)
+    @Test("fetchTracked excludes untracked and archived contacts", arguments: RepositoryContractBackend.allCases)
+    func trackedFilter(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let baselineIDs = Set(try await repositories.contacts.fetchTracked().map(\.id))
+        let tracked = contractContact(
+            id: try contractUUID(111), suffix: "tracked", tracked: true)
+        let untracked = contractContact(
+            id: try contractUUID(112), suffix: "untracked")
+        let archived = contractContact(
+            id: try contractUUID(113),
+            suffix: "archived",
+            tracked: true,
+            archivedAt: Date(timeIntervalSince1970: 1_700_000_200.875)
+        )
 
-        let primary = Contact(
-            systemContactRef: "sys-mom-personal",
-            displayName: "Mom (personal)",
-            tracked: true, preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550200")
-        try await repos.contacts.upsert(primary)
+        for contact in [tracked, untracked, archived] {
+            try await repositories.contacts.upsert(contact)
+        }
 
+        let currentIDs = Set(try await repositories.contacts.fetchTracked().map(\.id))
+        #expect(currentIDs.subtracting(baselineIDs) == [tracked.id])
+        #expect(!currentIDs.contains(untracked.id))
+        #expect(!currentIDs.contains(archived.id))
+    }
+
+    @Test("archive keeps the row and normalizes archivedAt", arguments: RepositoryContractBackend.allCases)
+    func archive(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(
+            id: try contractUUID(121), suffix: "archive", tracked: true)
+        let archivedAt = Date(timeIntervalSince1970: 1_800_000_100.875)
+        try await repositories.contacts.upsert(contact)
+
+        try await repositories.contacts.archive(id: contact.id, at: archivedAt)
+
+        let fetched = try #require(try await repositories.contacts.fetch(id: contact.id))
+        #expect(fetched.archivedAt == contractStoredDate(archivedAt))
+        #expect(!fetched.isActive)
+        #expect(!Set(try await repositories.contacts.fetchTracked().map(\.id)).contains(contact.id))
+    }
+}
+struct ContactGroupRepositoryContractTests {
+
+    @Test(
+        "Group CRUD includes archived members and delete clears membership",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func groupLifecycle(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let baselineGroupIDs = Set(try await repositories.groups.fetchAll().map(\.id))
+        let primaryID = try contractUUID(201)
+        let memberID = try contractUUID(202)
         let group = ContactGroup(
-            displayName: "Mom",
-            primaryContactId: primary.id,
-            createdBy: .user)
-        try await repos.groups.upsert(group)
+            id: try contractUUID(203),
+            displayName: "Contract group",
+            primaryContactId: primaryID,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000.875),
+            createdBy: .suggestionAccepted
+        )
 
-        let activeMember = Contact(
-            systemContactRef: "sys-mom-personal-2",
-            displayName: "Mom (work)",
-            preferredChannel: .email,
-            preferredChannelValue: "",
-            contactGroupId: group.id)
-        let archivedMember = Contact(
-            systemContactRef: "sys-mom-whatsapp",
-            displayName: "Mom (WhatsApp, deleted from system contacts)",
-            preferredChannel: .whatsapp,
-            preferredChannelValue: "+15555550201",
-            contactGroupId: group.id)
-        let unrelated = Contact(
-            systemContactRef: "sys-other",
-            displayName: "Not Mom",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550999")
+        try await repositories.contacts.upsert(contractContact(
+            id: primaryID,
+            suffix: "group-primary"
+        ))
+        try await repositories.groups.upsert(group)
+        try await repositories.contacts.upsert(contractContact(
+            id: primaryID,
+            suffix: "group-primary",
+            groupID: group.id
+        ))
+        try await repositories.contacts.upsert(contractContact(
+            id: memberID,
+            suffix: "group-member",
+            groupID: group.id,
+            archivedAt: Date(timeIntervalSince1970: 1_700_000_100.875)
+        ))
 
-        // Set the group reference on the primary too, so all 3 group rows
-        // (primary + active + archived) carry the group id.
-        var primaryWithGroup = primary
-        primaryWithGroup.contactGroupId = group.id
-        try await repos.contacts.upsert(primaryWithGroup)
-        try await repos.contacts.upsert(activeMember)
-        try await repos.contacts.upsert(archivedMember)
-        try await repos.contacts.upsert(unrelated)
+        #expect(try await repositories.groups.fetch(id: group.id) == (try contractStored(group)))
+        let currentGroupIDs = Set(try await repositories.groups.fetchAll().map(\.id))
+        #expect(currentGroupIDs.subtracting(baselineGroupIDs) == [group.id])
+        let members = try await repositories.contacts.fetchMembers(ofGroup: group.id)
+        #expect(Set(members.map(\.id)) == [primaryID, memberID])
+        #expect(members.first(where: { $0.id == memberID })?.isActive == false)
 
-        // Archive one member after-the-fact. Per the ContactRepository
-        // contract, fetchMembers still returns it. Archival doesn't silently
-        // change group membership; callers filter `isActive` if they want
-        // active-only.
-        try await repos.contacts.archive(
-            id: archivedMember.id,
-            at: Date(timeIntervalSince1970: 1_800_000_000))
+        try await repositories.groups.delete(id: group.id)
 
-        let members = try await repos.contacts.fetchMembers(ofGroup: group.id)
-        #expect(Set(members.map(\.id)) == Set([primary.id, activeMember.id, archivedMember.id]))
-
-        // And the archived row really is archived in the result.
-        #expect(members.first(where: { $0.id == archivedMember.id })?.isActive == false)
+        #expect(try await repositories.groups.fetch(id: group.id) == nil)
+        #expect(try await repositories.contacts.fetchMembers(ofGroup: group.id).isEmpty)
+        #expect(try await repositories.contacts.fetch(id: primaryID)?.contactGroupId == nil)
+        #expect(try await repositories.contacts.fetch(id: memberID)?.contactGroupId == nil)
     }
 
-    @Test("archive sets archivedAt; fetch by id still returns the row")
-    func archivePersistsArchivedAt() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repo = GRDBRepositories(dbQueue: queue).contacts
+    @Test("Shipped foreign-key edges reject orphans", arguments: RepositoryContractBackend.allCases)
+    func shippedForeignKeyEdges(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let missingContactID = try contractUUID(211)
+        let orphanPrimaryGroup = ContactGroup(
+            id: try contractUUID(212),
+            displayName: "Unconstrained primary",
+            primaryContactId: missingContactID,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000.875)
+        )
+        try await repositories.groups.upsert(orphanPrimaryGroup)
+        #expect(try await repositories.groups.fetch(id: orphanPrimaryGroup.id) == (try contractStored(orphanPrimaryGroup)))
 
-        let c = Contact(
-            systemContactRef: "sys-arch",
-            displayName: "To Archive",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550300")
-        try await repo.upsert(c)
-
-        let archivedAt = Date(timeIntervalSince1970: 1_800_000_000)
-        try await repo.archive(id: c.id, at: archivedAt)
-
-        let loaded = try await repo.fetch(id: c.id)
-        #expect(loaded?.archivedAt == archivedAt)
-        #expect(loaded?.isActive == false)
-    }
-
-    // MARK: - ContactGroupRepository
-
-    @Test("ContactGroup upsert / fetchAll / fetch(id:) round-trips and delete removes the row")
-    func contactGroupCRUD() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repos = GRDBRepositories(dbQueue: queue)
-
-        let primary = Contact(
-            systemContactRef: "sys-grp-primary",
-            displayName: "Group Primary",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550400")
-        try await repos.contacts.upsert(primary)
-
-        let group = ContactGroup(
-            displayName: "Family",
-            primaryContactId: primary.id,
-            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
-            createdBy: .suggestionAccepted)
-        try await repos.groups.upsert(group)
-
-        let all = try await repos.groups.fetchAll()
-        #expect(all.count == 1)
-        #expect(all.first?.displayName == "Family")
-        #expect(all.first?.createdBy == .suggestionAccepted)
-
-        let one = try await repos.groups.fetch(id: group.id)
-        #expect(one == group)
-
-        try await repos.groups.delete(id: group.id)
-        let after = try await repos.groups.fetchAll()
-        #expect(after.isEmpty)
-    }
-
-    // MARK: - ReminderRepository
-
-    @Test("fetchPending(forContact:) filters by contact, ignores fired, orders by scheduledFor ascending")
-    func fetchPendingByContact() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repos = GRDBRepositories(dbQueue: queue)
-
-        let alex = Contact(
-            systemContactRef: "sys-alex",
-            displayName: "Alex",
-            tracked: true, cadenceDays: 30,
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550500")
-        let jordan = Contact(
-            systemContactRef: "sys-jordan",
-            displayName: "Jordan",
-            tracked: true, cadenceDays: 30,
-            preferredChannel: .sms,
-            preferredChannelValue: "+15555550501")
-        try await repos.contacts.upsert(alex)
-        try await repos.contacts.upsert(jordan)
-
-        // Two pending for Alex (out-of-order insert), one fired for Alex,
-        // one pending for Jordan. Result for Alex must be the two pendings
-        // in ascending `scheduledFor` order.
-        let alexLater = ScheduledReminder(
-            contactId: alex.id, kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_900_000_000),
-            osNotificationId: "n-alex-later")
-        let alexSooner = ScheduledReminder(
-            contactId: alex.id, kind: .cadence,
+        let missingGroupID = try contractUUID(213)
+        let orphanContact = contractContact(
+            id: try contractUUID(214), suffix: "orphan-group", groupID: missingGroupID)
+        await expectWriteRejected { try await repositories.contacts.upsert(orphanContact) }
+        let orphanReminder = ScheduledReminder(
+            contactId: missingContactID, kind: .cadence,
             scheduledFor: Date(timeIntervalSince1970: 1_800_000_000),
-            osNotificationId: "n-alex-sooner")
-        let alexFired = ScheduledReminder(
-            contactId: alex.id, kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_700_000_000),
-            osNotificationId: "n-alex-fired", state: .fired)
-        let jordanPending = ScheduledReminder(
-            contactId: jordan.id, kind: .birthday,
-            occasionDate: "06-15", occasionLabel: "Birthday",
-            scheduledFor: Date(timeIntervalSince1970: 1_950_000_000),
-            osNotificationId: "n-jordan-1")
-        try await repos.reminders.upsert(alexLater)
-        try await repos.reminders.upsert(alexSooner)
-        try await repos.reminders.upsert(alexFired)
-        try await repos.reminders.upsert(jordanPending)
+            osNotificationId: "orphan-reminder")
+        await expectWriteRejected { try await repositories.reminders.upsert(orphanReminder) }
+        let orphanInteraction = InteractionLog(
+            contactId: missingContactID,
+            occurredAt: Date(timeIntervalSince1970: 1_800_000_000), source: .manual)
+        await expectWriteRejected { try await repositories.interactions.append(orphanInteraction) }
+    }
+}
+struct ReminderRepositoryContractTests {
 
-        let alexResult = try await repos.reminders.fetchPending(forContact: alex.id)
-        #expect(alexResult.map(\.id) == [alexSooner.id, alexLater.id])
+    @Test(
+        "Pending reads normalize timestamps, round-trip, filter, scope, and sort ties by id",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func pendingOrdering(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(
+            id: try contractUUID(301), suffix: "reminder-contact", tracked: true)
+        let other = contractContact(
+            id: try contractUUID(302), suffix: "reminder-other", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        try await repositories.contacts.upsert(other)
 
-        let jordanResult = try await repos.reminders.fetchPending(forContact: jordan.id)
-        #expect(jordanResult.map(\.id) == [jordanPending.id])
+        let earlier = ScheduledReminder(
+            id: try contractUUID(311),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100.875),
+            osNotificationId: "contract-earlier"
+        )
+        let tiedFirst = ScheduledReminder(
+            id: try contractUUID(312),
+            contactId: contact.id,
+            kind: .birthday,
+            occasionDate: "08-07",
+            occasionLabel: "Birthday",
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_200.875),
+            osNotificationId: "contract-tied-first"
+        )
+        let tiedSecond = ScheduledReminder(
+            id: try contractUUID(313),
+            contactId: contact.id,
+            kind: .anniversary,
+            occasionDate: "08-07",
+            occasionLabel: "Anniversary",
+            scheduledFor: tiedFirst.scheduledFor,
+            osNotificationId: "contract-tied-second"
+        )
+        let fired = ScheduledReminder(
+            id: try contractUUID(314),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_000.875),
+            osNotificationId: "contract-fired",
+            state: .fired
+        )
+        let otherPending = ScheduledReminder(
+            id: try contractUUID(315),
+            contactId: other.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_150.875),
+            osNotificationId: "contract-other"
+        )
+        let cancelled = ScheduledReminder(
+            id: try contractUUID(316),
+            contactId: contact.id,
+            kind: .customOccasion,
+            occasionDate: "08-08",
+            occasionLabel: "Cancelled occasion",
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_050.875),
+            osNotificationId: "contract-cancelled",
+            state: .cancelled
+        )
+        let caughtUp = ScheduledReminder(
+            id: try contractUUID(317),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_075.875),
+            osNotificationId: "contract-caught-up",
+            state: .userCaughtUp
+        )
+        let inserted = [
+            tiedSecond, fired, otherPending, earlier, tiedFirst, cancelled, caughtUp,
+        ]
+        for reminder in inserted {
+            try await repositories.reminders.upsert(reminder)
+        }
+
+        let contactResult = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(contactResult == [contractStored(earlier), contractStored(tiedFirst), contractStored(tiedSecond)])
+        let insertedIDs = Set(inserted.map(\.id))
+        let globalResult = try await repositories.reminders.fetchAllPending()
+            .filter { insertedIDs.contains($0.id) }
+        #expect(globalResult == [
+            contractStored(earlier), contractStored(otherPending),
+            contractStored(tiedFirst), contractStored(tiedSecond),
+        ])
     }
 
-    @Test("Reminder delete removes the row from fetchAllPending")
-    func reminderDeleteRemovesRow() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repos = GRDBRepositories(dbQueue: queue)
+    @Test("Reminder state updates and delete remove pending rows", arguments: RepositoryContractBackend.allCases)
+    func updateStateAndDelete(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(
+            id: try contractUUID(321), suffix: "reminder-mutation", tracked: true)
+        let reminder = ScheduledReminder(
+            id: try contractUUID(322),
+            contactId: contact.id,
+            kind: .birthday,
+            occasionDate: "08-07",
+            occasionLabel: "Birthday",
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_000.875),
+            osNotificationId: "contract-mutation",
+            state: .fired
+        )
+        try await repositories.contacts.upsert(contact)
+        try await repositories.reminders.upsert(reminder)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
 
-        let c = Contact(
-            systemContactRef: "sys-del",
-            displayName: "Delete Target",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550600")
-        try await repos.contacts.upsert(c)
+        try await repositories.reminders.updateState(id: reminder.id, state: .pending)
+        var expected = contractStored(reminder)
+        expected.state = .pending
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id) == [expected])
 
-        let r = ScheduledReminder(
-            contactId: c.id, kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_000),
-            osNotificationId: "n-del")
-        try await repos.reminders.upsert(r)
-        #expect(try await repos.reminders.fetchAllPending().count == 1)
-
-        try await repos.reminders.delete(id: r.id)
-        #expect(try await repos.reminders.fetchAllPending().isEmpty)
+        var replacement = expected
+        replacement.kind = .anniversary
+        replacement.occasionLabel = "Updated anniversary"
+        replacement.scheduledFor = Date(timeIntervalSince1970: 1_800_000_100.875)
+        replacement.osNotificationId = "contract-replacement"
+        try await repositories.reminders.upsert(replacement)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id) == [contractStored(replacement)])
+        try await repositories.reminders.delete(id: reminder.id)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
+}
+struct InteractionRepositoryContractTests {
 
-    // MARK: - InteractionRepository
-
-    @Test("fetchRecent returns logs newest-first up to limit")
-    func interactionFetchRecentOrdersAndLimits() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repos = GRDBRepositories(dbQueue: queue)
-
-        let c = Contact(
-            systemContactRef: "sys-int",
-            displayName: "Interactor",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550700")
-        try await repos.contacts.upsert(c)
+    @Test(
+        "Recent interactions normalize timestamps, round-trip, scope, limit, and sort ties by id",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func recentOrdering(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(
+            id: try contractUUID(401), suffix: "interaction-contact")
+        let other = contractContact(
+            id: try contractUUID(402), suffix: "interaction-other")
+        try await repositories.contacts.upsert(contact)
+        try await repositories.contacts.upsert(other)
 
         let oldest = InteractionLog(
-            contactId: c.id,
-            occurredAt: Date(timeIntervalSince1970: 1_700_000_000),
-            source: .manual, channel: .phoneCall)
-        let middle = InteractionLog(
-            contactId: c.id,
-            occurredAt: Date(timeIntervalSince1970: 1_750_000_000),
-            source: .reminderTap, channel: .whatsapp)
-        let newest = InteractionLog(
-            contactId: c.id,
-            occurredAt: Date(timeIntervalSince1970: 1_800_000_000),
-            source: .reminderCaughtUp)
-        try await repos.interactions.append(oldest)
-        try await repos.interactions.append(middle)
-        try await repos.interactions.append(newest)
-
-        let limited = try await repos.interactions.fetchRecent(forContact: c.id, limit: 2)
-        #expect(limited.map(\.id) == [newest.id, middle.id])
-    }
-
-    @Test("fetchRecent ignores logs from a different contact")
-    func interactionFetchRecentScopesByContact() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repos = GRDBRepositories(dbQueue: queue)
-
-        let me = Contact(
-            systemContactRef: "sys-me",
-            displayName: "Me",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550800")
-        let other = Contact(
-            systemContactRef: "sys-other",
-            displayName: "Other",
-            preferredChannel: .phoneCall,
-            preferredChannelValue: "+15555550801")
-        try await repos.contacts.upsert(me)
-        try await repos.contacts.upsert(other)
-
-        try await repos.interactions.append(InteractionLog(
-            contactId: me.id,
-            occurredAt: Date(timeIntervalSince1970: 1_800_000_000),
-            source: .manual))
-        try await repos.interactions.append(InteractionLog(
+            id: try contractUUID(411),
+            contactId: contact.id,
+            occurredAt: Date(timeIntervalSince1970: 1_800_000_000.875),
+            source: .manual
+        )
+        let tiedFirst = InteractionLog(
+            id: try contractUUID(412),
+            contactId: contact.id,
+            occurredAt: Date(timeIntervalSince1970: 1_800_000_100.875),
+            source: .reminderTap,
+            channel: .signal
+        )
+        let tiedSecond = InteractionLog(
+            id: try contractUUID(413),
+            contactId: contact.id,
+            occurredAt: tiedFirst.occurredAt,
+            source: .reminderCaughtUp
+        )
+        let unrelated = InteractionLog(
+            id: try contractUUID(414),
             contactId: other.id,
-            occurredAt: Date(timeIntervalSince1970: 1_800_000_000),
-            source: .manual))
+            occurredAt: tiedFirst.occurredAt,
+            source: .manual
+        )
+        for log in [tiedSecond, unrelated, oldest, tiedFirst] {
+            try await repositories.interactions.append(log)
+        }
 
-        let mine = try await repos.interactions.fetchRecent(forContact: me.id, limit: 10)
-        #expect(mine.count == 1)
-        #expect(mine.first?.contactId == me.id)
+        let all = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+        #expect(all == [contractStored(tiedFirst), contractStored(tiedSecond), contractStored(oldest)])
+        let limited = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 2)
+        #expect(limited == Array(all.prefix(2)))
+        #expect(try await repositories.interactions.fetchRecent(
+            forContact: contact.id,
+            limit: 0
+        ).isEmpty)
+
+        let duplicate = InteractionLog(
+            id: tiedFirst.id, contactId: contact.id,
+            occurredAt: Date(timeIntervalSince1970: 1_900_000_000),
+            source: .manual, channel: .email)
+        await expectWriteRejected { try await repositories.interactions.append(duplicate) }
+        #expect(try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 10) == all)
     }
+}
 
-    // MARK: - ReminderWindowRepository
-
-    @Test("ReminderWindow singleton: migrator seeds it; saveGlobal overwrites")
-    func reminderWindowSingletonOverwrite() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repo = GRDBRepositories(dbQueue: queue).window
-
-        // Migrator seeded a row; fetch should succeed.
-        let seeded = try await repo.fetchGlobal()
-        #expect(seeded.allowedTimeRanges.isEmpty == false)
-
+struct SingletonRepositoryContractTests {
+    @Test(
+        "ReminderWindow saves valid values and preserves its row after rejection",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func reminderWindowValidation(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        _ = try await repositories.window.fetchGlobal()
         let updated = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 10))],
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 12)),
+            ],
             quietHours: nil,
-            timezoneIdentifier: "America/Los_Angeles")
-        try await repo.saveGlobal(updated)
+            timezoneIdentifier: "America/Los_Angeles",
+            occasionTime: TimeOfDay(hour: 10, minute: 30),
+            digestHorizonDays: 30
+        )
+        try await repositories.window.saveGlobal(updated)
+        #expect(try await repositories.window.fetchGlobal() == updated)
 
-        let reloaded = try await repo.fetchGlobal()
-        #expect(reloaded.allowedDays == .allDays)
-        #expect(reloaded.allowedTimeRanges.count == 1)
-        #expect(reloaded.timezoneIdentifier == "America/Los_Angeles")
-        #expect(reloaded.quietHours == nil)
+        let invalid = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [],
+            timezoneIdentifier: "America/Los_Angeles"
+        )
+        do {
+            try await repositories.window.saveGlobal(invalid)
+            Issue.record("Expected saveGlobal to reject an invalid reminder window")
+        } catch ReminderWindow.ValidationError.noAllowedTimeRanges {
+            // Expected. A failed save must preserve the current singleton.
+        } catch {
+            Issue.record("Expected noAllowedTimeRanges, got \(error)")
+        }
+        #expect(try await repositories.window.fetchGlobal() == updated)
     }
 
-    // MARK: - UserProfileRepository
-
-    @Test("UserProfile singleton: migrator seeds defaults; save overwrites")
-    func userProfileSingletonOverwrite() async throws {
-        let queue = try DatabaseFactory.makeInMemoryDatabase()
-        let repo = GRDBRepositories(dbQueue: queue).profile
-
-        let seeded = try await repo.fetch()
-        #expect(seeded.entitlementTier == .free)
-        #expect(seeded.onboardingCompletedAt == nil)
-
-        let onboardingDate = Date(timeIntervalSince1970: 1_800_000_000)
-        let refreshedAt = Date(timeIntervalSince1970: 1_800_500_000)
-        try await repo.save(UserProfile(
-            onboardingCompletedAt: onboardingDate,
+    @Test("UserProfile timestamp normalization and overwrite", arguments: RepositoryContractBackend.allCases)
+    func userProfileRoundTrip(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        _ = try await repositories.profile.fetch()
+        let updated = UserProfile(
+            onboardingCompletedAt: Date(timeIntervalSince1970: 1_800_000_000.875),
             entitlementTier: .lifetime,
-            entitlementRefreshedAt: refreshedAt))
+            entitlementRefreshedAt: Date(timeIntervalSince1970: 1_800_000_100.875),
+            trialStartedAt: Date(timeIntervalSince1970: 1_700_000_000.875)
+        )
 
-        let reloaded = try await repo.fetch()
-        #expect(reloaded.onboardingCompletedAt == onboardingDate)
-        #expect(reloaded.entitlementTier == .lifetime)
-        #expect(reloaded.entitlementRefreshedAt == refreshedAt)
+        try await repositories.profile.save(updated)
+
+        #expect(try await repositories.profile.fetch() == contractStored(updated))
     }
 }

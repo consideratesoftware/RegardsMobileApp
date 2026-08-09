@@ -80,6 +80,28 @@ struct AppRuntimeTests {
         #expect(try await runtime.environment.window.fetchGlobal() == runtime.window)
     }
 
+    @Test("Production composition uses the persisted digest horizon", arguments: [7, 30])
+    @MainActor
+    func productionCompositionUsesPersistedDigestHorizon(horizonDays: Int) async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let persistedWindow = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 10)),
+            ],
+            timezoneIdentifier: "America/Los_Angeles",
+            digestHorizonDays: horizonDays
+        )
+        let seedEnvironment = AppEnvironment.makeProduction(database: database)
+        try await seedEnvironment.window.saveGlobal(persistedWindow)
+
+        let runtime = try await AppRuntime.makeProduction(database: database)
+        let viewModel = RegardsTabRoot.makeUpcomingViewModel(runtime: runtime)
+
+        #expect(runtime.window.digestHorizonDays == horizonDays)
+        #expect(viewModel.horizonDays == horizonDays)
+    }
+
     @Test("Production runtime propagates a missing persisted window")
     func productionRuntimeRejectsMissingWindow() async throws {
         let database = try DatabaseFactory.makeInMemoryDatabase()

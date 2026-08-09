@@ -16,6 +16,8 @@ struct ContactRecord: Codable, FetchableRecord, PersistableRecord {
     var priorityTier: Int
     var preferredChannel: String
     var preferredChannelValue: String
+    var phonesJson: String
+    var emailsJson: String
     var reminderWindowOverride: String?
     var lastInteractedAt: Int?
     var notes: String
@@ -24,6 +26,7 @@ struct ContactRecord: Codable, FetchableRecord, PersistableRecord {
     var archivedAt: Int?
 
     init(from c: Contact) throws {
+        try c.reminderWindowOverride?.validate()
         self.id = c.id.uuidString
         self.systemContactRef = c.systemContactRef
         self.displayName = c.displayName
@@ -33,8 +36,10 @@ struct ContactRecord: Codable, FetchableRecord, PersistableRecord {
         self.priorityTier = c.priorityTier.rawValue
         self.preferredChannel = c.preferredChannel.rawValue
         self.preferredChannelValue = c.preferredChannelValue
+        self.phonesJson = try encodeJSON(c.phoneNumbers)
+        self.emailsJson = try encodeJSON(c.emailAddresses)
         if let window = c.reminderWindowOverride {
-            self.reminderWindowOverride = try String(data: JSONEncoder().encode(window), encoding: .utf8)
+            self.reminderWindowOverride = try encodeJSON(window)
         } else {
             self.reminderWindowOverride = nil
         }
@@ -51,11 +56,11 @@ struct ContactRecord: Codable, FetchableRecord, PersistableRecord {
             throw DataError.invalidChannel(preferredChannel)
         }
         let tier = PriorityTier(rawValue: priorityTier) ?? .regular
-
-        var windowOverride: ReminderWindow?
-        if let json = reminderWindowOverride, let data = json.data(using: .utf8) {
-            windowOverride = try JSONDecoder().decode(ReminderWindow.self, from: data)
-        }
+        let phoneNumbers = try decodeOptionalJSON([String].self, from: phonesJson) ?? []
+        let emailAddresses = try decodeOptionalJSON([String].self, from: emailsJson) ?? []
+        let windowOverride = try decodeOptionalJSON(
+            ReminderWindow.self, from: reminderWindowOverride)
+        try windowOverride?.validate()
 
         return Contact(
             id: id,
@@ -67,6 +72,8 @@ struct ContactRecord: Codable, FetchableRecord, PersistableRecord {
             priorityTier: tier,
             preferredChannel: channel,
             preferredChannelValue: preferredChannelValue,
+            phoneNumbers: phoneNumbers,
+            emailAddresses: emailAddresses,
             reminderWindowOverride: windowOverride,
             lastInteractedAt: lastInteractedAt.map { Date(timeIntervalSince1970: TimeInterval($0)) },
             notes: notes,
@@ -198,12 +205,14 @@ struct UserProfileRecord: Codable, FetchableRecord, PersistableRecord {
     var onboardingCompletedAt: Int?
     var entitlementTier: String
     var entitlementRefreshedAt: Int
+    var trialStartedAt: Int?
 
     init(from p: UserProfile) {
         self.id = 1
         self.onboardingCompletedAt = p.onboardingCompletedAt.map { Int($0.timeIntervalSince1970) }
         self.entitlementTier = p.entitlementTier.rawValue
         self.entitlementRefreshedAt = Int(p.entitlementRefreshedAt.timeIntervalSince1970)
+        self.trialStartedAt = p.trialStartedAt.map { Int($0.timeIntervalSince1970) }
     }
 
     func toDomain() -> UserProfile {
@@ -212,7 +221,10 @@ struct UserProfileRecord: Codable, FetchableRecord, PersistableRecord {
                 Date(timeIntervalSince1970: TimeInterval($0))
             },
             entitlementTier: EntitlementTier(rawValue: entitlementTier) ?? .free,
-            entitlementRefreshedAt: Date(timeIntervalSince1970: TimeInterval(entitlementRefreshedAt))
+            entitlementRefreshedAt: Date(timeIntervalSince1970: TimeInterval(entitlementRefreshedAt)),
+            trialStartedAt: trialStartedAt.map {
+                Date(timeIntervalSince1970: TimeInterval($0))
+            }
         )
     }
 }
@@ -225,44 +237,80 @@ struct ReminderWindowRecord: Codable, FetchableRecord, PersistableRecord {
     var allowedTimeRangesJson: String
     var quietHoursJson: String?
     var timezone: String
+    var occasionTime: String
+    var digestHorizonDays: Int
 
     init(from w: ReminderWindow) throws {
         self.id = 1
         self.allowedDaysMask = w.allowedDays.rawValue
-        self.allowedTimeRangesJson = String(
-            data: try JSONEncoder().encode(w.allowedTimeRanges), encoding: .utf8) ?? "[]"
+        self.allowedTimeRangesJson = try encodeJSON(w.allowedTimeRanges)
         if let q = w.quietHours {
-            self.quietHoursJson = String(
-                data: try JSONEncoder().encode(q), encoding: .utf8)
+            self.quietHoursJson = try encodeJSON(q)
         } else {
             self.quietHoursJson = nil
         }
         self.timezone = w.timezoneIdentifier
+        self.occasionTime = Self.encodeTimeOfDay(w.occasionTime)
+        self.digestHorizonDays = w.digestHorizonDays
     }
 
     func toDomain() throws -> ReminderWindow {
         let ranges: [TimeRange] = try JSONDecoder().decode(
             [TimeRange].self, from: Data(allowedTimeRangesJson.utf8))
-        let quiet: TimeRange?
-        if let json = quietHoursJson, let data = json.data(using: .utf8) {
-            quiet = try JSONDecoder().decode(TimeRange.self, from: data)
-        } else {
-            quiet = nil
-        }
+        let quiet = try decodeOptionalJSON(TimeRange.self, from: quietHoursJson)
         let window = ReminderWindow(
             allowedDays: DayOfWeekMask(rawValue: allowedDaysMask),
             allowedTimeRanges: ranges,
             quietHours: quiet,
-            timezoneIdentifier: timezone
+            timezoneIdentifier: timezone,
+            occasionTime: try Self.decodeTimeOfDay(occasionTime),
+            digestHorizonDays: digestHorizonDays
         )
         try window.validate()
         return window
     }
+
+    private static func encodeTimeOfDay(_ time: TimeOfDay) -> String {
+        String(format: "%02d:%02d", time.hour, time.minute)
+    }
+
+    private static func decodeTimeOfDay(_ value: String) throws -> TimeOfDay {
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard value.count == 5,
+              parts.count == 2,
+              parts[0].count == 2,
+              parts[1].count == 2,
+              let hour = Int(parts[0]),
+              let minute = Int(parts[1]),
+              (0..<24).contains(hour),
+              (0..<60).contains(minute) else {
+            throw DataError.invalidTimeOfDay(value)
+        }
+        return TimeOfDay(hour: hour, minute: minute)
+    }
+}
+
+private func decodeOptionalJSON<Value: Decodable>(
+    _ type: Value.Type,
+    from json: String?
+) throws -> Value? {
+    guard let json else { return nil }
+    return try JSONDecoder().decode(Optional<Value>.self, from: Data(json.utf8))
+}
+
+private func encodeJSON<Value: Encodable>(_ value: Value) throws -> String {
+    let data = try JSONEncoder().encode(value)
+    guard let json = String(bytes: data, encoding: .utf8) else {
+        throw DataError.invalidJSONEncoding
+    }
+    return json
 }
 
 public enum DataError: Error, Equatable {
     case invalidUUID(String)
     case invalidEnum(String)
     case invalidChannel(String)
+    case invalidJSONEncoding
+    case invalidTimeOfDay(String)
     case notFound
 }

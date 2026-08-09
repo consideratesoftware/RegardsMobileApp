@@ -39,7 +39,9 @@ public struct ContactsImporter: Sendable {
 
     /// Reads everything from the system store and inserts new rows.
     /// Throws `ImportError.notAuthorized` if the source's current status
-    /// isn't `.authorized` or `.limited`.
+    /// isn't `.authorized` or `.limited`. Each row commits independently;
+    /// rerunning after an interruption skips rows already written and resumes
+    /// with the remaining system contacts.
     public func runFirstLaunchImport() async throws -> Result {
         let status = await source.currentAuthorization()
         guard status == .authorized || status == .limited else {
@@ -48,7 +50,7 @@ public struct ContactsImporter: Sendable {
 
         let systemContacts = try await source.fetchAllContacts()
         let existing = try await repo.fetchAll()
-        let existingRefs = Set(existing.map(\.systemContactRef))
+        var existingRefs = Set(existing.map(\.systemContactRef))
 
         var imported = 0
         var skipped = 0
@@ -59,6 +61,7 @@ public struct ContactsImporter: Sendable {
                 continue
             }
             try await repo.upsert(Self.map(systemContact: sc, now: now))
+            existingRefs.insert(sc.identifier)
             imported += 1
         }
         return Result(imported: imported, skipped: skipped)
@@ -73,7 +76,9 @@ public struct ContactsImporter: Sendable {
     /// - `preferredChannel` + `preferredChannelValue`: first phone number
     ///   under `.phoneCall`. If no phones, first email under `.email`.
     ///   If neither, `.phoneCall` with empty value (user fills in later).
-    /// - Phone numbers are NOT normalized to E.164 here; that's a follow-up.
+    /// - Every E.164-parseable phone is normalized before persistence. Raw
+    ///   values are retained when the country code cannot be resolved from
+    ///   the source value. Every email is lowercased.
     public static func map(systemContact sc: SystemContact, now: Date) -> Contact {
         let resolvedDisplayName: String
         if !sc.displayName.isEmpty {
@@ -86,8 +91,22 @@ public struct ContactsImporter: Sendable {
             resolvedDisplayName = "Unknown"
         }
 
-        let primaryPhone = sc.phoneNumbers.first ?? ""
-        let primaryEmail = sc.emailAddresses.first ?? ""
+        let phoneNumbers = sc.phoneNumbers.map { rawValue in
+            let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.first == "+",
+                  trimmed.dropFirst().allSatisfy({ character in
+                      "0123456789".contains(character)
+                          || character.isWhitespace
+                          || "()-./".contains(character)
+                  }) else {
+                return rawValue
+            }
+            let normalized = ChannelCatalog.normalizedPhone(trimmed)
+            return ChannelCatalog.isPhoneE164(normalized) ? normalized : rawValue
+        }
+        let emailAddresses = sc.emailAddresses.map { $0.lowercased() }
+        let primaryPhone = phoneNumbers.first ?? ""
+        let primaryEmail = emailAddresses.first ?? ""
         let preferredChannel: Channel
         let preferredChannelValue: String
         if !primaryPhone.isEmpty {
@@ -107,6 +126,9 @@ public struct ContactsImporter: Sendable {
             tracked: false,
             preferredChannel: preferredChannel,
             preferredChannelValue: preferredChannelValue,
+            phoneNumbers: phoneNumbers,
+            emailAddresses: emailAddresses,
             createdAt: now)
     }
+
 }

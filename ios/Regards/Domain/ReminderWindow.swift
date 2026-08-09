@@ -10,17 +10,60 @@ public struct ReminderWindow: Sendable, Codable, Equatable, Hashable {
     public let allowedTimeRanges: [TimeRange]
     public let quietHours: TimeRange?
     public let timezoneIdentifier: String
+    public let occasionTime: TimeOfDay
+    public let digestHorizonDays: Int
+
+    public static let defaultOccasionTime = TimeOfDay(hour: 9)
+    public static let defaultDigestHorizonDays = 14
 
     public init(
         allowedDays: DayOfWeekMask,
         allowedTimeRanges: [TimeRange],
         quietHours: TimeRange? = nil,
-        timezoneIdentifier: String
+        timezoneIdentifier: String,
+        occasionTime: TimeOfDay = ReminderWindow.defaultOccasionTime,
+        digestHorizonDays: Int = ReminderWindow.defaultDigestHorizonDays
     ) {
         self.allowedDays = allowedDays
         self.allowedTimeRanges = allowedTimeRanges
         self.quietHours = quietHours
         self.timezoneIdentifier = timezoneIdentifier
+        self.occasionTime = occasionTime
+        self.digestHorizonDays = digestHorizonDays
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case allowedDays
+        case allowedTimeRanges
+        case quietHours
+        case timezoneIdentifier
+        case occasionTime
+        case digestHorizonDays
+    }
+
+    /// Per-contact overrides persisted before v2 don't contain the occasion
+    /// or digest fields. Decode those blobs with the v2 defaults so an app
+    /// update doesn't invalidate a contact's existing window.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.allowedDays = try container.decode(DayOfWeekMask.self, forKey: .allowedDays)
+        self.allowedTimeRanges = try container.decode([TimeRange].self, forKey: .allowedTimeRanges)
+        self.quietHours = try container.decodeIfPresent(TimeRange.self, forKey: .quietHours)
+        self.timezoneIdentifier = try container.decode(String.self, forKey: .timezoneIdentifier)
+        self.occasionTime = try container.decodeIfPresent(
+            TimeOfDay.self, forKey: .occasionTime) ?? Self.defaultOccasionTime
+        self.digestHorizonDays = try container.decodeIfPresent(
+            Int.self, forKey: .digestHorizonDays) ?? Self.defaultDigestHorizonDays
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(allowedDays, forKey: .allowedDays)
+        try container.encode(allowedTimeRanges, forKey: .allowedTimeRanges)
+        try container.encodeIfPresent(quietHours, forKey: .quietHours)
+        try container.encode(timezoneIdentifier, forKey: .timezoneIdentifier)
+        try container.encode(occasionTime, forKey: .occasionTime)
+        try container.encode(digestHorizonDays, forKey: .digestHorizonDays)
     }
 
     public var timeZone: TimeZone {
@@ -57,6 +100,7 @@ public struct ReminderWindow: Sendable, Codable, Equatable, Hashable {
         case zeroLengthRange(TimeRange)
         case wrappingAllowedRange(TimeRange)
         case invalidTimezoneIdentifier(String)
+        case invalidDigestHorizonDays(Int)
     }
 
     /// Structural validity per decision #28: an allowed time range must not
@@ -76,6 +120,9 @@ public struct ReminderWindow: Sendable, Codable, Equatable, Hashable {
         }
         guard !allowedDays.isEmpty else { throw ValidationError.noAllowedDays }
         guard !allowedTimeRanges.isEmpty else { throw ValidationError.noAllowedTimeRanges }
+        guard [7, 14, 30].contains(digestHorizonDays) else {
+            throw ValidationError.invalidDigestHorizonDays(digestHorizonDays)
+        }
         for range in allowedTimeRanges {
             if range.start == range.end { throw ValidationError.zeroLengthRange(range) }
             if range.wrapsMidnight { throw ValidationError.wrappingAllowedRange(range) }

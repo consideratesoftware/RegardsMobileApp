@@ -108,7 +108,6 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
             CNContactFamilyNameKey,
             CNContactPhoneNumbersKey,
             CNContactEmailAddressesKey,
-            CNContactBirthdayKey,
         ].map { $0 as any CNKeyDescriptor }
         let request = CNContactFetchRequest(keysToFetch: keys)
         var results: [SystemContact] = []
@@ -118,8 +117,7 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
                 givenName: cn.givenName,
                 familyName: cn.familyName,
                 phoneNumbers: cn.phoneNumbers.map { $0.value.stringValue },
-                emailAddresses: cn.emailAddresses.map { $0.value as String },
-                birthday: cn.birthday))
+                emailAddresses: cn.emailAddresses.map { $0.value as String }))
         }
         return results
     }

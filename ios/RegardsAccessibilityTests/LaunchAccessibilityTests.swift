@@ -1,9 +1,8 @@
 import XCTest
 
-/// Phase 0 / PR3 accessibility smoke audit. Launches the app, waits past the
-/// brief splash for the tab root, and runs Apple's built-in accessibility
-/// audit against the Overdue tab (the default landing screen). Per-screen
-/// audits live in `ScreensAccessibilityTests`.
+/// Launch accessibility smoke audits. The mock runtime opens the tab root
+/// immediately; production-state fixtures cover onboarding and recoverable
+/// launch paths. Per-screen audits live in `ScreensAccessibilityTests`.
 final class LaunchAccessibilityTests: XCTestCase {
 
     override func setUpWithError() throws {
@@ -13,18 +12,159 @@ final class LaunchAccessibilityTests: XCTestCase {
     @MainActor
     func testLaunchAndOverdueTabPassAccessibilityAudit() throws {
         let app = XCUIApplication()
+        app.launchArguments.append("--regards-mock-runtime")
         app.launch()
 
-        // The splash (launch.root) shows for ~600ms before crossfading to the
-        // tab root. Wait for the Overdue screen to be on-screen before the
-        // audit runs so we're looking at the real post-launch state.
+        // The deterministic mock runtime starts ready and should render the
+        // tab root without exposing the production loading splash.
         let overdue = app.descendants(matching: .any)["screen.overdue"]
         XCTAssertTrue(overdue.waitForExistence(timeout: 10),
-                      "Overdue tab should appear after the splash.")
+                      "The ready mock runtime should open the Overdue tab immediately.")
         let splash = app.descendants(matching: .any)["launch.root"]
         XCTAssertTrue(splash.waitForNonExistence(timeout: 10),
-                      "Splash transition should finish before the audit begins.")
+                      "Mock launch should not expose the production loading splash.")
 
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+    }
+
+    @MainActor
+    func testProductionOpenFailurePassesAuditAndRetryRecovers() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-launch-fails-once")
+        app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = "accessibility5"
+        app.launch()
+
+        let failure = app.descendants(matching: .any)["launch.failure"]
+        XCTAssertTrue(
+            failure.waitForExistence(timeout: 10),
+            "A production-open failure should reveal a recoverable error screen."
+        )
+        let retry = app.buttons["Try Again"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
+        retry.tap()
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(
+            onboarding.waitForExistence(timeout: 10),
+            "Retry should reopen the runtime and resume first launch."
+        )
+    }
+
+    @MainActor
+    func testFirstLaunchImportsContactsAndReachesProductionTabs() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-first-launch-runtime")
+        app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = "accessibility5"
+        app.launch()
+
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(
+            onboarding.waitForExistence(timeout: 10),
+            "A fresh production runtime should stop at the Contacts pre-prompt."
+        )
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
+        let allow = app.buttons["onboarding.allow-contacts"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+
+        let overdue = app.descendants(matching: .any)["screen.overdue"]
+        XCTAssertTrue(
+            overdue.waitForExistence(timeout: 10),
+            "A completed import should reveal the production-backed tabs."
+        )
+        let contacts = app.descendants(matching: .any)["screen.contacts"]
+        selectTab(named: "Contacts", destination: contacts, in: app)
+        XCTAssertTrue(
+            app.staticTexts["Leia Organa"].waitForExistence(timeout: 10),
+            "Imported, untracked contacts should remain visible in All Contacts."
+        )
+    }
+
+    @MainActor
+    func testFirstLaunchPermissionDenialPassesAuditAndCanBrowse() throws {
+        let app = firstLaunchApp(contactsOutcome: "denied")
+        app.launch()
+
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        let allow = app.buttons["onboarding.allow-contacts"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+
+        let status = app.staticTexts["onboarding.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        let browse = app.buttons["onboarding.continue-without-contacts"]
+        XCTAssertTrue(browse.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(browse.frame.height, 44)
+        let why = app.buttons["onboarding.why-we-ask"]
+        XCTAssertTrue(why.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(why.frame.height, 44)
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
+        browse.tap()
+        let overdue = app.descendants(matching: .any)["screen.overdue"]
+        XCTAssertTrue(
+            overdue.waitForExistence(timeout: 10),
+            "Browse-only onboarding should reveal production-backed tabs."
+        )
+    }
+
+    @MainActor
+    func testFirstLaunchImportFailurePassesAuditAndRetryCompletes() throws {
+        let app = firstLaunchApp(contactsOutcome: "import-fails-once")
+        app.launch()
+
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        let allow = app.buttons["onboarding.allow-contacts"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+
+        let status = app.staticTexts["onboarding.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        let enabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"),
+            object: allow
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [enabled], timeout: 5),
+            .completed,
+            "Retry should become enabled after the failed import finishes."
+        )
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
+        allow.tap()
+        let overdue = app.descendants(matching: .any)["screen.overdue"]
+        XCTAssertTrue(
+            overdue.waitForExistence(timeout: 10),
+            "Retry should resume the import and reveal production-backed tabs."
+        )
+    }
+
+    @MainActor
+    private func firstLaunchApp(contactsOutcome: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-first-launch-runtime")
+        app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = "accessibility5"
+        app.launchEnvironment["REGARDS_UI_TEST_CONTACTS_OUTCOME"] = contactsOutcome
+        return app
+    }
+
+    @MainActor
+    private func selectTab(
+        named name: String,
+        destination: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        for _ in 0..<3 {
+            if destination.exists { return }
+            let button = app.tabBars.buttons[name]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            button.tap()
+            if destination.waitForExistence(timeout: 5) { return }
+        }
+        XCTFail("\(name) tab should show its root screen.")
     }
 }

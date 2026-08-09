@@ -3,13 +3,12 @@ import Testing
 import GRDB
 @testable import Regards
 
-/// Phase 0 migrator smoke test: the v1 schema creates every table + index
-/// from ARCHITECTURE.md §7 and a Contact round-trips through the repository
-/// without data loss.
+/// Migration coverage for fresh latest-schema databases and upgrades from the
+/// shipped v1 schema (ARCHITECTURE.md §7).
 struct DatabaseMigratorTests {
 
-    @Test("v1 migration creates every expected table")
-    func v1Tables() async throws {
+    @Test("Latest migration creates every expected table")
+    func latestTables() async throws {
         let db = try DatabaseFactory.makeInMemoryDatabase()
         let tables = try await db.read { db -> Set<String> in
             let sql = """
@@ -29,8 +28,8 @@ struct DatabaseMigratorTests {
                 "missing tables: \(expected.subtracting(tables))")
     }
 
-    @Test("v1 migration creates the indexes §7 requires")
-    func v1Indexes() async throws {
+    @Test("Latest migration preserves the indexes §7 requires")
+    func latestIndexes() async throws {
         let db = try DatabaseFactory.makeInMemoryDatabase()
         let indexes = try await db.read { db -> Set<String> in
             let names = try String.fetchAll(db,
@@ -62,6 +61,209 @@ struct DatabaseMigratorTests {
         #expect(windowCount == 1)
         #expect(profileCount == 1)
     }
+}
+
+extension DatabaseMigratorTests {
+    @Test("Fresh latest schema has v2 columns and defaults")
+    func freshLatestSchemaHasV2Defaults() async throws {
+        let queue = try DatabaseFactory.makeInMemoryDatabase()
+
+        let values = try await queue.write { db -> (String, String, String, Int, Int?) in
+            try db.execute(
+                sql: """
+                    INSERT INTO Contact
+                        (id, systemContactRef, displayName, preferredChannel, createdAt)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    UUID().uuidString,
+                    "fresh-v2-contact",
+                    "Fresh Contact",
+                    Channel.phoneCall.rawValue,
+                    1_700_000_000,
+                ])
+
+            guard let contact = try Row.fetchOne(
+                db,
+                sql: "SELECT phonesJson, emailsJson FROM Contact WHERE systemContactRef = ?",
+                arguments: ["fresh-v2-contact"]
+            ), let window = try Row.fetchOne(
+                db,
+                sql: "SELECT occasionTime, digestHorizonDays FROM ReminderWindow WHERE id = 1"
+            ), let profile = try Row.fetchOne(
+                db,
+                sql: "SELECT trialStartedAt FROM UserProfile WHERE id = 1"
+            ) else {
+                throw DataError.notFound
+            }
+
+            let phones: String = contact["phonesJson"]
+            let emails: String = contact["emailsJson"]
+            let occasionTime: String = window["occasionTime"]
+            let horizon: Int = window["digestHorizonDays"]
+            let trialStartedAt: Int? = profile["trialStartedAt"]
+            return (phones, emails, occasionTime, horizon, trialStartedAt)
+        }
+
+        #expect(values.0 == "[]")
+        #expect(values.1 == "[]")
+        #expect(values.2 == "09:00")
+        #expect(values.3 == 14)
+        #expect(values.4 == nil)
+    }
+
+    @Test("v1 upgrades to v2 without losing rows and normalizes JSON null (R39)")
+    func v1UpgradesToV2() async throws {
+        let queue = try DatabaseQueue()
+        let migrator = RegardsSchema.migrator()
+        try migrator.migrate(queue, upTo: "v1")
+
+        let groupId = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+        let contactId = UUID(uuidString: "20000000-0000-0000-0000-000000000002")!
+        let reminderId = UUID(uuidString: "30000000-0000-0000-0000-000000000003")!
+        let interactionId = UUID(uuidString: "40000000-0000-0000-0000-000000000004")!
+
+        try await queue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO ContactGroup
+                        (id, displayName, primaryContactId, createdAt, createdBy)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    groupId.uuidString,
+                    "Legacy Household",
+                    contactId.uuidString,
+                    1_699_999_900,
+                    ContactGroup.Origin.user.rawValue,
+                ])
+            try db.execute(
+                sql: """
+                    INSERT INTO Contact
+                        (id, systemContactRef, displayName, tracked, preferredChannel,
+                         contactGroupId, createdAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    contactId.uuidString,
+                    "legacy-contact",
+                    "Legacy Contact",
+                    true,
+                    Channel.email.rawValue,
+                    groupId.uuidString,
+                    1_700_000_000,
+                ])
+            try db.execute(
+                sql: """
+                    INSERT INTO ScheduledReminder
+                        (id, contactId, kind, occasionDate, occasionLabel,
+                         scheduledFor, osNotificationId, state)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    reminderId.uuidString,
+                    contactId.uuidString,
+                    ReminderKind.cadence.rawValue,
+                    nil,
+                    nil,
+                    1_700_000_100,
+                    "legacy-notification",
+                    ReminderState.pending.rawValue,
+                ])
+            try db.execute(
+                sql: """
+                    INSERT INTO InteractionLog
+                        (id, contactId, occurredAt, source, channel)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    interactionId.uuidString,
+                    contactId.uuidString,
+                    1_700_000_200,
+                    InteractionSource.manual.rawValue,
+                    Channel.email.rawValue,
+                ])
+            try db.execute(
+                sql: "UPDATE ReminderWindow SET quietHoursJson = 'null' WHERE id = 1")
+            try db.execute(
+                sql: """
+                    UPDATE UserProfile
+                    SET onboardingCompletedAt = ?, entitlementTier = ?, entitlementRefreshedAt = ?
+                    WHERE id = 1
+                    """,
+                arguments: [
+                    1_700_000_300,
+                    EntitlementTier.trial.rawValue,
+                    1_700_000_400,
+                ])
+        }
+
+        try migrator.migrate(queue)
+
+        let values = try await queue.read { db ->
+            (String, String, String, String, Int, Int?, String?) in
+            guard let contact = try Row.fetchOne(
+                db,
+                sql: "SELECT displayName, phonesJson, emailsJson FROM Contact WHERE systemContactRef = ?",
+                arguments: ["legacy-contact"]
+            ), let window = try Row.fetchOne(
+                db,
+                sql: """
+                    SELECT quietHoursJson, occasionTime, digestHorizonDays
+                    FROM ReminderWindow WHERE id = 1
+                    """
+            ), let profile = try Row.fetchOne(
+                db,
+                sql: "SELECT trialStartedAt FROM UserProfile WHERE id = 1"
+            ) else {
+                throw DataError.notFound
+            }
+
+            let name: String = contact["displayName"]
+            let phones: String = contact["phonesJson"]
+            let emails: String = contact["emailsJson"]
+            let occasionTime: String = window["occasionTime"]
+            let horizon: Int = window["digestHorizonDays"]
+            let trialStartedAt: Int? = profile["trialStartedAt"]
+            let quietHours: String? = window["quietHoursJson"]
+            return (name, phones, emails, occasionTime, horizon, trialStartedAt, quietHours)
+        }
+
+        #expect(values.0 == "Legacy Contact")
+        #expect(values.1 == "[]")
+        #expect(values.2 == "[]")
+        #expect(values.3 == "09:00")
+        #expect(values.4 == 14)
+        #expect(values.5 == nil)
+        #expect(values.6 == nil)
+
+        let repositories = GRDBRepositories(dbQueue: queue)
+        let contact = try await repositories.contacts.fetch(id: contactId)
+        let group = try await repositories.groups.fetch(id: groupId)
+        let reminders = try await repositories.reminders.fetchAllPending()
+        let interactions = try await repositories.interactions.fetchRecent(
+            forContact: contactId,
+            limit: 10
+        )
+        let window = try await repositories.window.fetchGlobal()
+        let profile = try await repositories.profile.fetch()
+
+        #expect(contact?.contactGroupId == groupId)
+        #expect(contact?.phoneNumbers == [])
+        #expect(contact?.emailAddresses == [])
+        #expect(group?.displayName == "Legacy Household")
+        #expect(group?.primaryContactId == contactId)
+        #expect(reminders.map(\.id) == [reminderId])
+        #expect(interactions.map(\.id) == [interactionId])
+        #expect(interactions.first?.channel == .email)
+        #expect(window.quietHours == nil)
+        #expect(window.occasionTime == TimeOfDay(hour: 9))
+        #expect(window.digestHorizonDays == 14)
+        #expect(profile.onboardingCompletedAt == Date(timeIntervalSince1970: 1_700_000_300))
+        #expect(profile.entitlementTier == .trial)
+        #expect(profile.entitlementRefreshedAt == Date(timeIntervalSince1970: 1_700_000_400))
+        #expect(profile.trialStartedAt == nil)
+    }
 
     @Test("A Contact round-trips through the GRDB repository")
     func contactRoundTrip() async throws {
@@ -76,6 +278,16 @@ struct DatabaseMigratorTests {
             priorityTier: .innerCircle,
             preferredChannel: .whatsapp,
             preferredChannelValue: "+919876543210",
+            phoneNumbers: ["+919876543210", "+919876543211"],
+            emailAddresses: ["priya@example.com", "priya@work.example"],
+            reminderWindowOverride: ReminderWindow(
+                allowedDays: .weekends,
+                allowedTimeRanges: [
+                    TimeRange(start: TimeOfDay(hour: 10), end: TimeOfDay(hour: 12)),
+                ],
+                timezoneIdentifier: "Asia/Kolkata",
+                occasionTime: TimeOfDay(hour: 8, minute: 15),
+                digestHorizonDays: 30),
             lastInteractedAt: Date(timeIntervalSince1970: 1_700_000_000),
             notes: "Test notes")
 
@@ -88,8 +300,40 @@ struct DatabaseMigratorTests {
         #expect(loaded?.priorityTier == .innerCircle)
         #expect(loaded?.preferredChannel == .whatsapp)
         #expect(loaded?.preferredChannelValue == "+919876543210")
+        #expect(loaded?.phoneNumbers == original.phoneNumbers)
+        #expect(loaded?.emailAddresses == original.emailAddresses)
+        #expect(loaded?.reminderWindowOverride == original.reminderWindowOverride)
         #expect(loaded?.notes == "Test notes")
         #expect(loaded?.lastInteractedAt == original.lastInteractedAt)
+    }
+
+    @Test("v2 ReminderWindow and UserProfile fields round-trip")
+    func v2SingletonFieldsRoundTrip() async throws {
+        let queue = try DatabaseFactory.makeInMemoryDatabase()
+        let repositories = GRDBRepositories(dbQueue: queue)
+        let window = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [
+                TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay(hour: 11)),
+            ],
+            quietHours: nil,
+            timezoneIdentifier: "America/Los_Angeles",
+            occasionTime: TimeOfDay(hour: 7, minute: 45),
+            digestHorizonDays: 30)
+        let trialStartedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let profile = UserProfile(
+            onboardingCompletedAt: Date(timeIntervalSince1970: 1_800_000_100),
+            entitlementTier: .trial,
+            entitlementRefreshedAt: Date(timeIntervalSince1970: 1_800_000_200),
+            trialStartedAt: trialStartedAt)
+
+        try await repositories.window.saveGlobal(window)
+        try await repositories.profile.save(profile)
+
+        let loadedWindow = try await repositories.window.fetchGlobal()
+        let loadedProfile = try await repositories.profile.fetch()
+        #expect(loadedWindow == window)
+        #expect(loadedProfile == profile)
     }
 
     @Test("Reminder can be written and read back, state update persists")

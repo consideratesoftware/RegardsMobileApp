@@ -18,6 +18,8 @@ struct ReminderWindowValidationTests {
         let window = ReminderWindow.defaultV1(timezone: TimeZone(identifier: "Asia/Kolkata")!)
         try window.validate()
         #expect(window.isValid)
+        #expect(window.occasionTime == TimeOfDay(hour: 9))
+        #expect(window.digestHorizonDays == 14)
     }
 
     @Test("A wrapping allowed range is rejected (decision #28, R3)")
@@ -85,6 +87,19 @@ struct ReminderWindowValidationTests {
         #expect(!window.isValid)
     }
 
+    @Test("Digest horizon accepts only the supported choices")
+    func invalidDigestHorizonRejected() {
+        let window = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [Self.range(18, 22)],
+            timezoneIdentifier: "Asia/Kolkata",
+            digestHorizonDays: 21)
+        #expect(throws: ReminderWindow.ValidationError.invalidDigestHorizonDays(21)) {
+            try window.validate()
+        }
+        #expect(!window.isValid)
+    }
+
     @Test("A persisted window with an unknown timezone is rejected at the data boundary")
     func persistedInvalidTimezoneRejected() throws {
         var record = try ReminderWindowRecord(from: .defaultV1(
@@ -94,6 +109,124 @@ struct ReminderWindowValidationTests {
         #expect(throws: ReminderWindow.ValidationError.invalidTimezoneIdentifier("Not/A_Timezone")) {
             try record.toDomain()
         }
+    }
+
+    @Test("Persisted JSON null quiet hours decode as nil (R39)")
+    func persistedJSONNullQuietHoursDecodeAsNil() throws {
+        var record = try ReminderWindowRecord(from: .defaultV1(
+            timezone: TimeZone(identifier: "Asia/Kolkata")!))
+        record.quietHoursJson = "null"
+
+        let window = try record.toDomain()
+        #expect(window.quietHours == nil)
+    }
+
+    // MARK: - Per-contact persisted overrides
+
+    @Test("A per-contact override with an unknown timezone is rejected at the data boundary")
+    func persistedContactOverrideRejectsInvalidTimezone() throws {
+        let override = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [Self.range(18, 22)],
+            timezoneIdentifier: "Not/A_Timezone")
+        let record = try Self.contactRecord(override: override)
+
+        #expect(throws: ReminderWindow.ValidationError.invalidTimezoneIdentifier(
+            "Not/A_Timezone")) {
+            try record.toDomain()
+        }
+    }
+
+    @Test("A per-contact override with a wrapping allowed range is rejected at the data boundary")
+    func persistedContactOverrideRejectsWrappingRange() throws {
+        let range = TimeRange(start: TimeOfDay(hour: 22), end: TimeOfDay(hour: 1))
+        let override = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [range],
+            timezoneIdentifier: "Asia/Kolkata")
+        let record = try Self.contactRecord(override: override)
+
+        #expect(throws: ReminderWindow.ValidationError.wrappingAllowedRange(range)) {
+            try record.toDomain()
+        }
+    }
+
+    @Test("A per-contact override with an unsupported horizon is rejected at the data boundary")
+    func persistedContactOverrideRejectsInvalidHorizon() throws {
+        let override = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [Self.range(18, 22)],
+            timezoneIdentifier: "Asia/Kolkata",
+            digestHorizonDays: 21)
+        let record = try Self.contactRecord(override: override)
+
+        #expect(throws: ReminderWindow.ValidationError.invalidDigestHorizonDays(21)) {
+            try record.toDomain()
+        }
+    }
+
+    @Test("Malformed per-contact override JSON is rejected at the data boundary")
+    func persistedContactOverrideRejectsMalformedJSON() throws {
+        var record = try Self.contactRecord(override: nil)
+        record.reminderWindowOverride = #"{"allowedDays":"#
+
+        #expect(throws: DecodingError.self) {
+            try record.toDomain()
+        }
+    }
+
+    private static func contactRecord(override: ReminderWindow?) throws -> ContactRecord {
+        var record = try ContactRecord(from: Contact(
+            systemContactRef: "contact-record-validation",
+            displayName: "Record Validation",
+            reminderWindowOverride: nil
+        ))
+        if let override {
+            record.reminderWindowOverride = String(
+                data: try JSONEncoder().encode(override),
+                encoding: .utf8
+            )
+        }
+        return record
+    }
+
+    // MARK: - Backward-compatible Codable
+
+    @Test("A pre-v2 ReminderWindow JSON blob receives v2 defaults")
+    func legacyReminderWindowDecodesWithV2Defaults() throws {
+        let legacyJSON = Data(#"""
+        {
+          "allowedDays": 62,
+          "allowedTimeRanges": [
+            {
+              "start": { "minutesSinceMidnight": 1080 },
+              "end": { "minutesSinceMidnight": 1320 }
+            }
+          ],
+          "timezoneIdentifier": "Asia/Kolkata"
+        }
+        """#.utf8)
+
+        let window = try JSONDecoder().decode(ReminderWindow.self, from: legacyJSON)
+        #expect(window.quietHours == nil)
+        #expect(window.occasionTime == TimeOfDay(hour: 9))
+        #expect(window.digestHorizonDays == 14)
+        try window.validate()
+    }
+
+    @Test("ReminderWindow Codable preserves non-default v2 fields")
+    func reminderWindowV2FieldsRoundTrip() throws {
+        let original = ReminderWindow(
+            allowedDays: .weekends,
+            allowedTimeRanges: [Self.range(10, 12)],
+            quietHours: nil,
+            timezoneIdentifier: "Asia/Kolkata",
+            occasionTime: TimeOfDay(hour: 8, minute: 15),
+            digestHorizonDays: 30)
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(ReminderWindow.self, from: data)
+        #expect(decoded == original)
     }
 
     // MARK: - TimeOfDay decode guard (R38)
@@ -107,7 +240,7 @@ struct ReminderWindowValidationTests {
     }
 
     @Test("Out-of-range minutesSinceMidnight throws instead of poisoning calendar math (R38)")
-    func timeOfDayRejectsOutOfRange() {
+    func timeOfDayRejectsOutOfRange() throws {
         let overflow = Data(#"{"minutesSinceMidnight":2000}"#.utf8)
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(TimeOfDay.self, from: overflow)
@@ -122,7 +255,7 @@ struct ReminderWindowValidationTests {
             try JSONDecoder().decode(TimeOfDay.self, from: boundary)
         }
         let lastValidMinute = Data(#"{"minutesSinceMidnight":1439}"#.utf8)
-        let decodedLastMinute = try? JSONDecoder().decode(TimeOfDay.self, from: lastValidMinute)
+        let decodedLastMinute = try JSONDecoder().decode(TimeOfDay.self, from: lastValidMinute)
         #expect(decodedLastMinute == TimeOfDay.endOfDay)
     }
 

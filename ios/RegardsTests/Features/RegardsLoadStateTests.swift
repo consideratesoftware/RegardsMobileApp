@@ -232,7 +232,7 @@ struct RegardsLoadStateTests {
         await viewModel.load()
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.contacts.count == 1)
-        #expect(viewModel.summary == "1 tracked")
+        #expect(viewModel.summary == "1 contact")
 
         await viewModel.load()
         #expect(viewModel.loadState == .failed)
@@ -242,7 +242,7 @@ struct RegardsLoadStateTests {
         await viewModel.load()
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.contacts.isEmpty)
-        #expect(viewModel.summary == "0 tracked")
+        #expect(viewModel.summary == "0 contacts")
     }
 
     // MARK: - Overlapping loads and refresh
@@ -308,7 +308,7 @@ struct RegardsLoadStateTests {
 
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.contacts.count == 1)
-        #expect(viewModel.summary == "1 tracked")
+        #expect(viewModel.summary == "1 contact")
     }
 
     @Test("Contacts keeps loaded content visible while refreshing")

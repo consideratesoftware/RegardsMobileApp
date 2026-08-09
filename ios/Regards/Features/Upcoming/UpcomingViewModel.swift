@@ -50,7 +50,7 @@ public final class UpcomingViewModel {
     public private(set) var totalCount: Int = 0
     private(set) var loadState: RegardsLoadState = .loading
 
-    public var horizonDays: Int = 14
+    public let horizonDays: Int
 
     /// The row that owns the zoom-transition source for each contact.
     ///
@@ -94,6 +94,7 @@ public final class UpcomingViewModel {
         self.reminders = reminders
         self.engine = engine
         self.window = window
+        self.horizonDays = window.digestHorizonDays
         self.clock = clock
     }
 

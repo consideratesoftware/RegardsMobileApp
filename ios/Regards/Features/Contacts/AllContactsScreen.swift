@@ -77,7 +77,7 @@ public struct AllContactsScreen: View {
             }
         } description: {
             if searchText.isEmpty {
-                Text("Tracked contacts will appear here.")
+                Text("Imported contacts will appear here.")
             } else {
                 Text("No contacts match “\(searchText)”.")
             }

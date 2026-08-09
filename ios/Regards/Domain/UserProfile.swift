@@ -12,14 +12,17 @@ public struct UserProfile: Sendable, Codable, Equatable, Hashable {
     public var onboardingCompletedAt: Date?
     public var entitlementTier: EntitlementTier
     public var entitlementRefreshedAt: Date
+    public var trialStartedAt: Date?
 
     public init(
         onboardingCompletedAt: Date? = nil,
         entitlementTier: EntitlementTier = .free,
-        entitlementRefreshedAt: Date = Date()
+        entitlementRefreshedAt: Date = Date(),
+        trialStartedAt: Date? = nil
     ) {
         self.onboardingCompletedAt = onboardingCompletedAt
         self.entitlementTier = entitlementTier
         self.entitlementRefreshedAt = entitlementRefreshedAt
+        self.trialStartedAt = trialStartedAt
     }
 }

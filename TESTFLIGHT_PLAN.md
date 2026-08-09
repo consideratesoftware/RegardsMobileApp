@@ -12,17 +12,21 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-08-05
-- Baseline: `main` at `d8193ff` (merged GitHub PR #42, the final TF-01 slice)
-- Active work: none. `TF-01` is complete.
-- Next ready work: `TF-02` — production DB v2, shared repository contracts, a
-  real environment at launch, resumable first import, and a basic onboarding
-  gate. Its first job is flipping the boot path from `AppRuntime.makeMock` to
-  `makeProduction`, which is the remaining half of R9a.
-- Open TF pull request: GitHub PR #43, the post-merge checkpoint close plus a
-  determinism repair (below). GitHub PR #42 merged as `d8193ff` after five
-  hosted review rounds; GitHub PR #39 merged as `ade40e3`; GitHub PR #41
-  merged as `bbd7c93` on the separate Android track and is not TF work.
+- Updated: 2026-08-08
+- Baseline: `main` at `8adeb0d` (merged GitHub PR #43, the TF-01 checkpoint
+  close and determinism repair)
+- Active work: `TF-02` on `codex/tf-02-production-runtime` in the linked
+  worktree `Regards Mobile App TF02`. Production DB v2, shared repository
+  contracts, production-first launch, resumable first import, and the basic
+  onboarding gate are implemented in one schema-locked lane. The production
+  fresh-install and manual accessibility smoke are complete. The final staged
+  review approves the recorded source with no blockers. The branch is ready
+  for its first commit and publication.
+- Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
+  independent ready lanes from the same exact merged `main`.
+- Open TF pull request: none yet. GitHub PR #43 merged as `8adeb0d`; GitHub PR
+  #42 merged as `d8193ff`; GitHub PR #41 merged as `bbd7c93` on the separate
+  Android track and is not TF work.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
   file-sync process in this worktree creates byte-identical `"* 2"` copies of
   recently written files, and `git add -A` sweeps them into the commit. PR
@@ -42,8 +46,57 @@ never pick up Android work.
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none. `TF-02` is agent-owned; no product, legal,
-  signing, or App Store decision is required before its exit.
+- Owner action needed now: none. No product, legal, signing, or App Store
+  decision is required.
+- Current-main automation: iOS CI run `30991317165` passed at `8adeb0d`.
+  Accessibility-stress run `31250952214` had one Apple audit timeout in its
+  first attempt, then its exact failed-job rerun passed 5/5 at the same head.
+- Current TF-02 local evidence: the baseline 232-test unit suite passes; the
+  append-only v1→v2 path carries representative rows through all six tables;
+  22 shared
+  mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/Android
+  guards, review-agent parity, source-boundary fixtures, diff checks, and
+  temporary-copy XcodeGen determinism pass. The exact-source Release simulator
+  build also passes. The exact-source five-state launch
+  accessibility slice passes on the dedicated iOS 26.5 iPhone 17 Pro
+  simulator (`D06660F8-D261-46FE-8CF4-8D8190104F80`), covering a successful
+  import, denial plus browse-only recovery, one import failure plus retry, a
+  recoverable database-open failure, and the mock launch audit. Its fail-once
+  regression now waits for the CTA's real
+  enabled state before retrying, closing a status-render timing race found by
+  the final slice. Final staged review also found that rapid repeated launch
+  retries could overlap. Retry now accepts only the failed phase and marks
+  loading before suspending; its blocking-factory regression proves one retry
+  runtime attempt and a stable final phase. The exact current 233-test bundle
+  executed directly inside a fresh iOS 26.5 simulator: all 231 functional and
+  data tests passed, including the complete launch and reminder-window suites.
+  The only two failures were the pre-existing asset-catalog lookups, because
+  direct `xctest` has no app-host `Bundle.main`; the normal Xcode runner had
+  wedged while materializing its install and launch workers. Hosted CI remains
+  the exact-head full app-host confirmation. The simulator was created for the
+  production smoke, so no existing simulator data needed deletion or reuse.
+- TF-02 production smoke completed 2026-08-08 with the exact Release simulator
+  product from `/tmp/RegardsTF02ShippingDerivedData` on the dedicated iOS 26.5
+  iPhone 17 Pro (`D06660F8-D261-46FE-8CF4-8D8190104F80`). The old task-only
+  Regards install was removed, its retained Contacts authorization was
+  explicitly revoked then reset, and a fresh install produced new app and data
+  containers. The truthful pre-prompt led to the real system Contacts prompt,
+  `Select Contacts`, John Appleseed, and `Allow Selected Contact`. Production
+  tabs then loaded, and All Contacts exposed exactly `1 contact` and the John
+  Appleseed button. The file-backed database exists only at
+  `Library/Application Support/Regards/regards.sqlite`; it records migrations
+  `v1` and `v2`, one imported `Contact`, one `ReminderWindow`, and one trial
+  `UserProfile`, with the other three production tables empty as expected.
+  Accessibility Inspector targeted that final Regards process. Its audits of
+  All Contacts and imported Contact Detail produced no warnings, while the
+  Simulator accessibility hierarchy exposed the screen and section headings,
+  natural John Appleseed row, working Back path, and unavailable action states
+  without inert buttons. Dynamic Type at `accessibility5` kept the imported row,
+  search, Contact Detail content, Back path, and adaptive tab control visible
+  and tappable. Reduce Motion and Increased Contrast were each tested on and
+  off; navigation remained coherent and text, icons, cards, and the priority
+  treatment stayed legible. Accessibility Inspector was restored to standard
+  Dynamic Type, Reduce Motion off, and Increased Contrast off. Findings: none.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
@@ -151,8 +204,8 @@ numbers.
 | ID | Status | Depends on | Scope and exit evidence | §14 alias / R-items |
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
-| TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R23, R27–R34, R40, R42–R43 |
-| TF-02 | READY | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
+| TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R22, R27–R34, R40, R42–R43 |
+| TF-02 | ACTIVE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
 | TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35 |
 | TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
