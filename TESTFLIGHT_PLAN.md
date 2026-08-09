@@ -13,27 +13,33 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-08-09
-- Baseline: `main` at `8adeb0d` (merged GitHub PR #43, the TF-01 checkpoint
-  close and determinism repair)
-- Active work: `TF-02` on `codex/tf-02-production-runtime` in the linked
-  worktree `Regards Mobile App TF02`. Production DB v2, shared repository
-  contracts, production-first launch, resumable first import, and the basic
-  onboarding gate are implemented in one schema-locked lane. The production
-  fresh-install, manual accessibility smoke, and §14 physical-device acceptance
-  pass are complete. GitHub PR #44 is published. Required checks passed on
-  pushed head `dab40f8`, and hosted semantic review run `31332360018`
-  returned `APPROVE` with no blockers. Its seven directly applicable
-  should-fixes are closed in the worktree with focused and full-suite evidence,
-  and the exact-worktree `$regards-pr-review` verdict is `APPROVE` across all
-  six roles. Guarded auto-merge remains off until this final candidate is
-  pushed, fresh required checks pass, and the exact-head hosted typed verdict
-  remains `APPROVE`.
-- Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
-  independent ready lanes from the same exact merged `main`.
-- Open TF pull request: GitHub PR #44, `codex/tf-02-production-runtime` into
-  `main`. Auto-merge is off until the final follow-up head passes every required
-  check and receives a hosted semantic `APPROVE` verdict. GitHub PR #43 merged
-  as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
+- Baseline: `main` at `b10f9ac` (merged GitHub PR #44, the TF-02 production
+  runtime implementation)
+- Active work: the docs-only `TF-02` close checkpoint on
+  `codex/audit-retry-action` in the linked worktree
+  `Regards Mobile App Audit Repair`. The production fresh-install, manual
+  accessibility smoke, and §14 physical-device acceptance pass are complete.
+  PR #44 merged only after its exact-head hosted semantic review and all
+  required checks approved. Final post-merge authority is green: diagnosed
+  failed-job rerun attempt 3 passed 29/29, and exact-main stress passed all 5
+  suites. The first one-run job exposed an intermittent XCTest action-delivery
+  failure in the audited launch-retry fixture; exact-main focused reproduction
+  passed 5/5 and the original case passed on the failed-job rerun. That failure
+  reproduced 0/5, below §17's repair threshold. The rerun instead caught an iOS
+  **Ready for Apple Intelligence** notification as “Potentially inaccessible
+  text”; its xcresult targeted system UI, so it is outside the product-finding
+  threshold. The existing `tap(_:until:message:)` helper remains limited to
+  onboarding controls whose first auto-scroll tap may not dispatch. Applying
+  its bounded second tap to the launch-retry Try Again fixture was rejected
+  because it could conceal one genuine failed runtime retry. No source repair
+  is committed or published.
+- Next ready work: `TF-03` and `TF-04` are independent lanes. Branch both from
+  the same exact `main` after this close checkpoint merges, then respect the
+  collision locks below.
+- Open TF pull request: GitHub PR #45 is the docs-only TF-02 close checkpoint
+  on `codex/audit-retry-action`; auto-merge is off while its exact-head hosted
+  review findings are addressed. GitHub PR #44 merged as `b10f9ac`; GitHub PR
+  #43 merged as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
   file-sync process in this worktree creates byte-identical `"* 2"` copies of
   recently written files, and `git add -A` sweeps them into the commit. PR
@@ -56,10 +62,23 @@ never pick up Android work.
 - Owner action needed now: none for TF-02. The connected-device permission,
   import, file-protection, populated-tabs, and accessibility acceptance pass is
   complete. No product, legal, signing, or App Store decision is required.
-- Current-main automation: iOS CI run `30991317165` passed at `8adeb0d`.
-  Accessibility-stress run `31250952214` had one Apple audit timeout in its
-  first attempt, then its exact failed-job rerun passed 5/5 at the same head;
-  newer stress run `31306380612` also passed 5/5 at exact current `main`.
+- Current-main automation is green on exact `b10f9ac`. iOS CI run
+  `31334462438` passed determinism, build,
+  unit tests, and coverage at exact `b10f9ac`, then failed its one-run
+  accessibility job only in
+  `testProductionOpenFailurePassesAuditAndRetryRecovers`. Its recording and
+  activity log show XCTest synthesized the tap inside **Try Again**, but the
+  fixture remained on the failure screen; the product recovery contracts pass,
+  as does a focused exact-main five-iteration reproduction. Failed-job rerun
+  attempt 2 passed that original test and failed only because an iOS **Ready
+  for Apple Intelligence** notification overlaid the defensive
+  ready-without-runtime fixture; the xcresult's failure screenshot and issue
+  description prove Apple audited the system banner's text. Manually
+  dispatched exact-main stress run `31334531081` passed all 5 complete suites,
+  including both launch-recovery fixtures in every run. No product or test
+  source change is warranted under §17. Diagnosed failed-job rerun attempt 3
+  then passed all 29 accessibility tests in 18m47s, leaving iOS CI run
+  `31334462438` green on exact `b10f9ac`.
 - Current TF-02 local evidence: the 266-test unit suite passes; the
   append-only v1→v2 path carries representative rows through all six tables;
   the shared mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/
@@ -378,9 +397,9 @@ numbers.
 |---|---|---|---|---|
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
 | TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R22, R27–R34, R40, R42–R43 |
-| TF-02 | ACTIVE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
-| TF-03 | BLOCKED | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
-| TF-04 | BLOCKED | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
+| TF-02 | DONE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
+| TF-03 | READY | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
+| TF-04 | READY | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
 | TF-06 | BLOCKED | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |
 | TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved | PR25; R4–R6, R10–R11, R24 |
@@ -454,8 +473,8 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    downstream XCUI failures in every run. Preserve the slot-start identity,
    keep the row visible, pin the active-slot regression, and require focused
    XCUI, mechanical gates, staged review, hosted review, and protected checks
-   before merge. Broad repeated sweeps remain owned by post-merge, nightly,
-   and pre-release automation.
+   before merge. The one-run audit remains post-merge; repeated 5× stress
+   remains owned by nightly automation and pre-release manual dispatch.
    The current-source focused XCUI rerun passed on the pinned simulator:
    `testAccessibility5AdaptiveContentDoesNotOverlap`,
    `testContactDetailFromUpcomingPassesAudit`, and
@@ -866,8 +885,9 @@ Current gates:
   per run, 76/76 executions total, including the formerly flaky Edit routes
   and the new `accessibility5` regression. The fifth local run was intentionally
   stopped in progress after the owner removed repeated local sweeps from the
-  PR policy; it did not report a test failure. Post-merge/nightly automation now
-  owns repeated 5× stress. The final implementation source at `57c2f37` then
+  PR policy; it did not report a test failure. The one-run audit now runs after
+  merges, while nightly automation and pre-release manual dispatch own repeated
+  5× stress. The final implementation source at `57c2f37` then
   built in Release and was installed and launched on the pinned iOS 26.5
   iPhone 17 Pro. Its current-source Simulator hierarchy confirmed the Contact
   Detail → Contact Preview route, the standard Back button labelled “Contact,”
@@ -892,9 +912,9 @@ Current gates:
   the same channel-aware speech policy, including a malformed-email regression.
   All 127 unit tests passed, as did the focused Overdue, Contact
   Detail, Contact Preview, and Overdue → Preview → Back tests. No repeated
-  local sweep was run; scheduled post-merge/nightly/pre-release workflows own
-  that evidence. The final local staged verdict is `APPROVE`; the final hosted
-  verdict and required checks remain before merge.
+  local sweep was run; scheduled post-merge 1× plus nightly/pre-release 5×
+  workflows own that evidence. The final local staged verdict is `APPROVE`;
+  the final hosted verdict and required checks remain before merge.
 - 2026-08-03 hosted-review response: unavailable Contact Detail and Overdue
   actions now have stable identifiers and focused XCUI coverage proving their
   “unavailable” labels and lack of button traits. The accessibility5 regression

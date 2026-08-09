@@ -50,11 +50,11 @@ The `test` action runs:
 - **`RegardsTests`** — `swift-testing` unit suite for Domain, Data, Platform,
   and feature behavior.
 - **`RegardsAccessibilityTests`** — XCUITest suite that launches the app and
-  calls `XCUIApplication.performAccessibilityAudit()`. Automated audits run
-  after merges to `main`, nightly, and on demand. UI pull requests require the
-  staged accessibility reviewer and manual smoke; releases require a green 5x
-  sweep. See [`docs/accessibility.md`](docs/accessibility.md) for the standing
-  rules.
+  calls `XCUIApplication.performAccessibilityAudit()`. The one-run audit runs
+  after merges to `main`; the five-run sweep runs nightly and by manual
+  dispatch before release. UI pull requests require the staged accessibility
+  reviewer and manual smoke; releases require a green five-run sweep. See
+  [`docs/accessibility.md`](docs/accessibility.md) for the standing rules.
 
 ## Execution plan
 

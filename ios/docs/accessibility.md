@@ -4,15 +4,15 @@ The app must be fully usable by someone who relies on VoiceOver, larger text,
 reduced motion, or high-contrast modes. This is a **release-blocking** concern,
 not a polish-phase one.
 
-As of 2026-08-02 the automated audits run on merges to `main`, nightly, and on
-demand, not on pull requests (ARCHITECTURE.md §10 has the reasoning). On a pull
-request the gate is the `pr-accessibility` reviewer plus the manual VoiceOver
-smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
-`Audit stress` and require it green. Because a regression now surfaces on
-`main` rather than on the pull request that caused it, UI pull requests run
-focused regressions for their affected flows. Repeated local sweeps are
-reserved for investigating a reproduced flake or an explicitly requested
-release candidate.
+As of 2026-08-02 the one-run automated audit runs after merges to `main`. The
+five-run sweep runs nightly and on demand before release; neither runs on pull
+requests (ARCHITECTURE.md §10 has the reasoning). On a pull request the gate is
+the `pr-accessibility` reviewer plus the manual VoiceOver smoke. Before cutting
+a release, run the five-run sweep with `workflow_dispatch` on `Audit stress`
+and require it green. UI pull requests run focused regressions for their
+affected flows because a regression now surfaces on `main`. Repeated local
+sweeps are reserved for investigating a reproduced flake or an explicitly
+requested release candidate.
 
 Keep this file up to date. Every new screen gets a line in the *screens
 audited* table.
@@ -20,11 +20,12 @@ audited* table.
 ## Standing rules (every UI change)
 
 1. **Automated audit.** `XCUIApplication.performAccessibilityAudit()` runs in
-   `RegardsAccessibilityTests` after merges to `main`, nightly, and on demand
-   before release. It catches missing labels, contrast failures, too-small
-   touch targets (<44×44pt), elements trapped from VoiceOver focus, duplicate
-   traits, and dynamic-type clipping. A failing sweep blocks release and must
-   be repaired before the next TestFlight build.
+   `RegardsAccessibilityTests`: once after merges to `main`, five times nightly,
+   and five times by manual dispatch before release. The enabled structural
+   categories catch missing descriptions, elements trapped from VoiceOver
+   focus, and incorrect traits. The sensory categories remain carved out below.
+   A failing sweep blocks release and must be repaired before the next
+   TestFlight build.
 2. **VoiceOver label completeness.** Every interactive element has an
    `.accessibilityLabel`. Decorative glyphs (channel icons inside labeled rows)
    are `.accessibilityHidden(true)` so they don't pollute the rotor. Compound
@@ -111,14 +112,28 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Transparency | PR3 | Reached via Settings → Transparency. |
 | Onboarding | PR3 / TF-02 | First-launch Contacts pre-prompt plus Settings preview. TF-02 audits the fresh flow at `accessibility5` before import and verifies the production-backed tab transition. |
 
+## Known system-UI audit interruption
+
+Every automated finding defaults to an app finding. The iOS **Ready for Apple
+Intelligence** notification can overlay the simulator during an audit. Run
+`31334462438` attempt 2 captured "Potentially inaccessible text" against that
+banner; its xcresult screenshot and failure attachment identified the targeted
+element inside the iOS notification rather than the Regards hierarchy.
+
+Classify a future finding as system UI only when the failed xcresult identifies
+the targeted element inside an operating-system banner or hierarchy and the
+screenshot shows that overlay. Inspect both artifacts and rerun the exact
+failed job. Without both proofs, or when an app-owned failure repeats under
+§17, treat it as a product finding.
+
 ## Sensory-audit carve-outs
 
 The enabled automated audit set uses the **structural** categories
-(`elementDetection`, `sufficientElementDescription`, `trait`) after merges,
-nightly, and before release. The **sensory** categories — `contrast`,
-`hitRegion`, `dynamicType`, `textClipped` — are not part of that release gate.
-The residual findings after PR4's sweep fall into two buckets, both
-intentional:
+(`elementDetection`, `sufficientElementDescription`, `trait`) in the one-run
+post-merge audit and the five-run nightly or pre-release sweep. The **sensory**
+categories — `contrast`, `hitRegion`, `dynamicType`, `textClipped` — are not
+part of that release gate. The residual findings after PR4's sweep fall into
+two buckets, both intentional:
 
 ### Bucket 1 — fixed
 
@@ -256,7 +271,8 @@ The script builds once and runs the audit suite N times via
 `test-without-building`, exits non-zero on any failure. Total runtime
 on a recent Mac: ~3 min.
 
-CI runs the audit 5x after merges to `main`, nightly, and through
-`workflow_dispatch` in `.github/workflows/audit-stress.yml`. Those runs own
-broad flake detection. A failure blocks the next release and becomes the next
-repair item; it does not justify rerunning the full suite during every PR.
+CI runs one audit after merges through `.github/workflows/ios-ci.yml`. The 5x
+sweep runs nightly and through `workflow_dispatch` in
+`.github/workflows/audit-stress.yml`. Those runs own broad flake detection. A
+failure blocks the next release and becomes the next repair item; it does not
+justify rerunning the full suite during every PR.

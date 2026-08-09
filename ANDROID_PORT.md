@@ -229,8 +229,9 @@ tests, kept honest by the vectors underneath.
 - Compose: screen-level semantics tests + Accessibility Test Framework
   checks; TalkBack manual smoke doc (`android/docs/accessibility.md`) mirrors
   the VoiceOver smoke contract. Same flake discipline as iOS: reproduce ≥2/5
-  before "fixing," prefer deleting cleverness over adding waits, stress runs
-  live post-merge/nightly, not on PRs (decision #39).
+  before "fixing," prefer deleting cleverness over adding waits. The one-run
+  audit belongs after merges; repeated stress belongs to nightly automation
+  and pre-release manual dispatch, not PRs (decision #39).
 - CI (`.github/workflows/android-ci.yml`, AN-01): **ubuntu runners** — the
   billed-macOS lesson (decision #39) doesn't get re-learned on Android. Jobs:
   build → `:domain` tests + Kover floor → lint (Android Lint + detekt) →
