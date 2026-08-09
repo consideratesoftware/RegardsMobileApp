@@ -27,17 +27,18 @@ never pick up Android work.
   Apple Intelligence** notification as “Potentially inaccessible text”; the
   failure screenshot proves the reported element was system UI, not Regards.
   Exact-main 5× stress then passed all five suites. Neither failure meets §17's
-  ≥2/5 repair threshold. An experimental bounded second tap was rejected
-  because it could conceal one genuine failed runtime retry; no source repair
-  is committed or published. Diagnosed failed-job rerun attempt 3 passed all
-  29 accessibility tests, completing TF-02's post-merge evidence.
+  ≥2/5 repair threshold. An experimental bounded second tap in the
+  launch-retry Try Again fixture was rejected because it could conceal one
+  genuine failed runtime retry; no source repair is committed or published.
+  Diagnosed failed-job rerun attempt 3 passed all 29 accessibility tests,
+  completing TF-02's post-merge evidence.
 - Next ready work: `TF-03` and `TF-04` are independent lanes. Branch both from
   the same exact `main` after this close checkpoint merges, then respect the
   collision locks below.
-- Open TF pull request: none. Current-main accessibility triage is local and
-  unpublished on `codex/audit-retry-action`; auto-merge is off. GitHub PR #44
-  merged as `b10f9ac`; GitHub PR #43 merged as `8adeb0d`; GitHub PR #42 merged
-  as `d8193ff`.
+- Open TF pull request: GitHub PR #45 is the docs-only TF-02 close checkpoint
+  on `codex/audit-retry-action`; auto-merge is off while its exact-head hosted
+  review findings are addressed. GitHub PR #44 merged as `b10f9ac`; GitHub PR
+  #43 merged as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
   file-sync process in this worktree creates byte-identical `"* 2"` copies of
   recently written files, and `git add -A` sweeps them into the commit. PR
@@ -470,8 +471,8 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
    downstream XCUI failures in every run. Preserve the slot-start identity,
    keep the row visible, pin the active-slot regression, and require focused
    XCUI, mechanical gates, staged review, hosted review, and protected checks
-   before merge. Broad repeated sweeps remain owned by post-merge, nightly,
-   and pre-release automation.
+   before merge. The one-run audit remains post-merge; repeated 5× stress
+   remains owned by nightly automation and pre-release manual dispatch.
    The current-source focused XCUI rerun passed on the pinned simulator:
    `testAccessibility5AdaptiveContentDoesNotOverlap`,
    `testContactDetailFromUpcomingPassesAudit`, and
@@ -882,8 +883,9 @@ Current gates:
   per run, 76/76 executions total, including the formerly flaky Edit routes
   and the new `accessibility5` regression. The fifth local run was intentionally
   stopped in progress after the owner removed repeated local sweeps from the
-  PR policy; it did not report a test failure. Post-merge/nightly automation now
-  owns repeated 5× stress. The final implementation source at `57c2f37` then
+  PR policy; it did not report a test failure. The one-run audit now runs after
+  merges, while nightly automation and pre-release manual dispatch own repeated
+  5× stress. The final implementation source at `57c2f37` then
   built in Release and was installed and launched on the pinned iOS 26.5
   iPhone 17 Pro. Its current-source Simulator hierarchy confirmed the Contact
   Detail → Contact Preview route, the standard Back button labelled “Contact,”

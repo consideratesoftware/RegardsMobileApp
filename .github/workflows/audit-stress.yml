@@ -1,8 +1,8 @@
 name: Audit stress
 
-# Runs the RegardsAccessibilityTests audit suite 5 times to catch
-# probabilistic flakes. The single-run `Accessibility audit` in `iOS CI`
-# follows the same post-merge schedule; neither audit is a per-PR gate.
+# Runs the RegardsAccessibilityTests audit suite 5 times nightly and by manual
+# dispatch to catch probabilistic flakes. The single-run `Accessibility audit`
+# in `iOS CI` runs after merges to main; neither audit is a per-PR gate.
 #
 # This used to run on every pull request. The header claimed "5-6 minutes
 # per PR"; six consecutive real runs took 23, 23, 29, 33, 38 and 49 minutes,
@@ -37,7 +37,7 @@ permissions:
 concurrency:
   group: audit-stress-${{ github.ref }}
   # Never cancel the in-flight run. GitHub keeps one running and only the latest
-  # pending run per group, so overlapping push, nightly, or manual signals may
+  # pending run per group, so overlapping nightly or manual signals may
   # coalesce before they start.
   cancel-in-progress: false
 

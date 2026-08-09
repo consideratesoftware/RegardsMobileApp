@@ -63,7 +63,7 @@ The dedicated PR must show:
 3. App Intents metadata extraction during the build.
 4. Launch proof on iOS 17 and iOS 26.
 5. Focused accessibility regressions for the changed flows plus the staged
-   accessibility review. Broad one-run and five-run audits remain owned by the
-   post-merge, nightly, and pre-release workflows.
+   accessibility review. The one-run audit remains post-merge; the five-run
+   sweep remains nightly and manually dispatched before release.
 6. Manual VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
    Contrast smoke before merge.

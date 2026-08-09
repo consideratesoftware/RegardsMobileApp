@@ -4,15 +4,15 @@ The app must be fully usable by someone who relies on VoiceOver, larger text,
 reduced motion, or high-contrast modes. This is a **release-blocking** concern,
 not a polish-phase one.
 
-As of 2026-08-02 the automated audits run on merges to `main`, nightly, and on
-demand, not on pull requests (ARCHITECTURE.md §10 has the reasoning). On a pull
-request the gate is the `pr-accessibility` reviewer plus the manual VoiceOver
-smoke; before cutting a release, run the 5x sweep with `workflow_dispatch` on
-`Audit stress` and require it green. Because a regression now surfaces on
-`main` rather than on the pull request that caused it, UI pull requests run
-focused regressions for their affected flows. Repeated local sweeps are
-reserved for investigating a reproduced flake or an explicitly requested
-release candidate.
+As of 2026-08-02 the one-run automated audit runs after merges to `main`. The
+five-run sweep runs nightly and on demand before release; neither runs on pull
+requests (ARCHITECTURE.md §10 has the reasoning). On a pull request the gate is
+the `pr-accessibility` reviewer plus the manual VoiceOver smoke. Before cutting
+a release, run the five-run sweep with `workflow_dispatch` on `Audit stress`
+and require it green. UI pull requests run focused regressions for their
+affected flows because a regression now surfaces on `main`. Repeated local
+sweeps are reserved for investigating a reproduced flake or an explicitly
+requested release candidate.
 
 Keep this file up to date. Every new screen gets a line in the *screens
 audited* table.
@@ -114,11 +114,20 @@ screen-level VoiceOver smoke and automated audit coverage.
 ## Sensory-audit carve-outs
 
 The enabled automated audit set uses the **structural** categories
-(`elementDetection`, `sufficientElementDescription`, `trait`) after merges,
-nightly, and before release. The **sensory** categories — `contrast`,
-`hitRegion`, `dynamicType`, `textClipped` — are not part of that release gate.
-The residual findings after PR4's sweep fall into two buckets, both
-intentional:
+(`elementDetection`, `sufficientElementDescription`, `trait`) in the one-run
+post-merge audit and the five-run nightly or pre-release sweep. The **sensory**
+categories — `contrast`, `hitRegion`, `dynamicType`, `textClipped` — are not
+part of that release gate. The residual findings after PR4's sweep fall into
+two buckets, both intentional:
+
+### Known system-UI audit interruption
+
+The iOS **Ready for Apple Intelligence** notification can overlay the
+simulator during an audit. Run `31334462438` attempt 2 captured
+"Potentially inaccessible text" against that system banner; its xcresult
+screenshot showed the finding belonged to iOS rather than Regards. Inspect the
+failed xcresult and rerun the exact failed job before classifying this message.
+Treat an app-owned element or a repeated failure under §17 as a product finding.
 
 ### Bucket 1 — fixed
 

@@ -13,8 +13,9 @@ AN-10; the rules below apply from the first composable regardless.
   mirroring `ios/docs/accessibility-smoke.md`).
 - Accessibility Test Framework checks wired into screen tests (AN-10).
 - Same flake discipline as iOS: reproduce ≥ 2/5 before fixing; prefer deleting
-  cleverness over adding waits; repeated stress belongs to post-merge/nightly
-  automation, not PRs (decision #39).
+  cleverness over adding waits. The one-run audit belongs after merges;
+  repeated stress belongs to nightly automation and pre-release manual
+  dispatch, not PRs (decision #39).
 
 ## Screens audited
 

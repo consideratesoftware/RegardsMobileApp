@@ -20,7 +20,7 @@ added or renamed.
 
 1. **Process rules first (cheap, absolute).**
    - New or renamed screen ⇒ a `performAccessibilityAudit` test AND a row in the audited-screens table in the same diff. Missing either is a BLOCKER (doc rule 10; the Edit Contact omission was R16).
-   - UI-test changes ⇒ focused affected accessibility regressions are named in the PR body; repeated 5× stress belongs to post-merge/nightly automation.
+   - UI-test changes ⇒ focused affected accessibility regressions are named in the PR body; the one-run audit belongs after merges, while repeated 5× stress belongs to nightly automation and pre-release manual dispatch.
    - Audit-category constant (`structuralAuditCategories`) may only widen (PR34 flips it to all categories); any narrowing is a BLOCKER.
 2. **Labels and traits.**
    - Every interactive element has an accessibility label that is human-readable natural-case prose (the all-caps Wordmark flake is the cautionary tale: decorative/styled text needs an explicit spoken-form `.accessibilityLabel`).
