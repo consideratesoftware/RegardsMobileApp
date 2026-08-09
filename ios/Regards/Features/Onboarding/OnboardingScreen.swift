@@ -8,6 +8,7 @@ public struct OnboardingScreen: View {
     }
 
     @AccessibilityFocusState private var focusedRecoveryAction: RecoveryAction?
+    @State private var statusEffectGeneration = 0
 
     let showsPermissionAction: Bool
     let isBusy: Bool
@@ -105,18 +106,24 @@ public struct OnboardingScreen: View {
         .background(RegardsDS.background.ignoresSafeArea())
         .accessibilityIdentifier("screen.onboarding")
         .onChange(of: statusMessage, initial: true) { _, message in
-            guard let message else { return }
+            statusEffectGeneration &+= 1
+            let effectGeneration = statusEffectGeneration
+            guard let message else {
+                focusedRecoveryAction = nil
+                return
+            }
             let recoveryAction: RecoveryAction = canContinueWithoutContacts
                 ? .continueWithoutContacts
                 : .allowContacts
+            let effects = accessibilityEffects
             Task { @MainActor in
-                await Task.yield()
-                guard statusMessage == message else { return }
-                accessibilityEffects.announce(message)
-                await Task.yield()
-                guard statusMessage == message else { return }
+                await effects.yieldControl()
+                guard statusEffectGeneration == effectGeneration else { return }
+                effects.announce(message)
+                await effects.yieldControl()
+                guard statusEffectGeneration == effectGeneration else { return }
                 focusedRecoveryAction = recoveryAction
-                accessibilityEffects.didFocusRecovery()
+                effects.didFocusRecovery()
             }
         }
     }
@@ -226,6 +233,17 @@ public struct OnboardingScreen: View {
 struct OnboardingAccessibilityEffects {
     let announce: @MainActor (String) -> Void
     let didFocusRecovery: @MainActor () -> Void
+    let yieldControl: @MainActor () async -> Void
+
+    init(
+        announce: @escaping @MainActor (String) -> Void,
+        didFocusRecovery: @escaping @MainActor () -> Void,
+        yieldControl: @escaping @MainActor () async -> Void = { await Task.yield() }
+    ) {
+        self.announce = announce
+        self.didFocusRecovery = didFocusRecovery
+        self.yieldControl = yieldControl
+    }
 
     static let live = OnboardingAccessibilityEffects(
         announce: { AccessibilityNotification.Announcement($0).post() },

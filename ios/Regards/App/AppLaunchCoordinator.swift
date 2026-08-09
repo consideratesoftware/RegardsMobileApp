@@ -54,10 +54,10 @@ final class AppLaunchCoordinator {
         AppLaunchCoordinator(
             dependencies: Dependencies(
                 makeRuntime: {
-                    let database = try await Task.detached(priority: .userInitiated) {
-                        try DatabaseFactory.makeDatabase()
+                    let environment = try await Task.detached(priority: .userInitiated) {
+                        try ProductionRepositoryFactory.makeFileBackedEnvironment()
                     }.value
-                    return try await AppRuntime.makeProduction(database: database)
+                    return try await AppRuntime.makeProduction(environment: environment)
                 },
                 contactsSource: CNContactsSource(),
                 clock: { Date() }
@@ -94,8 +94,8 @@ final class AppLaunchCoordinator {
             return AppLaunchCoordinator(
                 dependencies: Dependencies(
                     makeRuntime: {
-                        let database = try DatabaseFactory.makeInMemoryDatabase()
-                        return try await AppRuntime.makeProduction(database: database)
+                        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+                        return try await AppRuntime.makeProduction(environment: environment)
                     },
                     contactsSource: FirstLaunchUITestContactsSource(outcome: contactsOutcome),
                     clock: { Date(timeIntervalSince1970: 1_785_600_000) }
@@ -106,8 +106,8 @@ final class AppLaunchCoordinator {
             return AppLaunchCoordinator(
                 dependencies: Dependencies(
                     makeRuntime: {
-                        let database = try DatabaseFactory.makeInMemoryDatabase()
-                        return try await AppRuntime.makeProduction(database: database)
+                        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+                        return try await AppRuntime.makeProduction(environment: environment)
                     },
                     contactsSource: FirstLaunchUITestContactsSource(outcome: .authorized),
                     clock: { Date(timeIntervalSince1970: 1_785_600_000) }
@@ -316,8 +316,8 @@ private actor FirstLaunchUITestRuntimeFactory {
             shouldFail = false
             throw FirstLaunchUITestRuntimeError.openFailed
         }
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        return try await AppRuntime.makeProduction(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        return try await AppRuntime.makeProduction(environment: environment)
     }
 }
 

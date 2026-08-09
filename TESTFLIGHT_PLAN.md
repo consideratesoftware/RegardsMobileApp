@@ -20,11 +20,13 @@ never pick up Android work.
   contracts, production-first launch, resumable first import, and the basic
   onboarding gate are implemented in one schema-locked lane. The production
   fresh-install, manual accessibility smoke, and §14 physical-device acceptance
-  pass are complete. GitHub PR #44 is published. Hosted semantic review run
-  `31300926594` requested one blocker and follow-up hardening on pushed head
-  `ed6023b`; the source repair and exact-source device evidence are complete.
-  Guarded auto-merge remains off until the repair head receives fresh required
-  checks and a hosted semantic `APPROVE` verdict.
+  pass are complete. GitHub PR #44 is published. Required checks passed on
+  pushed head `52487b0`, but hosted semantic review run `31328636788`
+  correctly requested one accessibility blocker before merge. Its repair and
+  final local evidence are complete in the worktree, and the exact-worktree
+  `$regards-pr-review` verdict is `APPROVE`. Guarded auto-merge remains off
+  until the repair is pushed, fresh required checks pass, and the hosted typed
+  verdict is `APPROVE`.
 - Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
   independent ready lanes from the same exact merged `main`.
 - Open TF pull request: GitHub PR #44, `codex/tf-02-production-runtime` into
@@ -191,12 +193,62 @@ never pick up Android work.
   Application Support directory and `regards.sqlite`. The app was detached and
   the Accessibility Inspector overrides were verified back at defaults.
   Findings: none.
-- The final exact-worktree `$regards-pr-review` rerule is `APPROVE` across
+- The prior exact-worktree `$regards-pr-review` rerule on `52487b0` was
+  `APPROVE` across
   correctness, security/privacy, code quality, tests, accessibility, and
   fit/finish. The physical-device and file-protection coverage holes are
   cleared; no blocker, should-fix, question, or confirmed test hole remains.
-  Five optional code-organization nits about adding `MARK` sections to long
-  launch and test files were consciously left as non-semantic preferences.
+  Five optional file-organization nits were consciously left as non-semantic
+  preferences: split `ProductionRepositoryFactory` into its own Data file and
+  add `MARK` sections to four long launch/UI-test files.
+- PR #44 hosted semantic review run `31328636788` then found one valid blocker
+  on `52487b0`: OnboardingScreen's status-effect task compared the message
+  captured by a value-type view to itself, so an overlapping transition could
+  re-announce stale recovery copy and refocus a removed action. The worktree
+  now uses a live generation token across both suspension points. A
+  deterministic hosting regression overlaps two status transitions and proves
+  that only the newest message announces and focuses. The directly applicable
+  should-fixes are also closed: imported
+  phone and email arrays still preserve raw values, but invalid domestic,
+  extension, alphabetic, non-ASCII-digit, too-short, too-long, and malformed
+  email values can no longer become a non-empty preferred deep-link value;
+  selection takes the first valid phone and otherwise the first valid email,
+  with the canonical ChannelCatalog rule accepting only safe separator
+  normalization around a leading `+` and 7–15 ASCII digits; and
+  ReminderWindow's Codable regression now round-trips non-nil wrapping quiet
+  hours. Production GRDB construction now lives behind the Data-layer
+  `ProductionRepositoryFactory`; App composition and App-level tests receive
+  only repository-protocol environments. The file-backed factory is exercised
+  against an injectable temporary Application Support root, proving protected
+  creation, migration, repository reads/writes, persistence, and reopen; App
+  recovery tests use the configured shared repository fakes. The final affected
+  slice passes 103 expanded cases / 87 logical tests with zero failures, and
+  the complete unit bundle passes 259/259 (317 expanded device-configured
+  cases). The five affected launch audits pass 5/5 at accessibility5. A manual
+  simulator walkthrough now explicitly covers denial → **Continue without
+  contacts**, import failure → Retry, and launch failure → **Try Again**;
+  every action reached its expected destination and Accessibility Inspector
+  reported no warnings on all three recovery surfaces.
+  The remaining suggestions retain their existing owners or are already
+  covered at the real boundary: §10.8/R14 deliberately lets the browse-only
+  escape complete onboarding until PR29 adds Settings re-entry; TF-03 owns
+  R25's off-pool/chunked 5k import and R35/R50 per-row corruption tolerance;
+  TF-07 owns resident-timezone scheduling; missing reminder-window state must
+  remain a visible launch failure rather than silently synthesizing user timing
+  under R9a/R47; the file-backed reopen regression already reapplies the GRDB
+  migrator to an existing v2 store; there is no suspension point between
+  assigning a healthy runtime and choosing its profile phase; and production
+  CNContact identifiers are non-empty while the importer de-duplicates every
+  identifier within a pass. RootView's guard reads live observable coordinator
+  state and its two defensive failure fixtures remain audited, unlike the
+  repaired value-input OnboardingScreen case. The hosted narrative and bounded
+  polling nits are corrected by this evidence and the new `eventually` helper.
+- The final exact-worktree `$regards-pr-review` verdict is `APPROVE` across
+  correctness, security/privacy, code quality, tests, accessibility, and
+  fit/finish. There are no blockers, fixes, coverage holes, questions, or
+  accessibility findings. Five optional file-organization nits remain
+  consciously deferred because they do not change behavior. The exact-source
+  Release simulator build also passes after the final composition seam.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 

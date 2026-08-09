@@ -64,8 +64,8 @@ struct DatabaseMigratorTests {
 }
 
 extension DatabaseMigratorTests {
-    @Test("File-backed production database creates protected storage and survives reopen")
-    func fileBackedDatabaseCreatesProtectedStorageAndReopens() async throws {
+    @Test("File-backed production environment creates protected migrated repositories and reopens")
+    func fileBackedEnvironmentCreatesProtectedStorageAndReopens() async throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
             .appendingPathComponent("RegardsDatabaseFactory-\(UUID().uuidString)", isDirectory: true)
@@ -79,29 +79,20 @@ extension DatabaseMigratorTests {
             .appendingPathComponent("Regards", isDirectory: true)
             .appendingPathComponent(fileName)
         let onboardingDate = Date(timeIntervalSince1970: 1_800_000_000)
-
-        func seedDatabase() async throws {
-            let queue = try DatabaseFactory.makeDatabase(
-                applicationSupportDirectory: root,
-                fileName: fileName,
-                fileManager: fileManager
-            )
-            let repository = GRDBRepositories(dbQueue: queue).profile
-            var profile = try await repository.fetch()
-            profile.onboardingCompletedAt = onboardingDate
-            try await repository.save(profile)
-        }
-
-        func reopenDatabase() async throws -> UserProfile {
-            let queue = try DatabaseFactory.makeDatabase(
-                applicationSupportDirectory: root,
-                fileName: fileName,
-                fileManager: fileManager
-            )
-            return try await GRDBRepositories(dbQueue: queue).profile.fetch()
-        }
-
-        try await seedDatabase()
+        let contact = Contact(
+            systemContactRef: "file-backed-environment",
+            displayName: "File-backed Contact"
+        )
+        let environment = try ProductionRepositoryFactory.makeFileBackedEnvironment(
+            applicationSupportDirectory: root,
+            fileName: fileName,
+            fileManager: fileManager
+        )
+        let seededWindow = try await environment.window.fetchGlobal()
+        var profile = try await environment.profile.fetch()
+        profile.onboardingCompletedAt = onboardingDate
+        try await environment.profile.save(profile)
+        try await environment.contacts.upsert(contact)
 
         #expect(fileManager.fileExists(atPath: databaseURL.path))
         #if !targetEnvironment(simulator)
@@ -118,8 +109,15 @@ extension DatabaseMigratorTests {
         )
         #endif
 
-        let reopenedProfile = try await reopenDatabase()
+        let reopened = try ProductionRepositoryFactory.makeFileBackedEnvironment(
+            applicationSupportDirectory: root,
+            fileName: fileName,
+            fileManager: fileManager
+        )
+        let reopenedProfile = try await reopened.profile.fetch()
         #expect(reopenedProfile.onboardingCompletedAt == onboardingDate)
+        #expect(try await reopened.window.fetchGlobal() == seededWindow)
+        #expect(try await reopened.contacts.fetch(id: contact.id)?.displayName == contact.displayName)
     }
 
     @Test("Fresh latest schema has v2 columns and defaults")

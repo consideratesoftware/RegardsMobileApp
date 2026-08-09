@@ -73,9 +73,11 @@ public struct ContactsImporter: Sendable {
     /// Mapping rules:
     /// - `displayName`: "Given Family", trimmed empties out. Falls back to
     ///   the first phone number, then the first email, then "Unknown".
-    /// - `preferredChannel` + `preferredChannelValue`: first phone number
-    ///   under `.phoneCall`. If no phones, first email under `.email`.
-    ///   If neither, `.phoneCall` with empty value (user fills in later).
+    /// - `preferredChannel` + `preferredChannelValue`: first valid phone
+    ///   number under `.phoneCall`. If none, first valid email under `.email`.
+    ///   Values that cannot produce a valid deep link are retained in the
+    ///   contact-value arrays but leave the preferred value empty for later
+    ///   user correction.
     /// - Every E.164-parseable phone is normalized before persistence. Raw
     ///   values are retained when the country code cannot be resolved from
     ///   the source value. Every email is lowercased.
@@ -93,20 +95,14 @@ public struct ContactsImporter: Sendable {
 
         let phoneNumbers = sc.phoneNumbers.map { rawValue in
             let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.first == "+",
-                  trimmed.dropFirst().allSatisfy({ character in
-                      "0123456789".contains(character)
-                          || character.isWhitespace
-                          || "()-./".contains(character)
-                  }) else {
-                return rawValue
-            }
-            let normalized = ChannelCatalog.normalizedPhone(trimmed)
-            return ChannelCatalog.isPhoneE164(normalized) ? normalized : rawValue
+            guard ChannelCatalog.isPhoneE164(trimmed) else { return rawValue }
+            return ChannelCatalog.normalizedPhone(trimmed)
         }
         let emailAddresses = sc.emailAddresses.map { $0.lowercased() }
-        let primaryPhone = phoneNumbers.first ?? ""
-        let primaryEmail = emailAddresses.first ?? ""
+        let primaryPhone = phoneNumbers.first(where: ChannelCatalog.isPhoneE164) ?? ""
+        let primaryEmail = emailAddresses.first {
+            ChannelCatalog.validate(value: $0, for: .email)
+        } ?? ""
         let preferredChannel: Channel
         let preferredChannelValue: String
         if !primaryPhone.isEmpty {
@@ -115,6 +111,9 @@ public struct ContactsImporter: Sendable {
         } else if !primaryEmail.isEmpty {
             preferredChannel = .email
             preferredChannelValue = primaryEmail
+        } else if !emailAddresses.isEmpty && phoneNumbers.isEmpty {
+            preferredChannel = .email
+            preferredChannelValue = ""
         } else {
             preferredChannel = .phoneCall
             preferredChannelValue = ""
@@ -130,4 +129,5 @@ public struct ContactsImporter: Sendable {
             emailAddresses: emailAddresses,
             createdAt: now)
     }
+
 }

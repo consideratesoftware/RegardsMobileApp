@@ -22,8 +22,8 @@ actor StubContactRepository: ContactRepository {
     }
 
     /// A repository whose every read throws.
-    static func failing() -> StubContactRepository {
-        StubContactRepository([], failure: RepositoryFakeFailure())
+    static func failing(_ contacts: [Contact] = []) -> StubContactRepository {
+        StubContactRepository(contacts, failure: RepositoryFakeFailure())
     }
 
     private func requireSuccess() throws {
@@ -63,6 +63,8 @@ actor StubContactRepository: ContactRepository {
     func archive(id: UUID, at: Date) async throws {
         try requireSuccess()
     }
+
+    func storedCount() -> Int { contacts.count }
 }
 
 actor StubReminderRepository: ReminderRepository {
@@ -109,4 +111,39 @@ actor StubReminderRepository: ReminderRepository {
     func delete(id: UUID) async throws {
         try requireSuccess()
     }
+}
+
+struct StubReminderWindowRepository: ReminderWindowRepository {
+    enum ReadFailure: Sendable {
+        case opaque
+        case missing
+        case invalidTimezone(String)
+    }
+
+    let failure: ReadFailure
+
+    static func failing() -> StubReminderWindowRepository {
+        StubReminderWindowRepository(failure: .opaque)
+    }
+
+    static func missing() -> StubReminderWindowRepository {
+        StubReminderWindowRepository(failure: .missing)
+    }
+
+    static func invalidTimezone(_ identifier: String) -> StubReminderWindowRepository {
+        StubReminderWindowRepository(failure: .invalidTimezone(identifier))
+    }
+
+    func fetchGlobal() async throws -> ReminderWindow {
+        switch failure {
+        case .opaque:
+            throw RepositoryFakeFailure()
+        case .missing:
+            throw DataError.notFound
+        case let .invalidTimezone(identifier):
+            throw ReminderWindow.ValidationError.invalidTimezoneIdentifier(identifier)
+        }
+    }
+
+    func saveGlobal(_ window: ReminderWindow) async throws {}
 }
