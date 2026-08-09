@@ -20,6 +20,8 @@ under a **Manual accessibility smoke** heading.
 ## Launch and tab shell
 
 - [ ] Launch app. VoiceOver announces "Regards. Loading." as a header.
+- [ ] Force a production database-open failure. VoiceOver announces the error,
+      focuses “Try Again”, and activation recovers to onboarding without a trap.
 - [ ] On a fresh install, VoiceOver reaches the Contacts pre-prompt heading,
       benefit cards, permission CTA, and proofs link in reading order.
 - [ ] Activate "Why we ask" and return with Done; neither route traps focus.

@@ -258,7 +258,7 @@ ReminderWindow (global prefs, single row)
   quietHoursJson: TEXT              -- absolute "never between X and Y" override; wrap-aware (22:00→07:00 legal)
   timezone: TEXT                    -- IANA, defaults to device
   -- v2 adds:
-  occasionTime: TEXT                -- "HH:mm" morning-of time for birthday/anniversary notifications, default "09:00"
+  occasionTime: TEXT                -- persisted/validated "HH:mm", default "09:00"; no production scheduler consumes it yet
   digestHorizonDays: INTEGER        -- Upcoming view horizon (7/14/30), default 14
 
 ScheduledReminder
@@ -301,7 +301,7 @@ UserProfile (single row)
 **Re-import & reconciliation (Phase 1B, PR21 — spec unchanged from v0.5):** on every app launch/foreground + on `CNContactStoreDidChange`, reconcile against `systemContactRef`:
 - New system contacts → import as `tracked=false`.
 - Deleted system contacts → set `archivedAt` (never hard-delete; cadence/log history stays for potential re-add).
-- Changed contacts → refresh `displayName`, `photoRef`, `phonesJson`, `emailsJson`, birthday/dates inputs.
+- Changed contacts → refresh `displayName`, `photoRef`, `phonesJson`, and `emailsJson`; PR30 later adds birthday/date inputs to that reconciliation scope.
 - The shipped `ContactsImporter` (PR #10) is first-launch/additive only — that's the documented gap PR21 closes, not a bug in what shipped.
 
 **Write-back (Phase 1D, PR27):** partial-field `CNSaveRequest` — only fields the user explicitly edited. `notes` never write back. Re-fetch after save so Regards reflects what the system store accepted.
@@ -453,7 +453,7 @@ returning through that path.
 5. **Edit Contact** — real form (`TextField`s) mirroring system-contact fields: name, phones, emails, postal addresses, birthday, anniversary. Save = partial-field `CNSaveRequest` write-back of touched fields only; Cancel/back always available. The interim screen now has a standard Back escape route and no inert Save/Cancel controls; the real form lands in TF-09 (PR27). Regards-local `notes` visible but labeled not-written-back. Write-permission-denied state links to Settings.
 6. **Merge Duplicates** (Settings entry) — ranked candidate pairs (§7 heuristic) with side-by-side preview; user picks the primary face; **Confirm creates a `ContactGroup` row** (shipped gap R12: nothing persists); one-tap Undo (delete group); **Skip** dismisses a pair persistently (store dismissed pair hashes locally); manual "link two contacts…" flow for heuristic misses.
 7. **Settings** — Reminder windows (→ screen 9), quiet hours, occasion notification time, Upcoming horizon, digest preview, Find duplicate contacts, notification permission status + re-prompt, entitlement card (trial countdown / unlock / restore purchases / tip jar, Phase 2), **Export my data** (JSON to Files), **Delete everything** (wipe DB + reset first-run), Transparency screen, "Behind the App" (journal link — the app's one outbound *user-initiated* Safari link; it does not violate §11 because it's `openURL` to the system browser, no in-app networking), Contact support (mailto with prefilled diagnostics), Onboarding replay.
-8. **Onboarding** — 3 screens: (a) concept sell ("who have you been meaning to call?"), (b) Contacts permission pre-prompt → system prompt, (c) optional Calendar pre-prompt + pick-your-first-3-contacts starter (search, set cadence+channel inline). Gated by `UserProfile.onboardingCompletedAt` in the launch path (shipped gap: only reachable from Settings preview, R14). Denial paths: Contacts denied → explainer + Settings deep link + browse-only mode.
+8. **Onboarding** — 3 screens: (a) concept sell ("who have you been meaning to call?"), (b) Contacts permission pre-prompt → system prompt, (c) optional Calendar pre-prompt + pick-your-first-3-contacts starter (search, set cadence+channel inline). Gated by `UserProfile.onboardingCompletedAt` in the launch path. TF-02 supplies the Contacts pre-prompt, retry, and browse-only path; its **Continue without contacts** choice completes onboarding and has no later Contacts re-entry. PR29 owns the Settings re-entry/deep link plus the remaining starter and notification steps (R14).
 9. **Reminder Windows** (pushed from Settings; promoted to a first-class Features folder, decision #33) — **live editor**, not the shipped display-only mock (R9): day pills toggle `allowedDaysMask`, time ranges add/edit/remove with overlap validation, quiet-hours editor (wrap allowed), zero-capacity configs refuse to save with inline error, writes through `ReminderWindowRepository` and triggers `SchedulingPass.runFull()`.
 
 Plus **Transparency** (static, shipped) under Settings — plain-language privacy proof with links out (wire the three inert "Open" rows to `openURL`, R15).
@@ -684,7 +684,7 @@ boundaries.
 | PR | Scope | Key acceptance criteria |
 |---|---|---|
 | **PR24** | `Platform/Notifications` adapter (`NotificationScheduling`), permission pre-prompt + request in onboarding step (c) and Settings, notification categories/actions (Caught up / Snooze / open) | Local notification fires on device at a window boundary; actions round-trip |
-| **PR25** | `SchedulingPass` actor: full + targeted runs, digest batching (slot-start snapping, `digest-{epoch}` identity), occasion scheduling from Contacts source, no-double-up rule, orphan cancellation, launch/foreground reconcile; Upcoming switches to `ValueObservation` over persisted rows (R10); live digest labels (R11) | Idempotence + reconcile tests green; airplane-mode device test: overdue contact → digest at next window open |
+| **PR25** | `SchedulingPass` actor: full + targeted runs, digest batching (slot-start snapping, `digest-{epoch}` identity), occasion scheduling from injected/available inputs (production Contacts/EventKit activation stays PR30), no-double-up rule, orphan cancellation, launch/foreground reconcile; Upcoming switches to `ValueObservation` over persisted rows (R10); live digest labels (R11) | Idempotence + reconcile tests green; airplane-mode device test: overdue contact → digest at next window open |
 | **PR26** | Deep-link execution: `DeepLinker` adapter, channel taps wired in all 4 surfaces, notification tap-through routing (digest → Overdue; single → Contact Detail), `LSApplicationQueriesSchemes: [discord]`, `reminder_tap` interaction logging | Tapping WhatsApp row on device opens WhatsApp to the contact; R37 closed |
 
 ### Phase 1D — Editing, merging, onboarding, calendar (Jul 27–31)
@@ -694,7 +694,7 @@ boundaries.
 | **PR27** | Edit Contact: real form, dirty-field tracking, partial `CNSaveRequest` write-back via `ContactsWriter`, re-fetch after save, nav trap fixed (R13), write-denied state, `NSContactsUsageDescription` reworded (R17) | Edit phone on device → visible in system Contacts app; only touched fields written; audit test added |
 | **PR28** | Merge for real: confirm→`ContactGroup` write, group-aware SchedulingPass (one reminder/group, member-max interaction), one-row-per-group in Overdue/Upcoming, unmerge, persistent skip, manual link, detector fed full handle sets (R12) | Two "Mom" entries → one reminder; unmerge restores; group chip reachable and audited |
 | **PR29** | Onboarding: 3-screen flow in launch path (R14), pre-prompts, first-3-contacts starter, denial paths | Fresh-install TestFlight-ready first-run |
-| **PR30** | Calendar birthdays: `CalendarSource` (EventKit), `NSCalendarsFullAccessUsageDescription`, source merge (Contacts wins), Settings toggle, importer maps `SystemContact.birthday` (closing the fetched-then-dropped gap) | Calendar-only birthday appears in Upcoming; revoking permission degrades gracefully |
+| **PR30** | Calendar birthdays: `CalendarSource` (EventKit), `NSCalendarsFullAccessUsageDescription`, Settings toggle, re-add `CNContactBirthdayKey` to `CNContactsSource`, populate `SystemContact.birthday`, update the Contacts pre-prompt before that read begins, and merge non-persisted Contacts/EventKit occasion inputs with Contacts winning | Calendar-only birthday appears in Upcoming; revoking permission degrades gracefully |
 
 ### Phase 2 — Widget, monetization, polish (Aug 3–14)
 
@@ -869,11 +869,17 @@ work.
   and records `onboardingCompletedAt` only after the pass succeeds. Relaunch
   resumes an interrupted pass by skipping existing `systemContactRef` values.
   Denied/restricted access has a functional browse-without-importing path, and
-  database/import failures remain visible and retryable.
+  database/import failures remain visible and retryable. The current import
+  persists only system identifiers, names, phone numbers, and email addresses.
+  It does not request birthdays. PR30 re-adds `CNContactBirthdayKey` and maps
+  `CNContact.birthday` into `SystemContact.birthday` when production occasion
+  scheduling consumes it.
 - The `v2` migration preserves the shipped `v1` registration and adds contact
-  phone/email arrays, reminder occasion time and digest horizon, and the
-  profile trial timestamp. Its v1→v2 test carries representative data through
-  all six tables and normalizes legacy JSON `null` quiet hours to SQL NULL.
+  phone/email arrays, persisted reminder occasion time and digest horizon, and
+  the profile trial timestamp. `AppRuntime` decodes the global window, but no
+  production scheduling path consumes `occasionTime` yet. Its v1→v2 test
+  carries representative data through all six tables and normalizes legacy JSON
+  `null` quiet hours to SQL NULL.
 - Shared repository contracts now run against both mock and GRDB backends,
   including persistence values, ordering, validation, referential failures,
   duplicate identifiers, and timestamp normalization.
@@ -922,10 +928,10 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R9a | **Global window injection.** `UpcomingViewModel` has no silent default; production launch opens GRDB and `AppRuntime.makeProduction` resolves the persisted singleton before tabs appear. Missing or invalid storage produces a visible retry state, never a mock fallback | `UpcomingViewModel.swift`, `AppEnvironment.swift`, `AppLaunchCoordinator.swift` | Production launch uses the stored global window; mock launch is explicit and DEBUG-only | Seam closed by GitHub PR #42; TF-02 closes the runtime half on merge |
 | R9b | **Per-contact override and live refresh — OPEN.** Overrides are still unresolved anywhere in the UI, a stored-window change does not refresh an open Upcoming, and the ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `ReminderWindowsScreen.swift:7,226`, `UpcomingViewModel.swift` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | TF-05 (PR23) |
 | R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
-| R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; Contact Detail's Caught up/Snooze/Log-other and channel action plus Overdue channel actions are muted, unavailable content pending TF-04/TF-08; inert Merge "Skip"; no-op Onboarding permission button | `ContactDetailScreen.swift`, `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift`, `MergeDuplicatesScreen.swift:108-112`, `OnboardingScreen.swift:3-5` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | Horizon/All stubs removed ✅ **closed by TF-01 modernization / GitHub PR #24**; remaining PR22–PR29 |
+| R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; Contact Detail's Caught up/Snooze/Log-other and channel action plus Overdue channel actions are muted, unavailable content pending TF-04/TF-08; inert Merge "Skip" | `ContactDetailScreen.swift`, `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift`, `MergeDuplicatesScreen.swift:108-112` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | Horizon/All stubs removed ✅ **closed by TF-01 modernization / GitHub PR #24**; remaining PR22–PR29 |
 | R12 | **Merge never persists** (no `ContactGroup` written; `env.groups` unused) and detector sees only `preferredChannelValue` instead of full handle sets | `MergeDuplicatesViewModel.swift:44-55` | PR28 scope + `phonesJson`/`emailsJson` inputs | PR28 |
 | R13 | **Edit Contact shipped as a navigation trap and remains a read-only stub:** the hidden Back button and mixed navigation APIs made Edit unreachable or inescapable; the interim screen now removes inert form actions | `EditContactScreen.swift`, `ContactDetailScreen.swift` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | escape route ✅ **closed by TF-01 slice 1**; real form PR27 |
-| R14 | **Full onboarding remains incomplete.** TF-02 adds the persisted launch gate, Contacts pre-prompt, resumable first import, denial/retry paths, and non-inert proof link. Starter-contact selection and the notification step remain absent | `OnboardingScreen.swift`, `RegardsApp.swift`, `AppLaunchCoordinator.swift` | Complete the 3-screen starter-contact and notification flow per §10.8 | PR29 |
+| R14 | **Full onboarding remains incomplete.** TF-02 adds the persisted launch gate, Contacts pre-prompt, resumable first import, denial/retry paths, and non-inert proof link. Starter-contact selection, the notification step, and Contacts re-entry after **Continue without contacts** remain absent | `OnboardingScreen.swift`, `RegardsApp.swift`, `AppLaunchCoordinator.swift` | Complete the 3-screen starter-contact and notification flow, including Settings re-entry for Contacts, per §10.8 | PR29 |
 | R15 | **Transparency screen's 3 "Open" links inert**; repo URL hardcoded — verify before launch | `TransparencyScreen.swift:123, 183-187` | Wire `openURL`; confirm `github.com/consideratesoftware/RegardsMobileApp` is the public repo URL | PR33 |
 | R49 | **Upcoming drops already-overdue contacts during an active reminder slot.** `ReminderEngine` intentionally returns the slot start for deterministic batching, but the ViewModel rejects it when that start is earlier than `now` | `UpcomingViewModel.swift` | Keep the active-slot row while preserving its slot-start identity; pin a regression at 18:30 for an 18:00–22:00 slot | ✅ **closed by TF-01 scheduled-audit follow-up** |
 
@@ -934,7 +940,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R | Defect | Where | Fix | PR |
 |---|---|---|---|---|
 | R16 | Edit Contact missing from the audited-screens table AND the audit suite (violates accessibility.md rule 10) | `ios/docs/accessibility.md:76-89`, `ScreensAccessibilityTests.swift` | Add row + test | ✅ **closed by TF-01 slice 1** |
-| R17 | `NSContactsUsageDescription` is read-only copy; §11 requires the edit mention before write-back ships. `NSCalendarsFullAccessUsageDescription` absent (needed PR30) | `project.yml:84-86` | Reword with PR27; add calendar key with PR30 | PR27/PR30 |
+| R17 | `NSContactsUsageDescription` is read-only copy; §11 requires the edit mention before write-back ships. `NSCalendarsFullAccessUsageDescription` is absent, and `CNContactBirthdayKey` is intentionally not requested until PR30 activates birthday ingestion | `project.yml:84-86`, `ContactsSource.swift` | Reword with PR27; with PR30, add the calendar key, re-add the birthday key, and disclose that read in the Contacts pre-prompt | PR27/PR30 |
 | R18 | `PrivacyInfo.xcprivacy` has empty `NSPrivacyAccessedAPITypes`; SQLite/GRDB file-timestamp access will need required-reason entries at submission | `ios/Regards/PrivacyInfo.xcprivacy` | Populate against Apple's current category list during Phase 3 prep | PR34/§20 |
 | R19 | Root markdown was exempt from link checks, and README referenced nonexistent `docs/DOMAIN_MODEL.md` and `android/` paths | `README.md`; `guards.yml` | README references ✅ **closed by TF-01 slice 1**; root Markdown checks cover repository root and `ios/docs/` | ✅ **closed by GitHub PR #39** |
 | R20 | **CLAUDE.md misroutes agents (5 stale claims):** iPhone 15 destinations (CI uses 16 Pro); "Platform/ currently empty" (has Contacts adapter); PrivacyInfo said to live in `Resources/`; `pr3AuditCategories`/"PR3 follow-ups" naming (actual: `structuralAuditCategories`, "Sensory-audit carve-outs"); "snapshot job declared `if: false`" (it's a comment, no job) | `CLAUDE.md:37,41,78,80,92,111` | Rewrite (done in the same change set as this doc v1.0); future edits follow sibling-PR rule | ✅ **closed by TF-00 / GitHub PR #22** |

@@ -203,6 +203,99 @@ struct AppLaunchCoordinatorTests {
         #expect(await runtimeFactory.attemptCount() == 2)
     }
 
+    @Test("A corrupt persisted window reaches visible launch recovery")
+    func corruptPersistedWindowFailsLaunchRetryably() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        try await database.write { db in
+            try db.execute(
+                sql: "UPDATE ReminderWindow SET occasionTime = ? WHERE id = 1",
+                arguments: ["24:00"]
+            )
+        }
+        let source = ScriptedLaunchContactsSource(status: .notDetermined)
+        let launch = coordinator(database: database, source: source)
+
+        await launch.start()
+
+        #expect(launch.phase == .failed)
+        #expect(launch.runtime == nil)
+        #expect(launch.statusMessage != nil)
+        #expect(await source.counts() == .init(current: 0, requests: 0, fetches: 0))
+    }
+
+    @Test("An undecodable stored contact leaves onboarding incomplete")
+    func corruptStoredContactLeavesOnboardingIncomplete() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = AppEnvironment.makeProduction(database: database)
+        let corruptContact = Contact(
+            systemContactRef: "corrupt-stored-contact",
+            displayName: "Corrupt Stored Contact"
+        )
+        try await environment.contacts.upsert(corruptContact)
+        try await database.write { db in
+            try db.execute(
+                sql: "UPDATE Contact SET phonesJson = ? WHERE id = ?",
+                arguments: ["[", corruptContact.id.uuidString]
+            )
+        }
+        let source = ScriptedLaunchContactsSource(
+            status: .authorized,
+            contacts: [Self.systemContact]
+        )
+        let launch = coordinator(database: database, source: source)
+
+        await launch.start()
+
+        #expect(launch.phase == .onboarding)
+        #expect(launch.statusMessage != nil)
+        let runtime = try #require(launch.runtime)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
+        #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
+        let persistedContactCount = try await database.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM Contact")
+        }
+        #expect(persistedContactCount == 1)
+    }
+
+    @Test("A permission tap racing launch starts one import")
+    func permissionTapRacingAuthorizationStartsOneImport() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let source = BlockingAuthorizationContactsSource(contacts: [Self.systemContact])
+        let launch = coordinator(database: database, source: source)
+        let start = Task { await launch.start() }
+        await source.waitUntilCurrentAuthorizationStarts()
+        await launch.requestContactsAndImport()
+        await source.finishCurrentAuthorization()
+        await start.value
+        #expect(launch.phase == .ready)
+        #expect(launch.statusMessage == nil)
+        #expect(await source.counts() == .init(current: 2, requests: 1, fetches: 1))
+        let runtime = try #require(launch.runtime)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await runtime.environment.contacts.fetchAll().count == 1)
+    }
+
+    @Test("A failed permission-tap import is not replaced by stale launch work")
+    func failedPermissionTapRacingAuthorizationPreservesFailure() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let source = BlockingAuthorizationContactsSource(
+            contacts: [Self.systemContact],
+            fetchFailuresRemaining: 1
+        )
+        let launch = coordinator(database: database, source: source)
+        let start = Task { await launch.start() }
+        await source.waitUntilCurrentAuthorizationStarts()
+        await launch.requestContactsAndImport()
+        await source.finishCurrentAuthorization()
+        await start.value
+        #expect(launch.phase == .onboarding)
+        #expect(launch.statusMessage != nil)
+        #expect(await source.counts() == .init(current: 2, requests: 1, fetches: 1))
+        let runtime = try #require(launch.runtime)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
+        #expect(try await runtime.environment.contacts.fetchAll().isEmpty)
+    }
+
     @Test("Overlapping production-open retries start only one runtime attempt")
     func overlappingProductionOpenRetriesStartOneAttempt() async throws {
         let database = try DatabaseFactory.makeInMemoryDatabase()
@@ -238,7 +331,7 @@ struct AppLaunchCoordinatorTests {
 
     private func coordinator(
         database: DatabaseQueue,
-        source: ScriptedLaunchContactsSource
+        source: any ContactsSource
     ) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(
@@ -272,7 +365,6 @@ private actor ScriptedLaunchContactsSource: ContactsSource {
         let requests: Int
         let fetches: Int
     }
-
     private var status: ContactsAuthorizationStatus
     private let requestResult: ContactsAuthorizationStatus?
     private let contacts: [SystemContact]
@@ -280,7 +372,6 @@ private actor ScriptedLaunchContactsSource: ContactsSource {
     private var currentCount = 0
     private var requestCount = 0
     private var fetchCount = 0
-
     init(
         status: ContactsAuthorizationStatus,
         contacts: [SystemContact] = [],
@@ -292,12 +383,10 @@ private actor ScriptedLaunchContactsSource: ContactsSource {
         self.fetchFailuresRemaining = fetchFailuresRemaining
         self.requestResult = requestResult
     }
-
     func currentAuthorization() async -> ContactsAuthorizationStatus {
         currentCount += 1
         return status
     }
-
     func requestAccess() async throws -> ContactsAuthorizationStatus {
         requestCount += 1
         if status == .notDetermined {
@@ -305,7 +394,6 @@ private actor ScriptedLaunchContactsSource: ContactsSource {
         }
         return status
     }
-
     func fetchAllContacts() async throws -> [SystemContact] {
         fetchCount += 1
         if fetchFailuresRemaining > 0 {
@@ -314,20 +402,14 @@ private actor ScriptedLaunchContactsSource: ContactsSource {
         }
         return contacts
     }
-
     func counts() -> Counts {
         Counts(current: currentCount, requests: requestCount, fetches: fetchCount)
     }
 }
-
 private actor TransientRuntimeFactory {
     private let database: DatabaseQueue
     private var attempts = 0
-
-    init(database: DatabaseQueue) {
-        self.database = database
-    }
-
+    init(database: DatabaseQueue) { self.database = database }
     func makeRuntime() async throws -> AppRuntime {
         attempts += 1
         if attempts == 1 {
@@ -335,27 +417,67 @@ private actor TransientRuntimeFactory {
         }
         return try await AppRuntime.makeProduction(database: database)
     }
-
     func attemptCount() -> Int { attempts }
 }
-
+private actor BlockingAuthorizationContactsSource: ContactsSource {
+    private let contacts: [SystemContact]
+    private var fetchFailuresRemaining: Int
+    private var currentStarted = false
+    private var currentStartWaiter: CheckedContinuation<Void, Never>?,
+                currentFinishWaiter: CheckedContinuation<Void, Never>?
+    private var currentCount = 0, requestCount = 0, fetchCount = 0
+    init(contacts: [SystemContact], fetchFailuresRemaining: Int = 0) {
+        self.contacts = contacts
+        self.fetchFailuresRemaining = fetchFailuresRemaining
+    }
+    func currentAuthorization() async -> ContactsAuthorizationStatus {
+        currentCount += 1
+        guard currentCount == 1 else { return .authorized }
+        currentStarted = true
+        currentStartWaiter?.resume()
+        currentStartWaiter = nil
+        await withCheckedContinuation { continuation in
+            currentFinishWaiter = continuation
+        }
+        return .authorized
+    }
+    func requestAccess() async throws -> ContactsAuthorizationStatus {
+        requestCount += 1
+        return .authorized
+    }
+    func fetchAllContacts() async throws -> [SystemContact] {
+        fetchCount += 1
+        if fetchFailuresRemaining > 0 {
+            fetchFailuresRemaining -= 1
+            throw LaunchTestError.fetchFailed
+        }
+        return contacts
+    }
+    func waitUntilCurrentAuthorizationStarts() async {
+        guard !currentStarted else { return }
+        await withCheckedContinuation { continuation in
+            currentStartWaiter = continuation
+        }
+    }
+    func finishCurrentAuthorization() { currentFinishWaiter?.resume(); currentFinishWaiter = nil }
+    func counts() -> ScriptedLaunchContactsSource.Counts {
+        .init(current: currentCount, requests: requestCount, fetches: fetchCount)
+    }
+}
 private actor BlockingRetryRuntimeFactory {
     private let database: DatabaseQueue
     private var attempts = 0
     private var retryStarted = false
     private var retryStartWaiter: CheckedContinuation<Void, Never>?
     private var retryFinishWaiter: CheckedContinuation<Void, Never>?
-
     init(database: DatabaseQueue) {
         self.database = database
     }
-
     func makeRuntime() async throws -> AppRuntime {
         attempts += 1
         guard attempts > 1 else {
             throw LaunchTestError.openFailed
         }
-
         retryStarted = true
         retryStartWaiter?.resume()
         retryStartWaiter = nil
@@ -364,18 +486,15 @@ private actor BlockingRetryRuntimeFactory {
         }
         return try await AppRuntime.makeProduction(database: database)
     }
-
     func waitUntilRetryStarts() async {
         guard !retryStarted else { return }
         await withCheckedContinuation { continuation in
             retryStartWaiter = continuation
         }
     }
-
     func finishRetry() {
         retryFinishWaiter?.resume()
         retryFinishWaiter = nil
     }
-
     func attemptCount() -> Int { attempts }
 }

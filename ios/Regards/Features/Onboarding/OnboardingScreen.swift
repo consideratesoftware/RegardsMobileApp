@@ -205,7 +205,11 @@ public struct OnboardingScreen: View {
         .buttonStyle(.plain)
         .disabled(isBusy)
         .accessibilityFocused($focusedRecoveryAction, equals: .allowContacts)
-        .accessibilityHint("Opens the system Contacts permission prompt.")
+        .accessibilityHint(
+            isBusy
+                ? "Importing the contacts you selected."
+                : "Opens the system Contacts permission prompt."
+        )
         .accessibilityIdentifier("onboarding.allow-contacts")
     }
 }

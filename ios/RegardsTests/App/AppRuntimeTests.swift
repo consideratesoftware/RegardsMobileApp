@@ -138,4 +138,45 @@ struct AppRuntimeTests {
             Issue.record("Expected invalidTimezoneIdentifier, got \(error)")
         }
     }
+
+    @Test("A defensive ready-without-runtime state retries production launch")
+    @MainActor
+    func readyWithoutRuntimeRetryStartsProductionRuntime() async throws {
+        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let runtimeFactory = SuccessfulRuntimeFactory(database: database)
+        let launch = AppLaunchCoordinator(
+            dependencies: .init(
+                makeRuntime: { try await runtimeFactory.makeRuntime() },
+                contactsSource: NotDeterminedContactsSource(),
+                clock: { Date(timeIntervalSince1970: 1_785_600_000) }
+            ),
+            testingPhase: .ready
+        )
+
+        await launch.retry()
+
+        #expect(launch.phase == .onboarding)
+        #expect(launch.runtime != nil)
+        #expect(await runtimeFactory.attemptCount() == 1)
+    }
+}
+
+private actor SuccessfulRuntimeFactory {
+    private let database: DatabaseQueue
+    private var attempts = 0
+
+    init(database: DatabaseQueue) { self.database = database }
+
+    func makeRuntime() async throws -> AppRuntime {
+        attempts += 1
+        return try await AppRuntime.makeProduction(database: database)
+    }
+
+    func attemptCount() -> Int { attempts }
+}
+
+private struct NotDeterminedContactsSource: ContactsSource {
+    func currentAuthorization() async -> ContactsAuthorizationStatus { .notDetermined }
+    func requestAccess() async throws -> ContactsAuthorizationStatus { .notDetermined }
+    func fetchAllContacts() async throws -> [SystemContact] { [] }
 }

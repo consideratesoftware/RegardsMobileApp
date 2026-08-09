@@ -27,11 +27,20 @@ final class AppLaunchCoordinator {
 
     @ObservationIgnored private let dependencies: Dependencies?
     @ObservationIgnored private var didStart = false
+    @ObservationIgnored private var onboardingActionGeneration = 0
 
     init(dependencies: Dependencies) {
         self.phase = .loading
         self.dependencies = dependencies
     }
+
+#if DEBUG
+    init(dependencies: Dependencies, testingPhase: Phase) {
+        self.phase = testingPhase
+        self.dependencies = dependencies
+        self.didStart = true
+    }
+#endif
 
     private init(mockRuntime: AppRuntime) {
         self.phase = .ready
@@ -126,7 +135,12 @@ final class AppLaunchCoordinator {
             }
 
             phase = .onboarding
-            switch await dependencies.contactsSource.currentAuthorization() {
+            let actionGeneration = onboardingActionGeneration
+            let authorization = await dependencies.contactsSource.currentAuthorization()
+            guard phase == .onboarding,
+                  !isImporting,
+                  onboardingActionGeneration == actionGeneration else { return }
+            switch authorization {
             case .authorized, .limited:
                 await importAuthorizedContacts(runtime: runtime, dependencies: dependencies)
             case .denied, .restricted:
@@ -142,7 +156,7 @@ final class AppLaunchCoordinator {
     }
 
     func retry() async {
-        guard phase == .failed else { return }
+        guard phase == .failed || (phase == .ready && runtime == nil) else { return }
         phase = .loading
         didStart = false
         runtime = nil
@@ -151,6 +165,7 @@ final class AppLaunchCoordinator {
 
     func requestContactsAndImport() async {
         guard let runtime, let dependencies, !isImporting else { return }
+        onboardingActionGeneration &+= 1
         isImporting = true
         statusMessage = nil
         canContinueWithoutContacts = false
@@ -164,7 +179,13 @@ final class AppLaunchCoordinator {
                 return
             }
 
-            await importAuthorizedContacts(runtime: runtime, dependencies: dependencies)
+            let importer = ContactsImporter(
+                source: dependencies.contactsSource,
+                repo: runtime.environment.contacts,
+                clock: dependencies.clock
+            )
+            _ = try await importer.runFirstLaunchImport()
+            try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
         } catch {
             statusMessage = "Regards couldn't finish importing contacts. Try again to resume."
         }
@@ -172,6 +193,7 @@ final class AppLaunchCoordinator {
 
     func continueWithoutContacts() async {
         guard let runtime, let dependencies, !isImporting else { return }
+        onboardingActionGeneration &+= 1
         isImporting = true
         defer { isImporting = false }
 
@@ -198,6 +220,7 @@ final class AppLaunchCoordinator {
         runtime: AppRuntime,
         dependencies: Dependencies
     ) async {
+        guard !isImporting else { return }
         isImporting = true
         statusMessage = nil
         canContinueWithoutContacts = false

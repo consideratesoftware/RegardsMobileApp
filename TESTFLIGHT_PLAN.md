@@ -19,14 +19,17 @@ never pick up Android work.
   worktree `Regards Mobile App TF02`. Production DB v2, shared repository
   contracts, production-first launch, resumable first import, and the basic
   onboarding gate are implemented in one schema-locked lane. The production
-  fresh-install and manual accessibility smoke are complete. The final staged
-  review approves the recorded source with no blockers. The branch is ready
-  for its first commit and publication.
+  fresh-install and manual accessibility smoke are complete. GitHub PR #44 is
+  published. Its first hosted semantic review requested three blockers and
+  eight should-fixes; the verified repair is being committed and pushed while
+  guarded auto-merge remains off.
 - Next ready work: none until TF-02 merges. TF-03 and TF-04 then become
   independent ready lanes from the same exact merged `main`.
-- Open TF pull request: none yet. GitHub PR #43 merged as `8adeb0d`; GitHub PR
-  #42 merged as `d8193ff`; GitHub PR #41 merged as `bbd7c93` on the separate
-  Android track and is not TF work.
+- Open TF pull request: GitHub PR #44, `codex/tf-02-production-runtime` into
+  `main`. Its published head `e7808d9` passed iOS CI, Guards, Lint, XcodeGen
+  determinism, and the dedicated App-authored review gate; auto-merge is off
+  until the repair head receives a hosted semantic `APPROVE` verdict. GitHub
+  PR #43 merged as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
 - Worktree hazard found and contained inside PR #43, never on `main`: a
   file-sync process in this worktree creates byte-identical `"* 2"` copies of
   recently written files, and `git add -A` sweeps them into the commit. PR
@@ -65,9 +68,10 @@ never pick up Android work.
   regression now waits for the CTA's real
   enabled state before retrying, closing a status-render timing race found by
   the final slice. Final staged review also found that rapid repeated launch
-  retries could overlap. Retry now accepts only the failed phase and marks
-  loading before suspending; its blocking-factory regression proves one retry
-  runtime attempt and a stable final phase. The exact current 233-test bundle
+  retries could overlap. Retry accepts the failed phase plus the defensive
+  ready-without-runtime recovery, and marks loading before suspending; its
+  blocking-factory regression proves one retry runtime attempt and a stable
+  final phase. The exact current 233-test bundle
   executed directly inside a fresh iOS 26.5 simulator: all 231 functional and
   data tests passed, including the complete launch and reminder-window suites.
   The only two failures were the pre-existing asset-catalog lookups, because
@@ -75,6 +79,27 @@ never pick up Android work.
   wedged while materializing its install and launch workers. Hosted CI remains
   the exact-head full app-host confirmation. The simulator was created for the
   production smoke, so no existing simulator data needed deletion or reuse.
+- PR #44 hosted-review repair: the birthday blocker was a documentation-truth
+  issue, not a reason to fetch unused personal data. Architecture now states
+  that TF-02 reads only identifiers, names, phones, and emails, and PR30 must
+  re-add and disclose `CNContactBirthdayKey` when occasion scheduling consumes
+  it. The new launch-failure screen is registered in the audited-screen table
+  and the manual-smoke script covers announcement, focus, and Try Again.
+  Malformed persisted `occasionTime` now has direct boundary and visible-launch
+  coverage; a corrupt Contact row is proved to leave onboarding retryable.
+  A blocked-authorization regression proves a permission tap racing launch
+  performs one import, and the source now rejects that stale automatic path.
+  Mock and GRDB interaction repositories agree that non-positive limits return
+  an empty result, the new onboarding text/background pair is contrast-gated,
+  and the defensive ready-without-runtime Try Again path is functional.
+  Persisted `occasionTime`, Contacts re-entry, and R11 ownership are documented
+  against TF-07/PR29 instead of overstated. The hosted suggestion to silently
+  replace an invalid reminder-window singleton was not taken: R9a/R47 require
+  visible failure because changing reminder timing without consent is unsafe.
+  All 39 focused launch, persistence, repository-contract, and contrast cases
+  pass on iOS 26.5; strict SwiftLint reports zero violations. The only hosted
+  test-fake preference was consciously left local because that fake records
+  `fetchAll` versus `fetchTracked`, which the shared stub does not model.
 - TF-02 production smoke completed 2026-08-08 with the exact Release simulator
   product from `/tmp/RegardsTF02ShippingDerivedData` on the dedicated iOS 26.5
   iPhone 17 Pro (`D06660F8-D261-46FE-8CF4-8D8190104F80`). The old task-only

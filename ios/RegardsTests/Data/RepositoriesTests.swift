@@ -432,9 +432,9 @@ struct InteractionRepositoryContractTests {
         let limited = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 2)
         #expect(limited == Array(all.prefix(2)))
         #expect(try await repositories.interactions.fetchRecent(
-            forContact: contact.id,
-            limit: 0
-        ).isEmpty)
+            forContact: contact.id, limit: 0).isEmpty)
+        #expect(try await repositories.interactions.fetchRecent(
+            forContact: contact.id, limit: -1).isEmpty)
 
         let duplicate = InteractionLog(
             id: tiedFirst.id, contactId: contact.id,
