@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 import Testing
 @testable import Regards
 
@@ -9,8 +8,7 @@ struct AppLaunchCoordinatorTests {
 
     @Test("Completed onboarding opens the production runtime without Contacts access")
     func completedProfileBypassesContacts() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = AppEnvironment.makeProduction(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         try await environment.profile.save(
             UserProfile(
                 onboardingCompletedAt: now,
@@ -20,7 +18,7 @@ struct AppLaunchCoordinatorTests {
             )
         )
         let source = ScriptedLaunchContactsSource(status: .denied)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -31,9 +29,9 @@ struct AppLaunchCoordinatorTests {
 
     @Test("Fresh launch records the trial and waits for the permission CTA")
     func freshLaunchWaitsForPermission() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(status: .notDetermined)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -47,8 +45,7 @@ struct AppLaunchCoordinatorTests {
 
     @Test("An existing trial timestamp and entitlement are preserved")
     func existingTrialTimestampIsNotRestarted() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = AppEnvironment.makeProduction(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let originalTrialStart = now.addingTimeInterval(-86_400)
         let originalRefresh = now.addingTimeInterval(-43_200)
         try await environment.profile.save(
@@ -59,7 +56,7 @@ struct AppLaunchCoordinatorTests {
             )
         )
         let source = ScriptedLaunchContactsSource(status: .notDetermined)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -71,8 +68,7 @@ struct AppLaunchCoordinatorTests {
 
     @Test("Recording a missing trial timestamp does not downgrade lifetime access")
     func lifetimeEntitlementIsNotDowngraded() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = AppEnvironment.makeProduction(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let originalRefresh = now.addingTimeInterval(-43_200)
         try await environment.profile.save(
             UserProfile(
@@ -81,7 +77,7 @@ struct AppLaunchCoordinatorTests {
             )
         )
         let source = ScriptedLaunchContactsSource(status: .notDetermined)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -93,12 +89,12 @@ struct AppLaunchCoordinatorTests {
 
     @Test("An authorized relaunch resumes import and saves completion last")
     func authorizedRelaunchResumesImport() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .authorized,
             contacts: [Self.systemContact]
         )
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -113,13 +109,13 @@ struct AppLaunchCoordinatorTests {
 
     @Test("A failed import leaves onboarding incomplete and retry resumes")
     func failedImportCanRetry() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .notDetermined,
             contacts: [Self.systemContact],
             fetchFailuresRemaining: 1
         )
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
         await launch.start()
 
         await launch.requestContactsAndImport()
@@ -141,9 +137,9 @@ struct AppLaunchCoordinatorTests {
 
     @Test("Denied permission offers a durable browse-only path")
     func deniedPermissionCanContinue() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(status: .denied)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -158,12 +154,12 @@ struct AppLaunchCoordinatorTests {
 
     @Test("Permission-prompt denial offers the browse-only path")
     func permissionPromptDenialOffersBrowseWithoutContacts() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .notDetermined,
             requestResult: .denied
         )
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
         await launch.requestContactsAndImport()
@@ -182,8 +178,8 @@ struct AppLaunchCoordinatorTests {
 
     @Test("A transient production-open failure retries into onboarding")
     func transientProductionOpenFailureRetriesToOnboarding() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let runtimeFactory = TransientRuntimeFactory(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let runtimeFactory = TransientRuntimeFactory(environment: environment)
         let source = ScriptedLaunchContactsSource(status: .notDetermined)
         let now = self.now
         let launch = AppLaunchCoordinator(
@@ -207,15 +203,17 @@ struct AppLaunchCoordinatorTests {
 
     @Test("A corrupt persisted window reaches visible launch recovery")
     func corruptPersistedWindowFailsLaunchRetryably() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        try await database.write { db in
-            try db.execute(
-                sql: "UPDATE ReminderWindow SET occasionTime = ? WHERE id = 1",
-                arguments: ["24:00"]
-            )
-        }
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let environment = AppEnvironment(
+            contacts: base.contacts,
+            groups: base.groups,
+            reminders: base.reminders,
+            interactions: base.interactions,
+            window: StubReminderWindowRepository.failing(),
+            profile: base.profile
+        )
         let source = ScriptedLaunchContactsSource(status: .notDetermined)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -227,9 +225,9 @@ struct AppLaunchCoordinatorTests {
 
     @Test("A permission tap racing launch starts one import")
     func permissionTapRacingAuthorizationStartsOneImport() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = BlockingAuthorizationContactsSource(contacts: [Self.systemContact])
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
         let start = Task { await launch.start() }
         await source.waitUntilCurrentAuthorizationStarts()
         await launch.requestContactsAndImport()
@@ -245,9 +243,9 @@ struct AppLaunchCoordinatorTests {
 
     @Test("A completed permission action survives stale launch cancellation")
     func permissionActionWinsBeforeLaunchCancellation() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = BlockingAuthorizationContactsSource(contacts: [Self.systemContact])
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
         let start = Task { await launch.start() }
         await source.waitUntilCurrentAuthorizationStarts()
 
@@ -265,12 +263,12 @@ struct AppLaunchCoordinatorTests {
 
     @Test("A failed permission-tap import is not replaced by stale launch work")
     func failedPermissionTapRacingAuthorizationPreservesFailure() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = BlockingAuthorizationContactsSource(
             contacts: [Self.systemContact],
             fetchFailuresRemaining: 1
         )
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
         let start = Task { await launch.start() }
         await source.waitUntilCurrentAuthorizationStarts()
         await launch.requestContactsAndImport()
@@ -286,8 +284,8 @@ struct AppLaunchCoordinatorTests {
 
     @Test("Overlapping production-open retries start only one runtime attempt")
     func overlappingProductionOpenRetriesStartOneAttempt() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let runtimeFactory = BlockingRetryRuntimeFactory(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let runtimeFactory = BlockingRetryRuntimeFactory(environment: environment)
         let source = ScriptedLaunchContactsSource(status: .notDetermined)
         let now = self.now
         let launch = AppLaunchCoordinator(
@@ -318,14 +316,14 @@ struct AppLaunchCoordinatorTests {
     }
 
     func coordinator(
-        database: DatabaseQueue,
+        environment: AppEnvironment,
         source: any ContactsSource
     ) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(
             dependencies: .init(
                 makeRuntime: {
-                    try await AppRuntime.makeProduction(database: database)
+                    try await AppRuntime.makeProduction(environment: environment)
                 },
                 contactsSource: source,
                 clock: { now }
@@ -395,15 +393,15 @@ actor ScriptedLaunchContactsSource: ContactsSource {
     }
 }
 private actor TransientRuntimeFactory {
-    private let database: DatabaseQueue
+    private let environment: AppEnvironment
     private var attempts = 0
-    init(database: DatabaseQueue) { self.database = database }
+    init(environment: AppEnvironment) { self.environment = environment }
     func makeRuntime() async throws -> AppRuntime {
         attempts += 1
         if attempts == 1 {
             throw LaunchTestError.openFailed
         }
-        return try await AppRuntime.makeProduction(database: database)
+        return try await AppRuntime.makeProduction(environment: environment)
     }
     func attemptCount() -> Int { attempts }
 }
@@ -453,13 +451,13 @@ private actor BlockingAuthorizationContactsSource: ContactsSource {
     }
 }
 private actor BlockingRetryRuntimeFactory {
-    private let database: DatabaseQueue
+    private let environment: AppEnvironment
     private var attempts = 0
     private var retryStarted = false
     private var retryStartWaiter: CheckedContinuation<Void, Never>?
     private var retryFinishWaiter: CheckedContinuation<Void, Never>?
-    init(database: DatabaseQueue) {
-        self.database = database
+    init(environment: AppEnvironment) {
+        self.environment = environment
     }
     func makeRuntime() async throws -> AppRuntime {
         attempts += 1
@@ -472,7 +470,7 @@ private actor BlockingRetryRuntimeFactory {
         await withCheckedContinuation { continuation in
             retryFinishWaiter = continuation
         }
-        return try await AppRuntime.makeProduction(database: database)
+        return try await AppRuntime.makeProduction(environment: environment)
     }
     func waitUntilRetryStarts() async {
         guard !retryStarted else { return }

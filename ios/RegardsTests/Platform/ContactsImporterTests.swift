@@ -57,30 +57,32 @@ struct ContactsImporterTests {
         #expect(c.displayName == "Unknown")
     }
 
-    @Test("Preferred channel prefers phone over email when both exist")
+    @Test("Preferred channel selects the first valid phone before email")
     func mapPreferredChannelPrefersPhone() {
         let sc = SystemContact(
             identifier: "id-5",
             givenName: "Mom",
             familyName: "",
-            phoneNumbers: ["+15555550200"],
+            phoneNumbers: ["(415) 555-0100", "+15555550200"],
             emailAddresses: ["mom@example.com"])
         let c = ContactsImporter.map(systemContact: sc, now: Self.now)
         #expect(c.preferredChannel == .phoneCall)
         #expect(c.preferredChannelValue == "+15555550200")
+        #expect(ChannelCatalog.validate(value: c.preferredChannelValue, for: c.preferredChannel))
     }
 
-    @Test("Preferred channel falls back to email when no phone is present")
+    @Test("Preferred channel falls back to email when no valid phone is present")
     func mapPreferredChannelFallsBackToEmail() {
         let sc = SystemContact(
             identifier: "id-6",
             givenName: "Alex",
             familyName: "",
-            phoneNumbers: [],
+            phoneNumbers: ["(415) 555-0100"],
             emailAddresses: ["Alex@Example.COM"])
         let c = ContactsImporter.map(systemContact: sc, now: Self.now)
         #expect(c.preferredChannel == .email)
         #expect(c.preferredChannelValue == "alex@example.com")
+        #expect(ChannelCatalog.validate(value: c.preferredChannelValue, for: c.preferredChannel))
     }
 
     @Test("Imported contacts always start with tracked == false")
@@ -130,6 +132,8 @@ struct ContactsImporterTests {
             "+1 415 CALL-NOW",
             "+١ ٤١٥ ٥٥٥ ٠١٠٠",
             "+１ ４１５ ５５５ ０１００",
+            "+12",
+            "+1234567890123456",
         ]
         let systemContact = SystemContact(
             identifier: "id-local-values",
@@ -142,7 +146,21 @@ struct ContactsImporterTests {
         let contact = ContactsImporter.map(systemContact: systemContact, now: Self.now)
 
         #expect(contact.phoneNumbers == rawPhones)
-        #expect(contact.preferredChannelValue == rawPhones.first)
+        #expect(contact.preferredChannelValue.isEmpty)
+    }
+
+    @Test("Mapping retains an invalid email without selecting it for deep links")
+    func mapPreservesInvalidEmailWithoutPreferredValue() {
+        let systemContact = SystemContact(
+            identifier: "id-invalid-email",
+            givenName: "Alex", familyName: "Chen", phoneNumbers: [],
+            emailAddresses: ["not-an-email"]
+        )
+
+        let contact = ContactsImporter.map(systemContact: systemContact, now: Self.now)
+
+        #expect(contact.preferredChannel == .email)
+        #expect(contact.preferredChannelValue.isEmpty)
     }
 
     // MARK: - runFirstLaunchImport — orchestration

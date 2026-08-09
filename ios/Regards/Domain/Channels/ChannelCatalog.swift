@@ -103,13 +103,22 @@ public enum ChannelCatalog {
         }
     }
 
-    /// Accepts E.164 (`+15551234567`) or any well-formed phone with common
-    /// separators — Regards normalizes before storing.
+    /// Accepts E.164 (`+15551234567`) or the same ASCII digits with common
+    /// visual separators. Alphabetic extensions and non-ASCII numerals stay
+    /// available as raw contact data but never become deep-link values.
     public static func isPhoneE164(_ value: String) -> Bool {
-        let normalized = normalizedPhone(value)
+        let stripped = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard stripped.first == "+",
+              stripped.dropFirst().allSatisfy({ character in
+                  "0123456789".contains(character)
+                      || character.isWhitespace
+                      || "()-./".contains(character)
+              }) else { return false }
+        let normalized = normalizedPhone(stripped)
         guard normalized.hasPrefix("+") else { return false }
         let digits = normalized.dropFirst()
-        return (7...15).contains(digits.count) && digits.allSatisfy(\.isNumber)
+        return (7...15).contains(digits.count)
+            && digits.allSatisfy { "0123456789".contains($0) }
     }
 
     /// Strips separators and parens; preserves a leading `+`.

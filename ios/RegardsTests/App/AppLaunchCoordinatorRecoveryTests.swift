@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 import Testing
 @testable import Regards
 
@@ -9,8 +8,8 @@ struct AppLaunchCoordinatorRecoveryTests {
 
     @Test("A cancelled production open becomes visibly retryable")
     func cancelledProductionOpenCanRetry() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let runtimeFactory = CancellableRecoveryRuntimeFactory(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let runtimeFactory = CancellableRecoveryRuntimeFactory(environment: environment)
         let source = RecoveryContactsSource(status: .notDetermined)
         let launch = AppLaunchCoordinator(
             dependencies: .init(
@@ -64,11 +63,13 @@ struct AppLaunchCoordinatorRecoveryTests {
 
     @Test("Double-tapping import starts one permission and import pass")
     func doubleImportTapStartsOnePass() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = BlockingRecoveryRequestContactsSource(contacts: [Self.systemContact])
         let launch = AppLaunchCoordinator(
             dependencies: .init(
-                makeRuntime: { try await AppRuntime.makeProduction(database: database) },
+                makeRuntime: {
+                    try await AppRuntime.makeProduction(environment: environment)
+                },
                 contactsSource: source,
                 clock: { Self.now }
             )
@@ -145,24 +146,25 @@ struct AppLaunchCoordinatorRecoveryTests {
 
     @Test("An undecodable stored contact offers browse-only recovery")
     func corruptStoredContactCanContinueWithoutContacts() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = AppEnvironment.makeProduction(database: database)
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let corruptContact = Contact(
             systemContactRef: "corrupt-stored-contact",
             displayName: "Corrupt Stored Contact"
         )
-        try await environment.contacts.upsert(corruptContact)
-        try await database.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET phonesJson = ? WHERE id = ?",
-                arguments: ["[", corruptContact.id.uuidString]
-            )
-        }
+        let contacts = StubContactRepository.failing([corruptContact])
+        let environment = AppEnvironment(
+            contacts: contacts,
+            groups: base.groups,
+            reminders: base.reminders,
+            interactions: base.interactions,
+            window: base.window,
+            profile: base.profile
+        )
         let source = RecoveryContactsSource(
             status: .authorized,
             contacts: [Self.systemContact]
         )
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -173,10 +175,7 @@ struct AppLaunchCoordinatorRecoveryTests {
         let runtime = try #require(launch.runtime)
         #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
         #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
-        let persistedContactCount = try await database.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM Contact")
-        }
-        #expect(persistedContactCount == 1)
+        #expect(await contacts.storedCount() == 1)
 
         await launch.continueWithoutContacts()
 
@@ -198,12 +197,14 @@ struct AppLaunchCoordinatorRecoveryTests {
     }
 
     private func coordinator(
-        database: DatabaseQueue,
+        environment: AppEnvironment,
         source: any ContactsSource
     ) -> AppLaunchCoordinator {
         AppLaunchCoordinator(
             dependencies: .init(
-                makeRuntime: { try await AppRuntime.makeProduction(database: database) },
+                makeRuntime: {
+                    try await AppRuntime.makeProduction(environment: environment)
+                },
                 contactsSource: source,
                 clock: { Self.now }
             )
@@ -288,14 +289,14 @@ private actor RecoveryContactsSource: ContactsSource {
 }
 
 private actor CancellableRecoveryRuntimeFactory {
-    private let database: DatabaseQueue
+    private let environment: AppEnvironment
     private var attempts = 0
     private var firstAttemptStarted = false
     private var firstAttemptWaiter: CheckedContinuation<Void, Never>?
     private var firstAttemptGate: CheckedContinuation<Void, Never>?
 
-    init(database: DatabaseQueue) {
-        self.database = database
+    init(environment: AppEnvironment) {
+        self.environment = environment
     }
 
     func makeRuntime() async throws -> AppRuntime {
@@ -308,7 +309,7 @@ private actor CancellableRecoveryRuntimeFactory {
                 firstAttemptGate = continuation
             }
         }
-        return try await AppRuntime.makeProduction(database: database)
+        return try await AppRuntime.makeProduction(environment: environment)
     }
 
     func waitUntilFirstAttemptStarts() async {

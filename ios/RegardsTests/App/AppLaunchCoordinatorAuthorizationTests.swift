@@ -4,12 +4,12 @@ import Testing
 extension AppLaunchCoordinatorTests {
     @Test("Limited authorization resumes import like full authorization")
     func limitedAuthorizationImportsLikeAuthorized() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .limited,
             contacts: [Self.systemContact]
         )
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 
@@ -22,9 +22,9 @@ extension AppLaunchCoordinatorTests {
 
     @Test("Restricted authorization offers the same browse-only recovery as denial")
     func restrictedAuthorizationOffersBrowseOnly() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(status: .restricted)
-        let launch = coordinator(database: database, source: source)
+        let launch = coordinator(environment: environment, source: source)
 
         await launch.start()
 

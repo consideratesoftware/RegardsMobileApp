@@ -257,7 +257,10 @@ struct ReminderWindowValidationTests {
         let original = ReminderWindow(
             allowedDays: .weekends,
             allowedTimeRanges: [Self.range(10, 12)],
-            quietHours: nil,
+            quietHours: TimeRange(
+                start: TimeOfDay(hour: 22, minute: 30),
+                end: TimeOfDay(hour: 7, minute: 30)
+            ),
             timezoneIdentifier: "Asia/Kolkata",
             occasionTime: TimeOfDay(hour: 8, minute: 15),
             digestHorizonDays: 30)

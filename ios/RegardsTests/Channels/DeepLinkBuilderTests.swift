@@ -47,6 +47,9 @@ struct DeepLinkBuilderTests {
     @Test("Invalid input returns nil for strictly-validated channels")
     func invalidInputRejected() {
         #expect(DeepLinkBuilder.build(channel: .whatsapp, value: "not-a-number") == nil)
+        #expect(DeepLinkBuilder.build(channel: .phoneCall, value: "+1 415 555 0100 x123") == nil)
+        #expect(DeepLinkBuilder.build(channel: .phoneCall, value: "+١ ٤١٥ ٥٥٥ ٠١٠٠") == nil)
+        #expect(DeepLinkBuilder.build(channel: .phoneCall, value: "+１ ４１５ ５５５ ０１００") == nil)
         #expect(DeepLinkBuilder.build(channel: .email, value: "garbled@") == nil)
         #expect(DeepLinkBuilder.build(channel: .email, value: "no-at-sign") == nil)
         #expect(DeepLinkBuilder.build(channel: .custom, value: "not a url") == nil)

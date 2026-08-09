@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import GRDB
 @testable import Regards
 
 struct AppRuntimeTests {
@@ -61,7 +60,7 @@ struct AppRuntimeTests {
 
     @Test("Production runtime uses live device timing instead of mock timing")
     func productionRuntimeDoesNotRetainMockTiming() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let seedEnvironment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let persistedWindow = ReminderWindow(
             allowedDays: .allDays,
             allowedTimeRanges: [
@@ -69,10 +68,9 @@ struct AppRuntimeTests {
             ],
             timezoneIdentifier: "America/Los_Angeles"
         )
-        let seedEnvironment = AppEnvironment.makeProduction(database: database)
         try await seedEnvironment.window.saveGlobal(persistedWindow)
 
-        let runtime = try await AppRuntime.makeProduction(database: database)
+        let runtime = try await AppRuntime.makeProduction(environment: seedEnvironment)
 
         #expect(runtime.window == persistedWindow)
         #expect(runtime.userCalendar.timeZone.identifier == TimeZone.current.identifier)
@@ -83,7 +81,7 @@ struct AppRuntimeTests {
     @Test("Production composition uses the persisted digest horizon", arguments: [7, 30])
     @MainActor
     func productionCompositionUsesPersistedDigestHorizon(horizonDays: Int) async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
+        let seedEnvironment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let persistedWindow = ReminderWindow(
             allowedDays: .allDays,
             allowedTimeRanges: [
@@ -92,10 +90,9 @@ struct AppRuntimeTests {
             timezoneIdentifier: "America/Los_Angeles",
             digestHorizonDays: horizonDays
         )
-        let seedEnvironment = AppEnvironment.makeProduction(database: database)
         try await seedEnvironment.window.saveGlobal(persistedWindow)
 
-        let runtime = try await AppRuntime.makeProduction(database: database)
+        let runtime = try await AppRuntime.makeProduction(environment: seedEnvironment)
         let viewModel = RegardsTabRoot.makeUpcomingViewModel(runtime: runtime)
 
         #expect(runtime.window.digestHorizonDays == horizonDays)
@@ -104,13 +101,10 @@ struct AppRuntimeTests {
 
     @Test("Production runtime propagates a missing persisted window")
     func productionRuntimeRejectsMissingWindow() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        try await database.write { db in
-            try db.execute(sql: "DELETE FROM ReminderWindow WHERE id = 1")
-        }
+        let environment = environment(window: StubReminderWindowRepository.missing())
 
         do {
-            _ = try await AppRuntime.makeProduction(database: database)
+            _ = try await AppRuntime.makeProduction(environment: environment)
             Issue.record("Expected the missing singleton to fail production composition")
         } catch DataError.notFound {
             // Expected: launch owns the visible recovery path in TF-02.
@@ -121,16 +115,12 @@ struct AppRuntimeTests {
 
     @Test("Production runtime rejects an invalid persisted window")
     func productionRuntimeRejectsInvalidWindow() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        try await database.write { db in
-            try db.execute(
-                sql: "UPDATE ReminderWindow SET timezone = ? WHERE id = 1",
-                arguments: ["Not/A_Timezone"]
-            )
-        }
+        let environment = environment(
+            window: StubReminderWindowRepository.invalidTimezone("Not/A_Timezone")
+        )
 
         do {
-            _ = try await AppRuntime.makeProduction(database: database)
+            _ = try await AppRuntime.makeProduction(environment: environment)
             Issue.record("Expected the invalid singleton to fail production composition")
         } catch ReminderWindow.ValidationError.invalidTimezoneIdentifier("Not/A_Timezone") {
             // Expected: corrupt timing state must never silently change zones.
@@ -142,8 +132,8 @@ struct AppRuntimeTests {
     @Test("A defensive ready-without-runtime state retries production launch")
     @MainActor
     func readyWithoutRuntimeRetryStartsProductionRuntime() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let runtimeFactory = SuccessfulRuntimeFactory(database: database)
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let runtimeFactory = SuccessfulRuntimeFactory(environment: environment)
         let launch = AppLaunchCoordinator(
             dependencies: .init(
                 makeRuntime: { try await runtimeFactory.makeRuntime() },
@@ -159,17 +149,29 @@ struct AppRuntimeTests {
         #expect(launch.runtime != nil)
         #expect(await runtimeFactory.attemptCount() == 1)
     }
+
+    private func environment(window: any ReminderWindowRepository) -> AppEnvironment {
+        let base = AppEnvironment.makeMock()
+        return AppEnvironment(
+            contacts: base.contacts,
+            groups: base.groups,
+            reminders: base.reminders,
+            interactions: base.interactions,
+            window: window,
+            profile: base.profile
+        )
+    }
 }
 
 private actor SuccessfulRuntimeFactory {
-    private let database: DatabaseQueue
+    private let environment: AppEnvironment
     private var attempts = 0
 
-    init(database: DatabaseQueue) { self.database = database }
+    init(environment: AppEnvironment) { self.environment = environment }
 
     func makeRuntime() async throws -> AppRuntime {
         attempts += 1
-        return try await AppRuntime.makeProduction(database: database)
+        return try await AppRuntime.makeProduction(environment: environment)
     }
 
     func attemptCount() -> Int { attempts }

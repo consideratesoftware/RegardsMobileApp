@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 
 /// Bundle of repositories the UI layer needs. Injected at the root view so
 /// swapping mock ↔ GRDB-backed repos is a one-line change at @main.
@@ -48,22 +47,6 @@ public struct AppEnvironment: Sendable {
             profile: mocks.profile
         )
     }
-
-    /// Production wiring — every repo backed by GRDB on the supplied
-    /// `DatabaseQueue`. The caller owns the queue's lifetime; production
-    /// builds open it via `DatabaseFactory.makeDatabase()`, tests pass
-    /// `DatabaseFactory.makeInMemoryDatabase()`.
-    public static func makeProduction(database: DatabaseQueue) -> AppEnvironment {
-        let repos = GRDBRepositories(dbQueue: database)
-        return AppEnvironment(
-            contacts: repos.contacts,
-            groups: repos.groups,
-            reminders: repos.reminders,
-            interactions: repos.interactions,
-            window: repos.window,
-            profile: repos.profile
-        )
-    }
 }
 
 /// Complete root composition. Repositories and every time-derived screen use
@@ -110,8 +93,7 @@ public struct AppRuntime: Sendable {
     /// Missing or invalid persisted state is deliberately thrown to the TF-02
     /// launch coordinator instead of silently restoring defaults. TF-05 owns
     /// rebuilding observable screen state after a saved window edit.
-    public static func makeProduction(database: DatabaseQueue) async throws -> AppRuntime {
-        let environment = AppEnvironment.makeProduction(database: database)
+    public static func makeProduction(environment: AppEnvironment) async throws -> AppRuntime {
         let window = try await environment.window.fetchGlobal()
         return AppRuntime(
             environment: environment,

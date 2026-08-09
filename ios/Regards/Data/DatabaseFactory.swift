@@ -58,3 +58,42 @@ public enum DatabaseFactory {
         return queue
     }
 }
+
+/// Owns the GRDB-facing half of production composition. App-layer callers
+/// receive only an `AppEnvironment` of repository protocol existentials; the
+/// concrete database queue never crosses into launch or SwiftUI composition.
+public enum ProductionRepositoryFactory {
+    public static func makeFileBackedEnvironment() throws -> AppEnvironment {
+        makeEnvironment(database: try DatabaseFactory.makeDatabase())
+    }
+
+    static func makeFileBackedEnvironment(
+        applicationSupportDirectory root: URL,
+        fileName: String,
+        fileManager: FileManager = .default
+    ) throws -> AppEnvironment {
+        makeEnvironment(
+            database: try DatabaseFactory.makeDatabase(
+                applicationSupportDirectory: root,
+                fileName: fileName,
+                fileManager: fileManager
+            )
+        )
+    }
+
+    public static func makeInMemoryEnvironment() throws -> AppEnvironment {
+        makeEnvironment(database: try DatabaseFactory.makeInMemoryDatabase())
+    }
+
+    public static func makeEnvironment(database: DatabaseQueue) -> AppEnvironment {
+        let repositories = GRDBRepositories(dbQueue: database)
+        return AppEnvironment(
+            contacts: repositories.contacts,
+            groups: repositories.groups,
+            reminders: repositories.reminders,
+            interactions: repositories.interactions,
+            window: repositories.window,
+            profile: repositories.profile
+        )
+    }
+}

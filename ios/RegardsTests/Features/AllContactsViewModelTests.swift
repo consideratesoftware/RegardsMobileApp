@@ -138,7 +138,7 @@ struct AllContactsViewModelTests {
     @Test("A corrupt stored contact fails visibly instead of disappearing")
     func corruptStoredContactMakesAllContactsUnavailable() async throws {
         let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = AppEnvironment.makeProduction(database: database)
+        let environment = ProductionRepositoryFactory.makeEnvironment(database: database)
         let contact = Self.contact(
             id: UUID(),
             name: "Preserved Corrupt Contact",
