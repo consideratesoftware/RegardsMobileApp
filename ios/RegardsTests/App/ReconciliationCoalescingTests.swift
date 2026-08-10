@@ -185,9 +185,11 @@ struct ReconciliationCoalescingTests {
     }
 }
 
-/// Polls `launch.reconciliationCount` until it stops changing across
-/// `stableIterations` consecutive checks (bounded by `maxIterations` so a
-/// genuinely-never-settling count fails the test instead of hanging it).
+/// Polls `launch.reconciliationCount` until it settles: `reconciliationTask`
+/// — `AppLaunchCoordinator`'s own "isReconciling" gate (`reconcileNow`'s doc
+/// comment) — reads `nil` *and* the count hasn't moved across
+/// `stableCyclesRequired` consecutive pump cycles in a row. Bounded by a
+/// wall-clock `deadline`, not an iteration count.
 ///
 /// Round 11 hardening: the original version yielded between reads
 /// (`Task.yield()` only, the same shape `eventually` uses) and reproduced a
@@ -197,35 +199,40 @@ struct ReconciliationCoalescingTests {
 /// `burstOfChangeNotificationsCoalesces`'s comment): after `releaseFetch()`,
 /// `beginObservingContactStoreChanges`'s consumer loop has to actually get
 /// scheduled again to pick the one buffered notification back up and call
-/// `reconcileNow` for pass #3 — under CPU contention, a bare `Task.yield()`
-/// doesn't reliably give that suspended `Task` real scheduling turns inside
-/// 50 iterations the way `pumpRunLoopBriefly()` (promoted to
-/// `RegardsTests/Support/Eventually.swift` alongside `eventuallyPumpingRunLoop`
-/// for the `AllContactsCorruptionAnnouncementTests` fix) does by actually
-/// spinning the run loop each iteration.
+/// `reconcileNow` for pass #3, and a bare `Task.yield()` doesn't reliably
+/// give that suspended `Task` a real scheduling turn under contention.
+/// Fixed by pumping the run loop each cycle — the same primitive
+/// `eventuallyPumpingRunLoop` uses (`RegardsTests/Support/Eventually.swift`)
+/// — so a scheduling turn is a real event, not a hope, and by only counting
+/// a cycle toward "stable" while `reconciliationTask == nil`, so a pass
+/// genuinely in flight can never be mistaken for quiescence.
 ///
-/// Two changes close the gap instead of just widening it: (1) each iteration
-/// pumps the run loop, the same primitive `eventuallyPumpingRunLoop` uses,
-/// so a scheduling turn is a real event, not a hope; (2) a streak only
-/// counts as "stable" while `launch.reconciliationTask == nil` —
-/// `AppLaunchCoordinator`'s own "isReconciling" gate (`reconcileNow`'s doc
-/// comment) — so a pass genuinely in flight can never be mistaken for
-/// quiescence no matter what `reconciliationCount` happens to read at that
-/// exact instant. All work in this suite is in-memory GRDB with no real I/O
-/// latency, so a real settle reliably lands well inside this window.
+/// Round 12 correction: that fix still capped the *number of pump cycles*
+/// (`maxIterations`) rather than real time, and PR #48's CI caught exactly
+/// what that encodes — local machine timing. Each pump cycle blocks for a
+/// fixed slice of wall-clock time (`pumpRunLoopBriefly`), but how much
+/// *real* elapsed time an in-flight pass needs before the next cycle sees
+/// it finish depends on how contended the runner is; a contended CI runner
+/// needing more cycles than a fast local machine isn't a bug; capping
+/// cycles bakes in an assumption about how fast "the runner" is. `deadline`
+/// replaces that cap with a wall-clock backstop instead — generous on
+/// purpose, since it exists only to fail a genuinely-hung drain rather than
+/// to bound how long a slow-but-real drain gets. That costs nothing on the
+/// green path: this suite settles in well under a second even locally, and
+/// the assertion that follows compares the exact settled count, which is
+/// load-independent regardless of how long it took to reach it.
 @MainActor
 private func drainedCount(
     of launch: AppLaunchCoordinator,
-    stableIterations: Int = 10,
-    maxIterations: Int = 600
+    stableCyclesRequired: Int = 3,
+    deadline: TimeInterval = 60
 ) async -> Int {
+    let cutoff = Date().addingTimeInterval(deadline)
     var lastCount = launch.reconciliationCount
     var stableStreak = 0
-    var iterations = 0
-    while stableStreak < stableIterations, iterations < maxIterations {
+    while stableStreak < stableCyclesRequired, Date() < cutoff {
         await Task.yield()
         pumpRunLoopBriefly()
-        iterations += 1
         let current = launch.reconciliationCount
         if current == lastCount, launch.reconciliationTask == nil {
             stableStreak += 1
