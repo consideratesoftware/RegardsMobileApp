@@ -50,23 +50,28 @@ struct AllContactsCorruptionAccessibilityTests {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = host
         window.makeKeyAndVisible()
-        window.layoutIfNeeded()
-        host.view.layoutIfNeeded()
-        // SwiftUI materializes its UIKit-facing accessibility tree during a
-        // real run-loop pass tied to the CATransaction commit, which a bare
-        // `Task.yield()` doesn't force — give it a bounded moment before
-        // polling starts. `RunLoop.current` is `noasync`, so it's boxed in a
-        // plain synchronous helper, same pattern as the other `noasync`
-        // workarounds in this suite (`Thread.current`, `DispatchSemaphore
-        // .wait`).
-        spinRunLoopBriefly(seconds: 0.2)
 
+        // SwiftUI materializes its UIKit-facing accessibility tree during a
+        // real run-loop pass tied to the CATransaction commit. `Task.yield()`
+        // only reschedules *Swift concurrency* tasks — it never pumps the
+        // actual `CFRunLoop`, so it can't force that commit on its own. A
+        // single fixed warm-up spin before switching to yield-only polling
+        // is fragile: on a slower/colder simulator (observed: a freshly
+        // erased-and-booted one took over 15s for this exact tree to
+        // materialize, vs. under a second on a warm one) the tree simply
+        // isn't ready yet when the fixed window ends, and yield-only polling
+        // after that never helps it along. So every iteration here pumps the
+        // run loop itself and re-checks — bounded by iteration count, not by
+        // a single elapsed-time budget, and it returns the instant the tree
+        // appears rather than always paying the worst case.
         var matches: [NSObject] = []
-        #expect(await eventually {
+        let found = pollUntilTrue {
             window.layoutIfNeeded()
+            host.view.layoutIfNeeded()
             matches = findAccessibilityElements(withLabel: expectedMessage, in: window)
             return !matches.isEmpty
-        })
+        }
+        #expect(found)
 
         // Exactly one element carries the banner's combined label — proves
         // it renders once, not duplicated across the tree's two hosting
@@ -141,6 +146,26 @@ func findAccessibilityElements(withLabel label: String, in root: NSObject) -> [N
     return results
 }
 
-private func spinRunLoopBriefly(seconds: TimeInterval) {
-    RunLoop.current.run(until: Date().addingTimeInterval(seconds))
+/// Polls `condition`, pumping the real run loop for `iterationInterval`
+/// between checks — unlike `Task.yield()` (Swift-concurrency-only
+/// rescheduling), this actually lets a pending `CATransaction` commit, which
+/// is what makes SwiftUI materialize its UIKit-facing accessibility tree in
+/// the first place. Bounded by `maxIterations`, not by a single elapsed-time
+/// budget: it returns `true` the instant `condition()` succeeds, so a fast
+/// environment pays only what it needs, and a slow one gets up to
+/// `maxIterations * iterationInterval` (300 * 0.05s = 15s) before giving up
+/// — calibrated against a freshly erased-and-booted simulator, where this
+/// exact tree was observed taking a bit over that on a cold first render.
+/// `RunLoop.current` is `noasync`, so this whole helper stays a plain
+/// synchronous function the (async) test calls without `await`.
+private func pollUntilTrue(
+    maxIterations: Int = 300,
+    iterationInterval: TimeInterval = 0.05,
+    _ condition: () -> Bool
+) -> Bool {
+    for _ in 0..<maxIterations {
+        if condition() { return true }
+        RunLoop.current.run(until: Date().addingTimeInterval(iterationInterval))
+    }
+    return condition()
 }
