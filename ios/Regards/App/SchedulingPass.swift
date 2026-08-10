@@ -85,6 +85,15 @@ public actor SchedulingPass {
     /// need for cryptographic strength since the only goal is "the same
     /// contact always maps to the same row," not collision-resistance
     /// against an adversary.
+    ///
+    /// PR25: reuse this exact derivation for cadence rows rather than
+    /// re-deriving a new scheme, and give occasion rows (birthday,
+    /// anniversary, custom) their own distinct derivation — salted
+    /// differently, or folded with `ReminderKind` — so a contact's cadence
+    /// and occasion ids can never collide. A writer that skips this and goes
+    /// back to a fresh random id per write resurrects the exact duplicate-row
+    /// race this method exists to close (see `snooze(contactId:)`'s doc
+    /// comment above).
     private static func cadenceReminderID(contactId: UUID) -> UUID {
         let salt: [UInt8] = Array("cadence-reminder".utf8.prefix(16))
         var bytes = withUnsafeBytes(of: contactId.uuid) { Array($0) }

@@ -162,16 +162,24 @@ public final class OverdueViewModel {
     /// (§14 PR22). A failure restores the true state with a fresh `load()`
     /// instead of re-inserting the row locally, so the list never disagrees
     /// with what is actually persisted.
-    public func markCaughtUp(contactId: UUID) async {
+    ///
+    /// Returns whether the write succeeded so the screen can gate its
+    /// VoiceOver announcement on it — announcing "marked caught up" against
+    /// a write that then fails and reloads the row back in would tell a
+    /// VoiceOver user something that didn't happen.
+    @discardableResult
+    public func markCaughtUp(contactId: UUID) async -> Bool {
         rows.removeAll { $0.contactId == contactId }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
             try await logging.markCaughtUp(contactId: contactId, at: clock())
+            return true
         } catch {
             Self.log.error(
                 "failed to mark caught up for \(contactId, privacy: .private): \(error, privacy: .private)"
             )
             await performLoad()
+            return false
         }
     }
 
@@ -180,15 +188,21 @@ public final class OverdueViewModel {
     /// stub) and removes the row from view immediately, mirroring
     /// `markCaughtUp`'s instant-removal contract. No interaction is logged
     /// and `lastInteractedAt` is untouched (decision #31).
-    public func snooze(contactId: UUID) async {
+    ///
+    /// Returns whether the write succeeded — see `markCaughtUp`'s doc
+    /// comment for why the caller needs this.
+    @discardableResult
+    public func snooze(contactId: UUID) async -> Bool {
         rows.removeAll { $0.contactId == contactId }
         do {
             try await scheduler.snooze(contactId: contactId)
+            return true
         } catch {
             Self.log.error(
                 "failed to snooze \(contactId, privacy: .private): \(error, privacy: .private)"
             )
             await performLoad()
+            return false
         }
     }
 

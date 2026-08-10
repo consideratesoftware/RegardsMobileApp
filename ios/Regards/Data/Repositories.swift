@@ -201,8 +201,20 @@ struct GRDBContactRepository: ContactRepository {
             // `@preconcurrency import GRDB` that would downgrade every
             // Sendable diagnostic GRDB could ever raise in this file, not
             // just this one — scopes the `@unchecked` to exactly the one
-            // call this makes: `cancel()`, which GRDB's own cancellation
-            // contract already guarantees is safe from any thread.
+            // call this makes: `cancel()`.
+            //
+            // That call is *not* thread-safe by itself — GRDB 6.29's
+            // `AnyDatabaseCancellable.cancel()` is an unguarded `_cancel?();
+            // _cancel = nil`, so two concurrent callers could race. Safety
+            // here comes from cardinality, not synchronization:
+            // `AsyncStream`'s `onTermination` fires at most once for a given
+            // stream, so exactly one thread ever reaches `cancel()` through
+            // it, and this box's `deinit` — GRDB's other route to
+            // cancellation — is ordered after that by ARC's own release
+            // semantics, not a second concurrent caller. The invariant this
+            // depends on: `box.cancellable.cancel()` must never gain a
+            // second call site outside `onTermination` below. Add one and
+            // this reasoning no longer holds.
             let box = CancellableBox(cancellable)
             continuation.onTermination = { _ in box.cancellable.cancel() }
         }

@@ -203,7 +203,11 @@ public final class UpcomingViewModel {
     /// state this action didn't actually produce. A failure restores the
     /// true state with a fresh `load()` instead of re-inserting rows
     /// locally.
-    public func markCaughtUp(contactId: UUID) async {
+    ///
+    /// Returns whether the write succeeded so the screen can gate its
+    /// VoiceOver announcement on it — mirrors `OverdueViewModel.markCaughtUp`.
+    @discardableResult
+    public func markCaughtUp(contactId: UUID) async -> Bool {
         groups = groups.map { header, rows in
             (header, rows.filter { !($0.contactId == contactId && $0.kind == .cadence) })
         }.filter { !$0.rows.isEmpty }
@@ -211,11 +215,13 @@ public final class UpcomingViewModel {
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
             try await logging.markCaughtUp(contactId: contactId, at: clock())
+            return true
         } catch {
             Self.log.error(
                 "failed to mark caught up for \(contactId, privacy: .private): \(error, privacy: .private)"
             )
             await performLoad()
+            return false
         }
     }
 

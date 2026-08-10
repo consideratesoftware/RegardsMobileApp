@@ -55,6 +55,48 @@ struct UpcomingViewModelActionTests {
         #expect(stored.lastInteractedAt == Self.now)
     }
 
+    /// Discriminates the occasion-preservation fix from the pre-fix filter
+    /// it replaced. Every other test in this file passes `reminders: nil`,
+    /// so `buildRows` never produces an occasion row and the two filter
+    /// shapes — `!($0.contactId == contactId && $0.kind == .cadence)` (the
+    /// fix) vs. the older `$0.contactId != contactId` — agree on every one
+    /// of them; this is the only test that puts a real pending occasion
+    /// reminder in front of `markCaughtUp` so the two filters actually
+    /// diverge. Reverting to the old filter turns this red: it would drop
+    /// the birthday row too, since it doesn't look at `kind` at all.
+    @Test("Caught up removes only the contact's cadence row, leaving a same-contact occasion row in place")
+    func markCaughtUpPreservesOccasionRowRemovesOnlyCadence() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let birthday = ScheduledReminder(
+            contactId: contact.id,
+            kind: .birthday,
+            scheduledFor: Self.now.addingTimeInterval(3_600),
+            osNotificationId: "contact-\(contact.id.uuidString)-birthday"
+        )
+        try await reminders.upsert(birthday)
+        let interactions = StubInteractionRepository()
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            interactions: interactions,
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+        // Two rows pre-action for this one contact: the cadence row (3 days
+        // overdue, due now) and the birthday occasion row an hour out.
+        #expect(viewModel.totalCount == 2)
+
+        await viewModel.markCaughtUp(contactId: contact.id)
+
+        let remaining = viewModel.groups.flatMap(\.rows)
+        #expect(remaining.count == 1)
+        #expect(remaining.first?.kind == .birthday)
+        #expect(viewModel.totalCount == 1)
+    }
+
     @Test("A failing caught-up write reloads to restore the true state")
     func markCaughtUpFailureReloads() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
