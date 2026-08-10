@@ -31,6 +31,8 @@ public final class OverdueViewModel {
 
     private let contacts: any ContactRepository
     private let interactions: any InteractionRepository
+    private let reminders: any ReminderRepository
+    private let scheduler: SchedulingPass
     private let clock: () -> Date
     private let calendar: Calendar
     private var loadGeneration = 0
@@ -45,10 +47,14 @@ public final class OverdueViewModel {
     /// user's perception right now, not the scheduling clock.
     public init(contacts: any ContactRepository,
                 interactions: any InteractionRepository,
+                reminders: any ReminderRepository,
+                scheduler: SchedulingPass,
                 clock: @escaping () -> Date = { Date() },
                 calendar: Calendar = .current) {
         self.contacts = contacts
         self.interactions = interactions
+        self.reminders = reminders
+        self.scheduler = scheduler
         self.clock = clock
         self.calendar = calendar
     }
@@ -97,8 +103,20 @@ public final class OverdueViewModel {
         }
         do {
             let all = try await contacts.fetchTracked()
+            // A pending cadence reminder is Snooze's only persisted trace
+            // (§14 PR22's `SchedulingPass` stub) — no separate "snoozed"
+            // flag exists on `Contact`. Building the lookup here, once per
+            // load, keeps `makeOverdueRow` a pure function of its inputs.
+            let snoozedUntilByContact = try await Self.snoozedUntilByContact(reminders: reminders)
             let now = clock()
-            let loadedRows = all.compactMap { Self.makeOverdueRow(for: $0, now: now, calendar: calendar) }
+            let loadedRows = all.compactMap {
+                Self.makeOverdueRow(
+                    for: $0,
+                    now: now,
+                    calendar: calendar,
+                    snoozedUntil: snoozedUntilByContact[$0.id]
+                )
+            }
                 .filter { $0.overdueDays > 0 }
                 .sorted {
                     if $0.priority.rawValue != $1.priority.rawValue {
@@ -115,6 +133,16 @@ public final class OverdueViewModel {
             rows = []
             loadState = .failed
         }
+    }
+
+    private static func snoozedUntilByContact(
+        reminders: any ReminderRepository
+    ) async throws -> [UUID: Date] {
+        let pendingCadence = try await reminders.fetchAllPending().filter { $0.kind == .cadence }
+        return Dictionary(
+            pendingCadence.map { ($0.contactId, $0.scheduledFor) },
+            uniquingKeysWith: { _, latest in latest }
+        )
     }
 
     /// "Caught up" from an Overdue row: logs the interaction and moves
@@ -137,6 +165,23 @@ public final class OverdueViewModel {
         }
     }
 
+    /// "Snooze 1 wk" from an Overdue row: pushes the contact's cadence
+    /// reminder 7 days out through `SchedulingPass` (§14 PR22's DB-only
+    /// stub) and removes the row from view immediately, mirroring
+    /// `markCaughtUp`'s instant-removal contract. No interaction is logged
+    /// and `lastInteractedAt` is untouched (decision #31).
+    public func snooze(contactId: UUID) async {
+        rows.removeAll { $0.contactId == contactId }
+        do {
+            try await scheduler.snooze(contactId: contactId)
+        } catch {
+            Self.log.error(
+                "failed to snooze \(contactId, privacy: .private): \(error, privacy: .private)"
+            )
+            await performLoad()
+        }
+    }
+
     public var innerCircleRows: [OverdueRowState] { rows.filter { $0.priority == .innerCircle } }
     public var closeFriendRows: [OverdueRowState] { rows.filter { $0.priority == .close } }
     public var otherRows: [OverdueRowState] {
@@ -147,10 +192,20 @@ public final class OverdueViewModel {
 
     static let log = RegardsLogger.feature("Overdue")
 
+    /// `snoozedUntil` is the contact's pending cadence `ScheduledReminder`'s
+    /// `scheduledFor`, if one exists (§14 PR22's `SchedulingPass.snooze`
+    /// stub) — `nil` for a never-snoozed contact. While it's still in the
+    /// future the contact is suppressed from Overdue entirely, regardless of
+    /// how overdue the raw cadence math says it is; once it lapses, this
+    /// falls through to the ordinary `lastInteractedAt`-based computation
+    /// unchanged, so the row "returns" on its own the next time this runs
+    /// after the snoozed date passes.
     static func makeOverdueRow(for contact: Contact,
                                now: Date,
-                               calendar: Calendar) -> OverdueRowState? {
+                               calendar: Calendar,
+                               snoozedUntil: Date? = nil) -> OverdueRowState? {
         guard contact.tracked, let cadenceDays = contact.cadenceDays else { return nil }
+        if let snoozedUntil, snoozedUntil > now { return nil }
         let last = contact.lastInteractedAt ?? contact.createdAt
         let overdueAt = last.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
 

@@ -59,6 +59,10 @@ public struct AppRuntime: Sendable {
     public let window: ReminderWindow
     public let userCalendar: Calendar
     public let clock: @Sendable () -> Date
+    /// The single `SchedulingPass` writer for this runtime (decision #36).
+    /// This §14 PR22 stub only needs `reminders` + `clock`; composed here,
+    /// alongside `environment`, so every screen shares the same instance.
+    public let scheduler: SchedulingPass
 
     public init(
         environment: AppEnvironment,
@@ -70,6 +74,7 @@ public struct AppRuntime: Sendable {
         self.window = window
         self.userCalendar = userCalendar
         self.clock = clock
+        self.scheduler = SchedulingPass(reminders: environment.reminders, clock: clock)
     }
 
     /// The frozen mock fixture is reserved for previews and explicit DEBUG

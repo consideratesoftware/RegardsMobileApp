@@ -176,7 +176,8 @@ public struct OverdueScreen: View {
                     row: row,
                     isInnerCircle: innerCircle,
                     onTapContact: { onTapContact(row.contactId) },
-                    onMarkCaughtUp: { Task { await viewModel.markCaughtUp(contactId: row.contactId) } }
+                    onMarkCaughtUp: { Task { await viewModel.markCaughtUp(contactId: row.contactId) } },
+                    onSnooze: { Task { await viewModel.snooze(contactId: row.contactId) } }
                 )
                 if idx < rows.count - 1 {
                     Hair(inset: 72)
@@ -193,6 +194,7 @@ struct OverdueRow: View {
     let isInnerCircle: Bool
     let onTapContact: () -> Void
     let onMarkCaughtUp: () -> Void
+    let onSnooze: () -> Void
 
     var body: some View {
         AccessibilityAdaptiveLayout {
@@ -200,12 +202,14 @@ struct OverdueRow: View {
                 contactButton
                 channelPill
                 caughtUpButton
+                snoozeButton
             }
         } accessibility: {
             VStack(alignment: .leading, spacing: 8) {
                 contactButton
                 channelPill
                 caughtUpButton
+                snoozeButton
             }
         }
         .padding(.horizontal, 14)
@@ -297,5 +301,20 @@ struct OverdueRow: View {
         .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Mark \(row.name) caught up")
         .accessibilityIdentifier("overdue.caught-up")
+    }
+
+    private var snoozeButton: some View {
+        Button(action: onSnooze) {
+            Text("Snooze 1 wk")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(RegardsDS.muted)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .background(Capsule().fill(RegardsDS.hairSoft))
+        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .accessibilityLabel("Snooze \(row.name) 1 week")
+        .accessibilityIdentifier("overdue.snooze")
     }
 }

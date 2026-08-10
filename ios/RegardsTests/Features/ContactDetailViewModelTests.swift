@@ -11,7 +11,7 @@ import Testing
 @MainActor
 struct ContactDetailViewModelTests {
 
-    static let now = Date(timeIntervalSince1970: 1_800_000_000)
+    nonisolated static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     static func contact(
         id: UUID = UUID(),
@@ -50,6 +50,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository([log]),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -66,6 +67,7 @@ struct ContactDetailViewModelTests {
             contactId: UUID(),
             contacts: StubContactRepository.failing(),
             interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -82,6 +84,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository.failing(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -108,6 +111,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -123,6 +127,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -138,6 +143,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -153,6 +159,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now },
             calendar: {
                 var calendar = Calendar(identifier: .gregorian)
@@ -178,6 +185,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -201,6 +209,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -214,6 +223,32 @@ struct ContactDetailViewModelTests {
         #expect(logs[0].channel == .email)
     }
 
+    @Test("Snooze pushes a pending cadence reminder 7 days out and logs nothing")
+    func snoozePushesCadenceReminderAndLogsNothing() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: interactions,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        await viewModel.snooze()
+
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.count == 1)
+        #expect(pending[0].kind == .cadence)
+        #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
+        #expect(await interactions.appendedLogs().isEmpty)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == contact.lastInteractedAt) // untouched (decision #31)
+    }
+
     @Test("A failing action leaves the view model's loaded state untouched")
     func failingActionLeavesStateUntouched() async throws {
         let contact = Self.contact(lastInteractedAt: nil)
@@ -221,6 +256,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: StubContactRepository([contact]),
             interactionsRepo: StubInteractionRepository.failing(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()

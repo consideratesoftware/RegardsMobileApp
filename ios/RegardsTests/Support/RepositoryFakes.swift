@@ -112,7 +112,7 @@ actor StubContactRepository: ContactRepository {
 }
 
 actor StubReminderRepository: ReminderRepository {
-    private let reminders: [ScheduledReminder]
+    private var reminders: [ScheduledReminder]
     private let failure: RepositoryFakeFailure?
 
     init(_ reminders: [ScheduledReminder] = [], failure: RepositoryFakeFailure? = nil) {
@@ -144,16 +144,28 @@ actor StubReminderRepository: ReminderRepository {
         return reminders.filter { $0.contactId == contactId && $0.state == .pending }
     }
 
+    /// Applies the write in-memory (mirrors both production
+    /// implementations), so a `SchedulingPass.snooze` write-then-read
+    /// round trip is actually observable — see `StubContactRepository`'s
+    /// sibling note.
     func upsert(_ reminder: ScheduledReminder) async throws {
         try requireSuccess()
+        if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
+            reminders[index] = reminder
+        } else {
+            reminders.append(reminder)
+        }
     }
 
     func updateState(id: UUID, state: ReminderState) async throws {
         try requireSuccess()
+        guard let index = reminders.firstIndex(where: { $0.id == id }) else { return }
+        reminders[index].state = state
     }
 
     func delete(id: UUID) async throws {
         try requireSuccess()
+        reminders.removeAll { $0.id == id }
     }
 }
 

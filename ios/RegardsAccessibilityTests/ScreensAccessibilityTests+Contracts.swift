@@ -152,7 +152,7 @@ extension ScreensAccessibilityTests {
             in: app
         )
         let caughtUp = app.descendants(matching: .any)["contact-detail.caught-up"]
-        let snooze = app.descendants(matching: .any)["contact-detail.snooze-unavailable"]
+        let snooze = app.descendants(matching: .any)["contact-detail.snooze"]
         let logOther = app.descendants(matching: .any)["contact-detail.log-other"]
         XCTAssertTrue(caughtUp.waitForExistence(timeout: 10))
         XCTAssertTrue(snooze.waitForExistence(timeout: 10))
@@ -216,10 +216,6 @@ extension ScreensAccessibilityTests {
 
         let unavailableElements = [
             ("contact-detail.open-channel-unavailable", "Open WhatsApp, unavailable"),
-            // Snooze stays unavailable: a real "push 7 days" needs a
-            // `ScheduledReminder` writer, which is `SchedulingPass`'s
-            // exclusive job once TF-07 (PR25) builds it (decision #36).
-            ("contact-detail.snooze-unavailable", "Snooze 1 wk, unavailable"),
             ("contact-detail.cadence-change-unavailable", "Change, unavailable"),
             ("contact-detail.channel-change-unavailable", "Change, unavailable"),
         ]
@@ -231,15 +227,19 @@ extension ScreensAccessibilityTests {
             )
         }
 
-        // Caught up / Log other are wired (§14 PR22): real, hittable
-        // controls, not muted unavailable text.
+        // Caught up / Snooze / Log other are wired (§14 PR22): real,
+        // hittable controls, not muted unavailable text.
         let caughtUp = app.descendants(matching: .any)["contact-detail.caught-up"]
+        let snooze = app.descendants(matching: .any)["contact-detail.snooze"]
         let logOther = app.descendants(matching: .any)["contact-detail.log-other"]
         XCTAssertTrue(caughtUp.waitForExistence(timeout: 10))
+        XCTAssertTrue(snooze.waitForExistence(timeout: 10))
         XCTAssertTrue(logOther.waitForExistence(timeout: 10))
         XCTAssertEqual(caughtUp.label, "Caught up")
+        XCTAssertEqual(snooze.label, "Snooze 1 wk")
         XCTAssertEqual(logOther.label, "Log other")
         XCTAssertTrue(caughtUp.isEnabled)
+        XCTAssertTrue(snooze.isEnabled)
         XCTAssertTrue(logOther.isEnabled)
     }
 }

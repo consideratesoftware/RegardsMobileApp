@@ -676,7 +676,7 @@ boundaries.
 |---|---|---|
 | **PR20** | Build the file-backed `ProductionRepositoryFactory`, compose `AppRuntime.makeProduction(environment:)` through `AppLaunchCoordinator`, migrate to `v2` (§7 columns), add the first-launch import flow and `onboardingCompletedAt` gate, and keep the splash until actual load completion | Fresh install on device: onboarding → Contacts permission → import → populated All Contacts. Imported contacts remain untracked until PR29's starter selection, so Overdue and Upcoming may be empty. Mock path stays for previews/UI tests via launch argument |
 | **PR21** | Reconciliation: launch/foreground + `CNContactStoreDidChange` re-import; archive-on-delete; refresh names/photos/handles (`phonesJson`/`emailsJson`); importer per-row fault tolerance (R35); move Contacts enumeration off the cooperative pool with a synthetic 5k regression (R25) | Delete/re-add/rename a contact in the system app → Regards reflects it next foreground; history survives archive; synthetic 5k import does not block the cooperative pool |
-| **PR22** | The core loop: Caught up / Snooze / Log-other wired everywhere (Detail buttons, Overdue+Upcoming swipe actions) → `InteractionRepository.append` + `lastInteractedAt` + targeted SchedulingPass stub (DB-only until PR25); stable row identities (R36) | Marking caught-up moves the contact out of Overdue instantly and logs an interaction; snooze pushes 7 days; VM tests |
+| **PR22** | The core loop: Caught up / Snooze / Log-other wired everywhere (Detail buttons, Overdue+Upcoming row actions) → `InteractionRepository.append` + `lastInteractedAt` + targeted SchedulingPass stub (DB-only until PR25); stable row identities (R36) | Marking caught-up moves the contact out of Overdue instantly and logs an interaction; snooze pushes 7 days; VM tests |
 | **PR23** | Reminder-window persistence: ReminderWindows screen becomes a live editor (days/ranges/quiet-hours/occasion-time/horizon), writes via `ReminderWindowRepository`, zero-capacity refuses save; Upcoming/Overdue read the real global window + per-contact overrides (R9) | Edited windows survive relaunch and visibly re-shape Upcoming |
 
 ### Phase 1C — Notifications end-to-end (Jul 20–24) — the product starts existing
@@ -906,9 +906,12 @@ work.
   Phase 0 mock path seeds pending birthday and anniversary reminders so those
   states remain visible and auditable; no production scheduling pass or
   reactive observation exists until TF-07. `groups` still has no direct UI
-  consumer. No interaction is ever written (`append`
-  uncalled). No production `ScheduledReminder` row is created, no notification
-  is scheduled, and no deep link is opened.
+  consumer. `InteractionRepository.append` is now called from Contact
+  Detail, Overdue, and Upcoming's Caught up / Log other actions (TF-04); a
+  narrow `SchedulingPass` DB-only stub writes a single cadence
+  `ScheduledReminder` row on Snooze, with no window/engine resolution,
+  reconciliation, or batching. No notification is scheduled and no deep link
+  is opened.
 
 ### What is broken (fix before building — full detail in §19)
 
@@ -918,13 +921,14 @@ pipeline; merge and onboarding flows do not persist.
 
 ### What does not exist at all
 
-SchedulingPass, notifications, deep-link execution, reconciliation/re-import,
-write-back, merge persistence, the full three-screen starter-contact and
-notification onboarding flow, calendar ingestion, window editing,
-widgets, StoreKit/paywall enforcement, export/delete, snapshot tests, App Store
-listing metadata (name/bundle/SKU reserved 2026-04-15: `Regards: Stay in
-Touch`, `com.consideratesoftware.regards`, `regards-ios` — fields empty
-otherwise).
+`SchedulingPass`'s `runFull()`/general `run(for contactId:)` reconciliation
+(§9a) — only its narrow Snooze stub exists (TF-04) — notifications, deep-link
+execution, reconciliation/re-import, write-back, merge persistence, the full
+three-screen starter-contact and notification onboarding flow, calendar
+ingestion, window editing, widgets, StoreKit/paywall enforcement,
+export/delete, snapshot tests, App Store listing metadata (name/bundle/SKU
+reserved 2026-04-15: `Regards: Stay in Touch`,
+`com.consideratesoftware.regards`, `regards-ios` — fields empty otherwise).
 
 ## 19. Remediation register
 
@@ -945,7 +949,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R9a | **Global window injection.** `UpcomingViewModel` has no silent default; production launch opens GRDB and `AppRuntime.makeProduction` resolves the persisted singleton before tabs appear. Missing or invalid storage produces a visible retry state, never a mock fallback | `UpcomingViewModel.swift`, `AppEnvironment.swift`, `AppLaunchCoordinator.swift` | Production launch uses the stored global window; mock launch is explicit and DEBUG-only | ✅ **closed by GitHub PR #42 and TF-02 / GitHub PR #44** |
 | R9b | **Per-contact override and live refresh — OPEN.** Overrides are still unresolved anywhere in the UI, a stored-window change does not refresh an open Upcoming, and the ReminderWindows screen renders `defaultV1()` display-only with a `.constant` Toggle | `ReminderWindowsScreen.swift:7,226`, `UpcomingViewModel.swift` | Live editor + repository read/write + override resolution in SchedulingPass (§9) | TF-05 (PR23) |
 | R10 | **Upcoming re-derives on the fly** instead of reading persisted reminders reactively (§9 promised an indexed read + stream) | `UpcomingViewModel.swift:118-146` | `ValueObservation` over `ScheduledReminder ⋈ Contact` | PR25 |
-| R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; Contact Detail's Caught up/Snooze/Log-other and channel action plus Overdue channel actions are muted, unavailable content pending TF-04/TF-08; inert Merge "Skip" | `ContactDetailScreen.swift`, `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift`, `MergeDuplicatesScreen.swift:108-112` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | Horizon/All stubs removed ✅ **closed by TF-01 modernization / GitHub PR #24**; remaining PR22–PR29 |
+| R11 | **Placeholder strings/stubs shipping in real screens:** hardcoded "Today, 6:30 pm" next-reminder; "next digest at 6:00 pm"; Contact Detail's Caught up/Snooze/Log-other and channel action plus Overdue channel actions are muted, unavailable content pending TF-04/TF-08; inert Merge "Skip" | `ContactDetailScreen.swift`, `OverdueViewModel.swift:29`, `UpcomingScreen.swift:26`, `OverdueScreen.swift`, `MergeDuplicatesScreen.swift:108-112` | Each stub wired or removed by the PR owning its screen; **zero inert interactive controls at Phase 2 exit** (§10 rule) | Horizon/All stubs removed ✅ **closed by TF-01 modernization / GitHub PR #24**; Caught up/Snooze/Log-other ✅ **closed by TF-04 / PR22** (Snooze via `SchedulingPass`'s DB-only stub, R51); remaining: channel action (TF-08), Merge "Skip" (PR28) |
 | R12 | **Merge never persists** (no `ContactGroup` written; `env.groups` unused) and detector sees only `preferredChannelValue` instead of full handle sets | `MergeDuplicatesViewModel.swift:44-55` | PR28 scope + `phonesJson`/`emailsJson` inputs | PR28 |
 | R13 | **Edit Contact shipped as a navigation trap and remains a read-only stub:** the hidden Back button and mixed navigation APIs made Edit unreachable or inescapable; the interim screen now removes inert form actions | `EditContactScreen.swift`, `ContactDetailScreen.swift` | Never-hidden escape route; real form lands in PR27; audit test added (see R16) | escape route ✅ **closed by TF-01 slice 1**; real form PR27 |
 | R14 | **Full onboarding remains incomplete.** TF-02 adds the persisted launch gate, Contacts pre-prompt, resumable first import, denial/retry paths, and non-inert proof link. Imported contacts deliberately remain untracked, so a fresh import populates All Contacts while Overdue and Upcoming may remain empty. Starter-contact selection (including marking the chosen contacts tracked), the notification step, and Contacts re-entry after **Continue without contacts** remain absent | `OnboardingScreen.swift`, `RegardsApp.swift`, `AppLaunchCoordinator.swift` | Complete the 3-screen starter-contact and notification flow, including tracking the selected starters and Settings re-entry for Contacts, per §10.8 | PR29 |
@@ -965,7 +969,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R21 | `Package.resolved` gitignored while GRDB floats `from: 6.29.0` — contradicts reproducible-build claim | `.gitignore`, `project.yml` | Commit the resolved GRDB revision | ✅ **closed by GitHub PR #39** |
 | R22 | `RegardsUITests` placeholder target in no scheme/workflow; `PlaceholderTests.swift` in unit bundle | `ios/RegardsUITests/`, `RegardsTests/PlaceholderTests.swift` | Delete both placeholders and the ownerless target | ✅ **closed by GitHub PR #39** |
 | R23 | Mock and GRDB repositories previously had no shared contract tests | `RegardsTests/Data/RepositoriesTests.swift` | Shared contracts cover all six protocols on both backends, including failure and normalization semantics | ✅ **closed by TF-02 / GitHub PR #44** |
-| R24 | Upcoming has focused representative-state, identity, ordering, boundary, failure, and transition-source tests but not its complete behavior suite. ContactDetail has spoken-label coverage only (`ContactDetailInteractionLabelTests`); its load, error, and derived-string behavior still has no unit suite. MergeDuplicates was also missing a suite at rebaseline. | `ios/RegardsTests/Features/` | Add the remaining coverage with the PRs that touch each VM | Upcoming/ContactDetail PR22/PR25; MergeDuplicates ✅ **closed by TF-01 modernization / GitHub PR #24** |
+| R24 | Upcoming has focused representative-state, identity, ordering, boundary, failure, and transition-source tests but not its complete behavior suite. ContactDetail has spoken-label coverage only (`ContactDetailInteractionLabelTests`); its load, error, and derived-string behavior still has no unit suite. MergeDuplicates was also missing a suite at rebaseline. | `ios/RegardsTests/Features/` | Add the remaining coverage with the PRs that touch each VM | ContactDetail (`ContactDetailViewModelTests`) and Overdue/Upcoming action + `observeTracked()`/snooze suites ✅ **closed by TF-04 / PR22**; MergeDuplicates ✅ **closed by TF-01 modernization / GitHub PR #24**; remaining Upcoming reactive-pipeline suite PR25 |
 | R25 | `CNContactsSource.fetchAllContacts` blocks a cooperative-pool thread for the full enumeration (5k-contact stall); `@unchecked Sendable` justified only by comment | `ContactsSource.swift:69, 98-125` | Move enumeration off the pool; synthetic 5k regression in PR21, physical A15 budget confirmation at TF-18 | PR21 / TF-18 |
 | R26 | Force-unwrapped calendar math in the engine (`date(byAdding:)!`) | `ReminderEngine.swift:162,203-205` | Eliminated by the R1 rewrite (incl. `resolveFeb29Fallback`) | ✅ **closed by PR16** |
 | R27 | accessibility.md documents `waitForContactDetailReady` as canonical — the helper was reverted in PR #12 and doesn't exist | `ios/docs/accessibility.md:166-175` | Correct to the plain-identifier wait actually in use | ✅ **closed by TF-01 slice 1** |
@@ -995,6 +999,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R46 | `InteractionLog` doc comment referenced nonexistent `ContactRepository.markCaughtUp`; `Channel.isAvailableOnIOS` remains an intentionally documented Android-port seam | `InteractionLog.swift`, `Channel.swift` | Keep the comment truthful and retain `isAvailableOnIOS` only while the Android port owns the divergent implementation | comment ✅ **closed by PR16**; zero-caller `Contact.effectiveWindow` removed by TF-02; Android seam remains owned by PR22 |
 | R47 | Invalid persisted timezone identifiers silently fall back to the device timezone, changing reminder timing without consent | `ReminderWindow.swift`, `Records.swift` | Validate IANA identifier and reject malformed persisted windows | ✅ **closed in PR16 review** |
 | R48 | Slot-start snapping can schedule a future-due contact before `overdueAt`; repeated-hour snapping can choose a boundary from the wrong UTC occurrence | `ReminderEngine.swift` | Distinguish already-overdue from future-due targets; resolve fall-back boundaries relative to the search instant; regression tests | ✅ **closed in PR16 review** |
+| R51 | Overdue and Upcoming ship Caught up / Snooze as real per-row buttons, not the swipe actions §10 describes: both screens are `ScrollView`/`RegardsCard`-based, and SwiftUI's `.swipeActions` only functions inside `List`. Per-row buttons are the accessible interim shape (native VoiceOver custom actions come free with `List` swipe actions; a bespoke gesture would have to reimplement that manually) | `OverdueScreen.swift`, `UpcomingScreen.swift` | Deliberate, owner-approved deviation (§14 PR22 review) — no fix required now; revisit as a `List`-backed swipe redesign if TF-16 polish scope wants the literal gesture | TF-16 candidate |
 
 ## 20. Release engineering & App Store playbook
 

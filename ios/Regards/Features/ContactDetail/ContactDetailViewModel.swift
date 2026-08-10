@@ -29,6 +29,7 @@ public final class ContactDetailViewModel {
 
     private let contacts: any ContactRepository
     private let interactionsRepo: any InteractionRepository
+    private let scheduler: SchedulingPass
     private let contactId: UUID
     private let clock: () -> Date
     private let calendar: Calendar
@@ -39,11 +40,13 @@ public final class ContactDetailViewModel {
     public init(contactId: UUID,
                 contacts: any ContactRepository,
                 interactionsRepo: any InteractionRepository,
+                scheduler: SchedulingPass,
                 clock: @escaping () -> Date = { Date() },
                 calendar: Calendar = .current) {
         self.contactId = contactId
         self.contacts = contacts
         self.interactionsRepo = interactionsRepo
+        self.scheduler = scheduler
         self.clock = clock
         self.calendar = calendar
     }
@@ -106,6 +109,23 @@ public final class ContactDetailViewModel {
         } catch {
             Self.log.error(
                 "failed to log other channel for \(self.contactId, privacy: .private): \(error, privacy: .private)"
+            )
+        }
+    }
+
+    /// "Snooze 1 wk": pushes the contact's cadence reminder out 7 days
+    /// through `SchedulingPass` (§14 PR22's DB-only stub). No interaction is
+    /// logged and `lastInteractedAt` is untouched (decision #31) — this
+    /// screen's own labels don't yet read the persisted reminder (TF-07
+    /// wires the "live next reminder" placeholder), so there's nothing to
+    /// reload here; Overdue and Upcoming pick the change up through their
+    /// own reads.
+    public func snooze() async {
+        do {
+            try await scheduler.snooze(contactId: contactId)
+        } catch {
+            Self.log.error(
+                "failed to snooze \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )
         }
     }

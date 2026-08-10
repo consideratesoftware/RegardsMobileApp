@@ -96,7 +96,7 @@ private actor ControllableContactRepository: ContactRepository {
 struct RegardsLoadStateTests {
     // MARK: - Fixtures
 
-    private static let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private nonisolated static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private static func overdueContact(named displayName: String = "Alex Chen") -> Contact {
         Contact(
@@ -123,6 +123,8 @@ struct RegardsLoadStateTests {
         let viewModel = OverdueViewModel(
             contacts: repository,
             interactions: StubInteractionRepository(),
+            reminders: StubReminderRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -256,6 +258,8 @@ struct RegardsLoadStateTests {
         let viewModel = OverdueViewModel(
             contacts: repository,
             interactions: StubInteractionRepository(),
+            reminders: StubReminderRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -346,6 +350,8 @@ struct RegardsLoadStateTests {
         let viewModel = OverdueViewModel(
             contacts: repository,
             interactions: StubInteractionRepository(),
+            reminders: StubReminderRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             clock: { Self.now }
         )
 

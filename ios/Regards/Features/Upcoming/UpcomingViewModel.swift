@@ -281,8 +281,43 @@ public final class UpcomingViewModel {
             ?? now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
+        // A pending cadence `ScheduledReminder` is Snooze's only persisted
+        // trace (§14 PR22's `SchedulingPass.snooze` stub) — no separate
+        // "snoozed" flag exists on `Contact`. While it's still in the future
+        // it overrides the live-computed date entirely and skips window
+        // re-resolution (the write is already the authoritative instant);
+        // once it lapses this map is simply not consulted and the ordinary
+        // computation below takes over unchanged, so the row "returns" on
+        // its own the next load after the snoozed date passes.
+        let snoozedUntilByContact = Dictionary(
+            reminders
+                .filter { $0.kind == .cadence }
+                .map { ($0.contactId, $0.scheduledFor) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+
+        func appendCadenceRow(contact: Contact, cadence: Int, fires: Date) {
+            guard fires < horizonEnd else { return }
+            rows.append(UpcomingRowState(
+                id: .init(contactId: contact.id, kind: .cadence),
+                contactId: contact.id,
+                name: contact.displayName,
+                kind: .cadence,
+                scheduledFor: fires,
+                channel: contact.preferredChannel,
+                cadenceText: CadenceDescriptor.describe(days: cadence),
+                occasionText: nil,
+                timeOfDayText: Self.format(time: fires, timezone: window.timeZone),
+                dayHeader: Self.format(dayHeader: fires, now: now, timezone: window.timeZone)
+            ))
+        }
+
         for contact in contacts {
             if let cadence = contact.cadenceDays {
+                if let snoozedUntil = snoozedUntilByContact[contact.id], snoozedUntil > now {
+                    appendCadenceRow(contact: contact, cadence: cadence, fires: snoozedUntil)
+                    continue
+                }
                 let last = contact.lastInteractedAt ?? contact.createdAt
                 let overdueAt = last.addingTimeInterval(TimeInterval(cadence) * 86_400)
                 let target = max(now, overdueAt)
@@ -303,20 +338,7 @@ public final class UpcomingViewModel {
                 // slot start can be earlier than `now`; it still represents an
                 // immediate reminder and belongs in Upcoming. Future cadence
                 // eligibility remains guarded by `nextAllowedSlot` itself.
-                if fires < horizonEnd {
-                    rows.append(UpcomingRowState(
-                        id: .init(contactId: contact.id, kind: .cadence),
-                        contactId: contact.id,
-                        name: contact.displayName,
-                        kind: .cadence,
-                        scheduledFor: fires,
-                        channel: contact.preferredChannel,
-                        cadenceText: CadenceDescriptor.describe(days: cadence),
-                        occasionText: nil,
-                        timeOfDayText: Self.format(time: fires, timezone: window.timeZone),
-                        dayHeader: Self.format(dayHeader: fires, now: now, timezone: window.timeZone)
-                    ))
-                }
+                appendCadenceRow(contact: contact, cadence: cadence, fires: fires)
             }
         }
 

@@ -132,11 +132,9 @@ public struct ContactDetailScreen: View {
         secondaryAction("Caught up", identifier: "contact-detail.caught-up") {
             Task { await viewModel.markCaughtUp() }
         }
-        // Snooze stays a muted stub: a real "push 7 days" needs a persisted
-        // `ScheduledReminder` writer, which only `SchedulingPass` may touch
-        // (decision #36) and which doesn't exist until TF-07 (PR25) builds
-        // it. Tracked as an open question against this slice (§14 PR22).
-        secondaryStub("Snooze 1 wk", identifier: "contact-detail.snooze-unavailable")
+        secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
+            Task { await viewModel.snooze() }
+        }
         secondaryAction("Log other", identifier: "contact-detail.log-other") {
             showsLogOtherChannelPicker = true
         }
@@ -327,21 +325,6 @@ private extension ContactDetailScreen {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
-    }
-
-    func secondaryStub(_ title: String, identifier: String) -> some View {
-        Text(title)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(RegardsDS.muted)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 44)
-            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
-            .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
-            .accessibilityLabel("\(title), unavailable")
-            .accessibilityIdentifier(identifier)
     }
 
     func detailRow(label: String,
