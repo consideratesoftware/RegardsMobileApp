@@ -185,26 +185,49 @@ struct ReconciliationCoalescingTests {
     }
 }
 
-/// Polls `launch.reconciliationCount`, yielding between reads, until it
-/// stops changing across `stableIterations` consecutive checks (bounded by
-/// `maxIterations` so a genuinely-never-settling count fails the test
-/// instead of hanging it). All work in this suite is in-memory GRDB with no
-/// real I/O latency, so a real pass reliably completes well inside this
-/// window — a plateau this long is quiescence, not a gap between passes.
+/// Polls `launch.reconciliationCount` until it stops changing across
+/// `stableIterations` consecutive checks (bounded by `maxIterations` so a
+/// genuinely-never-settling count fails the test instead of hanging it).
+///
+/// Round 11 hardening: the original version yielded between reads
+/// (`Task.yield()` only, the same shape `eventually` uses) and reproduced a
+/// real flake under full-suite parallel load — `settledCount` landed on 1
+/// instead of 3, meaning it declared quiescence in the gap *between* pass #2
+/// finishing and pass #3 starting. That gap is real and expected here (see
+/// `burstOfChangeNotificationsCoalesces`'s comment): after `releaseFetch()`,
+/// `beginObservingContactStoreChanges`'s consumer loop has to actually get
+/// scheduled again to pick the one buffered notification back up and call
+/// `reconcileNow` for pass #3 — under CPU contention, a bare `Task.yield()`
+/// doesn't reliably give that suspended `Task` real scheduling turns inside
+/// 50 iterations the way `pumpRunLoopBriefly()` (promoted to
+/// `RegardsTests/Support/Eventually.swift` alongside `eventuallyPumpingRunLoop`
+/// for the `AllContactsCorruptionAnnouncementTests` fix) does by actually
+/// spinning the run loop each iteration.
+///
+/// Two changes close the gap instead of just widening it: (1) each iteration
+/// pumps the run loop, the same primitive `eventuallyPumpingRunLoop` uses,
+/// so a scheduling turn is a real event, not a hope; (2) a streak only
+/// counts as "stable" while `launch.reconciliationTask == nil` —
+/// `AppLaunchCoordinator`'s own "isReconciling" gate (`reconcileNow`'s doc
+/// comment) — so a pass genuinely in flight can never be mistaken for
+/// quiescence no matter what `reconciliationCount` happens to read at that
+/// exact instant. All work in this suite is in-memory GRDB with no real I/O
+/// latency, so a real settle reliably lands well inside this window.
 @MainActor
 private func drainedCount(
     of launch: AppLaunchCoordinator,
-    stableIterations: Int = 50,
-    maxIterations: Int = 2_000
+    stableIterations: Int = 10,
+    maxIterations: Int = 600
 ) async -> Int {
     var lastCount = launch.reconciliationCount
     var stableStreak = 0
     var iterations = 0
     while stableStreak < stableIterations, iterations < maxIterations {
         await Task.yield()
+        pumpRunLoopBriefly()
         iterations += 1
         let current = launch.reconciliationCount
-        if current == lastCount {
+        if current == lastCount, launch.reconciliationTask == nil {
             stableStreak += 1
         } else {
             stableStreak = 0
