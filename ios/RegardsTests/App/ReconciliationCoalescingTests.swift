@@ -72,6 +72,17 @@ struct ReconciliationCoalescingTests {
         #expect(launch.reconciliationCoalesceCount == 1)
     }
 
+    /// Deliberately doesn't use `eventually { reconciliationCount >= 2 }`
+    /// followed by a `< burstSize` check: that stops the instant pass #2
+    /// lands, which happens the moment the *first* buffered notification is
+    /// consumed — under a regression to unbounded buffering, the other 18
+    /// would still be sitting queued, unconsumed, and the count would
+    /// happen to read 2-3 at that exact moment too, passing by accident.
+    /// Instead this lands the whole burst *while a pass is genuinely
+    /// in-flight* (the same deterministic shape as the overlapping-trigger
+    /// test above), releases, and asserts the exact settled count — which
+    /// only stays low if the buffering policy really coalesced the burst
+    /// before the consumer ever got to it.
     @Test("A burst of rapid store-change notifications coalesces, not one pass per notification")
     func burstOfChangeNotificationsCoalesces() async throws {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
@@ -81,7 +92,7 @@ struct ReconciliationCoalescingTests {
             entitlementRefreshedAt: now,
             trialStartedAt: now
         ))
-        let source = MutableContactsSource(status: .authorized, contacts: [])
+        let source = BlockingFetchContactsSource(contacts: [])
         let launch = AppLaunchCoordinator(
             dependencies: .init(
                 makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
@@ -93,31 +104,76 @@ struct ReconciliationCoalescingTests {
         await launch.start()
         #expect(launch.reconciliationCount == 1)
 
-        // Fire many notifications back-to-back with no `await` between
-        // them, so the coordinator's change-observation `Task` — a
-        // separate unstructured task — cannot interleave and consume even
-        // one before the burst finishes. Everything after this loop is
-        // exercising `changeNotifications()`'s real `.bufferingNewest(1)`
-        // policy (`MutableContactsSource` adopts the exact same constant
-        // `CNContactsSource` uses), not a fake-invented one.
+        // One notification kicks off pass #2 and is armed to block inside
+        // `fetchAllContacts()`, so it's still genuinely in flight — not yet
+        // back at `for await` listening for the next stream value — when
+        // the burst below lands.
+        source.armBlock()
+        source.simulateChange()
+        await source.waitUntilFetchStarts()
+        #expect(source.fetchCountValue() == 2)
+
+        // The rest of the burst arrives while pass #2 is blocked. With
+        // `.bufferingNewest(1)` this collapses to at most one buffered
+        // value waiting for the consumer's next iteration, regardless of
+        // how many notifications land here.
         let burstSize = 20
-        for _ in 0..<burstSize {
+        for _ in 1..<burstSize {
             source.simulateChange()
         }
 
-        #expect(await eventually { launch.reconciliationCount >= 2 })
-        // A generous ceiling, not an exact count: both the stream's
-        // buffering and the coordinator's own single-flight coalescing
-        // (the test above) contribute, so pinning one exact number would
-        // overspecify which mechanism absorbed the burst. What matters is
-        // that 20 rapid triggers didn't produce anywhere near 20 passes.
-        #expect(launch.reconciliationCount < burstSize)
+        source.releaseFetch()
+
+        // Pass #2 finishes, then the consumer loop's next `for await`
+        // iteration picks up whatever the buffering policy left it: exactly
+        // one coalesced value (fixed) or up to 19 still-queued ones
+        // (regressed to unbounded). Draining to quiescence — rather than
+        // stopping at the first moment the count happens to equal the
+        // expected value — is what makes this discriminate: a broken policy
+        // would keep advancing past 3 after any single snapshot check.
+        let settledCount = await drainedCount(of: launch)
+
+        #expect(settledCount == 3)
+        #expect(source.fetchCountValue() == 3)
     }
+}
+
+/// Polls `launch.reconciliationCount`, yielding between reads, until it
+/// stops changing across `stableIterations` consecutive checks (bounded by
+/// `maxIterations` so a genuinely-never-settling count fails the test
+/// instead of hanging it). All work in this suite is in-memory GRDB with no
+/// real I/O latency, so a real pass reliably completes well inside this
+/// window — a plateau this long is quiescence, not a gap between passes.
+@MainActor
+private func drainedCount(
+    of launch: AppLaunchCoordinator,
+    stableIterations: Int = 50,
+    maxIterations: Int = 2_000
+) async -> Int {
+    var lastCount = launch.reconciliationCount
+    var stableStreak = 0
+    var iterations = 0
+    while stableStreak < stableIterations, iterations < maxIterations {
+        await Task.yield()
+        iterations += 1
+        let current = launch.reconciliationCount
+        if current == lastCount {
+            stableStreak += 1
+        } else {
+            stableStreak = 0
+            lastCount = current
+        }
+    }
+    return lastCount
 }
 
 /// A `ContactsSource` whose `fetchAllContacts()` can be armed to block until
 /// explicitly released, so a test can force two reconciliation triggers to
-/// genuinely overlap instead of hoping they do.
+/// genuinely overlap instead of hoping they do. Also drives
+/// `changeNotifications()` explicitly, using the exact same
+/// `.bufferingNewest(1)` policy `CNContactsSource` uses in production, for
+/// tests that need both a controllable block *and* controllable
+/// store-change notifications at once.
 private final class BlockingFetchContactsSource: ContactsSource, @unchecked Sendable {
     private let lock = NSLock()
     private let contacts: [SystemContact]
@@ -126,6 +182,7 @@ private final class BlockingFetchContactsSource: ContactsSource, @unchecked Send
     private var fetchStarted = false
     private var startWaiter: CheckedContinuation<Void, Never>?
     private var releaseWaiter: CheckedContinuation<Void, Never>?
+    private var changeContinuation: AsyncStream<Void>.Continuation?
 
     init(contacts: [SystemContact]) {
         self.contacts = contacts
@@ -133,6 +190,16 @@ private final class BlockingFetchContactsSource: ContactsSource, @unchecked Send
 
     func currentAuthorization() async -> ContactsAuthorizationStatus { .authorized }
     func requestAccess() async throws -> ContactsAuthorizationStatus { .authorized }
+
+    func changeNotifications() -> AsyncStream<Void> {
+        AsyncStream(bufferingPolicy: changeNotificationBufferingPolicy) { continuation in
+            lock.withLock { self.changeContinuation = continuation }
+        }
+    }
+
+    func simulateChange() {
+        lock.withLock { changeContinuation }?.yield()
+    }
 
     func fetchAllContacts() async throws -> [SystemContact] {
         let shouldBlock = lock.withLock {
