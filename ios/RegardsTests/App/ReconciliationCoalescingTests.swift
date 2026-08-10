@@ -136,6 +136,53 @@ struct ReconciliationCoalescingTests {
         #expect(settledCount == 3)
         #expect(source.fetchCountValue() == 3)
     }
+
+    /// Fix 6: `beginObservingContactStoreChanges` must run *before*
+    /// `start()`'s own launch reconcile, not after — otherwise a change
+    /// notification landing while that first (possibly long, per R25) pass
+    /// is still in flight has no stream to land on yet and is lost for
+    /// good, rather than merely delayed until the pass finishes.
+    @Test("A store-change notification landing during the launch reconcile itself still coalesces")
+    func storeChangeDuringLaunchReconcileCoalesces() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        try await environment.profile.save(UserProfile(
+            onboardingCompletedAt: now,
+            entitlementTier: .trial,
+            entitlementRefreshedAt: now,
+            trialStartedAt: now
+        ))
+        let source = BlockingFetchContactsSource(contacts: [])
+        let launch = AppLaunchCoordinator(
+            dependencies: .init(
+                makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
+                contactsSource: source,
+                clock: { self.now }
+            )
+        )
+
+        // Armed *before* `start()` runs at all, so the pass this blocks is
+        // `start()`'s own launch reconcile — not a later foreground/
+        // store-change pass, which the tests above already cover.
+        source.armBlock()
+        let startTask = Task { await launch.start() }
+        await source.waitUntilFetchStarts()
+        #expect(source.fetchCountValue() == 1)
+
+        source.simulateChange()
+        // Under the pre-fix ordering, `beginObservingContactStoreChanges`
+        // hasn't run yet at this point (it only ran *after* `reconcileNow`
+        // returned), so `changeContinuation` would still be nil and this
+        // call a silent no-op — this wait would time out and the coalesce
+        // count would never move off 0.
+        #expect(await eventually { launch.reconciliationCoalesceCount == 1 })
+
+        source.releaseFetch()
+        await startTask.value
+
+        #expect(launch.phase == .ready)
+        #expect(launch.reconciliationCount == 2)
+        #expect(source.fetchCountValue() == 2)
+    }
 }
 
 /// Polls `launch.reconciliationCount`, yielding between reads, until it
@@ -228,12 +275,32 @@ private final class BlockingFetchContactsSource: ContactsSource, @unchecked Send
         }
     }
 
-    func waitUntilFetchStarts() async {
+    /// Nit: bounded rather than an unconditional `await` — if a future
+    /// regression in the code under test means `fetchAllContacts()` is
+    /// never actually called, this used to hang the whole suite instead of
+    /// failing the one test that needed it to be called. The watchdog
+    /// forces the continuation closed and records a failure past `timeout`;
+    /// the common (passing) path cancels the watchdog once the real start
+    /// signal arrives, well under it.
+    func waitUntilFetchStarts(timeout: Duration = .seconds(10)) async {
         let alreadyStarted = lock.withLock { fetchStarted }
         guard !alreadyStarted else { return }
+        let watchdog = Task {
+            try? await Task.sleep(for: timeout)
+            let leftoverWaiter = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+                let waiter = startWaiter
+                startWaiter = nil
+                return waiter
+            }
+            if let leftoverWaiter {
+                Issue.record("waitUntilFetchStarts timed out after \(timeout) — fetchAllContacts() was never called")
+                leftoverWaiter.resume()
+            }
+        }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             lock.withLock { startWaiter = continuation }
         }
+        watchdog.cancel()
     }
 
     func releaseFetch() {

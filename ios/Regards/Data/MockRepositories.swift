@@ -410,6 +410,21 @@ extension MockStore {
         contacts[id] = c
     }
 
+    /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the
+    /// *current* dictionary entry (actor-isolated, so there's no separate
+    /// snapshot to go stale) and overwrites only these five fields, same as
+    /// the real field-scoped `UPDATE` — parity for `ContactsReconciler`'s
+    /// refresh writes between the production and mock/preview backends.
+    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) {
+        guard var c = contacts[id] else { return }
+        c.displayName = fields.displayName
+        c.phoneNumbers = fields.phoneNumbers
+        c.emailAddresses = fields.emailAddresses
+        c.preferredChannelValue = fields.preferredChannelValue
+        c.archivedAt = fields.archivedAt.map(mockStoredDate)
+        contacts[id] = c
+    }
+
     func allGroups() -> [ContactGroup] { Array(groups.values) }
     func group(id: UUID) -> ContactGroup? { groups[id] }
     func upsertGroup(_ g: ContactGroup) throws { groups[g.id] = try mockStoredGroup(g) }

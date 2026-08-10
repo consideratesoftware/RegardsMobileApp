@@ -23,7 +23,14 @@ extension AppLaunchCoordinator {
         changeObservationTask = Task { [weak self] in
             for await _ in stream {
                 guard let self else { return }
-                guard let runtime = self.runtime else { continue }
+                guard let runtime = self.runtime else {
+                    // No runtime to reconcile against right now (e.g. mid-
+                    // `retry()`) — remember the notification instead of
+                    // dropping it; `start()` replays it once `runtime` is
+                    // set again (see `pendingStoreChangeReplay`).
+                    self.pendingStoreChangeReplay = true
+                    continue
+                }
                 await self.reconcileNow(runtime: runtime, dependencies: dependencies)
             }
         }

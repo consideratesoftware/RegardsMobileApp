@@ -68,8 +68,17 @@ struct ContactsReconcilerResilienceTests {
             preferredChannel: .phoneCall,
             preferredChannelValue: "+15555550920"
         )
+        // A bystander that stays visible across both passes keeps neither
+        // fetch wholesale-empty — fix 3's mass-archive guard would otherwise
+        // skip the deletion pass's sweep entirely.
+        let bystander = Contact(systemContactRef: "bystander", displayName: "Bystander")
         try await repo.upsert(original)
-        let deletionSource = MutableContactsSource(status: .authorized, contacts: [])
+        try await repo.upsert(bystander)
+        let bystanderSystemContact = SystemContact(
+            identifier: "bystander", givenName: "Bystander", familyName: "",
+            phoneNumbers: [], emailAddresses: []
+        )
+        let deletionSource = MutableContactsSource(status: .authorized, contacts: [bystanderSystemContact])
         let deletionReconciler = ContactsReconciler(source: deletionSource, repo: repo, clock: { Self.now })
         _ = try await deletionReconciler.reconcile()
         let archivedOriginal = try #require(try await repo.fetch(id: original.id))
@@ -82,14 +91,17 @@ struct ContactsReconcilerResilienceTests {
         let readdSource = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "new-identifier", givenName: "Original", familyName: "Person",
                           phoneNumbers: ["+15555550920"], emailAddresses: []),
+            bystanderSystemContact,
         ])
         let readdReconciler = ContactsReconciler(source: readdSource, repo: repo, clock: { readdedAt })
 
         let result = try await readdReconciler.reconcile()
 
-        #expect(result == .init(imported: 1))
+        #expect(result == .init(imported: 1, unchanged: 1))
         let allContacts = try await repo.fetchAll()
-        #expect(allContacts.count == 2)
+        #expect(allContacts.count == 3)
+        let stillActiveBystander = try #require(try await repo.fetch(id: bystander.id))
+        #expect(stillActiveBystander.archivedAt == nil)
         let stillArchivedOriginal = try #require(try await repo.fetch(id: original.id))
         // The archived original's history-bearing fields are exactly as
         // they were the moment it was archived — a re-add never touches it.
@@ -129,12 +141,19 @@ struct ContactsReconcilerResilienceTests {
         )
         try await repositories.interactions.append(log)
 
-        let source = MutableContactsSource(status: .authorized, contacts: [])
+        // A still-visible bystander keeps the fetch from being
+        // wholesale-empty — see fix 3's mass-archive guard.
+        let bystander = Contact(systemContactRef: "bystander", displayName: "Bystander")
+        try await repositories.contacts.upsert(bystander)
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "bystander", givenName: "Bystander", familyName: "",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
         let reconciler = ContactsReconciler(source: source, repo: repositories.contacts, clock: { Self.now })
 
         let result = try await reconciler.reconcile()
 
-        #expect(result == .init(archived: 1))
+        #expect(result == .init(archived: 1, unchanged: 1))
         let archivedContact = try #require(try await repositories.contacts.fetch(id: contact.id))
         #expect(archivedContact.archivedAt == Self.now)
         let survivingReminder = try await repositories.reminders.fetchPending(forContact: contact.id)

@@ -73,6 +73,7 @@
 		8AB2F404FE525C0D7F43A21C /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0950902FF5E235B5FB5F695E /* SettingsScreen.swift */; };
 		8B34747587732A165A8AABFF /* ContactsSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */; };
 		8C1DE13FD942E53BBE0B58CA /* AppLaunchCoordinatorReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B012902AB1F37B1756A73733 /* AppLaunchCoordinatorReconciliationTests.swift */; };
+		8F62E8F8EF3581E07D0EBFF8 /* ContactsReconcilerFieldScopedWriteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12A7E06561B26D29C72F196A /* ContactsReconcilerFieldScopedWriteTests.swift */; };
 		8FE57C05706DB9DF84A51CA2 /* ChannelGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34C83038855D3F5D94D87075 /* ChannelGlyph.swift */; };
 		9231B5BB5919CC130787145A /* AllContactsScreenReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879C79B7F43F0161D326FDC0 /* AllContactsScreenReconciliationTests.swift */; };
 		95985B0A2B1E3B341A104B3D /* OverdueScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA83CFB2493F560AB4FF030 /* OverdueScreen.swift */; };
@@ -156,6 +157,7 @@
 		10AFB91724C972036043E115 /* RegardsIntentRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsIntentRouterTests.swift; sourceTree = "<group>"; };
 		11810902C3217ECA1F287118 /* ContactsSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsSource.swift; sourceTree = "<group>"; };
 		11E0102D9499D35503808FA5 /* AppLaunchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchCoordinatorTests.swift; sourceTree = "<group>"; };
+		12A7E06561B26D29C72F196A /* ContactsReconcilerFieldScopedWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsReconcilerFieldScopedWriteTests.swift; sourceTree = "<group>"; };
 		16738B3353782A7FC97B0A67 /* DatabaseFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseFactory.swift; sourceTree = "<group>"; };
 		196DC04E6A284D9227CF2232 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1ADC5733A26E2C5DEF5A8AA3 /* AppLaunchCoordinator+Reconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppLaunchCoordinator+Reconciliation.swift"; sourceTree = "<group>"; };
@@ -509,6 +511,7 @@
 			children = (
 				24A240F758BF789AC64D5A3E /* ContactsImporterTests.swift */,
 				362A5876FD1B7D0F02F56E7A /* ContactsReconcilerAuthorizationTests.swift */,
+				12A7E06561B26D29C72F196A /* ContactsReconcilerFieldScopedWriteTests.swift */,
 				86A6A21C2DCA33AADA047708 /* ContactsReconcilerResilienceTests.swift */,
 				03942DF2AF18E649A0CCFDD5 /* ContactsReconcilerTests.swift */,
 				6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */,
@@ -814,6 +817,7 @@
 				3CD64DE48976BBB5B7BAC907 /* ContactWriteTrackingFakes.swift in Sources */,
 				D02616FCEEA8888EF9DEF40A /* ContactsImporterTests.swift in Sources */,
 				DA5318732173A38E990CD0DC /* ContactsReconcilerAuthorizationTests.swift in Sources */,
+				8F62E8F8EF3581E07D0EBFF8 /* ContactsReconcilerFieldScopedWriteTests.swift in Sources */,
 				83AA10666D5A7C26D5895344 /* ContactsReconcilerResilienceTests.swift in Sources */,
 				B85FE13B4F5A5C7170BC461F /* ContactsReconcilerTests.swift in Sources */,
 				8B34747587732A165A8AABFF /* ContactsSourceTests.swift in Sources */,

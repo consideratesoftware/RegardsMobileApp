@@ -100,17 +100,54 @@ struct ContactsReconcilerAuthorizationTests {
         #expect(reloaded.archivedAt == nil)
     }
 
-    @Test("A genuine deletion under .authorized still archives, proving the .limited guard is scoped correctly")
-    func authorizedStillArchivesADeletedContact() async throws {
+    /// Fix 3: a `fetchAllContacts()` that comes back wholesale empty while
+    /// the store previously held active contacts is indistinguishable from
+    /// "the user is mid-restore from an iCloud/device backup and Contacts
+    /// hasn't repopulated yet" — treating it as evidence every contact was
+    /// deleted would archive the whole address book in one pass on a false
+    /// read. This shape skips the sweep entirely rather than guess.
+    @Test("A wholesale-empty fetch under .authorized skips the archive sweep instead of mass-archiving")
+    func wholesaleEmptyFetchArchivesNothing() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
-        let deleted = Contact(systemContactRef: "truly-deleted", displayName: "Gone", tracked: true)
-        try await repo.upsert(deleted)
+        let contactA = Contact(systemContactRef: "still-stored-a", displayName: "A", tracked: true, cadenceDays: 7)
+        let contactB = Contact(systemContactRef: "still-stored-b", displayName: "B", tracked: true, cadenceDays: 30)
+        try await repo.upsert(contactA)
+        try await repo.upsert(contactB)
         let source = MutableContactsSource(status: .authorized, contacts: [])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
         let result = try await reconciler.reconcile()
 
-        #expect(result == .init(archived: 1))
+        #expect(result.archived == 0)
+        let reloadedA = try #require(try await repo.fetch(id: contactA.id))
+        let reloadedB = try #require(try await repo.fetch(id: contactB.id))
+        #expect(reloadedA.archivedAt == nil)
+        #expect(reloadedB.archivedAt == nil)
+    }
+
+    @Test("A genuine deletion under .authorized still archives, proving the .limited guard is scoped correctly")
+    func authorizedStillArchivesADeletedContact() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let deleted = Contact(systemContactRef: "truly-deleted", displayName: "Gone", tracked: true)
+        try await repo.upsert(deleted)
+        // A second, still-visible contact keeps the fetch from being
+        // wholesale-empty — the mass-archive guard (`ContactsReconcilerTests
+        // .reconcileWholesaleEmptyFetchArchivesNothing`) specifically skips
+        // the sweep when the store held contacts but the fetch reports none
+        // at all, so a single-contact deletion needs at least one other
+        // contact the store still reports to prove archiving itself (not
+        // that guard) is what this test exercises.
+        let stillVisible = Contact(systemContactRef: "still-visible", displayName: "Still Visible")
+        try await repo.upsert(stillVisible)
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "still-visible", givenName: "Still", familyName: "Visible",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+
+        let result = try await reconciler.reconcile()
+
+        #expect(result.archived == 1)
         let reloaded = try #require(try await repo.fetch(id: deleted.id))
         #expect(reloaded.archivedAt == Self.now)
     }

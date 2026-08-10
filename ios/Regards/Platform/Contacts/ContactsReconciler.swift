@@ -23,6 +23,10 @@ import Foundation
 /// - A row this pass can't decode (R50) is left untouched: it is neither
 ///   matched, refreshed, nor archived, so a corrupt row is never mistaken for
 ///   a deleted one.
+/// - Under `.authorized`, a `fetchAllContacts()` that comes back wholesale
+///   empty while the store previously held active contacts skips the
+///   archive sweep entirely instead of archiving everything it stored — see
+///   the sweep's own comment below for why (ARCHITECTURE.md §21).
 public struct ContactsReconciler: Sendable {
     private let source: any ContactsSource
     private let repo: any ContactRepository
@@ -109,7 +113,22 @@ public struct ContactsReconciler: Sendable {
                         unchanged += 1
                         continue
                     }
-                    try await repo.upsert(updated)
+                    // Field-scoped, not `repo.upsert(updated)`: `updated` is
+                    // built from a snapshot read at the start of this pass,
+                    // so a whole-row upsert here could revert a concurrent
+                    // user write (e.g. a "mark caught up" `lastInteractedAt`
+                    // update) landing on this same row mid-pass. See
+                    // `updateReconciledFields`'s protocol doc comment.
+                    try await repo.updateReconciledFields(
+                        id: existing.id,
+                        fields: ReconciledContactFields(
+                            displayName: updated.displayName,
+                            phoneNumbers: updated.phoneNumbers,
+                            emailAddresses: updated.emailAddresses,
+                            preferredChannelValue: updated.preferredChannelValue,
+                            archivedAt: updated.archivedAt
+                        )
+                    )
                     if wasArchived {
                         unarchived += 1
                     } else {
@@ -136,21 +155,40 @@ public struct ContactsReconciler: Sendable {
         // (possibly long) enumeration — see the TOCTOU comment above.
         var archived = 0
         if status == .authorized && statusAfterFetch == .authorized {
-            // No per-iteration re-check inside this loop: the two-point
-            // TOCTOU guard above already establishes "authorized at the
-            // start of the fetch and authorized right after it," and this
-            // loop does no further waiting on the source (only repository
-            // writes), so there's no additional window for a downgrade to
-            // land inside it.
-            for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
-                do {
-                    try await repo.archive(id: contact.id, at: now)
-                    archived += 1
-                } catch {
-                    failed += 1
-                    Self.log.error(
-                        "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
-                    )
+            // Fix 3: a wholesale-empty `fetchAllContacts()` while the store
+            // previously held active contacts is indistinguishable from "the
+            // user is mid-restore from an iCloud/device backup and Contacts
+            // hasn't repopulated yet" (§21) — genuine deletion of literally
+            // every contact and a resync-in-progress produce the exact same
+            // signal from this API. Sweeping in that shape would archive the
+            // whole address book in one pass on a false read. Skip the sweep
+            // entirely rather than guess; a real per-contact deletion still
+            // archives normally as long as *something* is still visible.
+            let activeStoredCount = byRef.values.lazy.filter { $0.archivedAt == nil }.count
+            let suspectedResyncInProgress = systemContacts.isEmpty && activeStoredCount > 0
+            if suspectedResyncInProgress {
+                Self.log.info("""
+                    skipped archive sweep: fetchAllContacts() returned zero contacts while \
+                    \(activeStoredCount) are stored active — treating as a possible resync in \
+                    progress rather than mass-deletion (§21)
+                    """)
+            } else {
+                // No per-iteration re-check inside this loop: the two-point
+                // TOCTOU guard above already establishes "authorized at the
+                // start of the fetch and authorized right after it," and this
+                // loop does no further waiting on the source (only repository
+                // writes), so there's no additional window for a downgrade to
+                // land inside it.
+                for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
+                    do {
+                        try await repo.archive(id: contact.id, at: now)
+                        archived += 1
+                    } catch {
+                        failed += 1
+                        Self.log.error(
+                            "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
+                        )
+                    }
                 }
             }
         }
@@ -202,17 +240,29 @@ public struct ContactsReconciler: Sendable {
 
     /// `preferredChannel` (WhatsApp vs. plain call vs. email, etc.) is a
     /// user preference and reconciliation never changes it. But for the two
-    /// channels the importer derives straight from the system's phone/email
-    /// arrays, a stale `preferredChannelValue` is a live correctness bug, not
-    /// cosmetic drift: a deep link would call or email a number the contact
-    /// no longer has. So if the refreshed arrays no longer contain the
-    /// stored value, re-derive it with the same rule `ContactsImporter.map`
-    /// uses (first E.164-valid phone / first catalog-valid email), clearing
-    /// it if nothing still qualifies. Any other channel's value isn't
-    /// sourced from phone/email at all — `SystemContact` doesn't carry
-    /// handles for those — so it's left untouched. An already-empty value
-    /// is left empty too: that means no preference was ever set (the
-    /// importer's own mapping leaves it blank when nothing qualifies), and
+    /// channels this re-derives — `.phoneCall` and `.email` — a stale
+    /// `preferredChannelValue` is a live correctness bug, not cosmetic
+    /// drift: a deep link would call or email a number the contact no
+    /// longer has. So if the refreshed arrays no longer contain the stored
+    /// value, re-derive it with the same rule `ContactsImporter.map` uses
+    /// (first E.164-valid phone / first catalog-valid email), clearing it
+    /// if nothing still qualifies.
+    ///
+    /// Every other channel's value is left untouched below, but not all of
+    /// them for the same reason. `telegram`/`messenger`/`instagramDM`/
+    /// `linkedinMsg`/`discord`/`custom` genuinely aren't phone/email sourced
+    /// — `SystemContact` carries no handle for those, so there's nothing to
+    /// re-derive from. `sms`, `whatsapp`, and `signal` **are** phone-sourced
+    /// (`ChannelCatalog.metadata(for:).valueKind == .phoneE164`, same rule as
+    /// `.phoneCall`), and `facetime` is phone-*or*-email-sourced — those four
+    /// can go just as stale as `.phoneCall`/`.email` can, by the same
+    /// mechanism. Not re-deriving them here is a known scope gap this pass
+    /// left for a follow-up, not evidence their values are unrecoverable —
+    /// see the test with `.whatsapp` below for exactly this distinction.
+    ///
+    /// An already-empty value is left empty too: that means no preference
+    /// was ever set (the importer's own mapping leaves it blank when
+    /// nothing qualifies), and
     /// reconciliation refreshes existing derived state, it doesn't invent a
     /// new preference where the user/importer left none — doing so would
     /// also make an otherwise-untouched contact "changed" on every pass

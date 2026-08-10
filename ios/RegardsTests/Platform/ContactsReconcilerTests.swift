@@ -37,12 +37,29 @@ struct ContactsReconcilerTests {
             preferredChannelValue: "+15555550901"
         )
         try await repo.upsert(existing)
-        let source = MutableContactsSource(status: .authorized, contacts: [])
+        // A second, still-visible contact keeps the fetch from being
+        // wholesale-empty — fix 3's mass-archive guard specifically treats
+        // "the store previously held active contacts, fetch returned none
+        // at all" as a suspected resync-in-progress and skips the sweep
+        // entirely (see `ContactsReconcilerAuthorizationTests
+        // .wholesaleEmptyFetchArchivesNothing`). This test is about one
+        // contact genuinely disappearing while the rest of the address book
+        // still answers normally.
+        let stillPresent = Contact(
+            systemContactRef: "present-1",
+            displayName: "Present Contact",
+            preferredChannel: .phoneCall
+        )
+        try await repo.upsert(stillPresent)
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "present-1", givenName: "Present", familyName: "Contact",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
         let result = try await reconciler.reconcile()
 
-        #expect(result == .init(archived: 1))
+        #expect(result.archived == 1)
         let reloaded = try await repo.fetch(id: existing.id)
         #expect(reloaded?.archivedAt == Self.now)
         // History-bearing fields survive archival untouched.
@@ -122,7 +139,7 @@ struct ContactsReconcilerTests {
         #expect(reloaded.notes == "User notes stay")
     }
 
-    @Test("A non-phone/email preferred channel's value is left alone even if it disappears from the arrays")
+    @Test("A preferred channel this pass doesn't re-derive is left alone even if its backing data changes")
     func reconcileLeavesNonDerivedPreferredChannelValueAlone() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
         let existing = Contact(
@@ -146,8 +163,13 @@ struct ContactsReconcilerTests {
         #expect(result == .init(refreshed: 1))
         let reloaded = try #require(try await repo.fetch(id: existing.id))
         #expect(reloaded.preferredChannel == .whatsapp)
-        // `SystemContact` carries no WhatsApp handle to re-derive from, so
-        // the stored value is left exactly as the user set it.
+        // Not because WhatsApp has no phone data to re-derive from — it's
+        // phone-sourced exactly like `.phoneCall`
+        // (`ChannelCatalog.metadata(for: .whatsapp).valueKind == .phoneE164`).
+        // `redeterminedPreferredChannelValue` only re-derives `.phoneCall`/
+        // `.email` today; leaving `.whatsapp` (and `sms`/`signal`/`facetime`)
+        // stale here is a known scope gap, not evidence the value is
+        // unrecoverable — see that function's doc comment.
         #expect(reloaded.preferredChannelValue == "+15555550903")
     }
 

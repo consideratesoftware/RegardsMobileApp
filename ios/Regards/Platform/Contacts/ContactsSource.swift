@@ -100,6 +100,14 @@ private final class UncheckedSendableBox<Value>: @unchecked Sendable {
 /// on a large address book (§19 R25 — measured stalling a cooperative-pool
 /// worker at ~5k contacts) to starve every other async task sharing that
 /// pool. Dispatching the blocking work elsewhere keeps the pool free.
+///
+/// Cancellation is best-effort, checked once at entry (`Task.checkCancellation()`
+/// below) and never again. Once `work` is dispatched to the GCD queue it
+/// runs to completion; the calling task being cancelled after that point
+/// doesn't stop `work` mid-flight, it just means the eventual
+/// `continuation.resume` result feeds back into an already-cancelled
+/// context. `CNContactStore.enumerateContacts`'s block-based API has no
+/// cooperative-cancellation hook to check partway through anyway.
 func runOffCooperativePool<T: Sendable>(
     qos: DispatchQoS.QoSClass = .userInitiated,
     _ work: @escaping @Sendable () throws -> T

@@ -94,4 +94,53 @@ struct AppLaunchCoordinatorImportFailureTests {
             "Onboarding must not complete silently when nothing was actually imported."
         )
     }
+
+    /// The blocker case above is `failed > 0 && imported == 0`. This pins
+    /// the other side of that condition: R35's per-row tolerance is meant to
+    /// let a partially-successful import through, so `failed > 0 &&
+    /// imported > 0` must complete onboarding normally, not get caught by
+    /// `importEffectivelyFailed`'s guard as if the whole pass failed.
+    @Test("An import where some rows fail but others succeed still completes onboarding")
+    func importWithPartialFailureStillCompletesOnboarding() async throws {
+        let okContact = SystemContact(
+            identifier: "partial-failure-ok-contact",
+            givenName: "Han",
+            familyName: "Solo",
+            phoneNumbers: ["+1 555 010 2001"],
+            emailAddresses: []
+        )
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let environment = AppEnvironment(
+            contacts: FailingWriteContactRepository(failingIdentifiers: [Self.systemContact.identifier]),
+            groups: base.groups,
+            reminders: base.reminders,
+            interactions: base.interactions,
+            window: base.window,
+            profile: base.profile
+        )
+        let source = ScriptedLaunchContactsSource(
+            status: .authorized,
+            contacts: [Self.systemContact, okContact]
+        )
+        let launch = AppLaunchCoordinator(
+            dependencies: .init(
+                makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
+                contactsSource: source,
+                clock: { self.now }
+            )
+        )
+
+        await launch.start()
+
+        #expect(launch.phase == .ready)
+        #expect(launch.statusMessage == nil)
+        #expect(!launch.canContinueWithoutContacts)
+        let profile = try await environment.profile.fetch()
+        #expect(
+            profile.onboardingCompletedAt == self.now,
+            "A partially-successful import (R35 tolerance) must still complete onboarding."
+        )
+        let stored = try await environment.contacts.fetchAll()
+        #expect(stored.map(\.systemContactRef) == [okContact.identifier])
+    }
 }

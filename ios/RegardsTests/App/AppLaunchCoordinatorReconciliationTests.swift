@@ -25,9 +25,16 @@ struct AppLaunchCoordinatorReconciliationTests {
             displayName: "Going Away",
             tracked: true
         )
+        // A second, still-visible contact keeps the second-pass fetch from
+        // being wholesale-empty — fix 3's mass-archive guard treats that
+        // shape as a suspected resync-in-progress and skips the sweep.
+        let staying = Contact(systemContactRef: "staying-x", displayName: "Staying")
         try await environment.contacts.upsert(existing)
+        try await environment.contacts.upsert(staying)
         let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "gone-x", givenName: "Going", familyName: "Away",
+                          phoneNumbers: [], emailAddresses: []),
+            SystemContact(identifier: "staying-x", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
         let launch = coordinator(environment: environment, source: source)
@@ -38,7 +45,10 @@ struct AppLaunchCoordinatorReconciliationTests {
         let stillPresent = try await environment.contacts.fetch(id: existing.id)
         #expect(stillPresent?.archivedAt == nil)
 
-        source.setContacts([])
+        source.setContacts([
+            SystemContact(identifier: "staying-x", givenName: "Staying", familyName: "",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
         await launch.handleSceneActivation()
 
         #expect(launch.reconciliationCount == 2)
@@ -152,9 +162,15 @@ struct AppLaunchCoordinatorReconciliationTests {
             displayName: "Also Going",
             tracked: true
         )
+        // A second, still-visible contact keeps the post-change fetch from
+        // being wholesale-empty — see fix 3's mass-archive guard.
+        let staying = Contact(systemContactRef: "staying-y", displayName: "Staying")
         try await environment.contacts.upsert(existing)
+        try await environment.contacts.upsert(staying)
         let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "gone-y", givenName: "Also", familyName: "Going",
+                          phoneNumbers: [], emailAddresses: []),
+            SystemContact(identifier: "staying-y", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
         let launch = coordinator(environment: environment, source: source)
@@ -162,12 +178,54 @@ struct AppLaunchCoordinatorReconciliationTests {
         await launch.start()
         #expect(launch.reconciliationCount == 1)
 
-        source.setContacts([])
+        source.setContacts([
+            SystemContact(identifier: "staying-y", givenName: "Staying", familyName: "",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
         source.simulateChange()
 
         #expect(await eventually { launch.reconciliationCount == 2 })
         let archived = try await environment.contacts.fetch(id: existing.id)
         #expect(archived?.archivedAt == now)
+    }
+
+    /// Fix 7: a store-change notification landing while the coordinator has
+    /// no `runtime` yet (the `retry()` window this coordinator's own
+    /// `launchFailureMessage`/`retry()` guards already model as `phase ==
+    /// .ready && runtime == nil`, even though no call site drives it there
+    /// today) must not be silently dropped. `beginObservingContactStoreChanges`
+    /// is called directly here, before `start()`, because that's the only
+    /// way to land a notification while `runtime` is still `nil` — it's the
+    /// exact same call `start()` itself makes once a runtime exists, so this
+    /// proves the replay mechanism directly rather than depending on
+    /// call-site timing production doesn't yet exercise.
+    @Test("A store-change notification arriving before a runtime exists is replayed once one does")
+    func storeChangeBeforeRuntimeReplaysOnceRuntimeExists() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        try await environment.profile.save(UserProfile(
+            onboardingCompletedAt: now,
+            entitlementTier: .trial,
+            entitlementRefreshedAt: now,
+            trialStartedAt: now
+        ))
+        let source = MutableContactsSource(status: .authorized, contacts: [])
+        let launch = coordinator(environment: environment, source: source)
+        let dependencies = try #require(launch.dependencies)
+
+        launch.beginObservingContactStoreChanges(dependencies: dependencies)
+        source.simulateChange()
+        #expect(await eventually { launch.pendingStoreChangeReplay })
+
+        await launch.start()
+
+        #expect(launch.phase == .ready)
+        #expect(!launch.pendingStoreChangeReplay)
+        // One pass for the replayed notification, one for `start()`'s own
+        // unconditional launch reconcile — sequential, not coalesced
+        // (`reconciliationTask` is nil again by the time the second one
+        // starts), so this is two genuine passes, not one pass double-counted.
+        #expect(launch.reconciliationCount == 2)
+        #expect(launch.reconciliationCoalesceCount == 0)
     }
 
     private func coordinator(

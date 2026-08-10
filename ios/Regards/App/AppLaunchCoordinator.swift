@@ -61,6 +61,14 @@ final class AppLaunchCoordinator {
         reconciliationCounters.coalesces += 1
     }
 
+    /// Set by `beginObservingContactStoreChanges` when a `CNContactStoreDidChange`
+    /// notification arrives while `runtime` is `nil` (e.g. mid-`retry()`) — see
+    /// that method's guard. `continue`-ing past it there would drop the
+    /// notification for good; this flag lets `start()` replay it into exactly
+    /// one reconciliation pass once a runtime exists again, instead of the
+    /// change sitting unaddressed until some unrelated later trigger.
+    @ObservationIgnored var pendingStoreChangeReplay = false
+
     // Not `private`: AppLaunchCoordinator+Reconciliation.swift reads/writes
     // these across the file split (see that file's header comment). Still
     // `internal`, i.e. module-scoped like everything else in this app
@@ -150,15 +158,21 @@ final class AppLaunchCoordinator {
             }
 
             self.runtime = runtime
+            // A store-change notification arriving while `runtime` was `nil`
+            // (see `pendingStoreChangeReplay`'s doc comment) gets exactly one
+            // catch-up pass now that there's a runtime to run it against.
+            await replayPendingStoreChangeIfNeeded(runtime: runtime, dependencies: dependencies)
             guard profile.onboardingCompletedAt == nil else {
-                // Flip the phase first so the tab root appears immediately —
-                // reconciliation (up to a full Contacts enumeration, moved
-                // off the cooperative pool by R25) never delays it — then
-                // reconcile this launch and start listening for foreground
-                // and CNContactStoreDidChange triggers.
+                // Subscribe *before* the launch reconcile below, not after:
+                // that reconcile can run long (up to a full Contacts
+                // enumeration, moved off the cooperative pool by R25), and a
+                // CNContactStoreDidChange landing during it must be caught by
+                // the listener rather than lost until the next foreground.
+                // Flipping `phase` first still means the tab root appears
+                // immediately — neither of these delays that.
                 phase = .ready
-                await reconcileNow(runtime: runtime, dependencies: dependencies)
                 beginObservingContactStoreChanges(dependencies: dependencies)
+                await reconcileNow(runtime: runtime, dependencies: dependencies)
                 return
             }
 
@@ -272,6 +286,20 @@ final class AppLaunchCoordinator {
     // Reconciliation triggers (`handleSceneActivation`, store-change
     // observation, single-flight coalescing) live in
     // AppLaunchCoordinator+Reconciliation.swift.
+
+    /// Drains `pendingStoreChangeReplay` into exactly one reconciliation
+    /// pass, now that `runtime` is set. A no-op when nothing was pending —
+    /// which is the common case, since `beginObservingContactStoreChanges`
+    /// only ever sets the flag if a notification arrives during the narrow
+    /// window this coordinator has no runtime to reconcile against.
+    private func replayPendingStoreChangeIfNeeded(
+        runtime: AppRuntime,
+        dependencies: Dependencies
+    ) async {
+        guard pendingStoreChangeReplay else { return }
+        pendingStoreChangeReplay = false
+        await reconcileNow(runtime: runtime, dependencies: dependencies)
+    }
 
     private func importAuthorizedContacts(
         runtime: AppRuntime,
