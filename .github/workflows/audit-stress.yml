@@ -43,10 +43,11 @@ concurrency:
 
 env:
   XCODE_VERSION: "26.6"
-  # The device name passed to scripts/prepare-audit-simulator.sh below
-  # resolves to the same "newest iOS runtime" device this string used to
-  # name directly; the script then pins every xcodebuild -destination to its
-  # exact UDID via $SIMULATOR_UDID instead of re-resolving OS=latest.
+  # Keep this device pin aligned with ios-ci.yml's SIMULATOR_NAME.
+  # scripts/prepare-audit-simulator.sh resolves it to the newest installed
+  # iOS runtime and pins every xcodebuild -destination to that exact UDID
+  # via $SIMULATOR_UDID instead of re-resolving OS=latest.
+  SIMULATOR_NAME: "iPhone 17 Pro"
   SCHEME: Regards
   STRESS_RUNS: "5"
 
@@ -83,7 +84,7 @@ jobs:
         # steps below pin their -destination to that exact device for all 5
         # iterations. See scripts/prepare-audit-simulator.sh.
         timeout-minutes: 10
-        run: scripts/prepare-audit-simulator.sh "iPhone 17 Pro"
+        run: scripts/prepare-audit-simulator.sh "$SIMULATOR_NAME"
       - name: Build accessibility test bundle once
         working-directory: ios
         run: |

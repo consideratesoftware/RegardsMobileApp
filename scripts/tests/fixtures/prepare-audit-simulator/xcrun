@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
 
-# Stub `xcrun` for scripts/tests/prepare-audit-simulator-tests.sh's end-to-end
-# case: it answers `simctl list devices available -j` from a fixture file and
-# logs every other simctl subcommand it receives instead of touching a real
-# simulator. The test asserts the call log stays empty when resolution fails,
-# proving simctl boot/bootstatus/status_bar are never reached.
+# Stub `xcrun` for scripts/tests/prepare-audit-simulator-tests.sh's
+# end-to-end cases. It answers `simctl list devices available -j` from a
+# fixture file and logs every call it receives (list, bootstatus,
+# status_bar) to PREPARE_AUDIT_SIMULATOR_CALL_LOG instead of touching a real
+# simulator, so a test can assert both call order and that a mutating call
+# never happened.
+#
+# PREPARE_AUDIT_SIMULATOR_BOOTSTATUS_FAIL_COUNT (optional): the first N
+# `bootstatus` calls fail with the transient-looking error CoreSimulator
+# emits mid-boot, after which calls succeed. Used to prove the retry loop in
+# prepare-audit-simulator.sh recovers instead of failing deterministically.
+#
+# A `simctl boot` call reaching this stub is a regression in its own right
+# (the script intentionally never calls `boot` directly -- see
+# prepare-audit-simulator.sh's comment on why `bootstatus -b` replaces it),
+# so it falls through to the catch-all "unexpected invocation" branch and
+# fails the test.
 
 set -euo pipefail
 
@@ -17,13 +29,28 @@ shift
 case "${1:-}" in
   list)
     if [[ "${2:-}" == "devices" && "${3:-}" == "available" && "${4:-}" == "-j" ]]; then
+      echo "list devices available -j" >>"${PREPARE_AUDIT_SIMULATOR_CALL_LOG:?}"
       cat "${PREPARE_AUDIT_SIMULATOR_FIXTURE:?}"
       exit 0
     fi
     echo "unexpected xcrun simctl list invocation: $*" >&2
     exit 64
     ;;
-  boot | bootstatus | status_bar)
+  bootstatus)
+    echo "$*" >>"${PREPARE_AUDIT_SIMULATOR_CALL_LOG:?}"
+    fail_count="${PREPARE_AUDIT_SIMULATOR_BOOTSTATUS_FAIL_COUNT:-0}"
+    if [[ "$fail_count" -gt 0 ]]; then
+      attempts_file="${PREPARE_AUDIT_SIMULATOR_CALL_LOG}.bootstatus-attempts"
+      attempt=$(($(cat "$attempts_file" 2>/dev/null || echo 0) + 1))
+      echo "$attempt" >"$attempts_file"
+      if ((attempt <= fail_count)); then
+        echo "Unable to boot device in current state: Booting" >&2
+        exit 149
+      fi
+    fi
+    exit 0
+    ;;
+  status_bar)
     echo "$*" >>"${PREPARE_AUDIT_SIMULATOR_CALL_LOG:?}"
     exit 0
     ;;

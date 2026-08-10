@@ -1,0 +1,7 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
+      { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "SOLO-UDID" }
+    ]
+  }
+}

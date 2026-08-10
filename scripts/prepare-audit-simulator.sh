@@ -2,9 +2,8 @@
 
 set -euo pipefail
 
-# Runner-image dependencies: the JSON parsing below uses the runner's system
-# Ruby (no Gemfile pins a version), and this script assumes `env bash` on the
-# runner's PATH resolves to bash >= 4, not macOS's preinstalled bash 3.2.
+# Runner-image dependency: the JSON parsing below uses the runner's system
+# Ruby (no Gemfile pins a version).
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 <device-name> [--resolve-only]" >&2
@@ -131,30 +130,38 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then
   echo "SIMULATOR_UDID=$udid" >>"$GITHUB_ENV"
 fi
 
-# Boot with the same bounded-retry shape as the "Install iOS platform" step
-# (ios-ci.yml's `xcodebuild -downloadPlatform iOS` loop): CoreSimulator boot
-# failures on these runners are occasionally transient, and a bounded retry
-# turns a flake into a pass instead of a job failure, without masking a
-# genuinely broken simulator (which still fails after 3 attempts).
+# `bootstatus -b` boots the device if it isn't already booted and then
+# blocks until it finishes -- it is both the boot call and the wait
+# mechanism, so there is no separate `simctl boot` call and no separate
+# polling loop here.
+#
+# That "boot if needed" behavior is exactly why this must NOT be a plain
+# `simctl boot` retried 3x: `boot` fails once the device has left the
+# Shutdown state ("Unable to boot device in current state:
+# Booting"/"Booted"), so a boot call that errors mid-transition would make
+# every retry fail deterministically instead of recovering. `bootstatus -b`
+# has no such failure mode -- retrying it is safe whether the previous
+# attempt made no progress, left the device mid-boot, or actually finished.
+#
+# Same bounded-retry shape as the "Install iOS platform" step (ios-ci.yml's
+# `xcodebuild -downloadPlatform iOS` loop): CoreSimulator boot failures on
+# these runners are occasionally transient, and a bounded retry turns a
+# flake into a pass instead of a job failure, without masking a genuinely
+# broken simulator (which still fails after 3 attempts).
 booted=0
 for attempt in 1 2 3; do
-  if xcrun simctl boot "$udid"; then
+  if xcrun simctl bootstatus "$udid" -b; then
     booted=1
-    [[ "$attempt" -gt 1 ]] && echo "simctl boot succeeded on attempt $attempt (after retries)"
+    [[ "$attempt" -gt 1 ]] && echo "simctl bootstatus succeeded on attempt $attempt (after retries)"
     break
   fi
-  echo "::warning::simctl boot $udid failed on attempt $attempt; sleeping 15s before retry"
+  echo "::warning::simctl bootstatus $udid -b failed on attempt $attempt; sleeping 15s before retry"
   sleep 15
 done
 if [[ "$booted" -ne 1 ]]; then
-  echo "::error::xcrun simctl boot $udid failed after 3 attempts" >&2
+  echo "::error::xcrun simctl bootstatus $udid -b failed after 3 attempts" >&2
   exit 1
 fi
-
-# `bootstatus -b` is the wait mechanism: it blocks until the device finishes
-# booting (or times out on its own), so there is no separate polling loop
-# here.
-xcrun simctl bootstatus "$udid" -b
 
 xcrun simctl status_bar "$udid" override \
   --time "9:41" \
