@@ -187,6 +187,15 @@ jobs:
           done
           echo "::error::xcodebuild -downloadPlatform iOS failed after 3 attempts"
           exit 1
+      - name: Boot fresh simulator
+        # Erase + reboot the pinned device instead of letting xcodebuild reuse
+        # whatever instance macos-latest already has around. This job is where
+        # a "Ready for Apple Intelligence" system notification overlaid the app
+        # mid-run and got flagged as inaccessible text (run 31346143276); a
+        # rerun against the same build passed, confirming runner noise, not a
+        # product regression. See scripts/boot-fresh-simulator.sh for the
+        # full reasoning and its limits.
+        run: scripts/boot-fresh-simulator.sh "iPhone 17 Pro"
       - name: Run RegardsAccessibilityTests
         working-directory: ios
         run: |

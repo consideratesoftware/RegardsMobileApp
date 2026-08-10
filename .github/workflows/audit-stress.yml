@@ -70,6 +70,14 @@ jobs:
           done
           echo "::error::xcodebuild -downloadPlatform iOS failed after 3 attempts"
           exit 1
+      - name: Boot fresh simulator
+        # Same hardening as the `iOS CI` accessibility-audit job: erase +
+        # reboot the pinned device so all 5 stress iterations run against a
+        # factory-fresh simulator instead of an unknown-age one. See
+        # scripts/boot-fresh-simulator.sh for the full reasoning and its
+        # limits -- it narrows the window for system-UI intrusions, it does
+        # not eliminate them.
+        run: scripts/boot-fresh-simulator.sh "iPhone 17 Pro"
       - name: Build accessibility test bundle once
         working-directory: ios
         run: |
