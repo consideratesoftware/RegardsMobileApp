@@ -23,6 +23,14 @@ jobs:
       - name: Verify source-boundary guard parity
         run: scripts/tests/source-boundary-guard-tests.sh
 
+  prepare-audit-simulator-tests:
+    name: Accessibility simulator resolution tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify newest-runtime resolution and fail-closed behavior
+        run: scripts/tests/prepare-audit-simulator-tests.sh
+
   privacy-grep:
     name: No networking code (§11)
     runs-on: ubuntu-latest

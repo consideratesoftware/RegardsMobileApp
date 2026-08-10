@@ -120,11 +120,30 @@ Intelligence** notification can overlay the simulator during an audit. Run
 banner; its xcresult screenshot and failure attachment identified the targeted
 element inside the iOS notification rather than the Regards hierarchy.
 
+A second instance recurred on the accessibility-audit job in run `31346143276`,
+flagging the same banner as "Potentially inaccessible text" inside
+`LaunchAccessibilityTests.testProductionOpenFailurePassesAuditAndRetryRecovers()`.
+A rerun on the identical commit `c873c648` passed with every job green,
+matching the first instance and confirming runner noise rather than a product
+regression.
+
 Classify a future finding as system UI only when the failed xcresult identifies
 the targeted element inside an operating-system banner or hierarchy and the
 screenshot shows that overlay. Inspect both artifacts and rerun the exact
 failed job. Without both proofs, or when an app-owned failure repeats under
 §17, treat it as a product finding.
+
+Both audit workflows (`ios-ci.yml`'s accessibility-audit job and
+`audit-stress.yml`'s nightly 5× sweep) run `scripts/prepare-audit-simulator.sh`
+before testing. `macos-latest` jobs are fresh ephemeral VMs, so there is no
+stale simulator state to clean between runs; what the script does instead is
+resolve the pinned device to one exact UDID and pin every subsequent
+`xcodebuild -destination` to it, normalize the status bar so a real runner
+glyph can't become its own finding, and bound the boot with a timeout. None of
+that suppresses the Apple Intelligence notification itself — no documented
+`simctl` or `defaults` toggle does — so this is not a guarantee against the
+intrusion class above. If a similar finding appears, the response is the same
+rerun-and-triage procedure this section already describes.
 
 ## Sensory-audit carve-outs
 

@@ -164,6 +164,10 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: macos-latest
     needs: build
+    # Generous ceiling over the ~19-minute single-run observed on main
+    # (TESTFLIGHT_PLAN.md), plus setup. Bounds the 2026-08-08-class hang at
+    # 8adeb0d instead of letting it run out the default 6-hour job limit.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
@@ -187,15 +191,15 @@ jobs:
           done
           echo "::error::xcodebuild -downloadPlatform iOS failed after 3 attempts"
           exit 1
-      - name: Boot fresh simulator
-        # Erase + reboot the pinned device instead of letting xcodebuild reuse
-        # whatever instance macos-latest already has around. This job is where
-        # a "Ready for Apple Intelligence" system notification overlaid the app
-        # mid-run and got flagged as inaccessible text (run 31346143276); a
-        # rerun against the same build passed, confirming runner noise, not a
-        # product regression. See scripts/boot-fresh-simulator.sh for the
-        # full reasoning and its limits.
-        run: scripts/boot-fresh-simulator.sh "iPhone 17 Pro"
+      - name: Boot accessibility simulator
+        # Resolves the pinned device to one UDID, boots it, and publishes
+        # SIMULATOR_UDID so the test step below pins its -destination to that
+        # exact device instead of re-resolving name=...,OS=latest. See
+        # scripts/prepare-audit-simulator.sh's header for what this does and
+        # does not address — it does not suppress the Apple Intelligence
+        # banner itself; no such toggle exists.
+        timeout-minutes: 10
+        run: scripts/prepare-audit-simulator.sh "iPhone 17 Pro"
       - name: Run RegardsAccessibilityTests
         working-directory: ios
         run: |
@@ -203,7 +207,7 @@ jobs:
           xcodebuild \
             -project Regards.xcodeproj \
             -scheme "$SCHEME" \
-            -destination "$SIMULATOR" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -configuration Debug \
             -only-testing:RegardsAccessibilityTests \
             -resultBundlePath build/RegardsAccessibilityTests.xcresult \

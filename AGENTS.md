@@ -148,8 +148,8 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 
 ## CI map
 
-- `.github/workflows/ios-ci.yml` — xcodegen determinism → build → unit tests with a ≥95% Domain coverage floor; its downstream accessibility job runs after merges to `main` and skips pull requests. No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
-- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, the three Android guards (manifest network-permission strip, network-free sources, `:domain` purity), project.yml YAML syntax, and Markdown link checks for root docs plus `ios/docs/`.
+- `.github/workflows/ios-ci.yml` — xcodegen determinism → build → unit tests with a ≥95% Domain coverage floor; its downstream accessibility job runs after merges to `main` and skips pull requests. Before testing, that job and `audit-stress.yml` both run `scripts/prepare-audit-simulator.sh` to resolve the pinned simulator to one UDID and pin every `xcodebuild -destination` to it (see the script's header). No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
+- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, the three Android guards (manifest network-permission strip, network-free sources, `:domain` purity), project.yml YAML syntax, `scripts/tests/prepare-audit-simulator-tests.sh` (the simulator-resolution logic used by the two audit workflows), and Markdown link checks for root docs plus `ios/docs/`.
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
 - `.github/workflows/audit-stress.yml` — builds the a11y bundle once and runs it 5× (flake detector). It runs nightly and through `workflow_dispatch`, not on pull requests or every merge; dispatch it and require green before cutting a release. The single-run `Accessibility audit` in `ios-ci.yml` runs after merges to `main`.
 - `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from

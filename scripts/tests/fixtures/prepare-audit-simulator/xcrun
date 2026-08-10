@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+# Stub `xcrun` for scripts/tests/prepare-audit-simulator-tests.sh's end-to-end
+# case: it answers `simctl list devices available -j` from a fixture file and
+# logs every other simctl subcommand it receives instead of touching a real
+# simulator. The test asserts the call log stays empty when resolution fails,
+# proving simctl boot/bootstatus/status_bar are never reached.
+
+set -euo pipefail
+
+if [[ "${1:-}" != "simctl" ]]; then
+  echo "unexpected xcrun invocation: $*" >&2
+  exit 64
+fi
+shift
+
+case "${1:-}" in
+  list)
+    if [[ "${2:-}" == "devices" && "${3:-}" == "available" && "${4:-}" == "-j" ]]; then
+      cat "${PREPARE_AUDIT_SIMULATOR_FIXTURE:?}"
+      exit 0
+    fi
+    echo "unexpected xcrun simctl list invocation: $*" >&2
+    exit 64
+    ;;
+  boot | bootstatus | status_bar)
+    echo "$*" >>"${PREPARE_AUDIT_SIMULATOR_CALL_LOG:?}"
+    exit 0
+    ;;
+  *)
+    echo "unexpected xcrun simctl invocation: $*" >&2
+    exit 64
+    ;;
+esac
