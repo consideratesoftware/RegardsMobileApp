@@ -122,14 +122,6 @@ struct OnboardingAccessibilityEffectsTests {
         #expect(await eventually { recorder.focusAssignments == 1 })
         window.isHidden = true
     }
-
-    private func eventually(_ condition: @escaping @MainActor () -> Bool) async -> Bool {
-        for _ in 0..<100 {
-            if condition() { return true }
-            await Task.yield()
-        }
-        return condition()
-    }
 }
 
 @MainActor

@@ -4,14 +4,14 @@ import Testing
 
 /// Tests for `ContactsReconciler` (PR21 / ARCHITECTURE.md §7 "Re-import &
 /// reconciliation"). Avoids `CNContactStore` entirely by injecting a
-/// `ReconcilerFakeContactsSource`; the only thing CI runs against is the
+/// `MutableContactsSource`; the only thing CI runs against is the
 /// in-memory GRDB DB plus the fake.
 struct ContactsReconcilerTests {
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     @Test("A new system contact is imported untracked")
     func reconcileImportsNewContact() async throws {
-        let source = ReconcilerFakeContactsSource(status: .authorized, contacts: [
+        let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "new-1", givenName: "New", familyName: "Person",
                           phoneNumbers: ["+15555550900"], emailAddresses: []),
         ])
@@ -37,7 +37,7 @@ struct ContactsReconcilerTests {
             preferredChannelValue: "+15555550901"
         )
         try await repo.upsert(existing)
-        let source = ReconcilerFakeContactsSource(status: .authorized, contacts: [])
+        let source = MutableContactsSource(status: .authorized, contacts: [])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
         let result = try await reconciler.reconcile()
@@ -62,7 +62,7 @@ struct ContactsReconcilerTests {
             archivedAt: Self.now.addingTimeInterval(-86_400)
         )
         try await repo.upsert(archived)
-        let source = ReconcilerFakeContactsSource(status: .limited, contacts: [
+        let source = MutableContactsSource(status: .limited, contacts: [
             SystemContact(identifier: "limited-1", givenName: "New", familyName: "Name",
                           phoneNumbers: ["+15555550902"], emailAddresses: []),
         ])
@@ -89,14 +89,14 @@ struct ContactsReconcilerTests {
             displayName: "Old Name",
             tracked: true, cadenceDays: 30,
             priorityTier: .close,
-            preferredChannel: .whatsapp,
+            preferredChannel: .phoneCall,
             preferredChannelValue: "+15555550903",
             phoneNumbers: ["+15555550903"],
             emailAddresses: [],
             notes: "User notes stay"
         )
         try await repo.upsert(existing)
-        let source = ReconcilerFakeContactsSource(status: .authorized, contacts: [
+        let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "changed-1", givenName: "New", familyName: "Name",
                           phoneNumbers: ["+15555550904"], emailAddresses: ["new@example.com"]),
         ])
@@ -113,9 +113,70 @@ struct ContactsReconcilerTests {
         #expect(reloaded.tracked == true)
         #expect(reloaded.cadenceDays == 30)
         #expect(reloaded.priorityTier == .close)
-        #expect(reloaded.preferredChannel == .whatsapp)
-        #expect(reloaded.preferredChannelValue == "+15555550903")
+        #expect(reloaded.preferredChannel == .phoneCall)
+        // Fix 8: `preferredChannelValue` is re-derived, not preserved
+        // verbatim — the old number is no longer among this contact's
+        // phones, so keeping it would leave a deep link dialing a number
+        // this contact doesn't have anymore.
+        #expect(reloaded.preferredChannelValue == "+15555550904")
         #expect(reloaded.notes == "User notes stay")
+    }
+
+    @Test("A non-phone/email preferred channel's value is left alone even if it disappears from the arrays")
+    func reconcileLeavesNonDerivedPreferredChannelValueAlone() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let existing = Contact(
+            systemContactRef: "whatsapp-1",
+            displayName: "Old Name",
+            tracked: true,
+            preferredChannel: .whatsapp,
+            preferredChannelValue: "+15555550903",
+            phoneNumbers: ["+15555550903"],
+            emailAddresses: []
+        )
+        try await repo.upsert(existing)
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "whatsapp-1", givenName: "New", familyName: "Name",
+                          phoneNumbers: ["+15555550904"], emailAddresses: []),
+        ])
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+
+        let result = try await reconciler.reconcile()
+
+        #expect(result == .init(refreshed: 1))
+        let reloaded = try #require(try await repo.fetch(id: existing.id))
+        #expect(reloaded.preferredChannel == .whatsapp)
+        // `SystemContact` carries no WhatsApp handle to re-derive from, so
+        // the stored value is left exactly as the user set it.
+        #expect(reloaded.preferredChannelValue == "+15555550903")
+    }
+
+    @Test("A re-derived preferred phone/email that's still present is left byte-identical")
+    func reconcilePreservesPreferredValueStillPresentAfterRefresh() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let existing = Contact(
+            systemContactRef: "kept-1",
+            displayName: "Old Name",
+            tracked: true,
+            preferredChannel: .phoneCall,
+            preferredChannelValue: "+15555550903",
+            phoneNumbers: ["+15555550903"],
+            emailAddresses: []
+        )
+        try await repo.upsert(existing)
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            // Display name changes; the phone that's already preferred
+            // stays in the refreshed array, just joined by a second one.
+            SystemContact(identifier: "kept-1", givenName: "New", familyName: "Name",
+                          phoneNumbers: ["+15555550903", "+15555550999"], emailAddresses: []),
+        ])
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+
+        let result = try await reconciler.reconcile()
+
+        #expect(result == .init(refreshed: 1))
+        let reloaded = try #require(try await repo.fetch(id: existing.id))
+        #expect(reloaded.preferredChannelValue == "+15555550903")
     }
 
     @Test("An unchanged system contact is neither written nor counted as refreshed")
@@ -130,7 +191,7 @@ struct ContactsReconcilerTests {
         )
         try await repo.upsert(existing)
         await repo.resetWriteCount()
-        let source = ReconcilerFakeContactsSource(status: .authorized, contacts: [
+        let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "same-1", givenName: "Same", familyName: "Name",
                           phoneNumbers: ["+15555550905"], emailAddresses: []),
         ])
@@ -162,7 +223,7 @@ struct ContactsReconcilerTests {
         }
         // The system still reports the same identifier — a naive
         // reconciler that ignores corruption would try to overwrite it.
-        let source = ReconcilerFakeContactsSource(status: .authorized, contacts: [
+        let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "corrupt-1", givenName: "Corrupt", familyName: "",
                           phoneNumbers: ["+15555550906"], emailAddresses: []),
         ])
@@ -185,7 +246,7 @@ struct ContactsReconcilerTests {
     @Test("Limited authorization reconciles against exactly the visible subset")
     func reconcileAcceptsLimitedAuthorization() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
-        let source = ReconcilerFakeContactsSource(status: .limited, contacts: [
+        let source = MutableContactsSource(status: .limited, contacts: [
             SystemContact(identifier: "limited-visible", givenName: "Visible", familyName: "",
                           phoneNumbers: ["+15555550907"], emailAddresses: []),
         ])
@@ -199,7 +260,7 @@ struct ContactsReconcilerTests {
     @Test("Reconciling without authorization throws")
     func reconcileThrowsWhenNotAuthorized() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
-        let source = ReconcilerFakeContactsSource(status: .denied, contacts: [])
+        let source = MutableContactsSource(status: .denied, contacts: [])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
         do {
@@ -213,7 +274,7 @@ struct ContactsReconcilerTests {
     @Test("A per-row write failure during reconciliation is counted, not silently dropped")
     func reconcileTolerantOfOneRowFailure() async throws {
         let repo = FailingWriteContactRepository(failingIdentifiers: ["broken-1"])
-        let source = ReconcilerFakeContactsSource(status: .authorized, contacts: [
+        let source = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "broken-1", givenName: "Broken", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
             SystemContact(identifier: "ok-1", givenName: "OK", familyName: "",
@@ -228,76 +289,7 @@ struct ContactsReconcilerTests {
 }
 
 // MARK: - Fakes
-
-private actor ReconcilerFakeContactsSource: ContactsSource {
-    private let status: ContactsAuthorizationStatus
-    private let contacts: [SystemContact]
-
-    init(status: ContactsAuthorizationStatus, contacts: [SystemContact]) {
-        self.status = status
-        self.contacts = contacts
-    }
-
-    func currentAuthorization() async -> ContactsAuthorizationStatus { status }
-    func requestAccess() async throws -> ContactsAuthorizationStatus { status }
-    func fetchAllContacts() async throws -> [SystemContact] { contacts }
-}
-
-/// A `ContactRepository` that records writes so a test can prove
-/// reconciliation skipped an unchanged contact rather than writing it
-/// through unconditionally.
-private actor RecordingWriteContactRepository: ContactRepository {
-    private var contacts: [UUID: Contact] = [:]
-    private var writes = 0
-
-    func fetchAll() async throws -> [Contact] { Array(contacts.values) }
-    func fetchTracked() async throws -> [Contact] {
-        contacts.values.filter { $0.tracked && $0.isActive }
-    }
-    func fetch(id: UUID) async throws -> Contact? { contacts[id] }
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        contacts.values.filter { $0.contactGroupId == groupId }
-    }
-    func upsert(_ contact: Contact) async throws {
-        writes += 1
-        contacts[contact.id] = contact
-    }
-    func archive(id: UUID, at: Date) async throws {
-        writes += 1
-        contacts[id]?.archivedAt = at
-    }
-    func resetWriteCount() { writes = 0 }
-    func writeCount() -> Int { writes }
-}
-
-private enum ReconcileRowFailure: Error {
-    case failed
-}
-
-/// Fails every `upsert` whose `systemContactRef` is in `failingIdentifiers`.
-private actor FailingWriteContactRepository: ContactRepository {
-    private var contacts: [UUID: Contact] = [:]
-    private let failingIdentifiers: Set<String>
-
-    init(failingIdentifiers: Set<String>) {
-        self.failingIdentifiers = failingIdentifiers
-    }
-
-    func fetchAll() async throws -> [Contact] { Array(contacts.values) }
-    func fetchTracked() async throws -> [Contact] {
-        contacts.values.filter { $0.tracked && $0.isActive }
-    }
-    func fetch(id: UUID) async throws -> Contact? { contacts[id] }
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        contacts.values.filter { $0.contactGroupId == groupId }
-    }
-    func upsert(_ contact: Contact) async throws {
-        guard !failingIdentifiers.contains(contact.systemContactRef) else {
-            throw ReconcileRowFailure.failed
-        }
-        contacts[contact.id] = contact
-    }
-    func archive(id: UUID, at: Date) async throws {
-        contacts[id]?.archivedAt = at
-    }
-}
+//
+// `MutableContactsSource`, `RecordingWriteContactRepository`, and
+// `FailingWriteContactRepository` live in RegardsTests/Support — shared
+// across the reconciler and launch-coordinator reconciliation suites.

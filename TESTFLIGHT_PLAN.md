@@ -92,6 +92,40 @@ never pick up Android work.
   if the user re-adds it to the selection. §21's OS-beta-season note calls
   out limited-access behavior drift as the likeliest silent breaker, so this
   interaction is worth explicit scrutiny before it closes.
+- A staged review of that commit returned `REQUEST_CHANGES` and the ruling on
+  the open design question above: archive-on-deselect is **not** acceptable —
+  a `.limited` deselection (or an `.authorized → .limited` downgrade) must be
+  a no-op for archiving. A consolidated fix batch on the same branch
+  addresses it plus 11 further items, committed separately (never amending
+  the original commit): the archive sweep now runs only under `.authorized`,
+  with regressions for both the steady-state and the downgrade-mid-session
+  case; `ContactsReconciler.refreshed()` now re-derives a stale `preferred
+  ChannelValue` for phone/email channels instead of leaving a deep link
+  pointed at a number the contact no longer has (a live bug the original
+  commit shipped, caught by review, fixed with a guard so an unset value is
+  never invented from scratch); `AllContactsScreen` reloads on `scenePhase`
+  becoming active so an already-open tab reflects reconciliation results,
+  not just a fresh `.task` appearance (Overdue/Upcoming stay TF-04's); the
+  5k-contact off-pool regression was rewritten to saturate
+  `activeProcessorCount` concurrent enumerations and prove pool
+  responsiveness via signal-gated counting instead of a wall-clock sleep
+  assertion (the original version passed even against pre-fix code whenever
+  the host had spare cores); reconciliation triggers are now single-flight
+  with coalescing (`reconciliationTask`/`reconciliationPending`) so an
+  overlapping foreground and store-change notification serialize into at
+  most one extra pass instead of racing concurrent `.reconcile()` calls
+  against the same database; the corrupt-row unit proof for plain
+  `fetchAll()` (fail-closed, unchanged by R50) was restored after the
+  original commit's AllContactsViewModel test switch left it uncovered; and
+  the R50 corruption banner now has a unit-level accessibility-tree
+  inspection proving its combined VoiceOver label, since the XCUITest mock
+  fixtures have no way to seed a corrupt row. `AppLaunchCoordinator.swift`'s
+  reconciliation methods moved to `AppLaunchCoordinator+Reconciliation.swift`
+  (lint length). Full local evidence after the fix batch: 297/297
+  `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen generate`
+  byte-identical. Manual VoiceOver smoke for the corruption-banner state is
+  still outstanding — needs a supervisor-arranged recorded pass before merge
+  (checklist in the fix-batch report). Still not pushed or opened as a PR.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,

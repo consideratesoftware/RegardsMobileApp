@@ -8,10 +8,18 @@ import GRDB
 
 public protocol ContactRepository: Sendable {
     /// Fail-closed read: throws if a single stored row can't be decoded.
-    /// Callers that need an all-or-nothing view (duplicate detection, the
-    /// first-launch importer's existing-ref check) use this. Callers that
-    /// need to keep working around one bad row use
-    /// `fetchAllWithDiagnostics()` instead (R50).
+    /// `MergeDuplicatesViewModel`'s full-handle-set duplicate detection uses
+    /// this and needs it to stay all-or-nothing. `ContactsImporter` and
+    /// `ContactsReconciler` do **not** use this for their existing-ref
+    /// check — they read `fetchAllWithDiagnostics()` instead so a corrupt
+    /// row doesn't abort an otherwise-healthy import/reconcile pass; a
+    /// corrupted row's `systemContactRef` is folded into their
+    /// already-resolved set from the diagnostics list so it's never
+    /// mistaken for new. Net effect: a first-launch import against a
+    /// database that already has one corrupt row now proceeds and imports
+    /// everything else instead of failing outright. Callers that need to
+    /// keep working around one bad row use `fetchAllWithDiagnostics()`
+    /// directly (R50).
     func fetchAll() async throws -> [Contact]
     func fetchTracked() async throws -> [Contact]
     func fetch(id: UUID) async throws -> Contact?

@@ -27,13 +27,34 @@ final class AppLaunchCoordinator {
     private(set) var onboardingCompletionPending = false
     /// Completed reconciliation passes (launch + foreground + store-change).
     /// Exposed so tests can await a specific pass deterministically instead
-    /// of sleeping; the UI never reads it.
-    private(set) var reconciliationCount = 0
+    /// of sleeping; the UI never reads it. Plain internal, not
+    /// `private(set)`: the mutator lives in
+    /// AppLaunchCoordinator+Reconciliation.swift, which needs write access
+    /// across the file split (see that file's header comment).
+    var reconciliationCount = 0
+    /// Incremented each time a trigger arrived while a pass was already in
+    /// flight and coalesced into it instead of starting a concurrent one
+    /// (fix 9). Test-only signal, same role as `reconciliationCount`.
+    var reconciliationCoalesceCount = 0
 
-    @ObservationIgnored private let dependencies: Dependencies?
+    // Not `private`: AppLaunchCoordinator+Reconciliation.swift reads/writes
+    // these across the file split (see that file's header comment). Still
+    // `internal`, i.e. module-scoped like everything else in this app
+    // target — never exposed outside `AppLaunchCoordinator` itself in
+    // practice, just not enforced by the compiler across the split.
+    @ObservationIgnored let dependencies: Dependencies?
     @ObservationIgnored private var didStart = false
     @ObservationIgnored private var onboardingActionGeneration = 0
-    @ObservationIgnored private var changeObservationTask: Task<Void, Never>?
+    @ObservationIgnored var changeObservationTask: Task<Void, Never>?
+    /// Non-nil while a reconciliation pass is in flight — the "isReconciling"
+    /// gate. A concurrent trigger joins this task instead of starting a
+    /// second pass.
+    @ObservationIgnored var reconciliationTask: Task<Void, Never>?
+    /// Set by a trigger that arrived while `reconciliationTask` was already
+    /// running; the in-flight loop checks this after each pass and runs
+    /// exactly one more before clearing `reconciliationTask`, coalescing any
+    /// number of overlapping triggers into at most one extra pass.
+    @ObservationIgnored var reconciliationPending = false
 
     init(dependencies: Dependencies) {
         self.phase = .loading
@@ -53,6 +74,11 @@ final class AppLaunchCoordinator {
         self.runtime = mockRuntime
         self.dependencies = nil
         self.didStart = true
+    }
+
+    deinit {
+        changeObservationTask?.cancel()
+        reconciliationTask?.cancel()
     }
 
     static func production() -> AppLaunchCoordinator {
@@ -264,45 +290,9 @@ final class AppLaunchCoordinator {
         }
     }
 
-    /// Called when the scene becomes active again (app foregrounded). A
-    /// no-op before the runtime is ready or while onboarding is still in
-    /// progress.
-    func handleSceneActivation() async {
-        guard phase == .ready, let runtime, let dependencies else { return }
-        await reconcileNow(runtime: runtime, dependencies: dependencies)
-    }
-
-    private func beginObservingContactStoreChanges(dependencies: Dependencies) {
-        guard changeObservationTask == nil else { return }
-        let stream = dependencies.contactsSource.changeNotifications()
-        changeObservationTask = Task { [weak self] in
-            for await _ in stream {
-                guard let self else { return }
-                guard let runtime = self.runtime else { continue }
-                await self.reconcileNow(runtime: runtime, dependencies: dependencies)
-            }
-        }
-    }
-
-    private func reconcileNow(runtime: AppRuntime, dependencies: Dependencies) async {
-        let reconciler = ContactsReconciler(
-            source: dependencies.contactsSource,
-            repo: runtime.environment.contacts,
-            clock: dependencies.clock
-        )
-        do {
-            let result = try await reconciler.reconcile()
-            Self.log.info("""
-                reconciliation complete: imported=\(result.imported) refreshed=\(result.refreshed) \
-                archived=\(result.archived) unarchived=\(result.unarchived) failed=\(result.failed)
-                """)
-        } catch {
-            Self.log.error("reconciliation failed: \(error, privacy: .private)")
-        }
-        reconciliationCount += 1
-    }
-
-    private static let log = RegardsLogger.feature("AppLaunchCoordinator")
+    // Reconciliation triggers (`handleSceneActivation`, store-change
+    // observation, single-flight coalescing) live in
+    // AppLaunchCoordinator+Reconciliation.swift.
 
     private func importAuthorizedContacts(
         runtime: AppRuntime,

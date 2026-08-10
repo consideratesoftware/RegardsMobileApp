@@ -69,9 +69,17 @@ public protocol ContactsSource: Sendable {
 
 public extension ContactsSource {
     func changeNotifications() -> AsyncStream<Void> {
-        AsyncStream { continuation in continuation.finish() }
+        AsyncStream(bufferingPolicy: changeNotificationBufferingPolicy) { continuation in
+            continuation.finish()
+        }
     }
 }
+
+/// Coalesces a burst of rapid change notifications (e.g. several edits
+/// applied in one sync batch) into a single pending signal instead of
+/// queuing every one — a reconciliation pass already re-reads the *current*
+/// state of the whole store, so replaying N stale wake-ups buys nothing.
+private let changeNotificationBufferingPolicy: AsyncStream<Void>.Continuation.BufferingPolicy = .bufferingNewest(1)
 
 /// Wraps a non-`Sendable` value so it can cross into a `@Sendable` closure.
 /// Used only to hand `CNContactStore`/`CNContactFetchRequest` (undocumented
@@ -93,7 +101,8 @@ func runOffCooperativePool<T: Sendable>(
     qos: DispatchQoS.QoSClass = .userInitiated,
     _ work: @escaping @Sendable () throws -> T
 ) async throws -> T {
-    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+    try Task.checkCancellation()
+    return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
         DispatchQueue.global(qos: qos).async {
             do {
                 continuation.resume(returning: try work())
@@ -186,7 +195,7 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
     }
 
     public func changeNotifications() -> AsyncStream<Void> {
-        AsyncStream { continuation in
+        AsyncStream(bufferingPolicy: changeNotificationBufferingPolicy) { continuation in
             let box = NotificationObserverBox()
             box.start(name: .CNContactStoreDidChange) {
                 continuation.yield()

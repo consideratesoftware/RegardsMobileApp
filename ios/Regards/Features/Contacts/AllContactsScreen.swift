@@ -6,6 +6,7 @@ import SwiftUI
 public struct AllContactsScreen: View {
     @State private var viewModel: AllContactsViewModel
     @Binding private var searchText: String
+    @Environment(\.scenePhase) private var scenePhase
     var rowConstructionObserver: (@MainActor (UUID) -> Void)?
 
     init(viewModel: AllContactsViewModel,
@@ -49,6 +50,23 @@ public struct AllContactsScreen: View {
         .task {
             await viewModel.load()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            // §14 PR21 acceptance: a contact deleted/re-added/renamed in the
+            // system app reflects here "next foreground." `AppLaunchCoordinator`
+            // reconciles the persisted store on every foreground independently;
+            // this reloads the already-materialized `@State` view model so a
+            // tab that was already on-screen picks up the refreshed rows too,
+            // instead of only updating on its next `.task` (re)appearance.
+            // Ordering caveat: this reload and the coordinator's reconciliation
+            // both start on the same foreground event with no guaranteed order
+            // between them, so a reload that wins the race can still show
+            // pre-reconciliation data once; the *next* trigger (another
+            // foreground, or the store-change notification while foregrounded)
+            // always catches up. Overdue and Upcoming get their own live-list
+            // wiring in TF-04, not here.
+            guard newPhase == .active else { return }
+            Task { await viewModel.load() }
+        }
     }
 
     @ViewBuilder
@@ -86,6 +104,7 @@ public struct AllContactsScreen: View {
     private func corruptionBanner(_ message: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
+                .font(.footnote)
                 .foregroundStyle(RegardsDS.ink)
                 .accessibilityHidden(true)
             Text(message)

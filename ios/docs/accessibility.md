@@ -101,7 +101,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Launch failure | TF-02 / PR20 | Triggered by a production database-open failure; audits `launch.failure` and verifies “Try Again” recovers into onboarding. |
 | Overdue (landing after splash) | PR3 / TF-01 | Default tab after splash; native large title and iOS 26 route-control glass. |
 | Upcoming | PR3 / TF-01 | Native large title and modern empty state. |
-| All Contacts | PR3 / TF-01 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. |
+| All Contacts | PR3 / TF-01; corruption banner TF-03 / PR21 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. R50: when `fetchAllWithDiagnostics()` reports one or more undecodable rows, a conditional banner (`contacts.corruption-banner`, `.accessibilityElement(children: .combine)`, icon `.accessibilityHidden(true)`) renders above the list with a combined label equal to the visible "N contact(s) couldn't be read and need attention." message — proven by `AllContactsCorruptionAccessibilityTests` (unit-level UIKit accessibility-tree inspection, since the XCUITest mock fixtures never produce a corrupt row). Manual VoiceOver smoke for this state is outstanding — see `accessibility-smoke.md`. |
 | Settings | PR3 | |
 | Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |

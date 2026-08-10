@@ -7,7 +7,14 @@ import Foundation
 ///
 /// Reconciliation never deletes a row:
 /// - A system contact the store no longer exposes is archived, not deleted,
-///   so cadence and interaction history survive for a possible re-add.
+///   so cadence and interaction history survive for a possible re-add. This
+///   only ever happens under `.authorized`, where `fetchAllContacts()` truly
+///   enumerates the whole address book — under `.limited`,
+///   `fetchAllContacts()` only ever returns the picker-selected subset, so a
+///   stored contact outside it isn't "deleted," it's simply not part of the
+///   grant, and archiving it would silently hide a still-real contact on
+///   every `.authorized → .limited` downgrade (ARCHITECTURE.md §21). Import,
+///   refresh, and un-archival still run under `.limited`.
 /// - A `systemContactRef` that reappears — e.g. the user adds a previously
 ///   deselected contact back into a `.limited` selection — is un-archived in
 ///   place. That's distinct from a genuine delete-then-re-add, which the
@@ -114,16 +121,22 @@ public struct ContactsReconciler: Sendable {
             }
         }
 
+        // §21: `.limited` exposes only the picker-selected subset, so a
+        // stored ref outside `visibleRefs` there isn't evidence of deletion
+        // — deselecting a contact from a limited grant must be a no-op, not
+        // an archive.
         var archived = 0
-        for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
-            do {
-                try await repo.archive(id: contact.id, at: now)
-                archived += 1
-            } catch {
-                failed += 1
-                Self.log.error(
-                    "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
-                )
+        if status == .authorized {
+            for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
+                do {
+                    try await repo.archive(id: contact.id, at: now)
+                    archived += 1
+                } catch {
+                    failed += 1
+                    Self.log.error(
+                        "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
+                    )
+                }
             }
         }
 
@@ -138,12 +151,14 @@ public struct ContactsReconciler: Sendable {
     }
 
     /// Applies the system-derived refresh onto a persisted row: name,
-    /// phones, emails, and un-archival if the store exposes the contact
-    /// again. `tracked`, `cadenceDays`, `priorityTier`, `preferredChannel`,
-    /// `notes`, and group membership are user-owned and never overwritten by
-    /// a reconciliation pass. `photoRef` is left alone too: no
-    /// `ContactsSource` implementation fetches a photo today, so there is
-    /// nothing here to refresh it from yet.
+    /// phones, emails, `preferredChannelValue` where it would otherwise go
+    /// stale, and un-archival if the store exposes the contact again.
+    /// `tracked`, `cadenceDays`, `priorityTier`, `preferredChannel`, `notes`,
+    /// and group membership are user-owned and never overwritten by a
+    /// reconciliation pass. `photoRef` is left alone too: no `ContactsSource`
+    /// implementation fetches a photo today (deferred to PR30 with the rest
+    /// of the calendar/birthday key additions), so there is nothing here to
+    /// refresh it from yet.
     private static func refreshed(
         _ existing: Contact,
         with systemContact: SystemContact,
@@ -155,7 +170,49 @@ public struct ContactsReconciler: Sendable {
         updated.phoneNumbers = mapped.phoneNumbers
         updated.emailAddresses = mapped.emailAddresses
         updated.archivedAt = nil
+        updated.preferredChannelValue = Self.redeterminedPreferredChannelValue(
+            channel: existing.preferredChannel,
+            existingValue: existing.preferredChannelValue,
+            refreshedPhones: mapped.phoneNumbers,
+            refreshedEmails: mapped.emailAddresses
+        )
         return updated
+    }
+
+    /// `preferredChannel` (WhatsApp vs. plain call vs. email, etc.) is a
+    /// user preference and reconciliation never changes it. But for the two
+    /// channels the importer derives straight from the system's phone/email
+    /// arrays, a stale `preferredChannelValue` is a live correctness bug, not
+    /// cosmetic drift: a deep link would call or email a number the contact
+    /// no longer has. So if the refreshed arrays no longer contain the
+    /// stored value, re-derive it with the same rule `ContactsImporter.map`
+    /// uses (first E.164-valid phone / first catalog-valid email), clearing
+    /// it if nothing still qualifies. Any other channel's value isn't
+    /// sourced from phone/email at all — `SystemContact` doesn't carry
+    /// handles for those — so it's left untouched. An already-empty value
+    /// is left empty too: that means no preference was ever set (the
+    /// importer's own mapping leaves it blank when nothing qualifies), and
+    /// reconciliation refreshes existing derived state, it doesn't invent a
+    /// new preference where the user/importer left none — doing so would
+    /// also make an otherwise-untouched contact "changed" on every pass
+    /// merely because it has a phone number, breaking idempotence.
+    private static func redeterminedPreferredChannelValue(
+        channel: Channel,
+        existingValue: String,
+        refreshedPhones: [String],
+        refreshedEmails: [String]
+    ) -> String {
+        guard !existingValue.isEmpty else { return existingValue }
+        switch channel {
+        case .phoneCall:
+            guard !refreshedPhones.contains(existingValue) else { return existingValue }
+            return refreshedPhones.first(where: ChannelCatalog.isPhoneE164) ?? ""
+        case .email:
+            guard !refreshedEmails.contains(existingValue) else { return existingValue }
+            return refreshedEmails.first { ChannelCatalog.validate(value: $0, for: .email) } ?? ""
+        default:
+            return existingValue
+        }
     }
 
     private static let log = RegardsLogger.feature("ContactsReconciler")
