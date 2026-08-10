@@ -20,6 +20,7 @@ public struct AllContactsScreen: View {
     /// store-change alike), so this is always correct-after-the-fact.
     let reconciliationGeneration: Int
     var rowConstructionObserver: (@MainActor (UUID) -> Void)?
+    var corruptionAnnouncementEffects = AllContactsCorruptionAnnouncementEffects.live
 
     init(
         viewModel: AllContactsViewModel,
@@ -75,6 +76,15 @@ public struct AllContactsScreen: View {
             // Overdue and Upcoming get their own live-list wiring in TF-04,
             // not here.
             Task { await viewModel.load() }
+        }
+        .onChange(of: viewModel.corruptionMessage, initial: true) { previous, message in
+            // Announce only the nil → non-nil transition, whether that's the
+            // first load or a later `reconciliationGeneration`-driven
+            // reload — not every change while it stays non-nil (the count
+            // shifting from 1 to 2 corrupt rows doesn't need a fresh
+            // interruption) and not when it clears.
+            guard previous == nil, let message else { return }
+            corruptionAnnouncementEffects.announce(message)
         }
     }
 
@@ -188,4 +198,16 @@ public struct AllContactsScreen: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
+}
+
+/// Injectable so tests can assert an announcement fired without a live
+/// VoiceOver session — same shape as `LaunchFailureAccessibilityEffects`
+/// (`RegardsApp.swift`) and `OnboardingAccessibilityEffects`
+/// (`OnboardingScreen.swift`).
+struct AllContactsCorruptionAnnouncementEffects {
+    let announce: @MainActor (String) -> Void
+
+    static let live = AllContactsCorruptionAnnouncementEffects(
+        announce: { AccessibilityNotification.Announcement($0).post() }
+    )
 }

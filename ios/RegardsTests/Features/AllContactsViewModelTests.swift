@@ -167,6 +167,28 @@ struct AllContactsViewModelTests {
         #expect(storedRows == 2)
     }
 
+    @Test("The corruption message pluralizes correctly for more than one unreadable row")
+    func corruptionMessagePluralizesForMultipleRows() async throws {
+        let healthy = Self.contact(id: UUID(), name: "Healthy Contact", tracked: false)
+        let report = ContactFetchReport(
+            contacts: [healthy],
+            corrupted: [
+                ContactCorruptionDiagnostic(rawId: "bad-1", systemContactRef: "bad-1", reason: "decode failed"),
+                ContactCorruptionDiagnostic(rawId: "bad-2", systemContactRef: "bad-2", reason: "decode failed"),
+                ContactCorruptionDiagnostic(rawId: "bad-3", systemContactRef: "bad-3", reason: "decode failed"),
+            ]
+        )
+        let repository = FixedDiagnosticsRepository(report: report)
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        await viewModel.load()
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.map(\.id) == [healthy.id])
+        #expect(viewModel.corruptedContactCount == 3)
+        #expect(viewModel.corruptionMessage == "3 contacts couldn't be read and need attention.")
+    }
+
     @Test("A repository read failure that isn't about one row still fails the whole load")
     func genuineReadFailureStillMarksLoadFailed() async throws {
         let repository = StubContactRepository.failing()
@@ -280,4 +302,23 @@ private actor RecordingAllContactsRepository: ContactRepository {
     func writeCount() -> Int {
         writes
     }
+}
+
+/// A `ContactRepository` whose `fetchAllWithDiagnostics()` always returns a
+/// fixed report, so a test can pin the exact corruption-count copy without
+/// needing a real corrupt GRDB row.
+private struct FixedDiagnosticsRepository: ContactRepository {
+    let report: ContactFetchReport
+
+    func fetchAll() async throws -> [Contact] { report.contacts }
+    func fetchTracked() async throws -> [Contact] {
+        report.contacts.filter { $0.tracked && $0.isActive }
+    }
+    func fetch(id: UUID) async throws -> Contact? { report.contacts.first { $0.id == id } }
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        report.contacts.filter { $0.contactGroupId == groupId }
+    }
+    func upsert(_ contact: Contact) async throws {}
+    func archive(id: UUID, at: Date) async throws {}
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport { report }
 }

@@ -127,10 +127,8 @@ public struct ContactsImporter: Sendable {
             return ChannelCatalog.normalizedPhone(trimmed)
         }
         let emailAddresses = sc.emailAddresses.map { $0.lowercased() }
-        let primaryPhone = phoneNumbers.first(where: ChannelCatalog.isPhoneE164) ?? ""
-        let primaryEmail = emailAddresses.first {
-            ChannelCatalog.validate(value: $0, for: .email)
-        } ?? ""
+        let primaryPhone = ChannelCatalog.primaryPhone(in: phoneNumbers)
+        let primaryEmail = ChannelCatalog.primaryEmail(in: emailAddresses)
         let preferredChannel: Channel
         let preferredChannelValue: String
         if !primaryPhone.isEmpty {

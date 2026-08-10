@@ -12,6 +12,13 @@ struct MockContactRepository: ContactRepository {
     }
     func upsert(_ contact: Contact) async throws { try await store.upsertContact(contact) }
     func archive(id: UUID, at: Date) async throws { await store.archiveContact(id: id, at: at) }
+
+    /// Overrides the protocol's default (which reports zero corruption for
+    /// any in-memory backend) so the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
+    /// fixture can make the All Contacts corruption banner reachable.
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport {
+        ContactFetchReport(contacts: await store.allContacts(), corrupted: await store.corruptionDiagnosticsList())
+    }
 }
 
 struct MockContactGroupRepository: ContactGroupRepository {

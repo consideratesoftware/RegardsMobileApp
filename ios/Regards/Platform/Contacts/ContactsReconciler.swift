@@ -136,6 +136,12 @@ public struct ContactsReconciler: Sendable {
         // (possibly long) enumeration — see the TOCTOU comment above.
         var archived = 0
         if status == .authorized && statusAfterFetch == .authorized {
+            // No per-iteration re-check inside this loop: the two-point
+            // TOCTOU guard above already establishes "authorized at the
+            // start of the fetch and authorized right after it," and this
+            // loop does no further waiting on the source (only repository
+            // writes), so there's no additional window for a downgrade to
+            // land inside it.
             for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
                 do {
                     try await repo.archive(id: contact.id, at: now)
@@ -178,6 +184,12 @@ public struct ContactsReconciler: Sendable {
         updated.displayName = mapped.displayName
         updated.phoneNumbers = mapped.phoneNumbers
         updated.emailAddresses = mapped.emailAddresses
+        // Unconditional, not `if existing.archivedAt != nil`: `systemContact`
+        // is only ever passed in for a ref `fetchAllContacts()` currently
+        // reports, so reaching this line already means "the store still
+        // (or again) exposes this contact" — setting `archivedAt = nil` is
+        // the un-archive, and it's a no-op when the row wasn't archived to
+        // begin with.
         updated.archivedAt = nil
         updated.preferredChannelValue = Self.redeterminedPreferredChannelValue(
             channel: existing.preferredChannel,
@@ -224,10 +236,10 @@ public struct ContactsReconciler: Sendable {
         switch channel {
         case .phoneCall:
             guard !refreshedPhones.contains(existingValue) else { return existingValue }
-            return refreshedPhones.first(where: ChannelCatalog.isPhoneE164) ?? ""
+            return ChannelCatalog.primaryPhone(in: refreshedPhones)
         case .email:
             guard !refreshedEmails.contains(existingValue) else { return existingValue }
-            return refreshedEmails.first { ChannelCatalog.validate(value: $0, for: .email) } ?? ""
+            return ChannelCatalog.primaryEmail(in: refreshedEmails)
         default:
             return existingValue
         }

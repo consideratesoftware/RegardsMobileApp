@@ -71,6 +71,35 @@ struct ContactsReconcilerAuthorizationTests {
         #expect(reloadedB.archivedAt == nil)
     }
 
+    /// TOCTOU nit: `fetchAllContacts()` can take a while (a full
+    /// enumeration, off-pool per R25), and the user can downgrade
+    /// permissions mid-pass. The reconciler re-reads status after the fetch
+    /// and requires *both* reads say `.authorized` before archiving — this
+    /// pins that a downgrade landing exactly inside the fetch call (not just
+    /// between two separate passes, which the test above already covers)
+    /// still archives nothing.
+    @Test("An .authorized → .limited downgrade landing mid-fetchAllContacts archives nothing")
+    func downgradeDuringFetchArchivesNothing() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let stillReal = Contact(systemContactRef: "still-real", displayName: "Still Real", tracked: true)
+        try await repo.upsert(stillReal)
+        // The store reports nothing visible — as if `stillReal` had been
+        // deleted — but the hook flips status to `.limited` right as the
+        // enumeration finishes, simulating the downgrade landing *during*
+        // the call rather than cleanly between two passes.
+        let source = MutableContactsSource(status: .authorized, contacts: [])
+        source.setFetchAllContactsHook {
+            source.setStatus(.limited)
+        }
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+
+        let result = try await reconciler.reconcile()
+
+        #expect(result.archived == 0)
+        let reloaded = try #require(try await repo.fetch(id: stillReal.id))
+        #expect(reloaded.archivedAt == nil)
+    }
+
     @Test("A genuine deletion under .authorized still archives, proving the .limited guard is scoped correctly")
     func authorizedStillArchivesADeletedContact() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts

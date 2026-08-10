@@ -343,7 +343,7 @@ struct ContactsImporterTests {
                           phoneNumbers: ["+15555550803"], emailAddresses: []),
         ]
         let source = FakeContactsSource(status: .authorized, contacts: sources)
-        let repo = InterruptingContactRepository(failingIdentifiers: ["resume-B"])
+        let repo = FailingWriteContactRepository(failingIdentifiers: ["resume-B"])
         let importer = ContactsImporter(source: source, repo: repo, clock: { Self.now })
 
         let result = try await importer.runFirstLaunchImport()
@@ -365,7 +365,7 @@ struct ContactsImporterTests {
         let source = FakeContactsSource(status: .authorized, contacts: sources)
         // Fails permanently — proves a still-broken row is reported every
         // pass (no silent discard) rather than the pass giving up entirely.
-        let repo = InterruptingContactRepository(failingIdentifiers: ["resume-B"])
+        let repo = FailingWriteContactRepository(failingIdentifiers: ["resume-B"])
         let importer = ContactsImporter(source: source, repo: repo, clock: { Self.now })
 
         _ = try await importer.runFirstLaunchImport()
@@ -407,47 +407,6 @@ private final class FakeContactsSource: ContactsSource, @unchecked Sendable {
     }
 }
 
-private enum RowWriteFailure: Error {
-    case failed
-}
-
-/// Fails every write whose `systemContactRef` is in `failingIdentifiers`,
-/// permanently — models a row that keeps failing (e.g. a persistent
-/// constraint violation) so R35's per-row tolerance can be proven without
-/// aborting the rest of the pass.
-private actor InterruptingContactRepository: ContactRepository {
-    private var contacts: [Contact] = []
-    private let failingIdentifiers: Set<String>
-
-    init(failingIdentifiers: Set<String>) {
-        self.failingIdentifiers = failingIdentifiers
-    }
-
-    func fetchAll() async throws -> [Contact] {
-        contacts
-    }
-
-    func fetchTracked() async throws -> [Contact] {
-        contacts.filter { $0.tracked && $0.isActive }
-    }
-
-    func fetch(id: UUID) async throws -> Contact? {
-        contacts.first { $0.id == id }
-    }
-
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        contacts.filter { $0.contactGroupId == groupId }
-    }
-
-    func upsert(_ contact: Contact) async throws {
-        guard !failingIdentifiers.contains(contact.systemContactRef) else {
-            throw RowWriteFailure.failed
-        }
-        contacts.append(contact)
-    }
-
-    func archive(id: UUID, at: Date) async throws {
-        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return }
-        contacts[index].archivedAt = at
-    }
-}
+// `FailingWriteContactRepository` (RegardsTests/Support/ContactWriteTrackingFakes.swift)
+// covers the same "permanently fails specific identifiers" shape this file
+// used to duplicate as `InterruptingContactRepository`.
