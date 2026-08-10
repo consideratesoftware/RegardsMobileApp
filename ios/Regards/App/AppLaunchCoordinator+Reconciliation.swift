@@ -43,7 +43,7 @@ extension AppLaunchCoordinator {
     func reconcileNow(runtime: AppRuntime, dependencies: Dependencies) async {
         if let inFlight = reconciliationTask {
             reconciliationPending = true
-            reconciliationCoalesceCount += 1
+            recordReconciliationCoalesce()
             await inFlight.value
             return
         }
@@ -79,7 +79,7 @@ extension AppLaunchCoordinator {
         } catch {
             Self.reconciliationLog.error("reconciliation failed: \(error, privacy: .private)")
         }
-        reconciliationCount += 1
+        recordReconciliationPass()
     }
 
     private static let reconciliationLog = RegardsLogger.feature("AppLaunchCoordinator")

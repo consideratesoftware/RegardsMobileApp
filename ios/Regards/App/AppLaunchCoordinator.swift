@@ -25,23 +25,49 @@ final class AppLaunchCoordinator {
     private(set) var statusMessage: String?
     private(set) var canContinueWithoutContacts = false
     private(set) var onboardingCompletionPending = false
+
+    /// Backing storage for `reconciliationCount`/`reconciliationCoalesceCount`
+    /// below. Nested and `private` on purpose, unlike the file-split
+    /// properties further down: `AppLaunchCoordinator+Reconciliation.swift`
+    /// can only advance these counts through `recordReconciliationPass()` /
+    /// `recordReconciliationCoalesce()`, never assign them directly. Kept as
+    /// a plain (non-`@ObservationIgnored`) stored property so reads through
+    /// the computed properties below still register with `@Observable`
+    /// tracking — `RootView` depends on that to re-render `RegardsTabRoot`
+    /// with a fresh `reconciliationGeneration` after every pass.
+    private struct ReconciliationCounters {
+        var passes = 0
+        var coalesces = 0
+    }
+    private var reconciliationCounters = ReconciliationCounters()
+
     /// Completed reconciliation passes (launch + foreground + store-change).
-    /// Exposed so tests can await a specific pass deterministically instead
-    /// of sleeping; the UI never reads it. Plain internal, not
-    /// `private(set)`: the mutator lives in
-    /// AppLaunchCoordinator+Reconciliation.swift, which needs write access
-    /// across the file split (see that file's header comment).
-    var reconciliationCount = 0
+    /// `AllContactsScreen` reloads when this changes (via `RootView` →
+    /// `RegardsTabRoot`'s `reconciliationGeneration`); tests also await a
+    /// specific pass deterministically instead of sleeping.
+    var reconciliationCount: Int { reconciliationCounters.passes }
     /// Incremented each time a trigger arrived while a pass was already in
     /// flight and coalesced into it instead of starting a concurrent one
     /// (fix 9). Test-only signal, same role as `reconciliationCount`.
-    var reconciliationCoalesceCount = 0
+    var reconciliationCoalesceCount: Int { reconciliationCounters.coalesces }
+
+    /// Called only from `AppLaunchCoordinator+Reconciliation.swift`.
+    func recordReconciliationPass() {
+        reconciliationCounters.passes += 1
+    }
+
+    /// Called only from `AppLaunchCoordinator+Reconciliation.swift`.
+    func recordReconciliationCoalesce() {
+        reconciliationCounters.coalesces += 1
+    }
 
     // Not `private`: AppLaunchCoordinator+Reconciliation.swift reads/writes
     // these across the file split (see that file's header comment). Still
     // `internal`, i.e. module-scoped like everything else in this app
     // target — never exposed outside `AppLaunchCoordinator` itself in
-    // practice, just not enforced by the compiler across the split.
+    // practice, just not enforced by the compiler across the split. Unlike
+    // the counters above, nothing outside the coordinator reads these, so
+    // there's no external write-protection guarantee to restore.
     @ObservationIgnored let dependencies: Dependencies?
     @ObservationIgnored private var didStart = false
     @ObservationIgnored private var onboardingActionGeneration = 0

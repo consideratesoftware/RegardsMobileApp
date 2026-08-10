@@ -48,7 +48,10 @@ final class MutableContactsSource: ContactsSource, @unchecked Sendable {
     }
 
     func changeNotifications() -> AsyncStream<Void> {
-        AsyncStream { continuation in
+        // Adopts the exact same buffering policy `CNContactsSource` uses in
+        // production, so a burst-coalescing test against this fake proves
+        // real behavior instead of a policy the fake invented on its own.
+        AsyncStream(bufferingPolicy: changeNotificationBufferingPolicy) { continuation in
             lock.withLock { self.continuation = continuation }
         }
     }

@@ -79,7 +79,10 @@ public extension ContactsSource {
 /// applied in one sync batch) into a single pending signal instead of
 /// queuing every one — a reconciliation pass already re-reads the *current*
 /// state of the whole store, so replaying N stale wake-ups buys nothing.
-private let changeNotificationBufferingPolicy: AsyncStream<Void>.Continuation.BufferingPolicy = .bufferingNewest(1)
+/// Not `private`: `MutableContactsSource` (RegardsTests/Support) reuses this
+/// exact policy so its burst-coalescing test proves the real production
+/// value, not a duplicated literal that could silently drift from it.
+let changeNotificationBufferingPolicy: AsyncStream<Void>.Continuation.BufferingPolicy = .bufferingNewest(1)
 
 /// Wraps a non-`Sendable` value so it can cross into a `@Sendable` closure.
 /// Used only to hand `CNContactStore`/`CNContactFetchRequest` (undocumented

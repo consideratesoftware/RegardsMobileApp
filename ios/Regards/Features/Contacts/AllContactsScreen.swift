@@ -6,13 +6,29 @@ import SwiftUI
 public struct AllContactsScreen: View {
     @State private var viewModel: AllContactsViewModel
     @Binding private var searchText: String
-    @Environment(\.scenePhase) private var scenePhase
+    /// Bumped by `AppLaunchCoordinator.reconciliationCount` (threaded down
+    /// through `RootView` → `RegardsTabRoot` → here) once per completed
+    /// reconciliation pass. Reloading on this instead of raw `scenePhase`
+    /// matters: `scenePhase` becoming `.active` and the coordinator's
+    /// `handleSceneActivation()` fire at the same moment with no ordering
+    /// guarantee between them, so a scene-phase-driven reload almost always
+    /// wins the race and reads the store *before* reconciliation finishes
+    /// enumerating — and a `CNContactStoreDidChange` arriving while the user
+    /// already sits on this tab (no foreground transition at all) never
+    /// reloads it. `reconciliationCount` only increments strictly *after*
+    /// a pass completes, for every trigger (launch, foreground, and
+    /// store-change alike), so this is always correct-after-the-fact.
+    let reconciliationGeneration: Int
     var rowConstructionObserver: (@MainActor (UUID) -> Void)?
 
-    init(viewModel: AllContactsViewModel,
-         searchText: Binding<String>) {
+    init(
+        viewModel: AllContactsViewModel,
+        searchText: Binding<String>,
+        reconciliationGeneration: Int = 0
+    ) {
         self._viewModel = State(initialValue: viewModel)
         self._searchText = searchText
+        self.reconciliationGeneration = reconciliationGeneration
     }
 
     public var body: some View {
@@ -50,21 +66,14 @@ public struct AllContactsScreen: View {
         .task {
             await viewModel.load()
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: reconciliationGeneration) { _, _ in
             // §14 PR21 acceptance: a contact deleted/re-added/renamed in the
-            // system app reflects here "next foreground." `AppLaunchCoordinator`
-            // reconciles the persisted store on every foreground independently;
-            // this reloads the already-materialized `@State` view model so a
-            // tab that was already on-screen picks up the refreshed rows too,
-            // instead of only updating on its next `.task` (re)appearance.
-            // Ordering caveat: this reload and the coordinator's reconciliation
-            // both start on the same foreground event with no guaranteed order
-            // between them, so a reload that wins the race can still show
-            // pre-reconciliation data once; the *next* trigger (another
-            // foreground, or the store-change notification while foregrounded)
-            // always catches up. Overdue and Upcoming get their own live-list
-            // wiring in TF-04, not here.
-            guard newPhase == .active else { return }
+            // system app reflects here "next foreground" — and, for free,
+            // on a `CNContactStoreDidChange` that lands while this tab is
+            // already on-screen. See `reconciliationGeneration`'s doc
+            // comment for why this fires here instead of on `scenePhase`.
+            // Overdue and Upcoming get their own live-list wiring in TF-04,
+            // not here.
             Task { await viewModel.load() }
         }
     }

@@ -71,6 +71,48 @@ struct ReconciliationCoalescingTests {
         #expect(source.fetchCountValue() == 3)
         #expect(launch.reconciliationCoalesceCount == 1)
     }
+
+    @Test("A burst of rapid store-change notifications coalesces, not one pass per notification")
+    func burstOfChangeNotificationsCoalesces() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        try await environment.profile.save(UserProfile(
+            onboardingCompletedAt: now,
+            entitlementTier: .trial,
+            entitlementRefreshedAt: now,
+            trialStartedAt: now
+        ))
+        let source = MutableContactsSource(status: .authorized, contacts: [])
+        let launch = AppLaunchCoordinator(
+            dependencies: .init(
+                makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
+                contactsSource: source,
+                clock: { self.now }
+            )
+        )
+
+        await launch.start()
+        #expect(launch.reconciliationCount == 1)
+
+        // Fire many notifications back-to-back with no `await` between
+        // them, so the coordinator's change-observation `Task` — a
+        // separate unstructured task — cannot interleave and consume even
+        // one before the burst finishes. Everything after this loop is
+        // exercising `changeNotifications()`'s real `.bufferingNewest(1)`
+        // policy (`MutableContactsSource` adopts the exact same constant
+        // `CNContactsSource` uses), not a fake-invented one.
+        let burstSize = 20
+        for _ in 0..<burstSize {
+            source.simulateChange()
+        }
+
+        #expect(await eventually { launch.reconciliationCount >= 2 })
+        // A generous ceiling, not an exact count: both the stream's
+        // buffering and the coordinator's own single-flight coalescing
+        // (the test above) contribute, so pinning one exact number would
+        // overspecify which mechanism absorbed the burst. What matters is
+        // that 20 rapid triggers didn't produce anywhere near 20 passes.
+        #expect(launch.reconciliationCount < burstSize)
+    }
 }
 
 /// A `ContactsSource` whose `fetchAllContacts()` can be armed to block until

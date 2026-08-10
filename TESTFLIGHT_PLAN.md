@@ -126,6 +126,34 @@ never pick up Android work.
   byte-identical. Manual VoiceOver smoke for the corruption-banner state is
   still outstanding — needs a supervisor-arranged recorded pass before merge
   (checklist in the fix-batch report). Still not pushed or opened as a PR.
+- A third review round found one further blocker in that fix batch: the
+  `AllContactsScreen` reload was keyed off raw `scenePhase`, which races
+  `AppLaunchCoordinator`'s own reconciliation pass (the scene-phase handler
+  and the screen's reload both fire off the same foreground transition with
+  no ordering guarantee, so the screen almost always read the store before
+  reconciliation finished) and never fired at all for a
+  `CNContactStoreDidChange` landing while the user was already sitting on
+  the Contacts tab. Fixed by threading `AppLaunchCoordinator
+  .reconciliationCount` down through `RootView` → `RegardsTabRoot` →
+  `AllContactsScreen` as `reconciliationGeneration`, which only advances
+  strictly *after* a pass completes for every trigger kind — the screen now
+  reloads on that instead. A new test hosts the real screen and proves the
+  reload happens through `reconciliationGeneration` observation alone (no
+  direct `viewModel.load()` call in the test). Also landed: a TOCTOU guard
+  in `ContactsReconciler` (re-reads authorization after `fetchAllContacts()`
+  and requires both reads `.authorized` before the archive sweep, so a
+  downgrade landing mid-enumeration can't mass-archive under a stale
+  status), a comment flagging that the preferred-value re-derivation's
+  exact-string-match assumption breaks once `EditContactScreen` (PR27)
+  lets a user edit that value directly, restored write protection on
+  `reconciliationCount`/`reconciliationCoalesceCount` (a private nested
+  counters struct plus narrow `recordReconciliationPass()`/
+  `recordReconciliationCoalesce()` mutators, since the file split had left
+  them as plain settable `var`s), and a burst-coalescing test proving
+  `changeNotifications()`'s real `.bufferingNewest(1)` policy collapses many
+  rapid store-change notifications into far fewer than one pass each.
+  299/299 `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen
+  generate` byte-identical. Still not pushed or opened as a PR.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,

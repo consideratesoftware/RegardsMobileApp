@@ -72,8 +72,11 @@ struct RootView: View {
                 .transition(.opacity)
             case .ready:
                 if let runtime = launch.runtime {
-                    RegardsTabRoot(runtime: runtime)
-                        .transition(.opacity)
+                    RegardsTabRoot(
+                        runtime: runtime,
+                        reconciliationGeneration: launch.reconciliationCount
+                    )
+                    .transition(.opacity)
                 } else {
                     launchFailure
                         .transition(.opacity)
@@ -213,6 +216,10 @@ struct SplashView: View {
 /// (Contact Detail, Edit, Transparency, …) stay local to the tab.
 struct RegardsTabRoot: View {
     let runtime: AppRuntime
+    /// Threaded straight through from `AppLaunchCoordinator.reconciliationCount`
+    /// via `RootView` — see `AllContactsScreen.reconciliationGeneration`'s
+    /// doc comment for why this exists instead of a `scenePhase` hook.
+    let reconciliationGeneration: Int
     @State private var navigation = RegardsNavigationState()
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
@@ -222,8 +229,9 @@ struct RegardsTabRoot: View {
     @Namespace private var upcomingContactTransition
     @Namespace private var contactsContactTransition
 
-    init(runtime: AppRuntime) {
+    init(runtime: AppRuntime, reconciliationGeneration: Int = 0) {
         self.runtime = runtime
+        self.reconciliationGeneration = reconciliationGeneration
         self._overdueVM = State(
             initialValue: Self.makeOverdueViewModel(runtime: runtime)
         )
@@ -402,7 +410,8 @@ struct RegardsTabRoot: View {
         NavigationStack(path: $navigation.contactsPath) {
             AllContactsScreen(
                 viewModel: Self.makeAllContactsViewModel(runtime: runtime),
-                searchText: $navigation.contactsSearchText
+                searchText: $navigation.contactsSearchText,
+                reconciliationGeneration: reconciliationGeneration
             )
             .navigationDestination(for: UUID.self) { contactId in
                 contactDetail(for: contactId)

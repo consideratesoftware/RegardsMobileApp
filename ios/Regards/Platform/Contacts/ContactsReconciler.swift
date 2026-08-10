@@ -79,6 +79,13 @@ public struct ContactsReconciler: Sendable {
         }
 
         let systemContacts = try await source.fetchAllContacts()
+        // TOCTOU guard: `fetchAllContacts()` can take a while (a full
+        // enumeration, even off-pool per R25), and the user can downgrade
+        // permissions mid-pass. Re-reading status here and requiring *both*
+        // reads say `.authorized` before the archive sweep below means a
+        // downgrade landing during the fetch can't mass-archive under a
+        // status that was already stale by the time the fetch returned.
+        let statusAfterFetch = await source.currentAuthorization()
         let visibleRefs = Set(systemContacts.map(\.identifier))
         let report = try await repo.fetchAllWithDiagnostics()
         var byRef: [String: Contact] = [:]
@@ -124,9 +131,11 @@ public struct ContactsReconciler: Sendable {
         // §21: `.limited` exposes only the picker-selected subset, so a
         // stored ref outside `visibleRefs` there isn't evidence of deletion
         // — deselecting a contact from a limited grant must be a no-op, not
-        // an archive.
+        // an archive. Both the pre-fetch and post-fetch reads must agree the
+        // pass is `.authorized`, not just the one taken before the
+        // (possibly long) enumeration — see the TOCTOU comment above.
         var archived = 0
-        if status == .authorized {
+        if status == .authorized && statusAfterFetch == .authorized {
             for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
                 do {
                     try await repo.archive(id: contact.id, at: now)
@@ -196,6 +205,15 @@ public struct ContactsReconciler: Sendable {
     /// new preference where the user/importer left none — doing so would
     /// also make an otherwise-untouched contact "changed" on every pass
     /// merely because it has a phone number, breaking idempotence.
+    ///
+    /// The "still present" check below is an exact string match against
+    /// `refreshedPhones`/`refreshedEmails`, which is safe only because
+    /// nothing today writes a user-edited `preferredChannelValue` that could
+    /// diverge in formatting from what `ContactsImporter.map` would derive
+    /// (e.g. a different but equivalent phone rendering). The first PR that
+    /// lets a user edit this value directly (`EditContactScreen`, per PR27 /
+    /// TF-09) must revisit this: an exact match may no longer reliably
+    /// recognize a still-valid, deliberately-edited value as "present."
     private static func redeterminedPreferredChannelValue(
         channel: Channel,
         existingValue: String,
