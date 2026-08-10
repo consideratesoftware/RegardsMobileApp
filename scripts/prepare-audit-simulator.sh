@@ -20,6 +20,10 @@ if [[ $# -eq 2 ]]; then
   resolve_only=1
 fi
 
+# Overridable so scripts/tests/prepare-audit-simulator-tests.sh can drive the
+# retry loop below with zero real sleeps.
+retry_sleep_seconds="${PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP:-15}"
+
 # The accessibility-audit jobs were tripped by simulator system-UI
 # intrusions: a "Ready for Apple Intelligence" onboarding notification
 # overlaid the app mid-run and Apple's audit flagged its text as
@@ -62,12 +66,21 @@ fi
 # -downloadPlatform iOS` call before this step may add one), and each
 # runtime has its own "iPhone 17 Pro" device. xcodebuild's destination
 # (`name=iPhone 17 Pro,OS=latest`) resolves to the newest installed runtime,
-# so this must pick the same one. Runtime identifiers encode the version
-# (com.apple.CoreSimulator.SimRuntime.iOS-18-0), so parse and compare that
-# instead of relying on hash/array ordering. If two available devices with
-# the same name tie at the newest version, refuse to guess: `max_by` would
-# pick one arbitrarily, and a silent arbitrary pick is exactly the kind of
-# heuristic divergence this script exists to avoid.
+# so this must pick the same one. Runtime identifiers end in a two-component
+# version token (com.apple.CoreSimulator.SimRuntime.iOS-26-0) -- SimRuntime
+# identifiers never carry a third numeric component, so patch releases share
+# one: 26.3.1 and 26.3 both report as iOS-26-3. The match is anchored to
+# that trailing `.iOS-<major>-<minor>` token (`\.iOS-(\d+)-(\d+)\z`) so an
+# "iOS-N-N"-shaped substring anywhere else in a malformed key can't be
+# mistaken for it.
+#
+# Ties at the newest version are a real, observed scenario, not a defensive
+# hypothetical: two distinct installed runtimes can report the same
+# identifier -- e.g. 26.4 build 23E244 and 26.4.1 build 23E254a both report
+# as iOS-26-4, each with its own "iPhone 17 Pro" device and UDID. `max_by`
+# would pick one of those arbitrarily and silently, so refuse instead and
+# name every tied UDID and runtime id in the error -- an operator resolves
+# it by deleting the stale runtime, which needs the UDID to find.
 #
 # The selection logic reads the `simctl list devices available -j` JSON from
 # stdin rather than shelling out itself, so `--resolve-only` can drive it
@@ -79,7 +92,7 @@ resolve_device() {
     name = ARGV.fetch(0)
 
     candidates = data.fetch("devices").flat_map do |runtime_id, devices|
-      version_match = runtime_id.match(/iOS-(\d+)-(\d+)/)
+      version_match = runtime_id.match(/\.iOS-(\d+)-(\d+)\z/)
       next [] unless version_match
 
       version = [version_match[1].to_i, version_match[2].to_i]
@@ -96,8 +109,8 @@ resolve_device() {
     max_version = candidates.map { |c| c[:version] }.max
     tied = candidates.select { |c| c[:version] == max_version }
     if tied.length > 1
-      runtimes = tied.map { |c| c[:runtime_id] }.join(", ")
-      warn("::error::Multiple available simulators named #{name.inspect} tie at the newest iOS runtime (#{runtimes}); refusing to pick one arbitrarily")
+      described = tied.map { |c| "#{c[:udid]} on #{c[:runtime_id]}" }.join("; ")
+      warn("::error::Multiple available simulators named #{name.inspect} tie at the newest iOS runtime: #{described}; refusing to pick one arbitrarily. Delete the stale runtime to resolve.")
       exit 1
     end
 
@@ -126,7 +139,18 @@ echo "Resolved \"$device_name\" to $udid on $runtime_id (newest available runtim
 # workflow's later xcodebuild steps can pin `-destination
 # platform=iOS Simulator,id=$SIMULATOR_UDID` to this exact device instead of
 # re-resolving `name=...,OS=latest` and risking a different answer.
+#
+# Require the UDID to actually look like one before it goes anywhere near
+# $GITHUB_ENV: simctl UDIDs are always this shape, so a value that isn't
+# means something upstream (a future edit to resolve_device, an
+# unanticipated `simctl` output format) already went wrong, and the safety
+# of appending it into a file GitHub Actions re-exports as shell environment
+# should be obvious by inspection rather than assumed.
 if [[ -n "${GITHUB_ENV:-}" ]]; then
+  if [[ ! "$udid" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+    echo "::error::Resolved udid \"$udid\" is not UUID-shaped; refusing to write it into \$GITHUB_ENV" >&2
+    exit 1
+  fi
   echo "SIMULATOR_UDID=$udid" >>"$GITHUB_ENV"
 fi
 
@@ -155,8 +179,8 @@ for attempt in 1 2 3; do
     [[ "$attempt" -gt 1 ]] && echo "simctl bootstatus succeeded on attempt $attempt (after retries)"
     break
   fi
-  echo "::warning::simctl bootstatus $udid -b failed on attempt $attempt; sleeping 15s before retry"
-  sleep 15
+  echo "::warning::simctl bootstatus $udid -b failed on attempt $attempt; sleeping ${retry_sleep_seconds}s before retry"
+  sleep "$retry_sleep_seconds"
 done
 if [[ "$booted" -ne 1 ]]; then
   echo "::error::xcrun simctl bootstatus $udid -b failed after 3 attempts" >&2

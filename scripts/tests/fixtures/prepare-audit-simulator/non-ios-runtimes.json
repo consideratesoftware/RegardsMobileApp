@@ -9,6 +9,9 @@
     "not-a-runtime-identifier": [
       { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "MALFORMED-KEY-UDID" }
     ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-99-0-experimental": [
+      { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "WRONG-EXCLUDED-BY-ANCHOR-UDID" }
+    ],
     "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
       { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "REAL-UDID" }
     ]
