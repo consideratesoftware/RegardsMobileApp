@@ -127,6 +127,16 @@ public final class UpcomingViewModel {
     /// repository keeps emitting, defeating `[weak self]` entirely.
     private func startObservingIfNeeded() async {
         guard observationTask == nil else { return }
+        // A placeholder, set synchronously before the first suspension
+        // below: the guard above and this assignment run back-to-back with
+        // no `await` between them, so no second concurrent `load()` can slip
+        // between "saw nil" and "set it" the way it could when the
+        // assignment waited for `observeTracked()` to return. Without this,
+        // two `load()` calls racing at launch (or a fast pull-to-refresh
+        // right after) could both see `nil`, both subscribe, and leave one
+        // subscription's `Task` orphaned in `observationTask`'s overwrite —
+        // never cancelled, running for the screen's entire lifetime.
+        observationTask = Task {}
         let updates = await contacts.observeTracked()
         observationTask = Task { [weak self] in
             for await _ in updates {
@@ -183,13 +193,19 @@ public final class UpcomingViewModel {
     static let log = RegardsLogger.feature("Upcoming")
 
     /// "Mark caught up" from an Upcoming row: logs the interaction and moves
-    /// `lastInteractedAt`, then removes every row for the contact from view
-    /// immediately rather than waiting for the next full `load()` (mirrors
-    /// `OverdueViewModel.markCaughtUp`). A failure restores the true state
-    /// with a fresh `load()` instead of re-inserting rows locally.
+    /// `lastInteractedAt`, then removes only the contact's *cadence* row from
+    /// view immediately rather than waiting for the next full `load()`
+    /// (mirrors `OverdueViewModel.markCaughtUp`). An occasion row (birthday,
+    /// anniversary) for the same contact is left alone: §9 contract 6 gives
+    /// occasions precedence over a same-day cadence reminder, and
+    /// `InteractionLogging.markCaughtUp` never touches occasion
+    /// `ScheduledReminder` rows, so removing an occasion row here would show
+    /// state this action didn't actually produce. A failure restores the
+    /// true state with a fresh `load()` instead of re-inserting rows
+    /// locally.
     public func markCaughtUp(contactId: UUID) async {
         groups = groups.map { header, rows in
-            (header, rows.filter { $0.contactId != contactId })
+            (header, rows.filter { !($0.contactId == contactId && $0.kind == .cadence) })
         }.filter { !$0.rows.isEmpty }
         totalCount = groups.reduce(0) { $0 + $1.rows.count }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
@@ -283,12 +299,10 @@ public final class UpcomingViewModel {
 
         // A pending cadence `ScheduledReminder` is Snooze's only persisted
         // trace (§14 PR22's `SchedulingPass.snooze` stub) — no separate
-        // "snoozed" flag exists on `Contact`. While it's still in the future
-        // it overrides the live-computed date entirely and skips window
-        // re-resolution (the write is already the authoritative instant);
-        // once it lapses this map is simply not consulted and the ordinary
-        // computation below takes over unchanged, so the row "returns" on
-        // its own the next load after the snoozed date passes.
+        // "snoozed" flag exists on `Contact`. Once it lapses this map is
+        // simply not consulted and the ordinary computation below decides
+        // the date unchanged, so the row "returns" on its own the next load
+        // after the snoozed date passes.
         let snoozedUntilByContact = Dictionary(
             reminders
                 .filter { $0.kind == .cadence }
@@ -314,13 +328,24 @@ public final class UpcomingViewModel {
 
         for contact in contacts {
             if let cadence = contact.cadenceDays {
-                if let snoozedUntil = snoozedUntilByContact[contact.id], snoozedUntil > now {
-                    appendCadenceRow(contact: contact, cadence: cadence, fires: snoozedUntil)
-                    continue
-                }
                 let last = contact.lastInteractedAt ?? contact.createdAt
                 let overdueAt = last.addingTimeInterval(TimeInterval(cadence) * 86_400)
-                let target = max(now, overdueAt)
+                // A pending snooze folds into the same `target`/
+                // `includingContainingSlot` computation as the ordinary
+                // cadence math, rather than bypassing `nextAllowedSlot`
+                // outright: an earlier version used the persisted
+                // `scheduledFor` verbatim as the row's date, which could
+                // land outside the window (quiet hours, a disallowed day) —
+                // exactly what `nextAllowedSlot` exists to prevent. Folding
+                // the snoozed instant in as a third candidate alongside `now`
+                // and `overdueAt`, both here and in `includingContainingSlot`,
+                // also makes a *later* caught-up beat a *stale* snooze for
+                // free: caught-up moves `overdueAt` forward (via
+                // `lastInteractedAt`), and `max` picks whichever of the two
+                // is later without either branch needing to know about the
+                // other.
+                let snoozedUntil = snoozedUntilByContact[contact.id] ?? .distantPast
+                let target = max(now, overdueAt, snoozedUntil)
                 // `nextAllowedSlot` returns nil for a zero-capacity window
                 // (R4). This is a live path, not a defensive one: the window is
                 // now caller-supplied (R9a), and
@@ -331,7 +356,7 @@ public final class UpcomingViewModel {
                 guard let fires = engine.nextAllowedSlot(
                     from: target,
                     in: window,
-                    includingContainingSlot: overdueAt <= now
+                    includingContainingSlot: max(overdueAt, snoozedUntil) <= now
                 ) else { continue }
                 // An already-overdue contact inside an active window resolves
                 // to that window's slot start for deterministic batching. The

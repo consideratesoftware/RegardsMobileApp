@@ -1,11 +1,5 @@
 import Foundation
-// `AnyDatabaseCancellable` (used by `observeTracked()`'s `ValueObservation`
-// subscription below) predates GRDB's own Sendable audit — `@preconcurrency`
-// downgrades that specific, GRDB-internal data-race diagnostic to a warning
-// without weakening this file's own concurrency checking. Data/ is where
-// GRDB imports live; the Domain-purity guard (`check-domain-purity.sh`)
-// only scans `Domain/**` and already rejects a bare `import GRDB` there.
-@preconcurrency import GRDB
+import GRDB
 
 // Repository protocols — the "seam" the UI layer depends on. GRDB
 // implementations live immediately below; PR3 will inject a `MockRepositories`
@@ -172,6 +166,17 @@ struct GRDBContactRepository: ContactRepository {
             // current value — that first call is the replay the protocol
             // doc says never to send; only a change *after* subscribing
             // reaches `continuation`.
+            //
+            // An earlier version tried `observation.values(in: dbQueue)
+            // .dropFirst()` — GRDB's async-sequence wrapper around this same
+            // callback API — to avoid the hand-rolled flag below. It hung
+            // indefinitely in the contract-test suite: something in how
+            // `dropFirst()` composes with `AsyncValueObservation`'s internal
+            // buffering never let a subscriber's first `next()` return, on
+            // both mock and GRDB backends running under the same suite. Not
+            // investigated further; reverted to the callback form below,
+            // proven to work, rather than ship a hang chasing a cleaner call
+            // site.
             var isInitialValue = true
             let cancellable = observation.start(
                 in: dbQueue,
@@ -191,8 +196,25 @@ struct GRDBContactRepository: ContactRepository {
                     continuation.yield(contacts)
                 }
             )
-            continuation.onTermination = { _ in cancellable.cancel() }
+            // `AnyDatabaseCancellable` predates GRDB's own Sendable audit.
+            // Boxing it — rather than reaching for a file-wide
+            // `@preconcurrency import GRDB` that would downgrade every
+            // Sendable diagnostic GRDB could ever raise in this file, not
+            // just this one — scopes the `@unchecked` to exactly the one
+            // call this makes: `cancel()`, which GRDB's own cancellation
+            // contract already guarantees is safe from any thread.
+            let box = CancellableBox(cancellable)
+            continuation.onTermination = { _ in box.cancellable.cancel() }
         }
+    }
+}
+
+/// See `GRDBContactRepository.observeTracked()`'s doc comment for why this
+/// exists instead of a file-wide `@preconcurrency import GRDB`.
+private final class CancellableBox: @unchecked Sendable {
+    let cancellable: AnyDatabaseCancellable
+    init(_ cancellable: AnyDatabaseCancellable) {
+        self.cancellable = cancellable
     }
 }
 

@@ -16,6 +16,13 @@ import Foundation
 /// state, so this runs on the same actor rather than asking the compiler to
 /// prove a plain closure capturing that state is safe to hand across an
 /// isolation boundary.
+///
+/// Shared, not a copy-per-file convenience: four call sites so far
+/// (`OverdueViewModelActionTests`, `UpcomingViewModelActionTests`), all
+/// waiting on the same shape of problem — a repository broadcast landing on
+/// a subscriber `Task` this test doesn't otherwise await. One implementation
+/// keeps the "never sleep, never guess a timeout" rule enforced in one place
+/// instead of re-derived per call site.
 @MainActor
 @discardableResult
 func waitUntil(maxYields: Int = 10_000, _ condition: () -> Bool) async -> Bool {

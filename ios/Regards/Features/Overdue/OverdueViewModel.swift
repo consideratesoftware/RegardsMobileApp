@@ -85,6 +85,16 @@ public final class OverdueViewModel {
     /// repository keeps emitting, defeating `[weak self]` entirely.
     private func startObservingIfNeeded() async {
         guard observationTask == nil else { return }
+        // A placeholder, set synchronously before the first suspension
+        // below: the guard above and this assignment run back-to-back with
+        // no `await` between them, so no second concurrent `load()` can slip
+        // between "saw nil" and "set it" the way it could when the
+        // assignment waited for `observeTracked()` to return. Without this,
+        // two `load()` calls racing at launch (or a fast pull-to-refresh
+        // right after) could both see `nil`, both subscribe, and leave one
+        // subscription's `Task` orphaned in `observationTask`'s overwrite —
+        // never cancelled, running for the screen's entire lifetime.
+        observationTask = Task {}
         let updates = await contacts.observeTracked()
         observationTask = Task { [weak self] in
             for await _ in updates {

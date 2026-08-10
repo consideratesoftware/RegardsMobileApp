@@ -7,6 +7,9 @@ public struct OverdueScreen: View {
     // shown; this binding only drives the pill highlight and fires the
     // callback that asks the tab root to switch.
     @State private var segment: RegardsSegment = .overdue
+    @State private var rowActionEffectGeneration = 0
+    @AccessibilityFocusState private var isSubtitleFocused: Bool
+    var accessibilityEffects = RowActionAccessibilityEffects.live
     private let upcomingCount: Int
     private let onTapContact: (UUID) -> Void
     private let onSwitchToUpcoming: () -> Void
@@ -30,6 +33,7 @@ public struct OverdueScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                     .padding(.top, 4)
+                    .accessibilityFocused($isSubtitleFocused)
 
                 RegardsSegmentedControl(
                     selection: Binding(
@@ -64,7 +68,16 @@ public struct OverdueScreen: View {
         // No `.task { await viewModel.load() }` here — `RegardsTabRoot`
         // loads both tab VMs concurrently on root appear so the cross-tab
         // counters (Upcoming: N / Overdue: N) are populated before the
-        // user sees either screen.
+        // user sees either screen. `.onAppear` below still reloads on every
+        // subsequent appearance (a `NavigationStack` pop back from Contact
+        // Detail counts), which is `load()`'s only route to noticing a
+        // Contact Detail Snooze: `ReminderRepository` writes have no
+        // `observeTracked()`-style push yet (that pipeline is TF-07/R10), so
+        // without this, a session that snoozes from Detail and returns here
+        // would keep showing the contact for the rest of the session.
+        .onAppear {
+            Task { await viewModel.load() }
+        }
     }
 
     private var subtitle: String {
@@ -176,13 +189,40 @@ public struct OverdueScreen: View {
                     row: row,
                     isInnerCircle: innerCircle,
                     onTapContact: { onTapContact(row.contactId) },
-                    onMarkCaughtUp: { Task { await viewModel.markCaughtUp(contactId: row.contactId) } },
-                    onSnooze: { Task { await viewModel.snooze(contactId: row.contactId) } }
+                    onMarkCaughtUp: {
+                        Task { await viewModel.markCaughtUp(contactId: row.contactId) }
+                        announceRowAction("Marked \(row.name) caught up")
+                    },
+                    onSnooze: {
+                        Task { await viewModel.snooze(contactId: row.contactId) }
+                        announceRowAction("Snoozed \(row.name) 1 week")
+                    }
                 )
                 if idx < rows.count - 1 {
                     Hair(inset: 72)
                 }
             }
+        }
+    }
+
+    /// Announces a row-removing action and lands focus on the subtitle
+    /// (which the removal itself has already updated to the new count) once
+    /// the list has settled — see `RowActionAccessibilityEffects`. A
+    /// `rowActionEffectGeneration` counter guards against two actions fired
+    /// in quick succession racing each other's yields: only the most recent
+    /// call's announcement and focus land.
+    private func announceRowAction(_ message: String) {
+        rowActionEffectGeneration &+= 1
+        let generation = rowActionEffectGeneration
+        let effects = accessibilityEffects
+        Task { @MainActor in
+            await effects.yieldControl()
+            guard rowActionEffectGeneration == generation else { return }
+            effects.announce(message)
+            await effects.yieldControl()
+            guard rowActionEffectGeneration == generation else { return }
+            isSubtitleFocused = true
+            effects.didFocus()
         }
     }
 }
@@ -300,6 +340,7 @@ struct OverdueRow: View {
         .background(Capsule().fill(RegardsDS.accentSoft))
         .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Mark \(row.name) caught up")
+        .accessibilityHint("Removes this contact from Overdue.")
         .accessibilityIdentifier("overdue.caught-up")
     }
 
@@ -315,6 +356,7 @@ struct OverdueRow: View {
         .background(Capsule().fill(RegardsDS.hairSoft))
         .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Snooze \(row.name) 1 week")
+        .accessibilityHint("Removes this contact from Overdue for one week.")
         .accessibilityIdentifier("overdue.snooze")
     }
 }

@@ -54,4 +54,41 @@ struct ContactObservationContractTests {
         let afterArchived = try #require(await iterator.next())
         #expect(!afterArchived.map(\.id).contains(archived.id))
     }
+
+    /// A group delete clears `contactGroupId` on every member — a real write
+    /// to the Contact table — even though the *filtered* tracked set it
+    /// leaves behind is unchanged. GRDB's region-based observation fires on
+    /// that write regardless; the mock previously didn't, a silent drift
+    /// this pins against regressing.
+    @Test(
+        "observeTracked emits after a group delete clears a member's contactGroupId",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeTrackedEmitsOnGroupDelete(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let primaryID = try contractUUID(134)
+        let group = ContactGroup(
+            id: try contractUUID(135),
+            displayName: "Contract group",
+            primaryContactId: primaryID
+        )
+        try await repositories.contacts.upsert(
+            contractContact(id: primaryID, suffix: "group-delete-primary", tracked: true)
+        )
+        try await repositories.groups.upsert(group)
+        try await repositories.contacts.upsert(
+            contractContact(id: primaryID, suffix: "group-delete-primary", tracked: true, groupID: group.id)
+        )
+
+        let stream = await repositories.contacts.observeTracked()
+        var iterator = stream.makeAsyncIterator()
+
+        try await repositories.groups.delete(id: group.id)
+
+        // The emission itself is what's under test, not its content: both
+        // backends must broadcast after a group delete, even though
+        // clearing `contactGroupId` alone doesn't change who's tracked.
+        let afterDelete = try #require(await iterator.next())
+        #expect(Set(afterDelete.map(\.id)).contains(primaryID))
+    }
 }

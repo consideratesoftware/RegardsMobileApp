@@ -46,30 +46,33 @@ struct SchedulingPassTests {
         #expect(pending[0].scheduledFor == second.addingTimeInterval(7 * 86_400))
     }
 
+    /// The blocker this pins: an earlier version read the existing pending
+    /// cadence reminder first, then decided insert-vs-update from that read.
+    /// Two overlapping snoozes for the same contact could both read "nothing
+    /// pending" before either had written, and both would insert under a
+    /// fresh random id — two pending cadence rows for one contact, and the
+    /// two screens reading them could disagree about whether (or until when)
+    /// the contact is snoozed. The fix is a deterministic row id derived from
+    /// `contactId` alone, so both writes race the *same* primary key and the
+    /// later one simply wins — never two rows.
     @Test(
-        "Snooze reuses an existing pending cadence reminder's id instead of inserting a second row",
+        "Two concurrent snoozes for the same contact resolve to exactly one row, not two",
         arguments: RepositoryContractBackend.allCases
     )
-    func snoozeReusesExistingCadenceReminderID(backend: RepositoryContractBackend) async throws {
+    func concurrentSnoozeResolvesToOneRow(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
-        let contact = contractContact(id: try contractUUID(503), suffix: "snooze-existing", tracked: true)
+        let contact = contractContact(id: try contractUUID(503), suffix: "snooze-concurrent", tracked: true)
         try await repositories.contacts.upsert(contact)
-        let existingID = try contractUUID(5031)
-        let existing = ScheduledReminder(
-            id: existingID,
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_700_000_000),
-            osNotificationId: "pre-existing-cadence"
-        )
-        try await repositories.reminders.upsert(existing)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
 
-        try await SchedulingPass(reminders: repositories.reminders, clock: { now }).snooze(contactId: contact.id)
+        async let first: () = scheduler.snooze(contactId: contact.id)
+        async let second: () = scheduler.snooze(contactId: contact.id)
+        _ = try await (first, second)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
-        #expect(pending[0].id == existingID)
+        #expect(pending[0].kind == .cadence)
         #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
     }
 

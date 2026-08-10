@@ -15,16 +15,32 @@ struct RepositoryFakeFailure: Error, Equatable {}
 actor StubContactRepository: ContactRepository {
     private var contacts: [Contact]
     private let failure: RepositoryFakeFailure?
+    /// Independent of `failure`: lets a test make `fetch` succeed and only
+    /// `upsert` fail, to exercise a write that fails *after* an earlier read
+    /// (or an earlier write to a different repository) already succeeded —
+    /// `failure` alone can't isolate that, since it applies uniformly to
+    /// every method.
+    private let upsertFailure: RepositoryFakeFailure?
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
-    init(_ contacts: [Contact] = [], failure: RepositoryFakeFailure? = nil) {
+    init(
+        _ contacts: [Contact] = [],
+        failure: RepositoryFakeFailure? = nil,
+        upsertFailure: RepositoryFakeFailure? = nil
+    ) {
         self.contacts = contacts
         self.failure = failure
+        self.upsertFailure = upsertFailure
     }
 
     /// A repository whose every read throws.
     static func failing(_ contacts: [Contact] = []) -> StubContactRepository {
         StubContactRepository(contacts, failure: RepositoryFakeFailure())
+    }
+
+    /// Reads succeed normally; only `upsert` fails.
+    static func failingUpsert(_ contacts: [Contact] = []) -> StubContactRepository {
+        StubContactRepository(contacts, upsertFailure: RepositoryFakeFailure())
     }
 
     private func requireSuccess() throws {
@@ -62,6 +78,7 @@ actor StubContactRepository: ContactRepository {
     /// afterward and see `lastInteractedAt` moved.
     func upsert(_ contact: Contact) async throws {
         try requireSuccess()
+        if let upsertFailure { throw upsertFailure }
         if let index = contacts.firstIndex(where: { $0.id == contact.id }) {
             contacts[index] = contact
         } else {
@@ -79,6 +96,14 @@ actor StubContactRepository: ContactRepository {
 
     func storedCount() -> Int { contacts.count }
 
+    private var subscribeCount = 0
+
+    /// Test-only instrumentation: how many times `observeTracked()` has been
+    /// called, i.e. how many independent subscriptions exist. A view model
+    /// that subscribes once per `load()` instead of once ever would show up
+    /// here as `> 1` after two concurrent `load()` calls.
+    func subscriptionCount() -> Int { subscribeCount }
+
     /// A real live stream (mirrors `GRDBContactRepository`/`MockStore`), for
     /// tests that assert an Overdue/Upcoming view model reflects a write made
     /// through a *different* repository reference to the same fake.
@@ -90,6 +115,7 @@ actor StubContactRepository: ContactRepository {
     /// write landing right after subscribe is missed (mirrors
     /// `MockStore.observeTracked()`).
     func observeTracked() async -> AsyncStream<[Contact]> {
+        subscribeCount += 1
         let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
         let token = UUID()
         trackedObservers[token] = continuation
@@ -114,15 +140,31 @@ actor StubContactRepository: ContactRepository {
 actor StubReminderRepository: ReminderRepository {
     private var reminders: [ScheduledReminder]
     private let failure: RepositoryFakeFailure?
+    /// Independent of `failure`: lets a test make reads succeed and only
+    /// `upsert` fail — e.g. `OverdueViewModel.snooze`'s failure path re-reads
+    /// through the same `reminders` reference `SchedulingPass.snooze` writes
+    /// through, so making the whole repository fail would fail the *restore*
+    /// read too, not just the write under test.
+    private let upsertFailure: RepositoryFakeFailure?
 
-    init(_ reminders: [ScheduledReminder] = [], failure: RepositoryFakeFailure? = nil) {
+    init(
+        _ reminders: [ScheduledReminder] = [],
+        failure: RepositoryFakeFailure? = nil,
+        upsertFailure: RepositoryFakeFailure? = nil
+    ) {
         self.reminders = reminders
         self.failure = failure
+        self.upsertFailure = upsertFailure
     }
 
     /// A repository whose every read throws.
     static func failing() -> StubReminderRepository {
         StubReminderRepository([], failure: RepositoryFakeFailure())
+    }
+
+    /// Reads succeed normally; only `upsert` fails.
+    static func failingUpsert() -> StubReminderRepository {
+        StubReminderRepository([], upsertFailure: RepositoryFakeFailure())
     }
 
     private func requireSuccess() throws {
@@ -150,6 +192,7 @@ actor StubReminderRepository: ReminderRepository {
     /// sibling note.
     func upsert(_ reminder: ScheduledReminder) async throws {
         try requireSuccess()
+        if let upsertFailure { throw upsertFailure }
         if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
             reminders[index] = reminder
         } else {

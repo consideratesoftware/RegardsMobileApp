@@ -181,4 +181,75 @@ struct OverdueViewModelActionTests {
         #expect(pending.count == 1) // idempotent write-through: still one row, not two
         #expect(pending[0].scheduledFor == clock.now().addingTimeInterval(7 * 86_400))
     }
+
+    /// `makeOverdueRow`'s guard is `snoozedUntil > now`, not `>=` — at the
+    /// exact instant the snooze was pushed to, it must already read as
+    /// lapsed. A boundary drawn one direction or the other is invisible
+    /// unless a test lands exactly on it; `advance(by: 6 * 86_400)` +
+    /// `advance(by: 2 * 86_400)` in the sibling test above never actually
+    /// hits the boundary itself.
+    @Test("A snoozed row has returned at exactly the 7-day mark, not just after it")
+    func snoozedRowReturnsAtExactSevenDayBoundary() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let clock = MutableClock(Self.now)
+        let viewModel = OverdueViewModel(
+            contacts: contacts,
+            interactions: StubInteractionRepository(),
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            clock: clock.now
+        )
+        await viewModel.load()
+
+        await viewModel.snooze(contactId: contact.id)
+        #expect(viewModel.rows.isEmpty)
+
+        clock.advance(by: 7 * 86_400)
+        await viewModel.load()
+
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+    }
+
+    @Test("A failing snooze write reloads to restore the true state")
+    func snoozeFailureReloadsToRestoreTrueState() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        // `.failingUpsert()`, not `.failing()`: the restore path below reads
+        // through this same `reminders` reference (for the snoozed-until
+        // lookup), so making every call fail would fail that read too, not
+        // just the write this test is about.
+        let reminders = StubReminderRepository.failingUpsert()
+        let viewModel = Self.viewModel(contacts: contacts, reminders: reminders)
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        await viewModel.snooze(contactId: contact.id)
+
+        // The write failed, so a fresh load restores the still-overdue row
+        // rather than leaving the optimistic removal standing — mirrors
+        // `markCaughtUpFailureReloads`.
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+    }
+
+    @Test("Two concurrent load() calls subscribe to observeTracked() exactly once")
+    func concurrentLoadSubscribesOnce() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let viewModel = Self.viewModel(contacts: contacts)
+
+        async let firstLoad: () = viewModel.load()
+        async let secondLoad: () = viewModel.load()
+        _ = await (firstLoad, secondLoad)
+
+        #expect(await contacts.subscriptionCount() == 1)
+        // The subscription still works after the race: a write from another
+        // reference is still picked up.
+        var updated = contact
+        updated.lastInteractedAt = Self.now
+        try await contacts.upsert(updated)
+        let sawEmpty = await waitUntil { viewModel.rows.isEmpty }
+        #expect(sawEmpty)
+    }
 }

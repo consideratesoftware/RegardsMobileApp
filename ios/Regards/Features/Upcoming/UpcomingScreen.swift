@@ -3,6 +3,9 @@ import SwiftUI
 public struct UpcomingScreen: View {
     let viewModel: UpcomingViewModel
     @State private var segment: RegardsSegment = .upcoming
+    @State private var rowActionEffectGeneration = 0
+    @AccessibilityFocusState private var isSubtitleFocused: Bool
+    var accessibilityEffects = RowActionAccessibilityEffects.live
     private let overdueCount: Int
     private let onTapContact: (UUID) -> Void
     private let onSwitchToOverdue: () -> Void
@@ -26,6 +29,7 @@ public struct UpcomingScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                     .padding(.top, 4)
+                    .accessibilityFocused($isSubtitleFocused)
 
                 RegardsSegmentedControl(
                     selection: Binding(
@@ -61,8 +65,12 @@ public struct UpcomingScreen: View {
         .navigationTitle("Upcoming")
         .navigationBarTitleDisplayMode(.large)
         .accessibilityIdentifier("screen.upcoming")
-        // Load is owned by `RegardsTabRoot` — see sibling note in
-        // `OverdueScreen`.
+        // Initial load is owned by `RegardsTabRoot`; `.onAppear` reloads on
+        // every subsequent appearance (a pop back from Contact Detail
+        // included) — see sibling note in `OverdueScreen`.
+        .onAppear {
+            Task { await viewModel.load() }
+        }
     }
 
     @ViewBuilder
@@ -89,6 +97,7 @@ public struct UpcomingScreen: View {
                                 onTap: { onTapContact(row.contactId) },
                                 onMarkCaughtUp: {
                                     Task { await viewModel.markCaughtUp(contactId: row.contactId) }
+                                    announceRowAction("Marked \(row.name) caught up")
                                 }
                             )
                             if idx < group.rows.count - 1 {
@@ -98,6 +107,25 @@ public struct UpcomingScreen: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Announces a row-removing action and lands focus on the subtitle
+    /// (already updated to the new count by the time this fires) once the
+    /// list has settled — see `RowActionAccessibilityEffects` and
+    /// `OverdueScreen`'s identical sibling method.
+    private func announceRowAction(_ message: String) {
+        rowActionEffectGeneration &+= 1
+        let generation = rowActionEffectGeneration
+        let effects = accessibilityEffects
+        Task { @MainActor in
+            await effects.yieldControl()
+            guard rowActionEffectGeneration == generation else { return }
+            effects.announce(message)
+            await effects.yieldControl()
+            guard rowActionEffectGeneration == generation else { return }
+            isSubtitleFocused = true
+            effects.didFocus()
         }
     }
 
@@ -209,6 +237,7 @@ struct UpcomingRow: View {
         .background(Capsule().fill(RegardsDS.accentSoft))
         .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Mark \(row.name) caught up")
+        .accessibilityHint("Removes this reminder from Upcoming.")
         .accessibilityIdentifier("upcoming.caught-up")
     }
 

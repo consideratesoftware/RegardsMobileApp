@@ -92,9 +92,9 @@ actor MockStore {
 
     /// Subscribers of `observeTracked()`, keyed by a per-subscription token so
     /// termination can remove exactly one without racing a concurrent
-    /// subscribe. Mirrors `GRDBContactRepository.observeTracked()`'s contract
-    /// in-memory: every subscriber gets the current tracked set immediately,
-    /// then again after any write that could change it.
+    /// subscribe. Mirrors `GRDBContactRepository.observeTracked()`'s
+    /// contract in-memory: a subscriber gets nothing on subscribe, only the
+    /// current tracked set again after any subsequent write.
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
     init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
@@ -441,6 +441,15 @@ extension MockStore {
             if updated.contactGroupId == id { updated.contactGroupId = nil }
             return updated
         }
+        // GRDB's real FK `ON DELETE SET NULL` writes every member row, and
+        // `observeTracked()`'s region-based observation fires on any write
+        // to the Contact table regardless of whether the *filtered* result
+        // changed — so a subscriber sees a fresh (if content-identical)
+        // emission after a group delete there. Without this call the mock
+        // silently drifted from that: a group delete never broadcast here,
+        // so a subscriber-driven parity test comparing the two backends
+        // would see GRDB emit and the mock stay silent.
+        broadcastTrackedChange()
     }
 
     func pendingReminders() -> [ScheduledReminder] {
