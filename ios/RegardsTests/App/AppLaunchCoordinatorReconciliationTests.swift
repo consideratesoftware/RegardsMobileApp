@@ -248,7 +248,8 @@ struct AppLaunchCoordinatorReconciliationTests {
     private func coordinator(
         environment: AppEnvironment,
         source: any ContactsSource,
-        clock: (@Sendable () -> Date)? = nil
+        clock: (@Sendable () -> Date)? = nil,
+        missingContactRefStore: MissingContactRefStore = .ephemeral()
     ) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(
@@ -257,7 +258,8 @@ struct AppLaunchCoordinatorReconciliationTests {
                     try await AppRuntime.makeProduction(environment: environment)
                 },
                 contactsSource: source,
-                clock: clock ?? { now }
+                clock: clock ?? { now },
+                missingContactRefStore: missingContactRefStore
             )
         )
     }

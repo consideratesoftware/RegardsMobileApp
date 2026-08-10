@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Reconciles the persisted `Contact` table against whatever the system
@@ -26,7 +27,15 @@ import Foundation
 /// - Under `.authorized`, a ref only archives once it's been missing across
 ///   **two consecutive `.authorized` passes at least `archiveDebounceFloor`
 ///   apart** — see the sweep's own comment below for why a single miss (or
-///   two rapid ones) isn't enough (ARCHITECTURE.md §21).
+///   two rapid ones) isn't enough (ARCHITECTURE.md §21). That state has to
+///   survive a relaunch to be useful (round 11: kept in-memory only, it
+///   almost never got both halves of "two passes" inside one process
+///   lifetime, so genuine deletions effectively never archived) —
+///   `AppLaunchCoordinator` persists `Result.missingRefs` to
+///   `MissingContactRefStore` (Application Support, `NSFileProtectionComplete`)
+///   across launches. `missingRefs` is keyed by `ContactRefHasher.hash(_:)`
+///   of the `systemContactRef`, never the raw ref, so nothing identifying a
+///   real contact sits in that sidecar file.
 public struct ContactsReconciler: Sendable {
     private let source: any ContactsSource
     private let repo: any ContactRepository
@@ -43,7 +52,20 @@ public struct ContactsReconciler: Sendable {
     }
 
     /// Outcome of one reconciliation pass.
-    public struct Result: Sendable {
+    ///
+    /// `Equatable` is synthesized, comparing every field including
+    /// `missingRefs` (round 11 — a hand-written `==` used to exclude it, so
+    /// `#expect(result == .init(archived: 1))`-shaped assertions never
+    /// actually verified the map "driving the archive decision" was
+    /// correct; a bug that only corrupted `missingRefs` while leaving the
+    /// counters right would have passed silently). Most passes leave
+    /// `missingRefs` empty (nothing currently missing, or a just-archived
+    /// ref resolved out of it — see the sweep below), so the `== .init(...)`
+    /// shorthand with its default `missingRefs: [:]` still reads naturally
+    /// at most call sites; a test asserting a pass that leaves something
+    /// genuinely pending needs to spell out `missingRefs` explicitly (or
+    /// assert on the individual counters instead).
+    public struct Result: Sendable, Equatable {
         public let imported: Int
         public let refreshed: Int
         public let archived: Int
@@ -52,15 +74,12 @@ public struct ContactsReconciler: Sendable {
         public let failed: Int
         /// System refs this pass found missing under `.authorized` (present
         /// in the repo as active, absent from `fetchAllContacts()`) but
-        /// didn't yet archive, keyed to the clock time this ref was *first*
-        /// observed missing — the two-pass, time-floored debounce below.
-        /// Feed this into the next call's `previouslyMissingRefs:` so a ref
-        /// that's still missing on a later `.authorized` pass, at least
-        /// `archiveDebounceFloor` after it was first seen missing, archives
-        /// on that pass. Deliberately excluded from `Equatable` (see the
-        /// hand-written `==` below): it's plumbing for the *next* call, not
-        /// part of what a test asserting on "this pass's outcome" should
-        /// have to spell out every time.
+        /// didn't yet archive, keyed to `ContactRefHasher.hash(_:)` of the
+        /// ref and the clock time it was *first* observed missing — the
+        /// two-pass, time-floored debounce below. Feed this into the next
+        /// call's `previouslyMissingRefs:` so a ref that's still missing on
+        /// a later `.authorized` pass, at least `archiveDebounceFloor`
+        /// after it was first seen missing, archives on that pass.
         public let missingRefs: [String: Date]
 
         public init(
@@ -209,16 +228,37 @@ public struct ContactsReconciler: Sendable {
             // this loop does no further waiting on the source (only
             // repository writes), so there's no additional window for a
             // downgrade to land inside it.
+            //
+            // `hashedRef`, not `ref`: round 11 persists this map to disk
+            // (`MissingContactRefStore`) across launches, and only a hash of
+            // the `systemContactRef` — never the raw identifier — is
+            // something safe to write to a sidecar file outside the
+            // protected GRDB database.
             for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
-                let firstMissingAt = previouslyMissingRefs[ref] ?? now
-                currentMissingRefs[ref] = firstMissingAt
-                guard previouslyMissingRefs[ref] != nil,
-                      now.timeIntervalSince(firstMissingAt) >= Self.archiveDebounceFloor else { continue }
+                let hashedRef = ContactRefHasher.hash(ref)
+                let firstMissingAt = previouslyMissingRefs[hashedRef] ?? now
+                let isConfirmedMiss = previouslyMissingRefs[hashedRef] != nil
+                    && now.timeIntervalSince(firstMissingAt) >= Self.archiveDebounceFloor
+                guard isConfirmedMiss else {
+                    // Not archiving this pass — still pending, so it carries
+                    // forward into the next call's `previouslyMissingRefs`.
+                    currentMissingRefs[hashedRef] = firstMissingAt
+                    continue
+                }
                 do {
                     try await repo.archive(id: contact.id, at: now)
                     archived += 1
+                    // Resolved — a successfully-archived ref doesn't belong
+                    // in the *next* pass's "still pending" set. `byRef`
+                    // itself excludes archived contacts from this loop on
+                    // the next pass anyway (`contact.archivedAt == nil`
+                    // above), so leaving it in here would only ever be a
+                    // one-pass-stale, self-correcting entry — but there's no
+                    // reason to persist that stale entry to disk at all
+                    // when we already know, right here, that it's resolved.
                 } catch {
                     failed += 1
+                    currentMissingRefs[hashedRef] = firstMissingAt
                     Self.log.error(
                         "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
                     )
@@ -341,18 +381,15 @@ public struct ContactsReconciler: Sendable {
     private static let log = RegardsLogger.feature("ContactsReconciler")
 }
 
-extension ContactsReconciler.Result: Equatable {
-    /// Hand-written, not synthesized: compares only the six counters.
-    /// `missingRefs` is next-call plumbing (see its doc comment on the
-    /// property) — the many `#expect(result == .init(archived: 1))`-shaped
-    /// assertions across the test suite predate it and were never meant to
-    /// pin which refs happened to be newly-missing on a given pass.
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.imported == rhs.imported
-            && lhs.refreshed == rhs.refreshed
-            && lhs.archived == rhs.archived
-            && lhs.unarchived == rhs.unarchived
-            && lhs.unchanged == rhs.unchanged
-            && lhs.failed == rhs.failed
+/// SHA-256 hex digest of a `systemContactRef` — the only form of a contact
+/// identifier `ContactsReconciler`'s archive-debounce state ever carries
+/// outside the file-protected GRDB database (round 11:
+/// `MissingContactRefStore` persists `Result.missingRefs`, keyed by this
+/// hash, to an Application Support sidecar file). One-way by construction:
+/// matching a candidate ref against persisted state means hashing the
+/// candidate and comparing, never reversing a stored hash back to a ref.
+enum ContactRefHasher {
+    static func hash(_ ref: String) -> String {
+        SHA256.hash(data: Data(ref.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -17,6 +17,29 @@ final class AppLaunchCoordinator {
         let makeRuntime: @Sendable () async throws -> AppRuntime
         let contactsSource: any ContactsSource
         let clock: @Sendable () -> Date
+        /// Round 11: persists `ContactsReconciler`'s archive-debounce state
+        /// across launches — see `MissingContactRefStore`'s doc comment for
+        /// why in-memory-only state (rounds 9–10) wasn't enough.
+        let missingContactRefStore: MissingContactRefStore
+
+        /// Explicit, not relying on the synthesized memberwise init to pick
+        /// up `missingContactRefStore`'s default: it defaults to
+        /// `.ephemeral()` (a throwaway temp-directory store) here so every
+        /// existing `Dependencies(makeRuntime:contactsSource:clock:)` call
+        /// site that doesn't care about cross-launch persistence keeps
+        /// compiling unchanged; `production()` below passes
+        /// `.applicationSupport()` explicitly.
+        init(
+            makeRuntime: @escaping @Sendable () async throws -> AppRuntime,
+            contactsSource: any ContactsSource,
+            clock: @escaping @Sendable () -> Date,
+            missingContactRefStore: MissingContactRefStore = .ephemeral()
+        ) {
+            self.makeRuntime = makeRuntime
+            self.contactsSource = contactsSource
+            self.clock = clock
+            self.missingContactRefStore = missingContactRefStore
+        }
     }
 
     private(set) var phase: Phase
@@ -96,11 +119,16 @@ final class AppLaunchCoordinator {
     /// missing, archives on that pass (round 9 + round 10 time floor,
     /// ARCHITECTURE.md §7/§21). `ContactsReconciler` itself is reconstructed
     /// fresh every pass and holds no state between calls; this is that
-    /// state. Unconditionally overwritten after every pass, including a
-    /// `.limited` or failed one — those return an empty `missingRefs` (the
-    /// sweep never runs), which resets this and means the sequence has to
-    /// restart cleanly rather than treat a `.limited` interruption as still
-    /// "consecutive".
+    /// state, mirrored to `Dependencies.missingContactRefStore` (round 11)
+    /// so it survives a relaunch — in-memory-only meant the required two
+    /// passes almost never both landed inside one process lifetime, so a
+    /// genuine deletion effectively never archived. Loaded once in
+    /// `start()`, unconditionally overwritten *and re-persisted* after
+    /// every pass (see `AppLaunchCoordinator+Reconciliation.swift`),
+    /// including a `.limited` or failed one — those return an empty
+    /// `missingRefs` (the sweep never runs), which resets this and means
+    /// the sequence has to restart cleanly rather than treat a `.limited`
+    /// interruption as still "consecutive".
     @ObservationIgnored var previouslyMissingContactRefs: [String: Date] = [:]
 
     init(dependencies: Dependencies) {
@@ -140,7 +168,16 @@ final class AppLaunchCoordinator {
                     return try await AppRuntime.makeProduction(environment: environment)
                 },
                 contactsSource: CNContactsSource(),
-                clock: { Date() }
+                clock: { Date() },
+                // `try?` + `.ephemeral()` fallback, not `production()`
+                // itself becoming `throws`: Application Support being
+                // unavailable is exceptionally rare, and this state is
+                // disposable debounce plumbing (see `MissingContactRefStore`'s
+                // doc comment) — degrading to "doesn't persist across
+                // launches this session" is far better than the app
+                // refusing to launch over it.
+                missingContactRefStore: (try? MissingContactRefStore.applicationSupport())
+                    ?? MissingContactRefStore.ephemeral()
             )
         )
     }
@@ -153,6 +190,10 @@ final class AppLaunchCoordinator {
         didStart = true
         phase = .loading
         statusMessage = nil
+        // Round 11: load before the first reconcile pass below, so it has
+        // whatever the *previous* process launch last persisted, not an
+        // empty map every single time.
+        previouslyMissingContactRefs = dependencies.missingContactRefStore.load()
 
         do {
             let runtime = try await dependencies.makeRuntime()

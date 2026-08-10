@@ -92,6 +92,17 @@ extension AppLaunchCoordinator {
             previouslyMissingContactRefs = [:]
             Self.reconciliationLog.error("reconciliation failed: \(error, privacy: .private)")
         }
+        // Round 11: persist after *every* pass, success or failure alike —
+        // both branches above already updated the in-memory map to
+        // whatever's now authoritative, so this just mirrors that to disk
+        // for the next process launch to pick up in `start()`.
+        do {
+            try dependencies.missingContactRefStore.save(previouslyMissingContactRefs)
+        } catch {
+            Self.reconciliationLog.error(
+                "failed to persist archive-debounce state: \(error, privacy: .private)"
+            )
+        }
         recordReconciliationPass()
     }
 
