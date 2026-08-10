@@ -1,0 +1,10 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "FALLBACK-UDID" }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
+      { "name": "iPhone 17 Pro", "isAvailable": false, "udid": "UNAVAILABLE-NEWEST-UDID" }
+    ]
+  }
+}

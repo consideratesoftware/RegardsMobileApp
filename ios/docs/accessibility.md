@@ -120,11 +120,40 @@ Intelligence** notification can overlay the simulator during an audit. Run
 banner; its xcresult screenshot and failure attachment identified the targeted
 element inside the iOS notification rather than the Regards hierarchy.
 
+A second instance recurred on the accessibility-audit job in run `31346143276`,
+flagging the same banner as "Potentially inaccessible text" inside
+`LaunchAccessibilityTests.testProductionOpenFailurePassesAuditAndRetryRecovers()`.
+Both artifacts were inspected, matching the first instance's proof bar: the
+xcresult's failure identified the targeted element inside the iOS
+notification, and `.claude/a11y-failure-screenshot.png` shows the banner
+overlaying the app. A rerun on the identical commit `c873c648` passed with
+every job green, matching the first instance and confirming runner noise
+rather than a product regression.
+
 Classify a future finding as system UI only when the failed xcresult identifies
 the targeted element inside an operating-system banner or hierarchy and the
 screenshot shows that overlay. Inspect both artifacts and rerun the exact
 failed job. Without both proofs, or when an app-owned failure repeats under
 §17, treat it as a product finding.
+
+Both audit workflows (`ios-ci.yml`'s accessibility-audit job and
+`audit-stress.yml`'s nightly 5× sweep) run `scripts/prepare-audit-simulator.sh`
+before testing. `macos-latest` jobs are fresh ephemeral VMs, so there is no
+stale simulator state to clean between runs; what the script does instead is
+resolve the pinned device to one exact UDID and pin every subsequent
+`xcodebuild -destination` to it, normalize the status bar so a real runner
+glyph can't become its own finding, and bound the boot with a timeout. None of
+that suppresses the Apple Intelligence notification itself: what was checked
+is `simctl help` for every relevant subcommand and Apple's `defaults`
+documentation, and no CoreSimulator or `defaults` knob that disables the
+notification turned up there. So this is not a guarantee against the
+intrusion class above. In `audit-stress.yml` specifically, the boot step also
+adds an idle gap between the simulator finishing boot and the first test
+actually executing (the build-for-testing step runs in between) — one more
+timing variable for whether the notification's delivery window lines up with
+a test run, not a mitigation for it. If a similar finding appears, the
+response is the same rerun-and-triage procedure this section already
+describes.
 
 ## Sensory-audit carve-outs
 
