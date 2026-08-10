@@ -21,14 +21,14 @@ public struct SettingsScreen: View {
                         navRow(
                             id: "reminder-windows",
                             title: "Reminder windows",
-                            subtitle: "when it's OK to nudge you",
+                            subtitle: "When it's OK to nudge you.",
                             route: .reminderWindows
                         )
                         Hair(inset: 16)
                         navRow(
                             id: "find-duplicate-contacts",
                             title: "Find duplicate contacts",
-                            subtitle: "virtual merges only",
+                            subtitle: "Virtual merges only.",
                             route: .mergeDuplicates
                         )
                     }
@@ -39,7 +39,7 @@ public struct SettingsScreen: View {
                     navRow(
                         id: "transparency",
                         title: "Transparency",
-                        subtitle: "how the privacy claim is verifiable",
+                        subtitle: "How the privacy claim is verifiable.",
                         route: .transparency
                     )
                 }
@@ -49,7 +49,7 @@ public struct SettingsScreen: View {
                     navRow(
                         id: "onboarding-preview",
                         title: "Onboarding preview",
-                        subtitle: "revisit the permission intro",
+                        subtitle: "Revisit the permission intro.",
                         route: .onboarding
                     )
                 }
