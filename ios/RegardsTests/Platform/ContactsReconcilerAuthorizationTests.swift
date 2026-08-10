@@ -100,14 +100,17 @@ struct ContactsReconcilerAuthorizationTests {
         #expect(reloaded.archivedAt == nil)
     }
 
-    /// Fix 3: a `fetchAllContacts()` that comes back wholesale empty while
-    /// the store previously held active contacts is indistinguishable from
-    /// "the user is mid-restore from an iCloud/device backup and Contacts
-    /// hasn't repopulated yet" — treating it as evidence every contact was
-    /// deleted would archive the whole address book in one pass on a false
-    /// read. This shape skips the sweep entirely rather than guess.
-    @Test("A wholesale-empty fetch under .authorized skips the archive sweep instead of mass-archiving")
-    func wholesaleEmptyFetchArchivesNothing() async throws {
+    /// Round 9: a `fetchAllContacts()` that comes back wholesale empty while
+    /// the store previously held active contacts is indistinguishable, on a
+    /// single pass, from "the user is mid-restore from an iCloud/device
+    /// backup and Contacts hasn't repopulated yet" — treating it as
+    /// evidence every contact was deleted would archive the whole address
+    /// book on a false read. The two-pass rule below defers on the first
+    /// miss and only archives once the *same* refs are still missing on the
+    /// very next `.authorized` pass (see `partialReadDefersArchiveUntilSecondConsecutiveMiss`
+    /// for the non-degenerate, partially-visible shape of this same rule).
+    @Test("A wholesale-empty fetch under .authorized defers archiving to a second consecutive miss")
+    func wholesaleEmptyFetchDefersArchiveUntilSecondConsecutiveMiss() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
         let contactA = Contact(systemContactRef: "still-stored-a", displayName: "A", tracked: true, cadenceDays: 7)
         let contactB = Contact(systemContactRef: "still-stored-b", displayName: "B", tracked: true, cadenceDays: 30)
@@ -116,13 +119,68 @@ struct ContactsReconcilerAuthorizationTests {
         let source = MutableContactsSource(status: .authorized, contacts: [])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
-        let result = try await reconciler.reconcile()
+        let firstPass = try await reconciler.reconcile()
+        #expect(firstPass.archived == 0)
+        let reloadedAAfterFirstPass = try #require(try await repo.fetch(id: contactA.id))
+        let reloadedBAfterFirstPass = try #require(try await repo.fetch(id: contactB.id))
+        #expect(reloadedAAfterFirstPass.archivedAt == nil)
+        #expect(reloadedBAfterFirstPass.archivedAt == nil)
 
-        #expect(result.archived == 0)
-        let reloadedA = try #require(try await repo.fetch(id: contactA.id))
-        let reloadedB = try #require(try await repo.fetch(id: contactB.id))
-        #expect(reloadedA.archivedAt == nil)
-        #expect(reloadedB.archivedAt == nil)
+        // Still wholesale-empty on the very next pass — a genuine
+        // mass-deletion (or the user revoking and the store staying
+        // legitimately empty) rather than a resync that would have
+        // repopulated by now.
+        let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
+        #expect(secondPass.archived == 2)
+        let reloadedAAfterSecondPass = try #require(try await repo.fetch(id: contactA.id))
+        let reloadedBAfterSecondPass = try #require(try await repo.fetch(id: contactB.id))
+        #expect(reloadedAAfterSecondPass.archivedAt == Self.now)
+        #expect(reloadedBAfterSecondPass.archivedAt == Self.now)
+    }
+
+    /// Round 9: the wholesale-empty case above is the degenerate 0-of-N
+    /// shape of a more general ambiguity — a *partial* read (some refs
+    /// visible, most not) is exactly as ambiguous on a single pass, since
+    /// nothing distinguishes "these refs were deleted" from "the resync
+    /// hasn't gotten to them yet". 2-of-50 visible pins the non-degenerate
+    /// case explicitly.
+    @Test("A partial read (2-of-50 visible) defers archiving until a second consecutive miss confirms it")
+    func partialReadDefersArchiveUntilSecondConsecutiveMiss() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        var stored: [Contact] = []
+        for index in 0..<50 {
+            let contact = Contact(systemContactRef: "bulk-\(index)", displayName: "Bulk \(index)", tracked: true)
+            try await repo.upsert(contact)
+            stored.append(contact)
+        }
+        let visibleRefs = Set(["bulk-0", "bulk-1"])
+        let source = MutableContactsSource(status: .authorized, contacts: visibleRefs.map { ref in
+            SystemContact(identifier: ref, givenName: ref, familyName: "", phoneNumbers: [], emailAddresses: [])
+        })
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+
+        let firstPass = try await reconciler.reconcile()
+        #expect(firstPass.archived == 0, "a single ambiguous partial read must not archive anything")
+        for contact in stored where !visibleRefs.contains(contact.systemContactRef) {
+            let reloaded = try #require(try await repo.fetch(id: contact.id))
+            #expect(reloaded.archivedAt == nil)
+        }
+
+        // Genuine-deletion control: the same 48 refs are still missing on
+        // the very next `.authorized` pass — this is what actually
+        // distinguishes a real deletion from a resync that would have
+        // repopulated some of them by now.
+        let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
+        #expect(secondPass.archived == 48)
+        for contact in stored where !visibleRefs.contains(contact.systemContactRef) {
+            let reloaded = try #require(try await repo.fetch(id: contact.id))
+            #expect(reloaded.archivedAt == Self.now)
+        }
+        for ref in visibleRefs {
+            let stillVisible = try #require(stored.first { $0.systemContactRef == ref })
+            let reloaded = try #require(try await repo.fetch(id: stillVisible.id))
+            #expect(reloaded.archivedAt == nil)
+        }
     }
 
     @Test("A genuine deletion under .authorized still archives, proving the .limited guard is scoped correctly")
@@ -130,13 +188,6 @@ struct ContactsReconcilerAuthorizationTests {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
         let deleted = Contact(systemContactRef: "truly-deleted", displayName: "Gone", tracked: true)
         try await repo.upsert(deleted)
-        // A second, still-visible contact keeps the fetch from being
-        // wholesale-empty — the mass-archive guard (`ContactsReconcilerTests
-        // .reconcileWholesaleEmptyFetchArchivesNothing`) specifically skips
-        // the sweep when the store held contacts but the fetch reports none
-        // at all, so a single-contact deletion needs at least one other
-        // contact the store still reports to prove archiving itself (not
-        // that guard) is what this test exercises.
         let stillVisible = Contact(systemContactRef: "still-visible", displayName: "Still Visible")
         try await repo.upsert(stillVisible)
         let source = MutableContactsSource(status: .authorized, contacts: [
@@ -145,9 +196,12 @@ struct ContactsReconcilerAuthorizationTests {
         ])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
-        let result = try await reconciler.reconcile()
+        let firstPass = try await reconciler.reconcile()
+        #expect(firstPass.archived == 0)
 
-        #expect(result.archived == 1)
+        let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
+
+        #expect(secondPass.archived == 1)
         let reloaded = try #require(try await repo.fetch(id: deleted.id))
         #expect(reloaded.archivedAt == Self.now)
     }

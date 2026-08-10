@@ -23,10 +23,9 @@ import Foundation
 /// - A row this pass can't decode (R50) is left untouched: it is neither
 ///   matched, refreshed, nor archived, so a corrupt row is never mistaken for
 ///   a deleted one.
-/// - Under `.authorized`, a `fetchAllContacts()` that comes back wholesale
-///   empty while the store previously held active contacts skips the
-///   archive sweep entirely instead of archiving everything it stored — see
-///   the sweep's own comment below for why (ARCHITECTURE.md §21).
+/// - Under `.authorized`, a ref only archives once it's been missing across
+///   **two consecutive `.authorized` passes** — see the sweep's own comment
+///   below for why a single miss isn't enough (ARCHITECTURE.md §21).
 public struct ContactsReconciler: Sendable {
     private let source: any ContactsSource
     private let repo: any ContactRepository
@@ -43,13 +42,24 @@ public struct ContactsReconciler: Sendable {
     }
 
     /// Outcome of one reconciliation pass.
-    public struct Result: Sendable, Equatable {
+    public struct Result: Sendable {
         public let imported: Int
         public let refreshed: Int
         public let archived: Int
         public let unarchived: Int
         public let unchanged: Int
         public let failed: Int
+        /// System refs this pass found missing under `.authorized` (present
+        /// in the repo as active, absent from `fetchAllContacts()`) but
+        /// didn't yet archive because they weren't *also* missing on the
+        /// previous `.authorized` pass — the two-pass debounce below. Feed
+        /// this into the next call's `previouslyMissingRefs:` so a ref that
+        /// stays missing across two consecutive `.authorized` passes
+        /// archives on the second one. Deliberately excluded from
+        /// `Equatable` (see the hand-written `==` below): it's plumbing for
+        /// the *next* call, not part of what a test asserting on "this
+        /// pass's outcome" should have to spell out every time.
+        public let missingRefs: Set<String>
 
         public init(
             imported: Int = 0,
@@ -57,7 +67,8 @@ public struct ContactsReconciler: Sendable {
             archived: Int = 0,
             unarchived: Int = 0,
             unchanged: Int = 0,
-            failed: Int = 0
+            failed: Int = 0,
+            missingRefs: Set<String> = []
         ) {
             self.imported = imported
             self.refreshed = refreshed
@@ -65,6 +76,7 @@ public struct ContactsReconciler: Sendable {
             self.unarchived = unarchived
             self.unchanged = unchanged
             self.failed = failed
+            self.missingRefs = missingRefs
         }
     }
 
@@ -76,7 +88,14 @@ public struct ContactsReconciler: Sendable {
     /// status isn't `.authorized` or `.limited` — `.limited` reconciles
     /// against exactly the picker-selected subset the system exposes, same
     /// as first-launch import.
-    public func reconcile() async throws -> Result {
+    ///
+    /// `previouslyMissingRefs` is the previous `.authorized` pass's
+    /// `Result.missingRefs` (empty for a first-ever call, or after any
+    /// non-`.authorized` pass in between — see the archive sweep below for
+    /// why only `.authorized` passes count). Threading it through is the
+    /// caller's job (`AppLaunchCoordinator` holds it across passes); this
+    /// method doesn't retain any state of its own between calls.
+    public func reconcile(previouslyMissingRefs: Set<String> = []) async throws -> Result {
         let status = await source.currentAuthorization()
         guard status == .authorized || status == .limited else {
             throw ReconciliationError.notAuthorized(status)
@@ -154,41 +173,38 @@ public struct ContactsReconciler: Sendable {
         // pass is `.authorized`, not just the one taken before the
         // (possibly long) enumeration — see the TOCTOU comment above.
         var archived = 0
+        var currentMissingRefs: Set<String> = []
         if status == .authorized && statusAfterFetch == .authorized {
-            // Fix 3: a wholesale-empty `fetchAllContacts()` while the store
-            // previously held active contacts is indistinguishable from "the
-            // user is mid-restore from an iCloud/device backup and Contacts
-            // hasn't repopulated yet" (§21) — genuine deletion of literally
-            // every contact and a resync-in-progress produce the exact same
-            // signal from this API. Sweeping in that shape would archive the
-            // whole address book in one pass on a false read. Skip the sweep
-            // entirely rather than guess; a real per-contact deletion still
-            // archives normally as long as *something* is still visible.
-            let activeStoredCount = byRef.values.lazy.filter { $0.archivedAt == nil }.count
-            let suspectedResyncInProgress = systemContacts.isEmpty && activeStoredCount > 0
-            if suspectedResyncInProgress {
-                Self.log.info("""
-                    skipped archive sweep: fetchAllContacts() returned zero contacts while \
-                    \(activeStoredCount) are stored active — treating as a possible resync in \
-                    progress rather than mass-deletion (§21)
-                    """)
-            } else {
-                // No per-iteration re-check inside this loop: the two-point
-                // TOCTOU guard above already establishes "authorized at the
-                // start of the fetch and authorized right after it," and this
-                // loop does no further waiting on the source (only repository
-                // writes), so there's no additional window for a downgrade to
-                // land inside it.
-                for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
-                    do {
-                        try await repo.archive(id: contact.id, at: now)
-                        archived += 1
-                    } catch {
-                        failed += 1
-                        Self.log.error(
-                            "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
-                        )
-                    }
+            // Round 9: a *single* miss isn't evidence of deletion either.
+            // `fetchAllContacts()` reporting a ref absent — whether that's
+            // every stored ref (wholesale-empty) or just some of them (e.g.
+            // 3-of-5000 visible) — is exactly what a resync-in-progress
+            // (iCloud/device restore, Contacts still repopulating) looks
+            // like from this API, and a partial read is just as ambiguous
+            // as an empty one: nothing distinguishes "this ref was deleted"
+            // from "this ref hasn't reappeared in the resync yet" on a
+            // single pass. Requiring a ref to be missing on *this* pass
+            // *and* have already been missing on the previous `.authorized`
+            // pass (`previouslyMissingRefs`, threaded in by the caller) is
+            // what actually tells them apart: a resync completes and the
+            // ref reappears before a second consecutive miss; a genuine
+            // deletion doesn't. No per-iteration re-check inside the loop
+            // below: the two-point TOCTOU guard above already establishes
+            // "authorized at the start of the fetch and authorized right
+            // after it," and this loop does no further waiting on the
+            // source (only repository writes), so there's no additional
+            // window for a downgrade to land inside it.
+            for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
+                currentMissingRefs.insert(ref)
+                guard previouslyMissingRefs.contains(ref) else { continue }
+                do {
+                    try await repo.archive(id: contact.id, at: now)
+                    archived += 1
+                } catch {
+                    failed += 1
+                    Self.log.error(
+                        "archive failed for \(contact.id, privacy: .private): \(error, privacy: .private)"
+                    )
                 }
             }
         }
@@ -199,7 +215,8 @@ public struct ContactsReconciler: Sendable {
             archived: archived,
             unarchived: unarchived,
             unchanged: unchanged,
-            failed: failed
+            failed: failed,
+            missingRefs: currentMissingRefs
         )
     }
 
@@ -296,4 +313,20 @@ public struct ContactsReconciler: Sendable {
     }
 
     private static let log = RegardsLogger.feature("ContactsReconciler")
+}
+
+extension ContactsReconciler.Result: Equatable {
+    /// Hand-written, not synthesized: compares only the six counters.
+    /// `missingRefs` is next-call plumbing (see its doc comment on the
+    /// property) — the many `#expect(result == .init(archived: 1))`-shaped
+    /// assertions across the test suite predate it and were never meant to
+    /// pin which refs happened to be newly-missing on a given pass.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.imported == rhs.imported
+            && lhs.refreshed == rhs.refreshed
+            && lhs.archived == rhs.archived
+            && lhs.unarchived == rhs.unarchived
+            && lhs.unchanged == rhs.unchanged
+            && lhs.failed == rhs.failed
+    }
 }

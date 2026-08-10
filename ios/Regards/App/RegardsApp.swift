@@ -13,27 +13,6 @@ struct RegardsApp: App {
     }
 }
 
-/// Gives UI tests a deterministic way to exercise accessibility layouts
-/// without changing the shared Simulator's system settings.
-private struct UITestDynamicTypeOverride: ViewModifier {
-#if DEBUG
-    private let requestedSize = ProcessInfo.processInfo.environment["REGARDS_UI_TEST_DYNAMIC_TYPE"]
-#endif
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-#if DEBUG
-        if requestedSize == "accessibility5" {
-            content.environment(\.dynamicTypeSize, .accessibility5)
-        } else {
-            content
-        }
-#else
-        content
-#endif
-    }
-}
-
 /// The first SwiftUI view the user sees. The splash remains visible until the
 /// persisted runtime has loaded, then the profile decides whether onboarding
 /// or the tab root is next.
@@ -41,6 +20,13 @@ struct RootView: View {
     @State var launch: AppLaunchCoordinator
     @State private var showsTransparency = false
     @State private var launchFailureEffectGeneration = 0
+    /// Latch for the scenePhase gate below. Foregrounding always routes
+    /// `.background → .inactive → .active`, so `oldPhase` at `.active` is
+    /// always `.inactive`, never `.background` — this remembers "passed
+    /// through `.background`" across that hop instead. A same-foreground
+    /// blip (`.active → .inactive → .active`, e.g. Control Center) never
+    /// sets it.
+    @State private var pendingForegroundReconcile = false
     @AccessibilityFocusState private var launchFailureFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -90,18 +76,20 @@ struct RootView: View {
         .task {
             await launch.start()
         }
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            // Only a genuine background→active edge is a real foreground —
-            // a Control Center pull-down, share sheet, or notification
-            // banner takes the scene through .inactive→.active without the
-            // app ever leaving the foreground, and re-reconciling Contacts
-            // (up to a full enumeration, R25) on every one of those blips
-            // would be wasted work on a signal that isn't "the user came
-            // back to the app."
-            guard oldPhase == .background, newPhase == .active else { return }
-            // Re-reconcile Contacts every foreground (ARCHITECTURE.md §7);
-            // launch itself already covers the first appearance.
-            Task { await launch.handleSceneActivation() }
+        // Re-reconcile Contacts every foreground (ARCHITECTURE.md §7);
+        // launch itself already covers the first appearance. `.active`
+        // reached without the latch set is a same-foreground blip; plain
+        // `.inactive` is just the hop the latch survives.
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .background:
+                pendingForegroundReconcile = true
+            case .active where pendingForegroundReconcile:
+                pendingForegroundReconcile = false
+                Task { await launch.handleSceneActivation() }
+            default:
+                break
+            }
         }
         .onChange(of: launchFailureMessage, initial: true) { _, message in
             launchFailureEffectGeneration &+= 1
@@ -473,17 +461,6 @@ struct RegardsTabRoot: View {
                 runtime: runtime
             )
         )
-    }
-}
-
-private struct RegardsTabBarBehavior: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            content
-        }
     }
 }
 

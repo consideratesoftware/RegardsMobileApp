@@ -9,51 +9,72 @@ import Testing
 /// the real `RootView`, drives genuine SwiftUI `scenePhase` environment
 /// transitions through an observable harness, and proves the coordinator's
 /// reconciliation count reacts correctly to both shapes of transition into
-/// `.active`: a real background→active foreground (round 7) reconciles, and
-/// an inactive→active blip — Control Center, share sheet, a notification
-/// banner dismissing, none of which ever leave the app backgrounded — does
-/// not (round 8).
+/// `.active`.
+///
+/// Round 9 correction: round 8's positive test drove `.background` straight
+/// to `.active`, a shape UIKit never actually produces — real foregrounding
+/// always routes through `.inactive` first (`.background → .inactive →
+/// .active`), so `oldPhase` at the `.active` edge is always `.inactive`,
+/// never `.background`. A guard comparing `oldPhase == .background` (round
+/// 8's fix) could never fire on a real device, and the test only passed
+/// because it synthesized a transition shape that skips the intervening
+/// `.inactive` hop. `RootView` now uses a latch (`pendingForegroundReconcile`)
+/// instead of comparing `oldPhase` directly, and both tests below drive only
+/// the realistic three-phase sequences a real device actually produces.
 @MainActor
 struct RootViewSceneActivationTests {
     let now = Date(timeIntervalSince1970: 1_785_600_000)
 
-    @Test("A genuine background→active foreground triggers handleSceneActivation")
-    func backgroundToActiveEdgeTriggersReconciliation() async throws {
+    @Test("A real foreground (background→inactive→active) triggers exactly one reconciliation")
+    func backgroundToActiveViaInactiveFiresExactlyOnce() async throws {
         let (launch, model, window) = try await makeStartedHarness()
         let countAfterLaunch = launch.reconciliationCount
 
+        // The realistic device sequence: UIKit never delivers `.background`
+        // directly to `.active`, it always routes through `.inactive`
+        // first. Each assignment is settled before the next so SwiftUI
+        // actually commits and diffs every intermediate value, rather than
+        // risk coalescing straight from `.active` to `.active` and silently
+        // skipping the states this test means to exercise.
         model.scenePhase = .background
-        // Forces SwiftUI to actually commit a render pass against the
-        // `.background` value before moving on — two assignments back to
-        // back with no render pass between them risk SwiftUI coalescing
-        // them and only ever diffing directly from the harness's initial
-        // `.active` to the final `.active`, silently skipping the
-        // intermediate state this test means to exercise. `layoutIfNeeded()`
-        // alone isn't reliable here (it forces UIKit's Auto Layout pass, not
-        // SwiftUI's own render cycle); the same run-loop pump `makeStartedHarness`
-        // already relies on for `.task` is what actually commits it.
-        pumpRunLoopBriefly()
+        await settleSceneUpdate()
+        model.scenePhase = .inactive
+        await settleSceneUpdate()
         model.scenePhase = .active
 
         #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount > countAfterLaunch })
         #expect(launch.reconciliationCount == countAfterLaunch + 1)
 
+        // The latch must also be *cleared* once it fires — an immediately
+        // following same-foreground blip (no further `.background`) must
+        // not produce a second pass off a latch left stuck set.
+        let countAfterForeground = launch.reconciliationCount
+        model.scenePhase = .inactive
+        await settleSceneUpdate()
+        model.scenePhase = .active
+        let reconciledAgain = await eventuallyPumpingRunLoop(maxIterations: 30) {
+            launch.reconciliationCount > countAfterForeground
+        }
+        #expect(!reconciledAgain, "the foreground latch must be cleared after firing, not left stuck set")
+        #expect(launch.reconciliationCount == countAfterForeground)
+
         window.isHidden = true
     }
 
-    @Test("An inactive→active blip (Control Center, share sheet) does not trigger reconciliation")
-    func inactiveToActiveBlipDoesNotTriggerReconciliation() async throws {
+    @Test("A same-foreground blip (active→inactive→active) does not trigger reconciliation")
+    func activeToInactiveToActiveBlipFiresNone() async throws {
         let (launch, model, window) = try await makeStartedHarness()
         let countAfterLaunch = launch.reconciliationCount
 
-        // The scene never left the foreground here — no `.background` in
-        // this sequence — so this must not reconcile. The pump between the
-        // two assignments forces SwiftUI to actually commit and diff the
+        // The scene never leaves the foreground in this sequence — no
+        // `.background` at all (Control Center, a share sheet, a
+        // notification banner all take this exact active→inactive→active
+        // shape) — so this must not reconcile. The pump between the two
+        // assignments forces SwiftUI to actually commit and diff the
         // `.inactive` value, rather than risk coalescing straight from
-        // `.active` to `.active` and testing nothing (see
-        // `backgroundToActiveEdgeTriggersReconciliation`'s comment above).
+        // `.active` to `.active` and testing nothing.
         model.scenePhase = .inactive
-        pumpRunLoopBriefly()
+        await settleSceneUpdate()
         model.scenePhase = .active
 
         // Waiting for a *negative* can't use the same "eventually true"
@@ -65,7 +86,7 @@ struct RootViewSceneActivationTests {
         let reconciledSpuriously = await eventuallyPumpingRunLoop(maxIterations: 30) {
             launch.reconciliationCount > countAfterLaunch
         }
-        #expect(!reconciledSpuriously, "an inactive→active blip must not trigger a reconciliation pass")
+        #expect(!reconciledSpuriously, "an active→inactive→active blip must not trigger a reconciliation pass")
         #expect(launch.reconciliationCount == countAfterLaunch)
 
         window.isHidden = true
@@ -139,6 +160,20 @@ private func eventuallyPumpingRunLoop(
 @MainActor
 private func pumpRunLoopBriefly() {
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+}
+
+/// Settles a single `scenePhase` assignment before the test moves on to the
+/// next one. A single `pumpRunLoopBriefly()` call was enough for a *pair*
+/// of assignments (round 8), but wasn't reliable for three assignments in a
+/// row (round 9's realistic `.background → .inactive → .active` sequence) —
+/// several yield-and-pump rounds gives SwiftUI's Combine-driven environment
+/// update more chances to actually commit before the next assignment lands.
+@MainActor
+private func settleSceneUpdate(iterations: Int = 5) async {
+    for _ in 0..<iterations {
+        await Task.yield()
+        pumpRunLoopBriefly()
+    }
 }
 
 @MainActor

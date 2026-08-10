@@ -89,6 +89,17 @@ final class AppLaunchCoordinator {
     /// exactly one more before clearing `reconciliationTask`, coalescing any
     /// number of overlapping triggers into at most one extra pass.
     @ObservationIgnored var reconciliationPending = false
+    /// `ContactsReconciler.Result.missingRefs` from the most recent pass —
+    /// fed back in as the next call's `previouslyMissingRefs:` so a ref
+    /// missing on two consecutive `.authorized` passes archives on the
+    /// second one (round 9, ARCHITECTURE.md §7/§21). `ContactsReconciler`
+    /// itself is reconstructed fresh every pass and holds no state between
+    /// calls; this is that state. Unconditionally overwritten after every
+    /// pass, including a `.limited` or failed one — those return an empty
+    /// `missingRefs` (the sweep never runs), which resets this and means
+    /// the two-pass sequence has to restart cleanly rather than treat a
+    /// `.limited` interruption as still "consecutive".
+    @ObservationIgnored var previouslyMissingContactRefs: Set<String> = []
 
     init(dependencies: Dependencies) {
         self.phase = .loading

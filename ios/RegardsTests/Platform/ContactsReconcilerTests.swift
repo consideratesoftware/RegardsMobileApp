@@ -26,7 +26,7 @@ struct ContactsReconcilerTests {
         #expect(stored.first?.tracked == false)
     }
 
-    @Test("A system contact the store no longer exposes is archived, never deleted")
+    @Test("A system contact the store no longer exposes archives on the second consecutive miss, never deleted")
     func reconcileArchivesDeletedSystemContact() async throws {
         let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
         let existing = Contact(
@@ -37,14 +37,6 @@ struct ContactsReconcilerTests {
             preferredChannelValue: "+15555550901"
         )
         try await repo.upsert(existing)
-        // A second, still-visible contact keeps the fetch from being
-        // wholesale-empty — fix 3's mass-archive guard specifically treats
-        // "the store previously held active contacts, fetch returned none
-        // at all" as a suspected resync-in-progress and skips the sweep
-        // entirely (see `ContactsReconcilerAuthorizationTests
-        // .wholesaleEmptyFetchArchivesNothing`). This test is about one
-        // contact genuinely disappearing while the rest of the address book
-        // still answers normally.
         let stillPresent = Contact(
             systemContactRef: "present-1",
             displayName: "Present Contact",
@@ -57,9 +49,18 @@ struct ContactsReconcilerTests {
         ])
         let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
 
-        let result = try await reconciler.reconcile()
+        // Round 9: a ref only archives once it's missing on two consecutive
+        // `.authorized` passes (see `ContactsReconcilerAuthorizationTests`
+        // for the dedicated ambiguous-partial-read regression) — the first
+        // pass here just records "gone-1" as newly missing, not archived.
+        let firstPass = try await reconciler.reconcile()
+        #expect(firstPass.archived == 0)
+        let stillActiveAfterFirstPass = try await repo.fetch(id: existing.id)
+        #expect(stillActiveAfterFirstPass?.archivedAt == nil)
 
-        #expect(result.archived == 1)
+        let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
+
+        #expect(secondPass.archived == 1)
         let reloaded = try await repo.fetch(id: existing.id)
         #expect(reloaded?.archivedAt == Self.now)
         // History-bearing fields survive archival untouched.

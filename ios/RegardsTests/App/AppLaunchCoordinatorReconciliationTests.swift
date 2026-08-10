@@ -25,9 +25,6 @@ struct AppLaunchCoordinatorReconciliationTests {
             displayName: "Going Away",
             tracked: true
         )
-        // A second, still-visible contact keeps the second-pass fetch from
-        // being wholesale-empty — fix 3's mass-archive guard treats that
-        // shape as a suspected resync-in-progress and skips the sweep.
         let staying = Contact(systemContactRef: "staying-x", displayName: "Staying")
         try await environment.contacts.upsert(existing)
         try await environment.contacts.upsert(staying)
@@ -49,9 +46,18 @@ struct AppLaunchCoordinatorReconciliationTests {
             SystemContact(identifier: "staying-x", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
+        // Round 9: a ref only archives once it's missing on two consecutive
+        // `.authorized` passes — `AppLaunchCoordinator` threads that state
+        // across calls itself, so the first foreground after "gone-x"
+        // disappears just records the miss.
+        await launch.handleSceneActivation()
+        #expect(launch.reconciliationCount == 2)
+        let stillNotArchivedAfterFirstMiss = try await environment.contacts.fetch(id: existing.id)
+        #expect(stillNotArchivedAfterFirstMiss?.archivedAt == nil)
+
         await launch.handleSceneActivation()
 
-        #expect(launch.reconciliationCount == 2)
+        #expect(launch.reconciliationCount == 3)
         let archived = try await environment.contacts.fetch(id: existing.id)
         #expect(archived?.archivedAt == now)
     }
@@ -162,8 +168,6 @@ struct AppLaunchCoordinatorReconciliationTests {
             displayName: "Also Going",
             tracked: true
         )
-        // A second, still-visible contact keeps the post-change fetch from
-        // being wholesale-empty — see fix 3's mass-archive guard.
         let staying = Contact(systemContactRef: "staying-y", displayName: "Staying")
         try await environment.contacts.upsert(existing)
         try await environment.contacts.upsert(staying)
@@ -182,9 +186,17 @@ struct AppLaunchCoordinatorReconciliationTests {
             SystemContact(identifier: "staying-y", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
+        // Round 9: the first miss just records "gone-y" as newly missing —
+        // archiving needs a second consecutive `.authorized` pass that
+        // still doesn't see it.
+        source.simulateChange()
+        #expect(await eventually { launch.reconciliationCount == 2 })
+        let stillNotArchivedAfterFirstMiss = try await environment.contacts.fetch(id: existing.id)
+        #expect(stillNotArchivedAfterFirstMiss?.archivedAt == nil)
+
         source.simulateChange()
 
-        #expect(await eventually { launch.reconciliationCount == 2 })
+        #expect(await eventually { launch.reconciliationCount == 3 })
         let archived = try await environment.contacts.fetch(id: existing.id)
         #expect(archived?.archivedAt == now)
     }

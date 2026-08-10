@@ -68,9 +68,6 @@ struct ContactsReconcilerResilienceTests {
             preferredChannel: .phoneCall,
             preferredChannelValue: "+15555550920"
         )
-        // A bystander that stays visible across both passes keeps neither
-        // fetch wholesale-empty — fix 3's mass-archive guard would otherwise
-        // skip the deletion pass's sweep entirely.
         let bystander = Contact(systemContactRef: "bystander", displayName: "Bystander")
         try await repo.upsert(original)
         try await repo.upsert(bystander)
@@ -80,7 +77,14 @@ struct ContactsReconcilerResilienceTests {
         )
         let deletionSource = MutableContactsSource(status: .authorized, contacts: [bystanderSystemContact])
         let deletionReconciler = ContactsReconciler(source: deletionSource, repo: repo, clock: { Self.now })
-        _ = try await deletionReconciler.reconcile()
+        // Round 9: a ref only archives once it's missing on two consecutive
+        // `.authorized` passes, so "deletion" here takes two calls.
+        let firstDeletionPass = try await deletionReconciler.reconcile()
+        #expect(firstDeletionPass.archived == 0)
+        let secondDeletionPass = try await deletionReconciler.reconcile(
+            previouslyMissingRefs: firstDeletionPass.missingRefs
+        )
+        #expect(secondDeletionPass.archived == 1)
         let archivedOriginal = try #require(try await repo.fetch(id: original.id))
         #expect(archivedOriginal.archivedAt == Self.now)
 
@@ -141,8 +145,6 @@ struct ContactsReconcilerResilienceTests {
         )
         try await repositories.interactions.append(log)
 
-        // A still-visible bystander keeps the fetch from being
-        // wholesale-empty — see fix 3's mass-archive guard.
         let bystander = Contact(systemContactRef: "bystander", displayName: "Bystander")
         try await repositories.contacts.upsert(bystander)
         let source = MutableContactsSource(status: .authorized, contacts: [
@@ -151,7 +153,11 @@ struct ContactsReconcilerResilienceTests {
         ])
         let reconciler = ContactsReconciler(source: source, repo: repositories.contacts, clock: { Self.now })
 
-        let result = try await reconciler.reconcile()
+        // Round 9: a ref only archives once it's missing on two consecutive
+        // `.authorized` passes.
+        let firstPass = try await reconciler.reconcile()
+        #expect(firstPass.archived == 0)
+        let result = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
 
         #expect(result == .init(archived: 1, unchanged: 1))
         let archivedContact = try #require(try await repositories.contacts.fetch(id: contact.id))

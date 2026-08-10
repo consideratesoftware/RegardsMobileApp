@@ -78,12 +78,18 @@ extension AppLaunchCoordinator {
             clock: dependencies.clock
         )
         do {
-            let result = try await reconciler.reconcile()
+            let result = try await reconciler.reconcile(previouslyMissingRefs: previouslyMissingContactRefs)
+            previouslyMissingContactRefs = result.missingRefs
             Self.reconciliationLog.info("""
                 reconciliation complete: imported=\(result.imported) refreshed=\(result.refreshed) \
                 archived=\(result.archived) unarchived=\(result.unarchived) failed=\(result.failed)
                 """)
         } catch {
+            // No sweep ran this pass, so there's nothing newly-confirmed as
+            // missing — reset rather than leave stale refs from a prior
+            // pass sitting around waiting to be "confirmed" by an unrelated
+            // later pass's coincidentally-overlapping miss.
+            previouslyMissingContactRefs = []
             Self.reconciliationLog.error("reconciliation failed: \(error, privacy: .private)")
         }
         recordReconciliationPass()

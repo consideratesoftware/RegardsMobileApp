@@ -125,7 +125,9 @@ never pick up Android work.
   `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen generate`
   byte-identical. Manual VoiceOver smoke for the corruption-banner state is
   still outstanding — needs a supervisor-arranged recorded pass before merge
-  (checklist in the fix-batch report). Still not pushed or opened as a PR.
+  (checklist in the fix-batch report). Not pushed as of this round; later
+  pushed as GitHub PR #48 (`claude/tf-03-contacts-reconciliation` → `main`)
+  — see below.
 - A third review round found one further blocker in that fix batch: the
   `AllContactsScreen` reload was keyed off raw `scenePhase`, which races
   `AppLaunchCoordinator`'s own reconciliation pass (the scene-phase handler
@@ -153,7 +155,32 @@ never pick up Android work.
   `changeNotifications()`'s real `.bufferingNewest(1)` policy collapses many
   rapid store-change notifications into far fewer than one pass each.
   299/299 `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen
-  generate` byte-identical. Still not pushed or opened as a PR.
+  generate` byte-identical. Not pushed as of this round either; a fourth
+  review round returned APPROVE (a burst-coalescing test fix, the last
+  non-blocking item) and the branch was then pushed and opened as GitHub PR
+  #48 (`claude/tf-03-contacts-reconciliation` → `main`).
+- PR #48 has been through five further hosted-review rounds since opening,
+  none merged yet: round 5 fixed a CI-only flake in the corruption-banner
+  accessibility test (in-process UIKit tree inspection never materializes
+  assistive technology on a headless runner); round 6 replaced that test
+  with an XCUI-driven one seeded via a new `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
+  launch flag, closed a silent-onboarding-completion gap when every import
+  row fails, and fixed a wrong doc comment about which channels re-derive a
+  stale preferred value; round 7 added a mass-archive guard, field-scoped
+  reconciliation writes (so a concurrent `lastInteractedAt` write can't be
+  reverted by a reconcile pass), and store-change replay/ordering fixes;
+  round 8 empirically re-proved the off-pool-saturation regression actually
+  discriminates (three earlier "fixes" to it turned out not to, only caught
+  by reverting the implementation and running the suite), added
+  `updateReconciledFields` contract coverage on both backends, and gated
+  reconciliation on a genuine background→active scenePhase edge; round 9
+  (in progress) fixes a production-breaking bug the round 8 gate shipped
+  with — real foregrounding never delivers `.background` directly to
+  `.active` (it routes through `.inactive`), so that gate could never fire
+  on a device — plus extends the mass-archive guard to a two-consecutive-pass
+  rule covering ambiguous partial reads, not just wholesale-empty ones. Not
+  yet merged; the manual VoiceOver smoke recording for the corruption-banner
+  state remains outstanding.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
