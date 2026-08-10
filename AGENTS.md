@@ -51,7 +51,7 @@ xcodebuild -project Regards.xcodeproj -scheme Regards \
   -onlyUsePackageVersionsFromResolvedFile test
 ```
 
-(iPhone 17 Pro matches CI's pinned simulator — `SIMULATOR` in `ios-ci.yml`. Keep them in sync.)
+(iPhone 17 Pro matches CI's pinned simulator — `SIMULATOR_NAME` in `ios-ci.yml`. Keep them in sync.)
 
 Run a single suite or test:
 
