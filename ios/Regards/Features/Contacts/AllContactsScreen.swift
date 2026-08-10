@@ -31,6 +31,10 @@ public struct AllContactsScreen: View {
                     .padding(.top, 4)
                     .padding(.bottom, 8)
 
+                if let corruptionMessage = viewModel.corruptionMessage {
+                    corruptionBanner(corruptionMessage)
+                }
+
                 listContent(visibleContacts)
 
                 Color.clear.frame(height: 40)
@@ -73,6 +77,26 @@ public struct AllContactsScreen: View {
             }
             .padding(.top, 4)
         }
+    }
+
+    /// Non-interactive: R50 asks that a corrupt row stay visible rather than
+    /// vanishing (or hiding the rest of the list) — not that the user takes
+    /// an action here. There's nothing to tap yet; a future PR can add a
+    /// "Learn more" / support-export path once one exists.
+    private func corruptionBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(RegardsDS.ink)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(RegardsDS.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("contacts.corruption-banner")
     }
 
     private var emptyState: some View {

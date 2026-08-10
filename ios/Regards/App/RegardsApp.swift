@@ -43,6 +43,7 @@ struct RootView: View {
     @State private var launchFailureEffectGeneration = 0
     @AccessibilityFocusState private var launchFailureFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     var launchFailureAccessibilityEffects = LaunchFailureAccessibilityEffects.live
 
     var body: some View {
@@ -85,6 +86,12 @@ struct RootView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: launch.phase)
         .task {
             await launch.start()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            // Re-reconcile Contacts every foreground (ARCHITECTURE.md §7);
+            // launch itself already covers the first appearance.
+            Task { await launch.handleSceneActivation() }
         }
         .onChange(of: launchFailureMessage, initial: true) { _, message in
             launchFailureEffectGeneration &+= 1

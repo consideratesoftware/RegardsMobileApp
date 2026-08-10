@@ -25,10 +25,15 @@ final class AppLaunchCoordinator {
     private(set) var statusMessage: String?
     private(set) var canContinueWithoutContacts = false
     private(set) var onboardingCompletionPending = false
+    /// Completed reconciliation passes (launch + foreground + store-change).
+    /// Exposed so tests can await a specific pass deterministically instead
+    /// of sleeping; the UI never reads it.
+    private(set) var reconciliationCount = 0
 
     @ObservationIgnored private let dependencies: Dependencies?
     @ObservationIgnored private var didStart = false
     @ObservationIgnored private var onboardingActionGeneration = 0
+    @ObservationIgnored private var changeObservationTask: Task<Void, Never>?
 
     init(dependencies: Dependencies) {
         self.phase = .loading
@@ -147,7 +152,14 @@ final class AppLaunchCoordinator {
 
             self.runtime = runtime
             guard profile.onboardingCompletedAt == nil else {
+                // Flip the phase first so the tab root appears immediately —
+                // reconciliation (up to a full Contacts enumeration, moved
+                // off the cooperative pool by R25) never delays it — then
+                // reconcile this launch and start listening for foreground
+                // and CNContactStoreDidChange triggers.
                 phase = .ready
+                await reconcileNow(runtime: runtime, dependencies: dependencies)
+                beginObservingContactStoreChanges(dependencies: dependencies)
                 return
             }
 
@@ -244,7 +256,53 @@ final class AppLaunchCoordinator {
         canContinueWithoutContacts = false
         onboardingCompletionPending = false
         phase = .ready
+        // First-launch import already read the full system store this
+        // session, so skip an immediate re-reconcile here — foreground and
+        // store-change triggers cover everything from this point on.
+        if let dependencies {
+            beginObservingContactStoreChanges(dependencies: dependencies)
+        }
     }
+
+    /// Called when the scene becomes active again (app foregrounded). A
+    /// no-op before the runtime is ready or while onboarding is still in
+    /// progress.
+    func handleSceneActivation() async {
+        guard phase == .ready, let runtime, let dependencies else { return }
+        await reconcileNow(runtime: runtime, dependencies: dependencies)
+    }
+
+    private func beginObservingContactStoreChanges(dependencies: Dependencies) {
+        guard changeObservationTask == nil else { return }
+        let stream = dependencies.contactsSource.changeNotifications()
+        changeObservationTask = Task { [weak self] in
+            for await _ in stream {
+                guard let self else { return }
+                guard let runtime = self.runtime else { continue }
+                await self.reconcileNow(runtime: runtime, dependencies: dependencies)
+            }
+        }
+    }
+
+    private func reconcileNow(runtime: AppRuntime, dependencies: Dependencies) async {
+        let reconciler = ContactsReconciler(
+            source: dependencies.contactsSource,
+            repo: runtime.environment.contacts,
+            clock: dependencies.clock
+        )
+        do {
+            let result = try await reconciler.reconcile()
+            Self.log.info("""
+                reconciliation complete: imported=\(result.imported) refreshed=\(result.refreshed) \
+                archived=\(result.archived) unarchived=\(result.unarchived) failed=\(result.failed)
+                """)
+        } catch {
+            Self.log.error("reconciliation failed: \(error, privacy: .private)")
+        }
+        reconciliationCount += 1
+    }
+
+    private static let log = RegardsLogger.feature("AppLaunchCoordinator")
 
     private func importAuthorizedContacts(
         runtime: AppRuntime,

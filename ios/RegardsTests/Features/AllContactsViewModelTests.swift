@@ -135,20 +135,18 @@ struct AllContactsViewModelTests {
         #expect(projectionCounter.constructedRowIDs.count < selected.count)
     }
 
-    @Test("A corrupt stored contact fails visibly instead of disappearing")
-    func corruptStoredContactMakesAllContactsUnavailable() async throws {
+    @Test("A corrupt stored contact fails visibly, but healthy contacts stay usable")
+    func corruptStoredContactStaysIsolatedFromHealthyContacts() async throws {
         let database = try DatabaseFactory.makeInMemoryDatabase()
         let environment = ProductionRepositoryFactory.makeEnvironment(database: database)
-        let contact = Self.contact(
-            id: UUID(),
-            name: "Preserved Corrupt Contact",
-            tracked: false
-        )
-        try await environment.contacts.upsert(contact)
+        let healthy = Self.contact(id: UUID(), name: "Healthy Contact", tracked: false)
+        let corrupt = Self.contact(id: UUID(), name: "Preserved Corrupt Contact", tracked: false)
+        try await environment.contacts.upsert(healthy)
+        try await environment.contacts.upsert(corrupt)
         try await database.write { db in
             try db.execute(
                 sql: "UPDATE Contact SET phonesJson = ? WHERE id = ?",
-                arguments: ["null", contact.id.uuidString]
+                arguments: ["null", corrupt.id.uuidString]
             )
         }
         let viewModel = AllContactsViewModel(
@@ -158,13 +156,29 @@ struct AllContactsViewModelTests {
 
         await viewModel.load()
 
-        #expect(viewModel.loadState == .failed)
-        #expect(viewModel.contacts.isEmpty)
-        #expect(viewModel.summary == "Unavailable")
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.map(\.id) == [healthy.id])
+        #expect(viewModel.summary == "1 contact")
+        #expect(viewModel.corruptedContactCount == 1)
+        #expect(viewModel.corruptionMessage == "1 contact couldn't be read and needs attention.")
         let storedRows = try await database.read { db in
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM Contact")
         }
-        #expect(storedRows == 1)
+        #expect(storedRows == 2)
+    }
+
+    @Test("A repository read failure that isn't about one row still fails the whole load")
+    func genuineReadFailureStillMarksLoadFailed() async throws {
+        let repository = StubContactRepository.failing()
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        await viewModel.load()
+
+        #expect(viewModel.loadState == .failed)
+        #expect(viewModel.contacts.isEmpty)
+        #expect(viewModel.corruptedContactCount == 0)
+        #expect(viewModel.corruptionMessage == nil)
+        #expect(viewModel.summary == "Unavailable")
     }
 
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)

@@ -7,6 +7,11 @@ import GRDB
 // against seeded data.
 
 public protocol ContactRepository: Sendable {
+    /// Fail-closed read: throws if a single stored row can't be decoded.
+    /// Callers that need an all-or-nothing view (duplicate detection, the
+    /// first-launch importer's existing-ref check) use this. Callers that
+    /// need to keep working around one bad row use
+    /// `fetchAllWithDiagnostics()` instead (R50).
     func fetchAll() async throws -> [Contact]
     func fetchTracked() async throws -> [Contact]
     func fetch(id: UUID) async throws -> Contact?
@@ -18,6 +23,53 @@ public protocol ContactRepository: Sendable {
     func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact]
     func upsert(_ contact: Contact) async throws
     func archive(id: UUID, at: Date) async throws
+    /// Corruption-aware read (R50, `AllContactsViewModel`): every row that
+    /// decodes, plus a diagnostic for each row that doesn't. Never mutates,
+    /// deletes, or silently skips the corrupt row — it stays exactly as
+    /// stored so a later fix (or export) can still reach it. Only a read
+    /// failure that isn't about one row's content (e.g. the database itself
+    /// is unreachable) throws.
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport
+}
+
+/// One stored `Contact` row GRDB fetched but could not decode into the
+/// domain type — malformed JSON in `phonesJson`/`emailsJson`, an invalid
+/// stored enum, etc. `rawId` is the raw `id` column value, not necessarily a
+/// valid UUID, since corruption can affect any column including the
+/// identifier itself.
+public struct ContactCorruptionDiagnostic: Sendable, Equatable {
+    public let rawId: String
+    public let systemContactRef: String
+    public let reason: String
+
+    public init(rawId: String, systemContactRef: String, reason: String) {
+        self.rawId = rawId
+        self.systemContactRef = systemContactRef
+        self.reason = reason
+    }
+}
+
+/// Result of a corruption-aware `Contact` read: healthy rows plus a
+/// diagnostic for every row that failed to decode.
+public struct ContactFetchReport: Sendable, Equatable {
+    public let contacts: [Contact]
+    public let corrupted: [ContactCorruptionDiagnostic]
+
+    public init(contacts: [Contact], corrupted: [ContactCorruptionDiagnostic]) {
+        self.contacts = contacts
+        self.corrupted = corrupted
+    }
+}
+
+public extension ContactRepository {
+    /// Default corruption-aware read for backends that never produce an
+    /// undecodable row (in-memory fakes and `MockContactRepository`, whose
+    /// writes always round-trip through `ContactRecord` first): everything
+    /// `fetchAll()` returns is healthy and nothing is corrupted. `GRDBContact
+    /// Repository` overrides this with a real per-row decode.
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport {
+        ContactFetchReport(contacts: try await fetchAll(), corrupted: [])
+    }
 }
 
 public protocol ContactGroupRepository: Sendable {
@@ -123,6 +175,27 @@ struct GRDBContactRepository: ContactRepository {
             try db.execute(
                 sql: "UPDATE Contact SET archivedAt = ? WHERE id = ?",
                 arguments: [Int(at.timeIntervalSince1970), id.uuidString])
+        }
+    }
+
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport {
+        try await dbQueue.read { db in
+            let records = try ContactRecord.fetchAll(db)
+            var healthy: [Contact] = []
+            var corrupted: [ContactCorruptionDiagnostic] = []
+            healthy.reserveCapacity(records.count)
+            for record in records {
+                do {
+                    healthy.append(try record.toDomain())
+                } catch {
+                    corrupted.append(ContactCorruptionDiagnostic(
+                        rawId: record.id,
+                        systemContactRef: record.systemContactRef,
+                        reason: String(describing: error)
+                    ))
+                }
+            }
+            return ContactFetchReport(contacts: healthy, corrupted: corrupted)
         }
     }
 }

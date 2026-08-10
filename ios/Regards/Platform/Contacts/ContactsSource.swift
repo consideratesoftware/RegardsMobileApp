@@ -59,6 +59,49 @@ public protocol ContactsSource: Sendable {
     /// Enumerates every contact the app is currently authorized to see. On
     /// `.limited` access (iOS 18+) the system already filtered the result.
     func fetchAllContacts() async throws -> [SystemContact]
+    /// Fires once per `CNContactStoreDidChange` notification — a contact
+    /// added, edited, or deleted in Contacts.app or synced from iCloud — so
+    /// `ContactsReconciler` can re-run without polling (ARCHITECTURE.md §7,
+    /// PR21). The default below never emits, so fakes that don't model live
+    /// changes keep compiling unchanged.
+    func changeNotifications() -> AsyncStream<Void>
+}
+
+public extension ContactsSource {
+    func changeNotifications() -> AsyncStream<Void> {
+        AsyncStream { continuation in continuation.finish() }
+    }
+}
+
+/// Wraps a non-`Sendable` value so it can cross into a `@Sendable` closure.
+/// Used only to hand `CNContactStore`/`CNContactFetchRequest` (undocumented
+/// as `Sendable` but documented thread-safe — see `CNContactsSource` below)
+/// to a background dispatch queue; the box is never read concurrently from
+/// two places at once.
+private final class UncheckedSendableBox<Value>: @unchecked Sendable {
+    let value: Value
+    init(_ value: Value) { self.value = value }
+}
+
+/// Runs a blocking, non-`Sendable`-capturing closure on a GCD global queue
+/// instead of the Swift concurrency cooperative thread pool. `CNContactStore
+/// .enumerateContacts` streams results synchronously and can take long enough
+/// on a large address book (§19 R25 — measured stalling a cooperative-pool
+/// worker at ~5k contacts) to starve every other async task sharing that
+/// pool. Dispatching the blocking work elsewhere keeps the pool free.
+func runOffCooperativePool<T: Sendable>(
+    qos: DispatchQoS.QoSClass = .userInitiated,
+    _ work: @escaping @Sendable () throws -> T
+) async throws -> T {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+        DispatchQueue.global(qos: qos).async {
+            do {
+                continuation.resume(returning: try work())
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
 }
 
 /// Default `ContactsSource` backed by a real `CNContactStore`.
@@ -96,12 +139,12 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
     }
 
     public func fetchAllContacts() async throws -> [SystemContact] {
-        // Synchronous body. `enumerateContacts` blocks while it streams
-        // results, but `CNContactStore` is documented thread-safe, so the
-        // cooperative thread the runtime hands us is fine. We avoid
-        // `Task.detached` because `CNContactStore` and `CNContactFetchRequest`
-        // aren't `Sendable` and capturing them into a Sendable closure
-        // doesn't compile under Swift 6 strict concurrency.
+        // `enumerateContacts` blocks synchronously while it streams results.
+        // `CNContactStore` is documented thread-safe ("All CNContactStore
+        // instances may be used on any thread."), so running it on a GCD
+        // worker via `runOffCooperativePool` — instead of the calling
+        // cooperative-pool thread — is safe and is the R25 fix: a large
+        // address book no longer stalls other async work sharing the pool.
         let keys: [any CNKeyDescriptor] = [
             CNContactIdentifierKey,
             CNContactGivenNameKey,
@@ -110,16 +153,48 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
             CNContactEmailAddressesKey,
         ].map { $0 as any CNKeyDescriptor }
         let request = CNContactFetchRequest(keysToFetch: keys)
-        var results: [SystemContact] = []
-        try store.enumerateContacts(with: request) { cn, _ in
-            results.append(SystemContact(
-                identifier: cn.identifier,
-                givenName: cn.givenName,
-                familyName: cn.familyName,
-                phoneNumbers: cn.phoneNumbers.map { $0.value.stringValue },
-                emailAddresses: cn.emailAddresses.map { $0.value as String }))
+        let box = UncheckedSendableBox((store: store, request: request))
+        return try await runOffCooperativePool {
+            var results: [SystemContact] = []
+            try box.value.store.enumerateContacts(with: box.value.request) { cn, _ in
+                results.append(SystemContact(
+                    identifier: cn.identifier,
+                    givenName: cn.givenName,
+                    familyName: cn.familyName,
+                    phoneNumbers: cn.phoneNumbers.map { $0.value.stringValue },
+                    emailAddresses: cn.emailAddresses.map { $0.value as String }))
+            }
+            return results
         }
-        return results
+    }
+
+    /// `@unchecked Sendable` because the `NSObjectProtocol` observer token
+    /// isn't `Sendable`, but the box only ever hands it between `start` and
+    /// `stop`, never touched from two places at once.
+    private final class NotificationObserverBox: @unchecked Sendable {
+        private var token: (any NSObjectProtocol)?
+        private let center = NotificationCenter.default
+
+        func start(name: Notification.Name, onFire: @escaping @Sendable () -> Void) {
+            token = center.addObserver(forName: name, object: nil, queue: nil) { _ in onFire() }
+        }
+
+        func stop() {
+            if let token { center.removeObserver(token) }
+            token = nil
+        }
+    }
+
+    public func changeNotifications() -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            let box = NotificationObserverBox()
+            box.start(name: .CNContactStoreDidChange) {
+                continuation.yield()
+            }
+            continuation.onTermination = { _ in
+                box.stop()
+            }
+        }
     }
 
     private static func translate(_ status: CNAuthorizationStatus) -> ContactsAuthorizationStatus {
