@@ -154,6 +154,66 @@ struct AppLaunchArchivePersistenceTests {
         #expect(fileContents.contains(ContactRefHasher.hash(rawRef)))
     }
 
+    /// Round 12: a hosted reviewer caught that `MissingContactRefStore`'s
+    /// `.complete` protection claim was defeated by composition order —
+    /// `AppLaunchCoordinator.production()` constructs the store *eagerly*
+    /// (setting `.complete` on `Application Support/Regards`), but
+    /// `makeRuntime`'s closure — which only runs later, once `start()`
+    /// awaits it — opens the database and re-sets that *same* directory to
+    /// the weaker `.completeUntilFirstUserAuthentication`, silently
+    /// downgrading the sidecar file `save()` goes on to write there well
+    /// after that point. This test reproduces `production()`'s exact
+    /// composition order (store constructed first, database opened second,
+    /// against the *same* injected Application Support root) and reads the
+    /// sidecar's real on-disk `protectionKey` attribute — not the type's own
+    /// bookkeeping — to prove the fix (the store's own `ReconcilerState`
+    /// subdirectory, isolated from anything `DatabaseFactory` touches)
+    /// actually holds under that order, the same way
+    /// `DatabaseMigratorTests.fileBackedEnvironmentCreatesProtectedStorageAndReopens`
+    /// proves the database's own class.
+    @Test("The sidecar keeps its .complete protection class after production-order composition with the database")
+    func sidecarProtectionSurvivesProductionCompositionOrder() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("MissingContactRefStoreCompositionOrder-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        // Step 1, matching `production()`: the store first — this is the
+        // eagerly-evaluated `Dependencies` argument.
+        let store = try MissingContactRefStore.applicationSupport(root: root, fileManager: fileManager)
+
+        // Step 2, matching `production()`: the database second — this is
+        // what `makeRuntime`'s closure does once `start()` finally awaits
+        // it. Pre-fix, this call re-protected the *same* directory the
+        // store had just claimed `.complete` on.
+        _ = try ProductionRepositoryFactory.makeFileBackedEnvironment(
+            applicationSupportDirectory: root,
+            fileName: "production-order.sqlite",
+            fileManager: fileManager
+        )
+
+        // Step 3: only now does the sidecar file actually get written —
+        // `save()` never runs until the first reconciliation pass, well
+        // after the database is already open.
+        try store.save(["deadbeef": now])
+
+        let sidecarURL = root
+            .appendingPathComponent("Regards", isDirectory: true)
+            .appendingPathComponent("ReconcilerState", isDirectory: true)
+            .appendingPathComponent("contacts-archive-debounce.json")
+        #expect(fileManager.fileExists(atPath: sidecarURL.path))
+        #if !targetEnvironment(simulator)
+        // Same platform caveat as `DatabaseMigratorTests`: the simulator
+        // accepts the protection write but doesn't expose the attribute
+        // back on its host-backed filesystem — a device does, so the value
+        // assertion is device-only, but the exact production setters run
+        // (and get exercised) on every simulator run too.
+        let sidecarAttributes = try fileManager.attributesOfItem(atPath: sidecarURL.path)
+        #expect(sidecarAttributes[.protectionKey] as? FileProtectionType == .complete)
+        #endif
+    }
+
     private static func freshTempDirectory() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("AppLaunchArchivePersistenceTests-\(UUID().uuidString)", isDirectory: true)

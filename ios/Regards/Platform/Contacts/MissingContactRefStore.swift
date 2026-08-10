@@ -21,6 +21,20 @@ import Foundation
 /// there's no reason to accept the weaker class for it. Every value is
 /// keyed by `ContactRefHasher.hash(_:)`, never a raw `systemContactRef` — no
 /// contact identifier lives on disk outside the protected database itself.
+///
+/// Round 12 correction: this used to live directly in `Application
+/// Support/Regards` — the *same* directory `DatabaseFactory.makeDatabase()`
+/// protects. Composition order defeated the `.complete` claim above: in
+/// production, `AppLaunchCoordinator.production()` constructs this store
+/// eagerly (setting `.complete` on that directory), but `makeRuntime`'s
+/// closure — which opens the database and re-sets that *same* directory to
+/// `.completeUntilFirstUserAuthentication` — only runs later, once `start()`
+/// awaits it, silently downgrading the directory (and everything created in
+/// it afterward, including this file, which is only ever written by `save()`
+/// well after that point) to the weaker class. `applicationSupport()` now
+/// gives this store its own `ReconcilerState` subdirectory, nested under
+/// `Regards` but never touched by `DatabaseFactory`, so nothing else can
+/// silently override the protection class applied here.
 public struct MissingContactRefStore: Sendable {
     private let fileURL: URL
 
@@ -43,16 +57,36 @@ public struct MissingContactRefStore: Sendable {
         self.fileURL = unprotectedFileURL
     }
 
-    /// Production location: Application Support/Regards — the same
-    /// directory `DatabaseFactory` uses for the database, a sibling file
-    /// inside it.
+    /// Production location: Application Support/Regards/ReconcilerState —
+    /// nested under the same `Regards` directory `DatabaseFactory` uses for
+    /// the database, but in its own subdirectory, not a sibling file
+    /// directly inside `Regards` itself. That nesting is deliberate (round
+    /// 12): `DatabaseFactory.makeDatabase()` sets its own protection class
+    /// on `Regards` every time it runs, and would silently downgrade this
+    /// store's `.complete` claim to the database's weaker
+    /// `.completeUntilFirstUserAuthentication` if both protected the same
+    /// directory — see the type's own doc comment above for the exact
+    /// composition-order bug this was defeating. A subdirectory
+    /// `DatabaseFactory` never touches keeps the two independent.
     public static func applicationSupport(fileManager: FileManager = .default) throws -> MissingContactRefStore {
         let root = try fileManager.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
             appropriateFor: nil, create: true
         )
-        return try MissingContactRefStore(
-            directory: root.appendingPathComponent("Regards", isDirectory: true),
+        return try applicationSupport(root: root, fileManager: fileManager)
+    }
+
+    /// Injectable-root variant of `applicationSupport()`, matching
+    /// `DatabaseFactory.makeDatabase(applicationSupportDirectory:fileName:fileManager:)`'s
+    /// shape — lets a test construct the sidecar and the database against
+    /// the *same* injected Application Support root, in the same order
+    /// `AppLaunchCoordinator.production()` does, to prove the `.complete`
+    /// claim actually survives that composition instead of asserting on
+    /// this type in isolation.
+    static func applicationSupport(root: URL, fileManager: FileManager = .default) throws -> MissingContactRefStore {
+        try MissingContactRefStore(
+            directory: root.appendingPathComponent("Regards", isDirectory: true)
+                .appendingPathComponent("ReconcilerState", isDirectory: true),
             fileManager: fileManager
         )
     }
