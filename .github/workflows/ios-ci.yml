@@ -174,11 +174,17 @@ jobs:
     # measured 18m47s (~19 min) on its diagnosed rerun. This job also pays
     # checkout + setup-xcode, up to 3 downloadPlatform attempts (15s backoff
     # each), and the boot step's own 10-min allowance below -- 30 min has no
-    # headroom once those are added on top of the ~19-min test step. 45 min
-    # covers the observed test-step duration plus the boot allowance plus a
-    # margin for the rest. Bounds the 2026-08-08-class hang at 8adeb0d
-    # instead of letting it run out the default 6-hour job limit.
-    timeout-minutes: 45
+    # headroom once those are added on top of the ~19-min test step, and
+    # 45 min covers that math with only a flat margin. But audit-stress.yml's
+    # own header documents a 2.1x spread on the same runner/test/scheme
+    # combination -- 23, 23, 29, 33, 38, and 49 minutes across six
+    # consecutive full-workflow runs of the 5x sweep -- and this job's
+    # single run shares that variance source (the same macos-latest image,
+    # the same xcodebuild/xcbeautify pipeline). 60 min keeps the 45-min
+    # budget's headroom intact even at the high end of that documented
+    # spread. Bounds the 2026-08-08-class hang at 8adeb0d instead of letting
+    # it run out the default 6-hour job limit.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1

@@ -2,31 +2,85 @@
 
 set -euo pipefail
 
+# This suite and prepare-audit-simulator.sh must both stay Ruby-2.6-stdlib
+# and bash-3.2-safe: this job runs on ubuntu-latest (newer Ruby and bash than
+# the macos-latest runner the script actually executes on in production), so
+# a method or feature that only exists in the newer versions would pass here
+# and only break on a real audit run. Nothing in this file uses anything
+# newer than bash 3.2 (no associative arrays, no `${var,,}`, no `mapfile`).
+
 script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "$script_directory/../.." && pwd)"
 fixtures_directory="$script_directory/fixtures/prepare-audit-simulator"
 target="$repository_root/scripts/prepare-audit-simulator.sh"
 single_device_udid="11111111-2222-3333-4444-555555555555"
 
+# Set up the scratch area before any test runs: expect_resolve below needs it
+# for a private stderr file, and the end-to-end section needs it for call
+# logs, fake $GITHUB_ENV files, and the stub xcrun's PATH entry.
+fake_bin="$(mktemp -d "${TMPDIR:-/tmp}/regards-prepare-audit-simulator-bin.XXXXXX")"
+ln -s "$fixtures_directory/xcrun" "$fake_bin/xcrun"
+
+scratch_dir="$(mktemp -d "${TMPDIR:-/tmp}/regards-prepare-audit-simulator-scratch.XXXXXX")"
+cleanup() {
+  rm -rf -- "$fake_bin" "$scratch_dir"
+}
+trap cleanup EXIT
+
+fresh_call_log() {
+  mktemp "$scratch_dir/calls.XXXXXX"
+}
+
+# Every end-to-end invocation below pins $GITHUB_ENV to one of these, even
+# when a case doesn't inspect its contents: without this, `env VAR=val cmd`
+# still inherits the real $GITHUB_ENV from the calling process, and this
+# suite itself runs inside guards.yml on a real GitHub Actions job -- an
+# unpinned invocation would silently append a fake SIMULATOR_UDID line into
+# that job's actual environment file.
+fresh_github_env() {
+  mktemp "$scratch_dir/github-env.XXXXXX"
+}
+
 expect_resolve() {
   local label="$1"
   local fixture="$2"
   local expected_udid="$3"
-  local raw_output
+  local expected_warning_substring="${4:-}"
+  local stdout_output
+  local stderr_file
+  local stderr_output
+  local status
   local actual
 
-  # Guarded (not a bare `actual="$(...)"` under `set -e`): a regression that
-  # makes resolution fail here would otherwise kill this whole test script
-  # via errexit instead of reporting a clean FAIL line.
-  if ! raw_output="$("$target" "iPhone 17 Pro" --resolve-only <"$fixtures_directory/$fixture" 2>&1)"; then
+  stderr_file="$(mktemp "$scratch_dir/expect_resolve_stderr.XXXXXX")"
+
+  # Guarded (not a bare `x="$(...)"` under `set -e`): a regression that makes
+  # resolution fail here would otherwise kill this whole test script via
+  # errexit instead of reporting a clean FAIL line. stdout and stderr are
+  # captured separately -- a tie emits a ::warning:: on stderr before the
+  # data line on stdout, and merging the two streams would make which one
+  # ends up first an unstated buffering assumption.
+  set +e
+  stdout_output="$("$target" "iPhone 17 Pro" --resolve-only <"$fixtures_directory/$fixture" 2>"$stderr_file")"
+  status=$?
+  set -e
+  stderr_output="$(cat "$stderr_file")"
+
+  if [[ "$status" -ne 0 ]]; then
     echo "FAIL: $label unexpectedly failed to resolve" >&2
-    echo "$raw_output" >&2
+    echo "$stderr_output" >&2
     exit 1
   fi
 
-  actual="$(cut -d" " -f1 <<<"$raw_output")"
+  actual="$(cut -d" " -f1 <<<"$stdout_output")"
   if [[ "$actual" != "$expected_udid" ]]; then
     echo "FAIL: $label expected udid $expected_udid, got $actual" >&2
+    exit 1
+  fi
+
+  if [[ -n "$expected_warning_substring" ]] && ! grep -qF "$expected_warning_substring" <<<"$stderr_output"; then
+    echo "FAIL: $label did not emit the expected warning" >&2
+    echo "$stderr_output" >&2
     exit 1
   fi
 }
@@ -84,13 +138,9 @@ expect_resolve "newest runtime wins over hash order and string order" \
 expect_resolve "unavailable newest runtime falls back to an older one" \
   unavailable-newest.json FALLBACK-UDID
 
-# (c) tvOS, watchOS, and a malformed (non-CoreSimulator) runtime key holding
-# a same-named device are all ignored, and so is a key that would have
-# matched the old *unanchored* `iOS-(\d+)-(\d+)` regex (iOS-99-0-experimental
-# has "iOS-99-0" as a substring but isn't the trailing `.iOS-<major>-<minor>`
-# token) -- proving the anchor actually excludes it rather than merely
-# happening not to be exercised.
-expect_resolve "non-iOS, malformed, and anchor-defeating runtime keys are ignored" \
+# (c) tvOS, watchOS, and a malformed (non-CoreSimulator, non-"iOS-shaped")
+# runtime key holding a same-named device are all silently ignored.
+expect_resolve "non-iOS and malformed runtime keys are silently ignored" \
   non-ios-runtimes.json REAL-UDID
 
 # (d) --resolve-only alone: no matching device fails with the expected
@@ -99,38 +149,31 @@ expect_resolve_failure "no matching device fails closed" \
   no-match.json \
   '::error::No available simulator named "iPhone 17 Pro" found'
 
-# (e) Two available devices tied at the newest iOS runtime fail loudly
-# instead of picking one arbitrarily (the exact risk of `Array#max_by`), and
-# the error names both tied UDIDs so an operator can tell which runtime to
-# delete.
-expect_resolve_failure "a tie at the newest runtime refuses to guess" \
-  tied-newest-runtime.json \
-  '::error::Multiple available simulators named "iPhone 17 Pro" tie at the newest iOS runtime: TIED-A-UDID on com.apple.CoreSimulator.SimRuntime.iOS-26-0; TIED-B-UDID on com.apple.CoreSimulator.SimRuntime.iOS-26-0'
+# (e) Two available devices tied at the newest iOS runtime pick the lowest
+# UDID deterministically and warn -- they do NOT refuse. Destination pinning
+# makes any pick safe, and refusing on an ephemeral runner would turn the
+# audit jobs permanently red with no remediation an operator can perform.
+expect_resolve "a tie at the newest runtime picks the lowest UDID and warns" \
+  tied-newest-runtime.json TIED-A-UDID \
+  '::warning::Multiple available simulators named "iPhone 17 Pro" tie at the newest iOS runtime: TIED-A-UDID on com.apple.CoreSimulator.SimRuntime.iOS-26-0; TIED-B-UDID on com.apple.CoreSimulator.SimRuntime.iOS-26-0; picking TIED-A-UDID deterministically'
 
-# (f) CLI usage errors: zero arguments, too many arguments, and an
+# (f) A runtime key whose trailing token starts with "iOS-" but doesn't match
+# the anchored two-component shape (iOS-99-0-experimental) is an unmodeled
+# format, not a different platform -- it fails loudly instead of being
+# silently skipped, since silently skipping it could mean silently ignoring
+# the actual newest runtime.
+expect_resolve_failure "an unmodeled iOS-shaped runtime key fails loudly" \
+  unmodeled-ios-runtime.json \
+  '::error::Unrecognized iOS runtime identifier shape: "com.apple.CoreSimulator.SimRuntime.iOS-99-0-experimental"'
+
+# (g) CLI usage errors: zero arguments, too many arguments, and an
 # unrecognized second argument all exit 64 with the usage message.
 expect_usage_error "zero arguments"
 expect_usage_error "too many arguments" "iPhone 17 Pro" --resolve-only extra
 expect_usage_error "unrecognized second argument" "iPhone 17 Pro" --bogus-flag
 
 # --- End-to-end cases: drive the full script (not --resolve-only) against a
-# stub xcrun on PATH. All temp files live under one scratch directory removed
-# wholesale in cleanup -- a per-call array populated inside `fresh_call_log`
-# would be mutated inside the command-substitution subshell that captures its
-# return value and never be visible to the parent shell's trap.
-
-fake_bin="$(mktemp -d "${TMPDIR:-/tmp}/regards-prepare-audit-simulator-bin.XXXXXX")"
-ln -s "$fixtures_directory/xcrun" "$fake_bin/xcrun"
-
-scratch_dir="$(mktemp -d "${TMPDIR:-/tmp}/regards-prepare-audit-simulator-scratch.XXXXXX")"
-cleanup() {
-  rm -rf -- "$fake_bin" "$scratch_dir"
-}
-trap cleanup EXIT
-
-fresh_call_log() {
-  mktemp "$scratch_dir/calls.XXXXXX"
-}
+# stub xcrun on PATH.
 
 # (d) End to end: a missing device is proven to fail *before* any
 # bootstatus/status_bar call -- the regression a future edit could introduce
@@ -145,6 +188,7 @@ if no_match_output="$(
     PREPARE_AUDIT_SIMULATOR_FIXTURE="$fixtures_directory/no-match.json" \
     PREPARE_AUDIT_SIMULATOR_CALL_LOG="$no_match_call_log" \
     PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0 \
+    GITHUB_ENV="$(fresh_github_env)" \
     "$target" "iPhone 17 Pro" 2>&1
 )"; then
   echo "FAIL: end-to-end run with no matching device unexpectedly succeeded" >&2
@@ -164,6 +208,45 @@ if grep -qE '^(bootstatus|status_bar) ' "$no_match_call_log"; then
   exit 1
 fi
 
+# BLOCKER coverage: the UUID-guard rejection branch. A resolved-but-malformed
+# udid must fail the full (non-resolve-only) script closed, before ever
+# reaching $GITHUB_ENV or a simctl mutation call.
+malformed_udid_call_log="$(fresh_call_log)"
+malformed_udid_github_env="$(fresh_github_env)"
+malformed_udid_output=""
+if malformed_udid_output="$(
+  env \
+    PATH="$fake_bin:$PATH" \
+    PREPARE_AUDIT_SIMULATOR_FIXTURE="$fixtures_directory/malformed-udid.json" \
+    PREPARE_AUDIT_SIMULATOR_CALL_LOG="$malformed_udid_call_log" \
+    PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0 \
+    GITHUB_ENV="$malformed_udid_github_env" \
+    "$target" "iPhone 17 Pro" 2>&1
+)"; then
+  echo "FAIL: end-to-end run with a non-UUID udid unexpectedly succeeded" >&2
+  echo "$malformed_udid_output" >&2
+  exit 1
+fi
+
+if ! grep -qF '::error::Resolved udid "not-a-real-uuid" is not UUID-shaped; refusing to proceed with an unrecognized value' <<<"$malformed_udid_output"; then
+  echo "FAIL: malformed-udid run did not emit the expected ::error:: line" >&2
+  echo "$malformed_udid_output" >&2
+  exit 1
+fi
+
+if grep -qE '^(bootstatus|status_bar) ' "$malformed_udid_call_log"; then
+  echo "FAIL: simctl bootstatus/status_bar was invoked despite the udid failing validation" >&2
+  cat "$malformed_udid_call_log" >&2
+  exit 1
+fi
+
+malformed_udid_env_line_count="$(grep -cF "SIMULATOR_UDID=" "$malformed_udid_github_env" || true)"
+if [[ "$malformed_udid_env_line_count" -ne 0 ]]; then
+  echo "FAIL: expected zero SIMULATOR_UDID= lines written for a malformed udid, saw $malformed_udid_env_line_count" >&2
+  cat "$malformed_udid_github_env" >&2
+  exit 1
+fi
+
 # Regression check for the boot/bootstatus fix: `simctl boot` must never be
 # called by this script (it fails deterministically on retry once the device
 # leaves Shutdown; `bootstatus -b` replaces it). The stub treats a `boot`
@@ -175,6 +258,7 @@ if ! env \
   PREPARE_AUDIT_SIMULATOR_FIXTURE="$fixtures_directory/single-device.json" \
   PREPARE_AUDIT_SIMULATOR_CALL_LOG="$solo_call_log" \
   PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0 \
+  GITHUB_ENV="$(fresh_github_env)" \
   "$target" "iPhone 17 Pro" >/dev/null 2>&1; then
   echo "FAIL: end-to-end run with one available device unexpectedly failed" >&2
   exit 1
@@ -198,6 +282,7 @@ if ! retry_output="$(
     PREPARE_AUDIT_SIMULATOR_CALL_LOG="$retry_call_log" \
     PREPARE_AUDIT_SIMULATOR_BOOTSTATUS_FAIL_COUNT=1 \
     PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0 \
+    GITHUB_ENV="$(fresh_github_env)" \
     "$target" "iPhone 17 Pro" 2>&1
 )"; then
   echo "FAIL: end-to-end run did not recover from a transient bootstatus failure" >&2
@@ -217,11 +302,11 @@ if ! grep -qE "^status_bar $single_device_udid override " "$retry_call_log"; the
   exit 1
 fi
 
-# BLOCKER coverage: exhaust all 3 bootstatus attempts and confirm the script
-# fails closed -- non-zero exit, the "failed after 3 attempts" ::error::
-# line, exactly 3 bootstatus calls (no fourth attempt), and status_bar is
-# never reached. PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0 keeps this at
-# effectively zero cost instead of the real 2x15s backoff.
+# BLOCKER coverage (prior round): exhaust all 3 bootstatus attempts and
+# confirm the script fails closed -- non-zero exit, the "failed after 3
+# attempts" ::error:: line, exactly 3 bootstatus calls (no fourth attempt),
+# and status_bar is never reached. PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0
+# keeps this at effectively zero cost.
 exhaustion_call_log="$(fresh_call_log)"
 exhaustion_output=""
 if exhaustion_output="$(
@@ -231,6 +316,7 @@ if exhaustion_output="$(
     PREPARE_AUDIT_SIMULATOR_CALL_LOG="$exhaustion_call_log" \
     PREPARE_AUDIT_SIMULATOR_BOOTSTATUS_FAIL_COUNT=3 \
     PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP=0 \
+    GITHUB_ENV="$(fresh_github_env)" \
     "$target" "iPhone 17 Pro" 2>&1
 )"; then
   echo "FAIL: end-to-end run with 3 consecutive bootstatus failures unexpectedly succeeded" >&2
@@ -261,7 +347,7 @@ fi
 # and that SIMULATOR_UDID lands in $GITHUB_ENV exactly once for later
 # workflow steps to pin their -destination to.
 success_call_log="$(fresh_call_log)"
-fake_github_env="$(mktemp "$scratch_dir/env.XXXXXX")"
+fake_github_env="$(fresh_github_env)"
 
 if ! env \
   PATH="$fake_bin:$PATH" \
@@ -290,4 +376,4 @@ if [[ "$github_env_udid_count" -ne 1 ]]; then
   exit 1
 fi
 
-echo "PASS: prepare-audit-simulator picks the newest tie-free runtime, retries and fails closed on bootstatus, and validates its usage and GITHUB_ENV output"
+echo "PASS: prepare-audit-simulator resolves deterministically, retries and fails closed on bootstatus, guards its UDID and usage, and isolates \$GITHUB_ENV"
