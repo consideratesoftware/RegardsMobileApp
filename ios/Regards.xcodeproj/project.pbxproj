@@ -124,6 +124,7 @@
 		FB5E64AD9A52BEF429194D6F /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 1A8E1B586940E1B4EED330AE /* GRDB */; };
 		FD614B160C4DB2B23EB15325 /* RegardsLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBC9E9A10F4ACE36099418D /* RegardsLogger.swift */; };
 		FD93025B908FC944215CA8CD /* ReminderWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C08F1EDF2F2D7AA655AB07 /* ReminderWindow.swift */; };
+		FE46E3F53D3E3AA1991AE8A1 /* ReconciledFieldsContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76FF8E82467D75A2AB9932C /* ReconciledFieldsContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -257,6 +258,7 @@
 		E06DD4E5622574D16D1559B7 /* MergeDuplicatesViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeDuplicatesViewModelTests.swift; sourceTree = "<group>"; };
 		E0ABE512E2B05FB378890460 /* RepositoryFakes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryFakes.swift; sourceTree = "<group>"; };
 		E1F69E8D289AB13128D0AD1B /* RegardsAccessibilityTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RegardsAccessibilityTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E76FF8E82467D75A2AB9932C /* ReconciledFieldsContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconciledFieldsContractTests.swift; sourceTree = "<group>"; };
 		EA3C46E8CED7412E12D16392 /* DayOfWeek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayOfWeek.swift; sourceTree = "<group>"; };
 		F0796D2167027FBCEF07289C /* ContactsReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsReconciler.swift; sourceTree = "<group>"; };
 		F1ADC20C0E7E4CE0DA30722D /* RegardsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsApp.swift; sourceTree = "<group>"; };
@@ -305,6 +307,7 @@
 				0F801281CA1EC0111165A9B8 /* DatabaseMigratorTests.swift */,
 				23563203660E749AE7290FAB /* MockOccasionSeedingTests.swift */,
 				7ABF76C0C5D07E0E054F54E3 /* MockRepositoriesTests.swift */,
+				E76FF8E82467D75A2AB9932C /* ReconciledFieldsContractTests.swift */,
 				749A533304ABA207075077DC /* ReminderWindowRepositoryReadContractTests.swift */,
 				9337143263D1CE0320C55554 /* RepositoriesTests.swift */,
 			);
@@ -832,6 +835,7 @@
 				18635A3F8AC9E94EC60EE566 /* MutableContactsSourceFake.swift in Sources */,
 				5EF2B954605E25F062B36C40 /* OnboardingAccessibilityEffectsTests.swift in Sources */,
 				46BDE040140A2537136D6D43 /* OverdueViewModelTests.swift in Sources */,
+				FE46E3F53D3E3AA1991AE8A1 /* ReconciledFieldsContractTests.swift in Sources */,
 				781229BA83C41976A6237AB6 /* ReconciliationCoalescingTests.swift in Sources */,
 				ABEDEEB621267412BA24A096 /* RegardsIntentRouterTests.swift in Sources */,
 				5250803E1BE3B74C539BACD5 /* RegardsLoadStateTests.swift in Sources */,

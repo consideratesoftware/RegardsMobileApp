@@ -90,8 +90,15 @@ struct RootView: View {
         .task {
             await launch.start()
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .active else { return }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Only a genuine background→active edge is a real foreground —
+            // a Control Center pull-down, share sheet, or notification
+            // banner takes the scene through .inactive→.active without the
+            // app ever leaving the foreground, and re-reconciling Contacts
+            // (up to a full enumeration, R25) on every one of those blips
+            // would be wasted work on a signal that isn't "the user came
+            // back to the app."
+            guard oldPhase == .background, newPhase == .active else { return }
             // Re-reconcile Contacts every foreground (ARCHITECTURE.md §7);
             // launch itself already covers the first appearance.
             Task { await launch.handleSceneActivation() }

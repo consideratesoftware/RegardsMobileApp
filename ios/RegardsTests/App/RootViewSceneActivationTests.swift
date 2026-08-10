@@ -6,15 +6,77 @@ import Testing
 /// No test previously exercised `RootView`'s actual `.onChange(of: scenePhase)`
 /// binding to `AppLaunchCoordinator.handleSceneActivation()` — every
 /// reconciliation test called `handleSceneActivation()` directly. This hosts
-/// the real `RootView`, drives a genuine SwiftUI `scenePhase` environment
-/// transition to `.active` through an observable harness, and proves the
-/// coordinator's reconciliation count advances as a result.
+/// the real `RootView`, drives genuine SwiftUI `scenePhase` environment
+/// transitions through an observable harness, and proves the coordinator's
+/// reconciliation count reacts correctly to both shapes of transition into
+/// `.active`: a real background→active foreground (round 7) reconciles, and
+/// an inactive→active blip — Control Center, share sheet, a notification
+/// banner dismissing, none of which ever leave the app backgrounded — does
+/// not (round 8).
 @MainActor
 struct RootViewSceneActivationTests {
     let now = Date(timeIntervalSince1970: 1_785_600_000)
 
-    @Test("RootView's scenePhase binding triggers handleSceneActivation on .active")
-    func scenePhaseBecomingActiveTriggersReconciliation() async throws {
+    @Test("A genuine background→active foreground triggers handleSceneActivation")
+    func backgroundToActiveEdgeTriggersReconciliation() async throws {
+        let (launch, model, window) = try await makeStartedHarness()
+        let countAfterLaunch = launch.reconciliationCount
+
+        model.scenePhase = .background
+        // Forces SwiftUI to actually commit a render pass against the
+        // `.background` value before moving on — two assignments back to
+        // back with no render pass between them risk SwiftUI coalescing
+        // them and only ever diffing directly from the harness's initial
+        // `.active` to the final `.active`, silently skipping the
+        // intermediate state this test means to exercise. `layoutIfNeeded()`
+        // alone isn't reliable here (it forces UIKit's Auto Layout pass, not
+        // SwiftUI's own render cycle); the same run-loop pump `makeStartedHarness`
+        // already relies on for `.task` is what actually commits it.
+        pumpRunLoopBriefly()
+        model.scenePhase = .active
+
+        #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount > countAfterLaunch })
+        #expect(launch.reconciliationCount == countAfterLaunch + 1)
+
+        window.isHidden = true
+    }
+
+    @Test("An inactive→active blip (Control Center, share sheet) does not trigger reconciliation")
+    func inactiveToActiveBlipDoesNotTriggerReconciliation() async throws {
+        let (launch, model, window) = try await makeStartedHarness()
+        let countAfterLaunch = launch.reconciliationCount
+
+        // The scene never left the foreground here — no `.background` in
+        // this sequence — so this must not reconcile. The pump between the
+        // two assignments forces SwiftUI to actually commit and diff the
+        // `.inactive` value, rather than risk coalescing straight from
+        // `.active` to `.active` and testing nothing (see
+        // `backgroundToActiveEdgeTriggersReconciliation`'s comment above).
+        model.scenePhase = .inactive
+        pumpRunLoopBriefly()
+        model.scenePhase = .active
+
+        // Waiting for a *negative* can't use the same "eventually true"
+        // shape as the positive case above: instead, wait (bounded, well
+        // short of the 15s ceiling other waits in this suite use, since a
+        // regression here would fire near-instantly) for the count to
+        // become what an *incorrect* ungated implementation would produce,
+        // and assert that never happens.
+        let reconciledSpuriously = await eventuallyPumpingRunLoop(maxIterations: 30) {
+            launch.reconciliationCount > countAfterLaunch
+        }
+        #expect(!reconciledSpuriously, "an inactive→active blip must not trigger a reconciliation pass")
+        #expect(launch.reconciliationCount == countAfterLaunch)
+
+        window.isHidden = true
+    }
+
+    /// Shared setup: starts a real `RootView` hosted in a `UIWindow`, waits
+    /// for `RootView`'s own launch `.task` to complete pass #1, and hands
+    /// back the pieces each test drives independently from there.
+    private func makeStartedHarness() async throws -> (
+        launch: AppLaunchCoordinator, model: ScenePhaseModel, window: UIWindow
+    ) {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         try await environment.profile.save(UserProfile(
             onboardingCompletedAt: now,
@@ -31,7 +93,7 @@ struct RootViewSceneActivationTests {
             )
         )
         let model = ScenePhaseModel()
-        model.scenePhase = .background
+        model.scenePhase = .active
 
         let host = UIHostingController(rootView: ScenePhaseHarness(model: model, launch: launch))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
@@ -48,14 +110,8 @@ struct RootViewSceneActivationTests {
         // this, the launch reconcile sometimes hadn't started by the time
         // a bounded yield loop gave up, making this test flaky.
         #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount >= 1 })
-        let countAfterLaunch = launch.reconciliationCount
 
-        model.scenePhase = .active
-
-        #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount > countAfterLaunch })
-        #expect(launch.reconciliationCount == countAfterLaunch + 1)
-
-        window.isHidden = true
+        return (launch, model, window)
     }
 }
 

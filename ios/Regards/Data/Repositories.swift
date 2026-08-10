@@ -48,9 +48,18 @@ public protocol ContactRepository: Sendable {
     /// Corruption-aware read (R50, `AllContactsViewModel`): every row that
     /// decodes, plus a diagnostic for each row that doesn't. Never mutates,
     /// deletes, or silently skips the corrupt row — it stays exactly as
-    /// stored so a later fix (or export) can still reach it. Only a read
-    /// failure that isn't about one row's content (e.g. the database itself
-    /// is unreachable) throws.
+    /// stored so a later fix (or export) can still reach it.
+    ///
+    /// The tolerance is narrower than "any row-content problem": it covers
+    /// `ContactRecord.toDomain()` decode failures (malformed
+    /// `phonesJson`/`emailsJson`, an invalid stored `preferredChannel`
+    /// enum/UUID) — the shapes R50 was written against. A raw SQLite
+    /// column-type mismatch at the `FetchableRecord` level (GRDB failing to
+    /// decode a column into `ContactRecord`'s stored properties in the
+    /// first place, before `toDomain()` ever runs) still throws through
+    /// this method uncaught, same as any other read failure — that's a
+    /// schema-level integrity problem this pass doesn't try to paper over,
+    /// not a single row's content (ARCHITECTURE.md §19 R50 scope note).
     func fetchAllWithDiagnostics() async throws -> ContactFetchReport
 }
 
