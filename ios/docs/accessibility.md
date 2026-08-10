@@ -126,6 +126,29 @@ screenshot shows that overlay. Inspect both artifacts and rerun the exact
 failed job. Without both proofs, or when an app-owned failure repeats under
 §17, treat it as a product finding.
 
+**Second precedent, different proof shape (TF-04, PR22).**
+`ScreensAccessibilityTests.testLogOtherChannelPickerPassesAudit` hits
+`.elementDetection` "Potentially inaccessible text" four times against
+Contact Detail's Log other `confirmationDialog`. Unlike the banner case
+above, Xcode's `.elementDetection` audit never populates `XCUIAccessibilityAuditIssue.element`
+for this message — confirmed by dumping every issue property in a debug
+run — so the first proof (xcresult identifies the targeted element inside
+an OS hierarchy) isn't obtainable for this audit type at all. The
+classification instead rests on source plus screenshot: every row this
+dialog declares is a plain `Button(channel.displayName)` with no custom
+drawing, and on this simulator/OS a `confirmationDialog` with this many
+choices renders as a translucent "glass" popover (not a bottom action
+sheet) whose system-owned material lets blurred Contact Detail content
+from behind the dialog show through specific rows — visible in an xcresult
+screenshot from run `TargetedRun-1786354772`
+(`AF67B7AA-83EB-4E25-9A4A-C6E5ECE2ACBC.png`) as text-shaped blur on both
+sides of the FaceTime row's label. Every element the dialog actually
+declares already carries a correct label, so nothing legible goes
+unreported. `ScreensAccessibilityTests+RowActions.swift`'s
+`suppressKnownPopoverGlassBleedThrough` filters only this exact audit type and
+message, only inside that one test's audit call — every other finding,
+and this same category everywhere else, still fails normally.
+
 ## Sensory-audit carve-outs
 
 The enabled automated audit set uses the **structural** categories
