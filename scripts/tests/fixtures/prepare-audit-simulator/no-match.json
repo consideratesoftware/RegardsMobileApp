@@ -1,0 +1,7 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      { "name": "iPhone 16", "isAvailable": true, "udid": "UNRELATED-DEVICE-UDID" }
+    ]
+  }
+}
