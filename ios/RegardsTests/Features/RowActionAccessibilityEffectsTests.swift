@@ -196,6 +196,10 @@ struct RowActionAccessibilityEffectsTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                clock: { Date(timeIntervalSince1970: 1_800_000_000) }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }

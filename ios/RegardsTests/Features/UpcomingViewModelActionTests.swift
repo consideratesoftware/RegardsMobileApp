@@ -34,11 +34,20 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let interactions = StubInteractionRepository()
+        // A 5-day horizon, deliberately shorter than the 7-day default
+        // cadence: `markCaughtUp` reloads on success (see its doc comment),
+        // and that reload legitimately computes a *new* upcoming cadence
+        // reminder at now + 7d for this contact — a real future reminder,
+        // not stale state. A horizon that excludes it is what makes "caught
+        // up empties this list" true here; the default 14-day horizon would
+        // not empty it, correctly.
+        let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             interactions: interactions,
-            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            window: window,
             clock: { Self.now }
         )
         await viewModel.load()
@@ -77,11 +86,17 @@ struct UpcomingViewModelActionTests {
         )
         try await reminders.upsert(birthday)
         let interactions = StubInteractionRepository()
+        // A 5-day horizon — see `markCaughtUpRemovesRowsAndPersists`'
+        // sibling comment: `markCaughtUp`'s reload legitimately computes a
+        // new upcoming cadence reminder at now + 7d, which must fall outside
+        // the horizon for "only the birthday row remains" to hold.
+        let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
             interactions: interactions,
-            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            window: window,
             clock: { Self.now }
         )
         await viewModel.load()
@@ -104,6 +119,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             interactions: StubInteractionRepository.failing(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }
@@ -136,6 +152,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }
@@ -194,6 +211,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: Self.eightAMWindow(),
             clock: { Self.now }
@@ -225,6 +243,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
             interactions: StubInteractionRepository(),
             window: window,
             clock: clock.now
@@ -259,6 +278,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
             interactions: StubInteractionRepository(),
             window: window,
             clock: clock.now
@@ -298,6 +318,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }
@@ -334,6 +355,52 @@ struct UpcomingViewModelActionTests {
         #expect(sawFreshDate)
     }
 
+    /// The actual bug this closes (PR #49 hosted review), which
+    /// `caughtUpAfterSnoozeBeatsStaleSnooze` above cannot catch:
+    /// that test widens the cadence to 10 days and writes `lastInteractedAt`
+    /// directly via `contacts.upsert`, never calling `markCaughtUp` itself —
+    /// so it can't see whether the real action clears the pending snooze row
+    /// or not. With cadence *unchanged* at 3 days, the fresh due date
+    /// (now + 3d) is *earlier* than the stale snooze (now + 7d), so
+    /// `max(now, overdueAt, snoozedUntil)` keeps picking the stale
+    /// snoozedUntil unless `markCaughtUp` actually clears the pending row —
+    /// this is the shape that shipped broken.
+    @Test("Caught up after a snooze with a short cadence shows the fresh date, not the stale snooze")
+    func caughtUpAfterSnoozeShowsFreshDateWithShortCadence() async throws {
+        let window = Self.eightAMWindow()
+        let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: scheduler,
+            interactions: StubInteractionRepository(),
+            window: window,
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        try await scheduler.snooze(contactId: contact.id) // pending cadence @ now + 7d
+        await viewModel.load()
+        #expect(viewModel.groups.flatMap(\.rows).first?.scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
+
+        await viewModel.markCaughtUp(contactId: contact.id)
+
+        // `waitUntil`, not a bare `#expect`: `markCaughtUp` reloads
+        // explicitly on success (see its doc comment), but a redundant
+        // reactive reload from the contact-upsert broadcast can still land
+        // around the same time — harmless once both resolve to the same
+        // correct state.
+        let expected = Self.now.addingTimeInterval(3 * 86_400)
+        let sawFreshDate = await waitUntil {
+            viewModel.groups.flatMap(\.rows).first?.scheduledFor == expected
+        }
+        #expect(sawFreshDate)
+        #expect(viewModel.groups.flatMap(\.rows).first?.scheduledFor != Self.now.addingTimeInterval(7 * 86_400))
+    }
+
     @Test("Two concurrent load() calls subscribe to observeTracked() exactly once")
     func concurrentLoadSubscribesOnce() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
@@ -341,6 +408,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }

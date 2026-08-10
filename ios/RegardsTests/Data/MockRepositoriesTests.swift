@@ -68,6 +68,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
+            scheduler: SchedulingPass(reminders: mocks.reminders, clock: { now }),
             interactions: mocks.interactions,
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -158,6 +159,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository(reminders),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(reminders), clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -208,6 +210,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository(reminders),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(reminders), clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -270,6 +273,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository([reminder]),
+            scheduler: SchedulingPass(reminders: StubReminderRepository([reminder]), clock: { nowDate }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
@@ -308,6 +312,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository([visible, excluded]),
+            scheduler: SchedulingPass(reminders: StubReminderRepository([visible, excluded]), clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }

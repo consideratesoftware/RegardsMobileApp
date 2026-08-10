@@ -96,6 +96,7 @@
 		CB6DFAAA9FE0A26F371A6E87 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B5E6620099016E635E9FB5 /* Contact.swift */; };
 		CB8B6E51DE9C90BFAA7E6F70 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F66D1A796C1ADC15E58FD9 /* AppEnvironment.swift */; };
 		CD76FBEDEEF35BB28E43303D /* ChannelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A814573BE991E0A35C84653E /* ChannelCatalog.swift */; };
+		CFCBF742CF33E2259B92AE81 /* PendingSnoozeLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8575A0B8C9D4A796360D4DF0 /* PendingSnoozeLookup.swift */; };
 		D02616FCEEA8888EF9DEF40A /* ContactsImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A240F758BF789AC64D5A3E /* ContactsImporterTests.swift */; };
 		D2519370DA6A639FBD030621 /* UpcomingFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47DD4E9A1F63D784EBA57296 /* UpcomingFixtures.swift */; };
 		D928A420E34C0B47420C0BD5 /* OnboardingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF5695280B533191F946271 /* OnboardingScreen.swift */; };
@@ -201,6 +202,7 @@
 		7DF5695280B533191F946271 /* OnboardingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScreen.swift; sourceTree = "<group>"; };
 		8422BFBA98540419934AFFB6 /* RegardsAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsAppIntents.swift; sourceTree = "<group>"; };
 		843338B9ADB21D66831CBD33 /* RegardsNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsNavigation.swift; sourceTree = "<group>"; };
+		8575A0B8C9D4A796360D4DF0 /* PendingSnoozeLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingSnoozeLookup.swift; sourceTree = "<group>"; };
 		858D00E29EA76BF067B5CF33 /* UpcomingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingViewModel.swift; sourceTree = "<group>"; };
 		8660B33741B4961FAB6E2884 /* DatabaseMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseMigrator.swift; sourceTree = "<group>"; };
 		8C323AA4C4A8ED52B96B70D7 /* DuplicateDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDetectorTests.swift; sourceTree = "<group>"; };
@@ -557,6 +559,7 @@
 				FD23D49A80EFB8405D107012 /* CadenceDescriptor.swift */,
 				2F0F1602FA69250B09439710 /* ContactValueAccessibility.swift */,
 				2F35FFABA2F385B00DA6FAC7 /* InteractionLogging.swift */,
+				8575A0B8C9D4A796360D4DF0 /* PendingSnoozeLookup.swift */,
 				7428641DD04FA994EB6C765F /* RegardsLoadState.swift */,
 				2EBC9E9A10F4ACE36099418D /* RegardsLogger.swift */,
 				404C6B72CE7713CE0C72E979 /* RegardsSegment.swift */,
@@ -864,6 +867,7 @@
 				D928A420E34C0B47420C0BD5 /* OnboardingScreen.swift in Sources */,
 				95985B0A2B1E3B341A104B3D /* OverdueScreen.swift in Sources */,
 				BDFBC9B3DEA4BCB0B1E492C7 /* OverdueViewModel.swift in Sources */,
+				CFCBF742CF33E2259B92AE81 /* PendingSnoozeLookup.swift in Sources */,
 				26637B6EFFE4F4273A4F96B9 /* PriorityTier.swift in Sources */,
 				A708FFAF946E893F9E9A686D /* Records.swift in Sources */,
 				E4B0A7C5A1EA4F5FDAB6B011 /* RegardsApp.swift in Sources */,

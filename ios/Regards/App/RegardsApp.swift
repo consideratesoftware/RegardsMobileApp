@@ -260,6 +260,7 @@ struct RegardsTabRoot: View {
         UpcomingViewModel(
             contacts: runtime.environment.contacts,
             reminders: runtime.environment.reminders,
+            scheduler: runtime.scheduler,
             interactions: runtime.environment.interactions,
             window: runtime.window,
             clock: runtime.clock

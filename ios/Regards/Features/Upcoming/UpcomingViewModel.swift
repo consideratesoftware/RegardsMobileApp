@@ -72,6 +72,7 @@ public final class UpcomingViewModel {
 
     private let contacts: any ContactRepository
     private let reminders: (any ReminderRepository)?
+    private let scheduler: SchedulingPass
     private let interactions: any InteractionRepository
     private let engine: ReminderEngine
     private let window: ReminderWindow
@@ -79,22 +80,26 @@ public final class UpcomingViewModel {
     private var loadGeneration = 0
     private var observationTask: Task<Void, Never>?
 
-    /// `reminders` and `window` are deliberately undefaulted.
+    /// `reminders`, `scheduler`, and `window` are deliberately undefaulted.
     ///
     /// A defaulted `window` is exactly how R9 shipped: a call site that forgot
     /// to inject the persisted window silently fell back to `.defaultV1()` and
     /// the reminder-window feature became fiction on screen with nothing
     /// failing. A defaulted `reminders` would drop every persisted occasion
-    /// just as quietly. Requiring both makes a missed injection a compile
-    /// error instead of a screen that lies.
+    /// just as quietly, and a defaulted `scheduler` would construct one over a
+    /// throwaway store disconnected from `reminders` above, silently breaking
+    /// the caught-up-clears-snooze fix below. Requiring all three makes a
+    /// missed injection a compile error instead of a screen that lies.
     public init(contacts: any ContactRepository,
                 reminders: (any ReminderRepository)?,
+                scheduler: SchedulingPass,
                 interactions: any InteractionRepository,
                 engine: ReminderEngine = ReminderEngine(),
                 window: ReminderWindow,
                 clock: @escaping () -> Date = { Date() }) {
         self.contacts = contacts
         self.reminders = reminders
+        self.scheduler = scheduler
         self.interactions = interactions
         self.engine = engine
         self.window = window
@@ -172,11 +177,7 @@ public final class UpcomingViewModel {
             let tracked = try await contacts.fetchTracked()
             let pendingReminders = try await reminders?.fetchAllPending() ?? []
             let now = clock()
-            let rows = buildRows(
-                contacts: tracked,
-                reminders: pendingReminders,
-                now: now
-            )
+            let rows = buildRows(contacts: tracked, reminders: pendingReminders, now: now)
             guard generation == loadGeneration else { return }
             totalCount = rows.count
             groups = group(rows: rows)
@@ -201,11 +202,28 @@ public final class UpcomingViewModel {
     /// `InteractionLogging.markCaughtUp` never touches occasion
     /// `ScheduledReminder` rows, so removing an occasion row here would show
     /// state this action didn't actually produce. A failure restores the
-    /// true state with a fresh `load()` instead of re-inserting rows
-    /// locally.
+    /// true state with a fresh `load()` instead of re-inserting rows locally.
     ///
     /// Returns whether the write succeeded so the screen can gate its
     /// VoiceOver announcement on it — mirrors `OverdueViewModel.markCaughtUp`.
+    ///
+    /// Also clears any pending snooze through `SchedulingPass.caughtUp` once
+    /// the interaction log succeeds — see `OverdueViewModel.markCaughtUp`'s
+    /// doc comment for why this is required: without it a short-cadence
+    /// contact's stale snoozed date keeps winning `buildRows`'
+    /// `max(now, overdueAt, snoozedUntil)` over the freshly computed one.
+    ///
+    /// Reloads explicitly on success too, unlike `OverdueViewModel`'s
+    /// sibling method: `logging.markCaughtUp`'s `contacts.upsert` broadcasts
+    /// through `observeTracked()` as soon as it lands, which can win the
+    /// race against this function's later `scheduler.caughtUp` call and
+    /// recompute this contact's new row from the still-stale snoozed date —
+    /// nothing else would correct it, since reminder writes have no
+    /// `observeTracked()`-style push (confirmed: removing this line makes
+    /// `caughtUpAfterSnoozeShowsFreshDateWithShortCadence` fail
+    /// intermittently on exactly that stale date). Overdue doesn't need
+    /// this: a freshly caught-up contact's `overdueDays` is 0 regardless of
+    /// snooze state, so the same race there just filters the row out anyway.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         groups = groups.map { header, rows in
@@ -215,6 +233,8 @@ public final class UpcomingViewModel {
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
             try await logging.markCaughtUp(contactId: contactId, at: clock())
+            try await scheduler.caughtUp(contactId: contactId)
+            await performLoad()
             return true
         } catch {
             Self.log.error(
@@ -303,18 +323,11 @@ public final class UpcomingViewModel {
             ?? now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
-        // A pending cadence `ScheduledReminder` is Snooze's only persisted
-        // trace (§14 PR22's `SchedulingPass.snooze` stub) — no separate
-        // "snoozed" flag exists on `Contact`. Once it lapses this map is
-        // simply not consulted and the ordinary computation below decides
-        // the date unchanged, so the row "returns" on its own the next load
-        // after the snoozed date passes.
-        let snoozedUntilByContact = Dictionary(
-            reminders
-                .filter { $0.kind == .cadence }
-                .map { ($0.contactId, $0.scheduledFor) },
-            uniquingKeysWith: { _, latest in latest }
-        )
+        // `PendingSnoozeLookup` — shared with `OverdueViewModel`. Once a
+        // snooze lapses this map is simply not consulted and the ordinary
+        // computation below decides the date unchanged, so the row "returns"
+        // on its own the next load after the snoozed date passes.
+        let snoozedUntilByContact = PendingSnoozeLookup.snoozedUntilByContact(pendingReminders: reminders)
 
         func appendCadenceRow(contact: Contact, cadence: Int, fires: Date) {
             guard fires < horizonEnd else { return }

@@ -84,11 +84,15 @@ public final class ContactDetailViewModel {
     /// "Caught up": logs a `.reminderCaughtUp` interaction against the
     /// contact's preferred channel and moves `lastInteractedAt` to now, then
     /// reloads so the interactions list and derived labels reflect it
-    /// immediately.
+    /// immediately. Also clears any pending snooze through
+    /// `SchedulingPass.caughtUp` once the log succeeds — see
+    /// `OverdueViewModel.markCaughtUp`'s doc comment for why this is
+    /// required so Overdue/Upcoming don't keep showing a stale snoozed date.
     public func markCaughtUp() async {
         let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
         do {
             try await logging.markCaughtUp(contactId: contactId, at: clock())
+            try await scheduler.caughtUp(contactId: contactId)
             await load()
         } catch {
             Self.log.error(

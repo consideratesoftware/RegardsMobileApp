@@ -113,11 +113,12 @@ public final class OverdueViewModel {
         }
         do {
             let all = try await contacts.fetchTracked()
-            // A pending cadence reminder is Snooze's only persisted trace
-            // (§14 PR22's `SchedulingPass` stub) — no separate "snoozed"
-            // flag exists on `Contact`. Building the lookup here, once per
-            // load, keeps `makeOverdueRow` a pure function of its inputs.
-            let snoozedUntilByContact = try await Self.snoozedUntilByContact(reminders: reminders)
+            // `PendingSnoozeLookup` — shared with `UpcomingViewModel`.
+            // Building it here, once per load, keeps `makeOverdueRow` a pure
+            // function of its inputs.
+            let snoozedUntilByContact = PendingSnoozeLookup.snoozedUntilByContact(
+                pendingReminders: try await reminders.fetchAllPending()
+            )
             let now = clock()
             let loadedRows = all.compactMap {
                 Self.makeOverdueRow(
@@ -145,16 +146,6 @@ public final class OverdueViewModel {
         }
     }
 
-    private static func snoozedUntilByContact(
-        reminders: any ReminderRepository
-    ) async throws -> [UUID: Date] {
-        let pendingCadence = try await reminders.fetchAllPending().filter { $0.kind == .cadence }
-        return Dictionary(
-            pendingCadence.map { ($0.contactId, $0.scheduledFor) },
-            uniquingKeysWith: { _, latest in latest }
-        )
-    }
-
     /// "Caught up" from an Overdue row: logs the interaction and moves
     /// `lastInteractedAt`, then removes the row from view immediately rather
     /// than waiting for the next full `load()` — the acceptance contract for
@@ -167,12 +158,21 @@ public final class OverdueViewModel {
     /// VoiceOver announcement on it — announcing "marked caught up" against
     /// a write that then fails and reloads the row back in would tell a
     /// VoiceOver user something that didn't happen.
+    ///
+    /// Also clears any pending snooze through `SchedulingPass.caughtUp` once
+    /// the interaction log succeeds (§9's caught-up trigger: "cancel pending
+    /// reminder(s)... reschedule") — without this, a short-cadence contact's
+    /// stale snoozed date would keep winning the `max(...)` in
+    /// `makeOverdueRow`/`UpcomingViewModel.buildRows` over the freshly
+    /// computed one (PR #49 hosted review; see `SchedulingPass.caughtUp`'s
+    /// doc comment for the exact mechanism).
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         rows.removeAll { $0.contactId == contactId }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
             try await logging.markCaughtUp(contactId: contactId, at: clock())
+            try await scheduler.caughtUp(contactId: contactId)
             return true
         } catch {
             Self.log.error(

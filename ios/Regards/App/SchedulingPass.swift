@@ -2,9 +2,11 @@ import Foundation
 
 /// The §14 PR22 DB-only stub of `SchedulingPass` (decision #36:
 /// "`SchedulingPass` actor is the sole writer of `ScheduledReminder` rows and
-/// OS notifications"). This slice's entire surface is Snooze: pushing a
-/// contact's cadence reminder 7 days out via a direct `ScheduledReminder`
-/// upsert.
+/// OS notifications"). This slice's surface is Snooze and the caught-up
+/// side effect on any pending cadence row: pushing a contact's cadence
+/// reminder 7 days out via a direct `ScheduledReminder` upsert, and
+/// transitioning a pending cadence row to `.userCaughtUp` when the contact
+/// is marked caught up elsewhere.
 ///
 /// There is no reconciliation, batching, occasion handling, or no-double-up
 /// suppression here, no `NotificationScheduling` call, and neither
@@ -72,6 +74,40 @@ public actor SchedulingPass {
             state: .pending
         )
         try await reminders.upsert(reminder)
+    }
+
+    /// "Caught up" side effect on `SchedulingPass`'s own state (§9's
+    /// caught-up re-evaluation trigger: "cancel pending reminder(s) for the
+    /// contact/group, reschedule"). Bugfix for a real cross-screen defect
+    /// (PR #49 hosted review): `OverdueViewModel`/`UpcomingViewModel` fold a
+    /// pending snooze's `scheduledFor` into `max(now, overdueAt,
+    /// snoozedUntil)` when computing a row's date. Without this, a
+    /// caught-up left the stale snoozed row `.pending`, so that `max(...)`
+    /// kept picking the old snoozed date over the freshly-computed one
+    /// whenever the cadence was short enough that `overdueAt` (now +
+    /// cadence) landed *before* the stale `snoozedUntil` (now + 7d from the
+    /// snooze) — invisible whenever the widened-cadence math happened to put
+    /// the fresh date later anyway, which is why
+    /// `caughtUpAfterSnoozeBeatsStaleSnooze` (cadence 10) passed while this
+    /// bug shipped.
+    ///
+    /// A state *transition*, not a delete: §7's lifecycle keeps a
+    /// caught-up-superseded reminder as a `.userCaughtUp` row rather than
+    /// removing it, and both `fetchAllPending()`/`fetchPending(forContact:)`
+    /// already filter to `state == .pending`, so this is enough on its own
+    /// to drop out of every read site's "pending" view — no caller-side
+    /// filtering needed.
+    ///
+    /// Targets `cadenceReminderID(contactId:)` directly rather than reading
+    /// first: a contact's pending cadence reminder, if one exists, is always
+    /// exactly that id (this stub is the sole writer of cadence rows and
+    /// never uses any other id), so there's nothing to look up.
+    /// `updateState` is a no-op — not an error — when nothing matches that
+    /// id, which is exactly the idempotence this needs: a contact with no
+    /// pending snooze has nothing to transition, and calling this twice in a
+    /// row does nothing the second time.
+    public func caughtUp(contactId: UUID) async throws {
+        try await reminders.updateState(id: Self.cadenceReminderID(contactId: contactId), state: .userCaughtUp)
     }
 
     private static func cadenceNotificationId(contactId: UUID) -> String {

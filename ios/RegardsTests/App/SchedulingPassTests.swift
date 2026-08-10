@@ -113,4 +113,50 @@ struct SchedulingPassTests {
             try await scheduler.snooze(contactId: unknownContactID)
         }
     }
+
+    // MARK: - caughtUp (PR #49 hosted review fix)
+
+    @Test(
+        "Caught up transitions a pending cadence row to userCaughtUp, dropping it from every pending read",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func caughtUpTransitionsPendingCadenceRow(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(506), suffix: "caughtup-transition", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        try await scheduler.snooze(contactId: contact.id)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count == 1)
+
+        try await scheduler.caughtUp(contactId: contact.id)
+
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+        #expect(try await repositories.reminders.fetchAllPending()
+            .contains { $0.contactId == contact.id } == false)
+    }
+
+    @Test(
+        "Caught up with no pending reminder is a no-op, not an error",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func caughtUpWithNoPendingRowIsNoOp(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(507), suffix: "caughtup-no-op", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            clock: { Date(timeIntervalSince1970: 1_800_000_000) }
+        )
+
+        // Never snoozed — no pending cadence row exists for this contact.
+        try await scheduler.caughtUp(contactId: contact.id)
+
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+
+        // Calling it again (the "twice in a row" half of idempotence) is
+        // equally uneventful.
+        try await scheduler.caughtUp(contactId: contact.id)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
 }

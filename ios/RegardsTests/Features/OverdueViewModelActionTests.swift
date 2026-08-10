@@ -182,6 +182,43 @@ struct OverdueViewModelActionTests {
         #expect(pending[0].scheduledFor == clock.now().addingTimeInterval(7 * 86_400))
     }
 
+    /// The bug this closes (PR #49 hosted review): `makeOverdueRow` guards
+    /// `snoozedUntil > now`, so a stale (uncleared) snoozed-until kept
+    /// suppressing this row until day 7 even once the contact was genuinely
+    /// overdue again — cadence 3 days puts that moment well before the
+    /// stale snooze's day-7 mark, exactly where a missing
+    /// `SchedulingPass.caughtUp` call would still hide the row.
+    @Test("A contact caught up after a snooze reappears at the fresh short cadence, not the stale snooze")
+    func caughtUpAfterSnoozeReappearsAtFreshCadence() async throws {
+        let contact = Self.overdueContact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let clock = MutableClock(Self.now)
+        let viewModel = OverdueViewModel(
+            contacts: contacts,
+            interactions: StubInteractionRepository(),
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            clock: clock.now
+        )
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        await viewModel.snooze(contactId: contact.id) // pending cadence @ now + 7d
+        #expect(viewModel.rows.isEmpty)
+
+        await viewModel.markCaughtUp(contactId: contact.id)
+        #expect(viewModel.rows.isEmpty) // freshly caught up, not yet overdue again
+
+        // 4 days later: genuinely overdue again at this 3-day cadence, and
+        // still short of the stale snooze's day-7 mark — the window where a
+        // missing `caughtUp` clear would still hide the row.
+        clock.advance(by: 4 * 86_400)
+        await viewModel.load()
+
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+    }
+
     /// `makeOverdueRow`'s guard is `snoozedUntil > now`, not `>=` — at the
     /// exact instant the snooze was pushed to, it must already read as
     /// lapsed. A boundary drawn one direction or the other is invisible

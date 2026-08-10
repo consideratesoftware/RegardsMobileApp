@@ -36,6 +36,7 @@ struct UpcomingViewModelDuplicateRowTests {
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([contact]),
             reminders: StubReminderRepository([occasion]),
+            scheduler: SchedulingPass(reminders: StubReminderRepository([occasion]), clock: { UpcomingFixtures.now }),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -86,6 +87,7 @@ struct UpcomingViewModelDuplicateRowTests {
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([first, second]),
             reminders: StubReminderRepository(occasions),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(occasions), clock: { UpcomingFixtures.now }),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -122,6 +124,10 @@ struct UpcomingViewModelDuplicateRowTests {
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([contact]),
             reminders: StubReminderRepository([laterOccasion]),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository([laterOccasion]),
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
