@@ -122,6 +122,7 @@ struct RegardsLoadStateTests {
         ])
         let viewModel = OverdueViewModel(
             contacts: repository,
+            interactions: StubInteractionRepository(),
             clock: { Self.now }
         )
 
@@ -149,6 +150,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
+            interactions: StubInteractionRepository(),
             window: .defaultV1(),
             clock: { Self.now }
         )
@@ -196,6 +198,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -250,7 +253,11 @@ struct RegardsLoadStateTests {
     @Test("Overdue ignores a stale failed load after a newer load succeeds")
     func overdueIgnoresStaleFailure() async {
         let repository = ControllableContactRepository()
-        let viewModel = OverdueViewModel(contacts: repository, clock: { Self.now })
+        let viewModel = OverdueViewModel(
+            contacts: repository,
+            interactions: StubInteractionRepository(),
+            clock: { Self.now }
+        )
 
         let firstLoad = Task { await viewModel.load() }
         await repository.waitForRequestCount(1)
@@ -272,6 +279,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
+            interactions: StubInteractionRepository(),
             window: .defaultV1(),
             clock: { Self.now }
         )
@@ -335,7 +343,11 @@ struct RegardsLoadStateTests {
     @Test("Overdue keeps loaded content visible while refreshing")
     func overdueKeepsLoadedContentWhileRefreshing() async {
         let repository = ControllableContactRepository()
-        let viewModel = OverdueViewModel(contacts: repository, clock: { Self.now })
+        let viewModel = OverdueViewModel(
+            contacts: repository,
+            interactions: StubInteractionRepository(),
+            clock: { Self.now }
+        )
 
         let initialLoad = Task { await viewModel.load() }
         await repository.waitForRequestCount(1)
@@ -359,6 +371,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
+            interactions: StubInteractionRepository(),
             window: .defaultV1(),
             clock: { Self.now }
         )

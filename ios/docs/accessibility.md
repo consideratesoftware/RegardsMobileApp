@@ -143,10 +143,12 @@ two buckets, both intentional:
   `.tint`, Transparency hero claim card, Merge Duplicates "Merge virtually"
   button, Reminder Windows active day pill, Onboarding "Allow contacts access"
   button, and every in-card nav-link text / toolbar "Edit" label.
-- **Unwired actions**: Contact Detail's primary channel, Caught up, Snooze, and
-  Log other actions plus Overdue's channel pills are muted, noninteractive
-  content until TF-04 and TF-08 supply persistence and routing. Their labels
-  include “unavailable” without exposing a false button trait.
+- **Unwired actions**: Contact Detail's Caught up and Log other actions are
+  wired (TF-04, R11): real, hittable controls, not muted text. Contact
+  Detail's primary channel and Snooze, and Overdue's channel pills, remain
+  muted, noninteractive content until TF-06/TF-07/TF-08 supply persisted
+  scheduling and routing. Their labels include “unavailable” without exposing
+  a false button trait.
 - **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
   per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
   push so tapping two different contacts in succession shows the right

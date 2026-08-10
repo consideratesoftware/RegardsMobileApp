@@ -76,6 +76,40 @@ public final class ContactDetailViewModel {
 
     static let log = RegardsLogger.feature("ContactDetail")
 
+    // MARK: - Actions (R11 / PR22)
+
+    /// "Caught up": logs a `.reminderCaughtUp` interaction against the
+    /// contact's preferred channel and moves `lastInteractedAt` to now, then
+    /// reloads so the interactions list and derived labels reflect it
+    /// immediately.
+    public func markCaughtUp() async {
+        let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
+        do {
+            try await logging.markCaughtUp(contactId: contactId, at: clock())
+            await load()
+        } catch {
+            Self.log.error(
+                "failed to mark caught up for \(self.contactId, privacy: .private): \(error, privacy: .private)"
+            )
+        }
+    }
+
+    /// "Log other channel…": the same downstream effect as `markCaughtUp` —
+    /// reaching a contact through any channel still counts as staying in
+    /// touch — logged as `.manual` against the channel the user actually
+    /// used.
+    public func logOther(channel: Channel) async {
+        let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
+        do {
+            try await logging.logOther(contactId: contactId, channel: channel, at: clock())
+            await load()
+        } catch {
+            Self.log.error(
+                "failed to log other channel for \(self.contactId, privacy: .private): \(error, privacy: .private)"
+            )
+        }
+    }
+
     // MARK: - Formatters (constructed once, locale-pinned)
     //
     // `@MainActor` because `static let` on an `@MainActor` class doesn't

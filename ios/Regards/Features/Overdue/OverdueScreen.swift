@@ -175,7 +175,8 @@ public struct OverdueScreen: View {
                 OverdueRow(
                     row: row,
                     isInnerCircle: innerCircle,
-                    onTapContact: { onTapContact(row.contactId) }
+                    onTapContact: { onTapContact(row.contactId) },
+                    onMarkCaughtUp: { Task { await viewModel.markCaughtUp(contactId: row.contactId) } }
                 )
                 if idx < rows.count - 1 {
                     Hair(inset: 72)
@@ -191,17 +192,20 @@ struct OverdueRow: View {
     let row: OverdueRowState
     let isInnerCircle: Bool
     let onTapContact: () -> Void
+    let onMarkCaughtUp: () -> Void
 
     var body: some View {
         AccessibilityAdaptiveLayout {
             HStack(spacing: 10) {
                 contactButton
                 channelPill
+                caughtUpButton
             }
         } accessibility: {
             VStack(alignment: .leading, spacing: 8) {
                 contactButton
                 channelPill
+                caughtUpButton
             }
         }
         .padding(.horizontal, 14)
@@ -278,5 +282,20 @@ struct OverdueRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(row.channelLabel), unavailable")
         .accessibilityIdentifier("overdue.channel-unavailable")
+    }
+
+    private var caughtUpButton: some View {
+        Button(action: onMarkCaughtUp) {
+            Text("Caught up")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(RegardsDS.accentInk)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .background(Capsule().fill(RegardsDS.accentSoft))
+        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .accessibilityLabel("Mark \(row.name) caught up")
+        .accessibilityIdentifier("overdue.caught-up")
     }
 }

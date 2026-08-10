@@ -68,6 +68,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
+            interactions: mocks.interactions,
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -157,6 +158,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository(reminders),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -206,6 +208,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository(reminders),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -267,6 +270,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository([reminder]),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
         )
@@ -304,6 +308,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: StubReminderRepository([visible, excluded]),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )

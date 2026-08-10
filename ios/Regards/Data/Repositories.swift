@@ -1,5 +1,11 @@
 import Foundation
-import GRDB
+// `AnyDatabaseCancellable` (used by `observeTracked()`'s `ValueObservation`
+// subscription below) predates GRDB's own Sendable audit — `@preconcurrency`
+// downgrades that specific, GRDB-internal data-race diagnostic to a warning
+// without weakening this file's own concurrency checking. Data/ is where
+// GRDB imports live; the Domain-purity guard (`check-domain-purity.sh`)
+// only scans `Domain/**` and already rejects a bare `import GRDB` there.
+@preconcurrency import GRDB
 
 // Repository protocols — the "seam" the UI layer depends on. GRDB
 // implementations live immediately below; PR3 will inject a `MockRepositories`
@@ -18,6 +24,35 @@ public protocol ContactRepository: Sendable {
     func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact]
     func upsert(_ contact: Contact) async throws
     func archive(id: UUID, at: Date) async throws
+    /// Live view of `fetchTracked()`'s result set: yields the current tracked,
+    /// active contacts again after any write that could change the set —
+    /// never on subscribe (ARCHITECTURE.md §14 PR22 — Overdue/Upcoming's
+    /// cadence rows stay current after an action on a different screen, e.g.
+    /// Contact Detail). Scoped to `Contact` reads only: the
+    /// `ScheduledReminder ⋈ Contact` join Upcoming's occasion rows need stays
+    /// on-the-fly until TF-07's `SchedulingPass` exists to keep it consistent
+    /// (R10).
+    ///
+    /// Deliberately **not** a replay of the current value on subscribe: the
+    /// subscriber's own explicit `fetchTracked()` read (already required to
+    /// render anything) is the sole source of the initial state. An eager
+    /// initial emission here would race that read — a caller that mutates
+    /// data and immediately checks its own optimistic UI update could see the
+    /// stream's buffered pre-mutation replay land *after* the optimistic
+    /// update and stomp it back to the stale state.
+    ///
+    /// Defaults to a stream that yields nothing and finishes immediately, so
+    /// read-only test fakes that never mutate contacts don't need a fake
+    /// implementation. `GRDBContactRepository` and `MockContactRepository`
+    /// override it with a real live stream. `async` because the mock's
+    /// backing actor has to be awaited to register the subscription.
+    func observeTracked() async -> AsyncStream<[Contact]>
+}
+
+extension ContactRepository {
+    public func observeTracked() async -> AsyncStream<[Contact]> {
+        AsyncStream { $0.finish() }
+    }
 }
 
 public protocol ContactGroupRepository: Sendable {
@@ -123,6 +158,40 @@ struct GRDBContactRepository: ContactRepository {
             try db.execute(
                 sql: "UPDATE Contact SET archivedAt = ? WHERE id = ?",
                 arguments: [Int(at.timeIntervalSince1970), id.uuidString])
+        }
+    }
+
+    func observeTracked() async -> AsyncStream<[Contact]> {
+        let observation = ValueObservation.tracking { db in
+            try ContactRecord
+                .filter(Column("tracked") == true && Column("archivedAt") == nil)
+                .fetchAll(db)
+        }
+        return AsyncStream { continuation in
+            // `ValueObservation.start` always fires once immediately with the
+            // current value — that first call is the replay the protocol
+            // doc says never to send; only a change *after* subscribing
+            // reaches `continuation`.
+            var isInitialValue = true
+            let cancellable = observation.start(
+                in: dbQueue,
+                onError: { _ in
+                    // A read failure ends the live stream; the screen keeps
+                    // its last-known rows rather than crash — matching every
+                    // other repository read path's fail-visible-not-fail-crash
+                    // posture.
+                    continuation.finish()
+                },
+                onChange: { records in
+                    if isInitialValue {
+                        isInitialValue = false
+                        return
+                    }
+                    let contacts = (try? records.map { try $0.toDomain() }) ?? []
+                    continuation.yield(contacts)
+                }
+            )
+            continuation.onTermination = { _ in cancellable.cancel() }
         }
     }
 }

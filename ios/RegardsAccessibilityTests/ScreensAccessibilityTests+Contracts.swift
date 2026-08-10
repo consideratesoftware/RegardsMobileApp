@@ -151,9 +151,9 @@ extension ScreensAccessibilityTests {
             sourceIdentifier: "screen.overdue",
             in: app
         )
-        let caughtUp = app.descendants(matching: .any)["contact-detail.caught-up-unavailable"]
+        let caughtUp = app.descendants(matching: .any)["contact-detail.caught-up"]
         let snooze = app.descendants(matching: .any)["contact-detail.snooze-unavailable"]
-        let logOther = app.descendants(matching: .any)["contact-detail.log-other-unavailable"]
+        let logOther = app.descendants(matching: .any)["contact-detail.log-other"]
         XCTAssertTrue(caughtUp.waitForExistence(timeout: 10))
         XCTAssertTrue(snooze.waitForExistence(timeout: 10))
         XCTAssertTrue(logOther.waitForExistence(timeout: 10))
@@ -216,9 +216,10 @@ extension ScreensAccessibilityTests {
 
         let unavailableElements = [
             ("contact-detail.open-channel-unavailable", "Open WhatsApp, unavailable"),
-            ("contact-detail.caught-up-unavailable", "Caught up, unavailable"),
+            // Snooze stays unavailable: a real "push 7 days" needs a
+            // `ScheduledReminder` writer, which is `SchedulingPass`'s
+            // exclusive job once TF-07 (PR25) builds it (decision #36).
             ("contact-detail.snooze-unavailable", "Snooze 1 wk, unavailable"),
-            ("contact-detail.log-other-unavailable", "Log other, unavailable"),
             ("contact-detail.cadence-change-unavailable", "Change, unavailable"),
             ("contact-detail.channel-change-unavailable", "Change, unavailable"),
         ]
@@ -229,5 +230,16 @@ extension ScreensAccessibilityTests {
                 in: app
             )
         }
+
+        // Caught up / Log other are wired (§14 PR22): real, hittable
+        // controls, not muted unavailable text.
+        let caughtUp = app.descendants(matching: .any)["contact-detail.caught-up"]
+        let logOther = app.descendants(matching: .any)["contact-detail.log-other"]
+        XCTAssertTrue(caughtUp.waitForExistence(timeout: 10))
+        XCTAssertTrue(logOther.waitForExistence(timeout: 10))
+        XCTAssertEqual(caughtUp.label, "Caught up")
+        XCTAssertEqual(logOther.label, "Log other")
+        XCTAssertTrue(caughtUp.isEnabled)
+        XCTAssertTrue(logOther.isEnabled)
     }
 }

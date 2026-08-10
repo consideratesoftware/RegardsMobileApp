@@ -86,7 +86,10 @@ public struct UpcomingScreen: View {
                             UpcomingRow(
                                 row: row,
                                 ownsTransitionSource: transitionSources.contains(row.id),
-                                onTap: { onTapContact(row.contactId) }
+                                onTap: { onTapContact(row.contactId) },
+                                onMarkCaughtUp: {
+                                    Task { await viewModel.markCaughtUp(contactId: row.contactId) }
+                                }
                             )
                             if idx < group.rows.count - 1 {
                                 Hair(inset: 68)
@@ -134,8 +137,25 @@ struct UpcomingRow: View {
     /// `UpcomingViewModel.transitionSourceRowIDs`.
     let ownsTransitionSource: Bool
     let onTap: () -> Void
+    let onMarkCaughtUp: () -> Void
 
     var body: some View {
+        AccessibilityAdaptiveLayout {
+            HStack(spacing: 12) {
+                rowButton
+                caughtUpButton
+            }
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 8) {
+                rowButton
+                caughtUpButton
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+    }
+
+    private var rowButton: some View {
         Button(action: onTap) {
             AccessibilityAdaptiveLayout {
                 HStack(spacing: 12) {
@@ -164,8 +184,6 @@ struct UpcomingRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -177,6 +195,21 @@ struct UpcomingRow: View {
         // buttons that also live on this screen).
         .accessibilityIdentifier("upcoming.row")
         .regardsContactTransitionSource(id: row.contactId, isActive: ownsTransitionSource)
+    }
+
+    private var caughtUpButton: some View {
+        Button(action: onMarkCaughtUp) {
+            Text("Caught up")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(RegardsDS.accentInk)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .background(Capsule().fill(RegardsDS.accentSoft))
+        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .accessibilityLabel("Mark \(row.name) caught up")
+        .accessibilityIdentifier("upcoming.caught-up")
     }
 
     private var nameAndTag: some View {

@@ -90,6 +90,13 @@ actor MockStore {
     var window: ReminderWindow
     var profile: UserProfile
 
+    /// Subscribers of `observeTracked()`, keyed by a per-subscription token so
+    /// termination can remove exactly one without racing a concurrent
+    /// subscribe. Mirrors `GRDBContactRepository.observeTracked()`'s contract
+    /// in-memory: every subscriber gets the current tracked set immediately,
+    /// then again after any write that could change it.
+    private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
+
     init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
         self.window = window
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
@@ -381,11 +388,47 @@ extension MockStore {
             throw MockRepositoryWriteError.missingGroup
         }
         contacts[c.id] = try mockStoredContact(c)
+        broadcastTrackedChange()
     }
     func archiveContact(id: UUID, at: Date) {
         guard var c = contacts[id] else { return }
         c.archivedAt = mockStoredDate(at)
         contacts[id] = c
+        broadcastTrackedChange()
+    }
+
+    // MARK: - Live observation
+
+    /// Never replays the current value on subscribe — only a write *after*
+    /// subscribing reaches the stream (see the protocol doc on
+    /// `ContactRepository.observeTracked()` for why: an eager replay would
+    /// race a caller's own optimistic UI update).
+    ///
+    /// Registers the continuation synchronously, before returning, using
+    /// `AsyncStream.makeStream` instead of the closure-based initializer: the
+    /// closure form can't touch actor-isolated `trackedObservers` directly
+    /// (it isn't actor-isolated itself), and deferring registration into a
+    /// spawned `Task` would leave a window where a write landing between
+    /// subscribe and that `Task` running is silently missed.
+    func observeTracked() -> AsyncStream<[Contact]> {
+        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
+        let token = UUID()
+        trackedObservers[token] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeTrackedObserver(token) }
+        }
+        return stream
+    }
+
+    private func removeTrackedObserver(_ token: UUID) {
+        trackedObservers.removeValue(forKey: token)
+    }
+
+    private func broadcastTrackedChange() {
+        let current = tracked()
+        for continuation in trackedObservers.values {
+            continuation.yield(current)
+        }
     }
 
     func allGroups() -> [ContactGroup] { Array(groups.values) }

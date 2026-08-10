@@ -247,6 +247,7 @@ struct RegardsTabRoot: View {
     static func makeOverdueViewModel(runtime: AppRuntime) -> OverdueViewModel {
         OverdueViewModel(
             contacts: runtime.environment.contacts,
+            interactions: runtime.environment.interactions,
             clock: runtime.clock,
             calendar: runtime.userCalendar
         )
@@ -257,6 +258,7 @@ struct RegardsTabRoot: View {
         UpcomingViewModel(
             contacts: runtime.environment.contacts,
             reminders: runtime.environment.reminders,
+            interactions: runtime.environment.interactions,
             window: runtime.window,
             clock: runtime.clock
         )

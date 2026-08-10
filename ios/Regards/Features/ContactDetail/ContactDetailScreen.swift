@@ -5,6 +5,7 @@ public struct ContactDetailScreen: View {
 
     @State private var viewModel: ContactDetailViewModel
     @State private var previewContact: Contact?
+    @State private var showsLogOtherChannelPicker = false
 
     public init(viewModel: ContactDetailViewModel) {
         self._viewModel = State(initialValue: viewModel)
@@ -48,6 +49,18 @@ public struct ContactDetailScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $previewContact) { contact in
             EditContactScreen(contact: contact)
+        }
+        .confirmationDialog(
+            "Log other channel",
+            isPresented: $showsLogOtherChannelPicker,
+            titleVisibility: .visible
+        ) {
+            ForEach(Channel.allCases, id: \.self) { channel in
+                Button(channel.displayName) {
+                    Task { await viewModel.logOther(channel: channel) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
         }
         .toolbar {
             if viewModel.contact != nil {
@@ -116,24 +129,17 @@ public struct ContactDetailScreen: View {
 
     @ViewBuilder
     private var secondaryItems: some View {
-        secondaryStub("Caught up", identifier: "contact-detail.caught-up-unavailable")
+        secondaryAction("Caught up", identifier: "contact-detail.caught-up") {
+            Task { await viewModel.markCaughtUp() }
+        }
+        // Snooze stays a muted stub: a real "push 7 days" needs a persisted
+        // `ScheduledReminder` writer, which only `SchedulingPass` may touch
+        // (decision #36) and which doesn't exist until TF-07 (PR25) builds
+        // it. Tracked as an open question against this slice (§14 PR22).
         secondaryStub("Snooze 1 wk", identifier: "contact-detail.snooze-unavailable")
-        secondaryStub("Log other", identifier: "contact-detail.log-other-unavailable")
-    }
-
-    private func secondaryStub(_ title: String, identifier: String) -> some View {
-        Text(title)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(RegardsDS.muted)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 44)
-            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
-            .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
-            .accessibilityLabel("\(title), unavailable")
-            .accessibilityIdentifier(identifier)
+        secondaryAction("Log other", identifier: "contact-detail.log-other") {
+            showsLogOtherChannelPicker = true
+        }
     }
 
     // MARK: - Cards
@@ -305,6 +311,38 @@ public struct ContactDetailScreen: View {
 private extension ContactDetailScreen {
 
     // MARK: - Helpers
+
+    func secondaryAction(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(RegardsDS.accentInk)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
+                .background(RegardsDS.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    func secondaryStub(_ title: String, identifier: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(RegardsDS.muted)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
+            .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegardsDS.hair, lineWidth: 0.5))
+            .accessibilityLabel("\(title), unavailable")
+            .accessibilityIdentifier(identifier)
+    }
 
     func detailRow(label: String,
                    value: String,

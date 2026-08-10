@@ -242,6 +242,7 @@ struct UpcomingViewModelBoundaryTests {
         let viewModel = UpcomingViewModel(
             contacts: StubContactRepository([inside, boundary]),
             reminders: nil,
+            interactions: StubInteractionRepository(),
             window: window,
             clock: { nowDate }
         )
@@ -298,6 +299,7 @@ struct UpcomingViewModelBoundaryTests {
         return UpcomingViewModel(
             contacts: StubContactRepository(contacts),
             reminders: StubReminderRepository(reminders),
+            interactions: StubInteractionRepository(),
             window: window,
             clock: { now }
         )

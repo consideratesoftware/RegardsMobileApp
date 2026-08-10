@@ -12,6 +12,7 @@ struct MockContactRepository: ContactRepository {
     }
     func upsert(_ contact: Contact) async throws { try await store.upsertContact(contact) }
     func archive(id: UUID, at: Date) async throws { await store.archiveContact(id: id, at: at) }
+    func observeTracked() async -> AsyncStream<[Contact]> { await store.observeTracked() }
 }
 
 struct MockContactGroupRepository: ContactGroupRepository {

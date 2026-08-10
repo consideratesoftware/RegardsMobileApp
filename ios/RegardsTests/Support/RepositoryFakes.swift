@@ -13,8 +13,9 @@ import Foundation
 struct RepositoryFakeFailure: Error, Equatable {}
 
 actor StubContactRepository: ContactRepository {
-    private let contacts: [Contact]
+    private var contacts: [Contact]
     private let failure: RepositoryFakeFailure?
+    private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
     init(_ contacts: [Contact] = [], failure: RepositoryFakeFailure? = nil) {
         self.contacts = contacts
@@ -56,15 +57,58 @@ actor StubContactRepository: ContactRepository {
         return contacts.filter { $0.contactGroupId == groupId }
     }
 
+    /// Applies the write in-memory (mirrors both production implementations,
+    /// which are real upserts) so an action test can `fetch` the contact back
+    /// afterward and see `lastInteractedAt` moved.
     func upsert(_ contact: Contact) async throws {
         try requireSuccess()
+        if let index = contacts.firstIndex(where: { $0.id == contact.id }) {
+            contacts[index] = contact
+        } else {
+            contacts.append(contact)
+        }
+        broadcastTrackedChange()
     }
 
     func archive(id: UUID, at: Date) async throws {
         try requireSuccess()
+        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return }
+        contacts[index].archivedAt = at
+        broadcastTrackedChange()
     }
 
     func storedCount() -> Int { contacts.count }
+
+    /// A real live stream (mirrors `GRDBContactRepository`/`MockStore`), for
+    /// tests that assert an Overdue/Upcoming view model reflects a write made
+    /// through a *different* repository reference to the same fake.
+    /// Never replays the current value on subscribe — only a write *after*
+    /// subscribing reaches the stream, matching the mock/GRDB contract (see
+    /// `ContactRepository.observeTracked()`'s doc comment). Registers the
+    /// continuation synchronously via `AsyncStream.makeStream` rather than
+    /// inside the closure-based initializer, so there's no window where a
+    /// write landing right after subscribe is missed (mirrors
+    /// `MockStore.observeTracked()`).
+    func observeTracked() async -> AsyncStream<[Contact]> {
+        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
+        let token = UUID()
+        trackedObservers[token] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeTrackedObserver(token) }
+        }
+        return stream
+    }
+
+    private func removeTrackedObserver(_ token: UUID) {
+        trackedObservers.removeValue(forKey: token)
+    }
+
+    private func broadcastTrackedChange() {
+        let current = contacts.filter { $0.tracked && $0.archivedAt == nil }
+        for continuation in trackedObservers.values {
+            continuation.yield(current)
+        }
+    }
 }
 
 actor StubReminderRepository: ReminderRepository {
@@ -111,6 +155,48 @@ actor StubReminderRepository: ReminderRepository {
     func delete(id: UUID) async throws {
         try requireSuccess()
     }
+}
+
+actor StubInteractionRepository: InteractionRepository {
+    private var logs: [InteractionLog]
+    private let failure: RepositoryFakeFailure?
+
+    init(_ logs: [InteractionLog] = [], failure: RepositoryFakeFailure? = nil) {
+        self.logs = logs
+        self.failure = failure
+    }
+
+    /// A repository whose every call throws.
+    static func failing() -> StubInteractionRepository {
+        StubInteractionRepository(failure: RepositoryFakeFailure())
+    }
+
+    private func requireSuccess() throws {
+        if let failure { throw failure }
+    }
+
+    /// Mirrors both production implementations: ordered by `occurredAt`
+    /// descending then `id` ascending, and `limit <= 0` returns empty.
+    func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
+        try requireSuccess()
+        guard limit > 0 else { return [] }
+        return logs
+            .filter { $0.contactId == contactId }
+            .sorted {
+                if $0.occurredAt != $1.occurredAt { return $0.occurredAt > $1.occurredAt }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    func append(_ log: InteractionLog) async throws {
+        try requireSuccess()
+        logs.append(log)
+    }
+
+    /// Test-only inspection of every logged interaction, in append order.
+    func appendedLogs() -> [InteractionLog] { logs }
 }
 
 struct StubReminderWindowRepository: ReminderWindowRepository {

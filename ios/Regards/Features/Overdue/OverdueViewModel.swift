@@ -30,9 +30,11 @@ public final class OverdueViewModel {
     private(set) var loadState: RegardsLoadState = .loading
 
     private let contacts: any ContactRepository
+    private let interactions: any InteractionRepository
     private let clock: () -> Date
     private let calendar: Calendar
     private var loadGeneration = 0
+    private var observationTask: Task<Void, Never>?
 
     /// `calendar` is injected so tests (and future multi-timezone logic)
     /// can pin the day math to a fixed TZ. Production uses `.current`
@@ -42,14 +44,52 @@ public final class OverdueViewModel {
     /// `ReminderEngine`. Intentional: the overdue label describes the
     /// user's perception right now, not the scheduling clock.
     public init(contacts: any ContactRepository,
+                interactions: any InteractionRepository,
                 clock: @escaping () -> Date = { Date() },
                 calendar: Calendar = .current) {
         self.contacts = contacts
+        self.interactions = interactions
         self.clock = clock
         self.calendar = calendar
     }
 
     public func load() async {
+        await startObservingIfNeeded()
+        await performLoad()
+    }
+
+    /// Subscribes once to `contacts.observeTracked()` so this screen reflects
+    /// an action taken elsewhere — Contact Detail's Caught up / Log other —
+    /// without the user having to leave and return (ARCHITECTURE.md §14
+    /// PR22: "live lists update"). `load()` can be called again afterward
+    /// (pull-to-refresh, retry) without re-subscribing.
+    ///
+    /// Awaits `observeTracked()` itself (registering the subscription)
+    /// before spawning the Task that consumes it. Doing the subscribe inside
+    /// the spawned Task instead would race: `Task { ... }` only *schedules*
+    /// its body, so a write happening right after `load()` returns could run
+    /// before that body ever reaches its `for await`, and the never-replayed
+    /// stream (see `ContactRepository.observeTracked()`) would silently miss
+    /// it. Subscribing here first, synchronously relative to `load()`'s
+    /// caller, means every write after `load()` returns is guaranteed seen.
+    ///
+    /// `self` is re-checked weakly on every emission, not just once before
+    /// the loop starts: capturing `self` non-weakly for the loop's duration
+    /// would keep this long-lived subscription alive for as long as the
+    /// repository keeps emitting, defeating `[weak self]` entirely.
+    private func startObservingIfNeeded() async {
+        guard observationTask == nil else { return }
+        let updates = await contacts.observeTracked()
+        observationTask = Task { [weak self] in
+            for await _ in updates {
+                if Task.isCancelled { return }
+                guard let self else { return }
+                await self.performLoad()
+            }
+        }
+    }
+
+    private func performLoad() async {
         loadGeneration += 1
         let generation = loadGeneration
         if loadState != .loaded {
@@ -74,6 +114,26 @@ public final class OverdueViewModel {
             Self.log.error("failed to load tracked contacts: \(error, privacy: .private)")
             rows = []
             loadState = .failed
+        }
+    }
+
+    /// "Caught up" from an Overdue row: logs the interaction and moves
+    /// `lastInteractedAt`, then removes the row from view immediately rather
+    /// than waiting for the next full `load()` — the acceptance contract for
+    /// this action is that it moves the contact out of Overdue instantly
+    /// (§14 PR22). A failure restores the true state with a fresh `load()`
+    /// instead of re-inserting the row locally, so the list never disagrees
+    /// with what is actually persisted.
+    public func markCaughtUp(contactId: UUID) async {
+        rows.removeAll { $0.contactId == contactId }
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+        do {
+            try await logging.markCaughtUp(contactId: contactId, at: clock())
+        } catch {
+            Self.log.error(
+                "failed to mark caught up for \(contactId, privacy: .private): \(error, privacy: .private)"
+            )
+            await performLoad()
         }
     }
 
