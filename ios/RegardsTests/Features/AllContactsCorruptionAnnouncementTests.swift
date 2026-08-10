@@ -37,16 +37,23 @@ struct AllContactsCorruptionAnnouncementTests {
         let model = ReconciliationGenerationModel()
         let selection = TabSelectionModel(selectedTab: .contacts)
         let recorder = AnnouncementRecorder()
+        let visibility = VisibilityRecorder()
         let host = UIHostingController(
-            rootView: AnnouncementHarness(viewModel: viewModel, model: model, selection: selection, recorder: recorder)
+            rootView: AnnouncementHarness(
+                viewModel: viewModel, model: model, selection: selection, recorder: recorder, visibility: visibility
+            )
         )
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = host
         window.makeKeyAndVisible()
         window.layoutIfNeeded()
 
-        // Initial load has no corruption — no announcement.
+        // Initial load has no corruption — no announcement. Also settle to
+        // the screen's own `.onAppear` having actually landed (not just
+        // `loadState`, a separate signal driven by `.task`) before treating
+        // "visible" as a known starting condition below.
         #expect(await eventually { viewModel.loadState == .loaded })
+        #expect(await eventuallyPumpingRunLoop { visibility.latest == true })
         #expect(recorder.announcements.isEmpty)
 
         // Reconciliation discovers a corrupt row: nil → "1 contact...".
@@ -78,8 +85,11 @@ struct AllContactsCorruptionAnnouncementTests {
         let model = ReconciliationGenerationModel()
         let selection = TabSelectionModel(selectedTab: .contacts)
         let recorder = AnnouncementRecorder()
+        let visibility = VisibilityRecorder()
         let host = UIHostingController(
-            rootView: AnnouncementHarness(viewModel: viewModel, model: model, selection: selection, recorder: recorder)
+            rootView: AnnouncementHarness(
+                viewModel: viewModel, model: model, selection: selection, recorder: recorder, visibility: visibility
+            )
         )
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = host
@@ -90,12 +100,23 @@ struct AllContactsCorruptionAnnouncementTests {
         // `TabView` only instantiates the selected tab's content) and its
         // initial healthy load completes.
         #expect(await eventually { viewModel.loadState == .loaded })
+        #expect(await eventuallyPumpingRunLoop { visibility.latest == true })
 
         // Switch away — the screen stays mounted (`.task`/`.onChange` keep
         // working, proven below by the reload actually happening) but is no
-        // longer the frontmost tab.
+        // longer the frontmost tab. `window.layoutIfNeeded()` forces a
+        // layout pass, but SwiftUI dispatches `.onDisappear` on its own
+        // run-loop schedule, not synchronously inside that call — a flake
+        // traced to exactly this gap: reconciliation could fire (below)
+        // before `.onDisappear` had actually landed, so the announcement
+        // gate was still reading `isCurrentlyVisible == true` at the moment
+        // it mattered. Settling on `visibility.latest == false` (via the
+        // screen's own `visibilityChangeObserver`, not a fixed number of
+        // yields) is the bounded, deterministic point that proves the
+        // transition happened before anything below can race it.
         selection.selectedTab = .other
         window.layoutIfNeeded()
+        #expect(await eventuallyPumpingRunLoop { visibility.latest == false })
 
         await repository.setReport(Self.report(healthy: healthy, corruptedCount: 1))
         model.reconciliationGeneration += 1
@@ -150,6 +171,7 @@ private struct AnnouncementHarness: View {
     @ObservedObject var model: ReconciliationGenerationModel
     @ObservedObject var selection: TabSelectionModel
     let recorder: AnnouncementRecorder
+    let visibility: VisibilityRecorder
 
     var body: some View {
         TabView(selection: $selection.selectedTab) {
@@ -171,6 +193,7 @@ private struct AnnouncementHarness: View {
         screen.corruptionAnnouncementEffects = AllContactsCorruptionAnnouncementEffects(
             announce: { message in recorder.record(message) }
         )
+        screen.visibilityChangeObserver = { isVisible in visibility.record(isVisible) }
         return screen
     }
 }
@@ -180,5 +203,20 @@ private final class AnnouncementRecorder {
     private(set) var announcements: [String] = []
     func record(_ message: String) {
         announcements.append(message)
+    }
+}
+
+/// Mirrors `AnnouncementRecorder`'s shape for `AllContactsScreen`'s
+/// `visibilityChangeObserver` — gives a test a deterministic, pollable
+/// signal for when `.onAppear`/`.onDisappear` have actually landed, instead
+/// of assuming a `window.layoutIfNeeded()` after a programmatic tab switch
+/// was enough. `latest` starts `nil` (no transition observed yet) so
+/// `eventuallyPumpingRunLoop { visibility.latest == false }` can't pass on a
+/// stale default; it has to see the real `.onDisappear` fire.
+@MainActor
+private final class VisibilityRecorder {
+    private(set) var latest: Bool?
+    func record(_ isVisible: Bool) {
+        latest = isVisible
     }
 }

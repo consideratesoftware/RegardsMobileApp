@@ -33,6 +33,18 @@ public struct AllContactsScreen: View {
     /// store-change alike), so this is always correct-after-the-fact.
     let reconciliationGeneration: Int
     var rowConstructionObserver: (@MainActor (UUID) -> Void)?
+    /// Test-only hook mirroring `rowConstructionObserver`'s shape: fires
+    /// alongside `isCurrentlyVisible`'s own assignment in `.onAppear`/
+    /// `.onDisappear` below. `isCurrentlyVisible` itself is private state a
+    /// test can't read directly, and SwiftUI dispatches `.onAppear`/
+    /// `.onDisappear` on its own run-loop schedule — a `window.layoutIfNeeded()`
+    /// after a programmatic tab switch doesn't guarantee they've already
+    /// fired. A test asserting the announcement gate stays *closed* needs a
+    /// way to settle to "the disappear transition has actually landed"
+    /// before it drives the state that would trigger an announcement,
+    /// otherwise it's racing SwiftUI's own scheduling instead of proving
+    /// the gate.
+    var visibilityChangeObserver: (@MainActor (Bool) -> Void)?
     var corruptionAnnouncementEffects = AllContactsCorruptionAnnouncementEffects.live
 
     init(
@@ -80,8 +92,14 @@ public struct AllContactsScreen: View {
         .task {
             await viewModel.load()
         }
-        .onAppear { isCurrentlyVisible = true }
-        .onDisappear { isCurrentlyVisible = false }
+        .onAppear {
+            isCurrentlyVisible = true
+            visibilityChangeObserver?(true)
+        }
+        .onDisappear {
+            isCurrentlyVisible = false
+            visibilityChangeObserver?(false)
+        }
         .onChange(of: reconciliationGeneration) { _, _ in
             // §14 PR21 acceptance: a contact deleted/re-added/renamed in the
             // system app reflects here "next foreground" — and, for free,

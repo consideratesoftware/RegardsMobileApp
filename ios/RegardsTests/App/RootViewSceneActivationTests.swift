@@ -37,9 +37,9 @@ struct RootViewSceneActivationTests {
         // risk coalescing straight from `.active` to `.active` and silently
         // skipping the states this test means to exercise.
         model.scenePhase = .background
-        await settleSceneUpdate()
+        await settleViewUpdate()
         model.scenePhase = .inactive
-        await settleSceneUpdate()
+        await settleViewUpdate()
         model.scenePhase = .active
 
         #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount > countAfterLaunch })
@@ -50,7 +50,7 @@ struct RootViewSceneActivationTests {
         // not produce a second pass off a latch left stuck set.
         let countAfterForeground = launch.reconciliationCount
         model.scenePhase = .inactive
-        await settleSceneUpdate()
+        await settleViewUpdate()
         model.scenePhase = .active
         let reconciledAgain = await eventuallyPumpingRunLoop(maxIterations: 30) {
             launch.reconciliationCount > countAfterForeground
@@ -74,7 +74,7 @@ struct RootViewSceneActivationTests {
         // `.inactive` value, rather than risk coalescing straight from
         // `.active` to `.active` and testing nothing.
         model.scenePhase = .inactive
-        await settleSceneUpdate()
+        await settleViewUpdate()
         model.scenePhase = .active
 
         // Waiting for a *negative* can't use the same "eventually true"
@@ -136,45 +136,12 @@ struct RootViewSceneActivationTests {
     }
 }
 
-/// Bounded, run-loop-pumping wait for state SwiftUI's own appearance/
-/// layout machinery drives (like `.task` firing) — see the call site's
-/// comment for why the shared `eventually` (`Task.yield()`-only) isn't
-/// sufficient here. Ceiling of `maxIterations * 0.05s` (15s) so a
-/// genuinely-broken binding fails the test instead of hanging it.
-@MainActor
-private func eventuallyPumpingRunLoop(
-    maxIterations: Int = 300,
-    _ condition: @escaping @MainActor () -> Bool
-) async -> Bool {
-    for _ in 0..<maxIterations {
-        if condition() { return true }
-        await Task.yield()
-        pumpRunLoopBriefly()
-    }
-    return condition()
-}
-
-/// `RunLoop.current` is `NS_SWIFT_UNAVAILABLE_FROM_ASYNC` — it can only be
-/// read from a synchronous context, hence this non-`async` wrapper instead
-/// of calling it directly inside `eventuallyPumpingRunLoop`'s loop.
-@MainActor
-private func pumpRunLoopBriefly() {
-    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-}
-
-/// Settles a single `scenePhase` assignment before the test moves on to the
-/// next one. A single `pumpRunLoopBriefly()` call was enough for a *pair*
-/// of assignments (round 8), but wasn't reliable for three assignments in a
-/// row (round 9's realistic `.background → .inactive → .active` sequence) —
-/// several yield-and-pump rounds gives SwiftUI's Combine-driven environment
-/// update more chances to actually commit before the next assignment lands.
-@MainActor
-private func settleSceneUpdate(iterations: Int = 5) async {
-    for _ in 0..<iterations {
-        await Task.yield()
-        pumpRunLoopBriefly()
-    }
-}
+// `eventuallyPumpingRunLoop`, `pumpRunLoopBriefly`, and `settleViewUpdate`
+// (used above as `settleSceneUpdate` was previously) now live in
+// `RegardsTests/Support/Eventually.swift` — round 11 promoted them from
+// file-private helpers here so `AllContactsCorruptionAnnouncementTests`
+// could reuse the same run-loop-pumping wait for its own `TabView`
+// appearance-transition race, instead of duplicating this logic.
 
 @MainActor
 private final class ScenePhaseModel: ObservableObject {
