@@ -117,7 +117,8 @@ struct ContactsReconcilerAuthorizationTests {
         try await repo.upsert(contactA)
         try await repo.upsert(contactB)
         let source = MutableContactsSource(status: .authorized, contacts: [])
-        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: clock.now)
 
         let firstPass = try await reconciler.reconcile()
         #expect(firstPass.archived == 0)
@@ -126,16 +127,17 @@ struct ContactsReconcilerAuthorizationTests {
         #expect(reloadedAAfterFirstPass.archivedAt == nil)
         #expect(reloadedBAfterFirstPass.archivedAt == nil)
 
-        // Still wholesale-empty on the very next pass — a genuine
-        // mass-deletion (or the user revoking and the store staying
-        // legitimately empty) rather than a resync that would have
-        // repopulated by now.
+        // Still wholesale-empty on the very next pass, `archiveDebounceFloor`
+        // later — a genuine mass-deletion (or the user revoking and the
+        // store staying legitimately empty) rather than a resync that would
+        // have repopulated by now.
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
         #expect(secondPass.archived == 2)
         let reloadedAAfterSecondPass = try #require(try await repo.fetch(id: contactA.id))
         let reloadedBAfterSecondPass = try #require(try await repo.fetch(id: contactB.id))
-        #expect(reloadedAAfterSecondPass.archivedAt == Self.now)
-        #expect(reloadedBAfterSecondPass.archivedAt == Self.now)
+        #expect(reloadedAAfterSecondPass.archivedAt == clock.now())
+        #expect(reloadedBAfterSecondPass.archivedAt == clock.now())
     }
 
     /// Round 9: the wholesale-empty case above is the degenerate 0-of-N
@@ -157,7 +159,8 @@ struct ContactsReconcilerAuthorizationTests {
         let source = MutableContactsSource(status: .authorized, contacts: visibleRefs.map { ref in
             SystemContact(identifier: ref, givenName: ref, familyName: "", phoneNumbers: [], emailAddresses: [])
         })
-        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: clock.now)
 
         let firstPass = try await reconciler.reconcile()
         #expect(firstPass.archived == 0, "a single ambiguous partial read must not archive anything")
@@ -167,14 +170,15 @@ struct ContactsReconcilerAuthorizationTests {
         }
 
         // Genuine-deletion control: the same 48 refs are still missing on
-        // the very next `.authorized` pass — this is what actually
-        // distinguishes a real deletion from a resync that would have
-        // repopulated some of them by now.
+        // the very next `.authorized` pass, `archiveDebounceFloor` later —
+        // this is what actually distinguishes a real deletion from a resync
+        // that would have repopulated some of them by now.
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
         #expect(secondPass.archived == 48)
         for contact in stored where !visibleRefs.contains(contact.systemContactRef) {
             let reloaded = try #require(try await repo.fetch(id: contact.id))
-            #expect(reloaded.archivedAt == Self.now)
+            #expect(reloaded.archivedAt == clock.now())
         }
         for ref in visibleRefs {
             let stillVisible = try #require(stored.first { $0.systemContactRef == ref })
@@ -194,15 +198,62 @@ struct ContactsReconcilerAuthorizationTests {
             SystemContact(identifier: "still-visible", givenName: "Still", familyName: "Visible",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: clock.now)
 
         let firstPass = try await reconciler.reconcile()
         #expect(firstPass.archived == 0)
 
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
 
         #expect(secondPass.archived == 1)
         let reloaded = try #require(try await repo.fetch(id: deleted.id))
-        #expect(reloaded.archivedAt == Self.now)
+        #expect(reloaded.archivedAt == clock.now())
+    }
+
+    /// Round 10 hardening: two consecutive `.authorized` passes alone isn't
+    /// enough either, if they happen only moments apart — a foreground
+    /// racing the `CNContactStoreDidChange` notification it woke up to
+    /// handle can both land within a fraction of a second of each other,
+    /// mid-resync, with nothing having had any real chance to reappear.
+    /// `archiveDebounceFloor` requires genuine wall-clock separation
+    /// between the pass that first observes a ref missing and the pass that
+    /// confirms it's still missing.
+    @Test("A ref missing on two passes under the debounce floor archives nothing; past it, it archives")
+    func archiveDebounceFloorGatesConsecutiveMisses() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let deleted = Contact(systemContactRef: "floor-test-deleted", displayName: "Gone", tracked: true)
+        try await repo.upsert(deleted)
+        let stillVisible = Contact(systemContactRef: "floor-test-visible", displayName: "Still Visible")
+        try await repo.upsert(stillVisible)
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "floor-test-visible", givenName: "Still", familyName: "Visible",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: clock.now)
+
+        let firstPass = try await reconciler.reconcile()
+        #expect(firstPass.archived == 0)
+
+        // Second pass lands well under the floor (a foreground racing a
+        // store-change notification for the same event, say) — still zero
+        // archives, even though this is technically "two consecutive
+        // misses".
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor - 1)
+        let secondPassTooSoon = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
+        #expect(secondPassTooSoon.archived == 0, "two rapid passes under the floor must not archive")
+        let stillActiveTooSoon = try #require(try await repo.fetch(id: deleted.id))
+        #expect(stillActiveTooSoon.archivedAt == nil)
+
+        // A third pass, now past the floor measured from the *first*
+        // observation (not the second pass) — the ref has been missing the
+        // whole time, so it archives here.
+        clock.advance(by: 1)
+        let thirdPassPastFloor = try await reconciler.reconcile(previouslyMissingRefs: secondPassTooSoon.missingRefs)
+        #expect(thirdPassPastFloor.archived == 1, "the same ref, now past the floor, must archive")
+        let archived = try #require(try await repo.fetch(id: deleted.id))
+        #expect(archived.archivedAt == clock.now())
     }
 }

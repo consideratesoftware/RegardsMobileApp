@@ -34,7 +34,8 @@ struct AppLaunchCoordinatorReconciliationTests {
             SystemContact(identifier: "staying-x", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        let launch = coordinator(environment: environment, source: source)
+        let clock = MutableClock(now)
+        let launch = coordinator(environment: environment, source: source, clock: clock.now)
 
         await launch.start()
 
@@ -46,20 +47,22 @@ struct AppLaunchCoordinatorReconciliationTests {
             SystemContact(identifier: "staying-x", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        // Round 9: a ref only archives once it's missing on two consecutive
-        // `.authorized` passes — `AppLaunchCoordinator` threads that state
-        // across calls itself, so the first foreground after "gone-x"
-        // disappears just records the miss.
+        // Round 9/10: a ref only archives once it's missing on two
+        // consecutive `.authorized` passes at least `archiveDebounceFloor`
+        // apart — `AppLaunchCoordinator` threads that state across calls
+        // itself, so the first foreground after "gone-x" disappears just
+        // records the miss.
         await launch.handleSceneActivation()
         #expect(launch.reconciliationCount == 2)
         let stillNotArchivedAfterFirstMiss = try await environment.contacts.fetch(id: existing.id)
         #expect(stillNotArchivedAfterFirstMiss?.archivedAt == nil)
 
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         await launch.handleSceneActivation()
 
         #expect(launch.reconciliationCount == 3)
         let archived = try await environment.contacts.fetch(id: existing.id)
-        #expect(archived?.archivedAt == now)
+        #expect(archived?.archivedAt == clock.now())
     }
 
     @Test("Foregrounding before the runtime is ready is a no-op")
@@ -177,7 +180,8 @@ struct AppLaunchCoordinatorReconciliationTests {
             SystemContact(identifier: "staying-y", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        let launch = coordinator(environment: environment, source: source)
+        let clock = MutableClock(now)
+        let launch = coordinator(environment: environment, source: source, clock: clock.now)
 
         await launch.start()
         #expect(launch.reconciliationCount == 1)
@@ -186,19 +190,20 @@ struct AppLaunchCoordinatorReconciliationTests {
             SystemContact(identifier: "staying-y", givenName: "Staying", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        // Round 9: the first miss just records "gone-y" as newly missing —
-        // archiving needs a second consecutive `.authorized` pass that
-        // still doesn't see it.
+        // Round 9/10: the first miss just records "gone-y" as newly missing
+        // — archiving needs a second consecutive `.authorized` pass, at
+        // least `archiveDebounceFloor` later, that still doesn't see it.
         source.simulateChange()
         #expect(await eventually { launch.reconciliationCount == 2 })
         let stillNotArchivedAfterFirstMiss = try await environment.contacts.fetch(id: existing.id)
         #expect(stillNotArchivedAfterFirstMiss?.archivedAt == nil)
 
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         source.simulateChange()
 
         #expect(await eventually { launch.reconciliationCount == 3 })
         let archived = try await environment.contacts.fetch(id: existing.id)
-        #expect(archived?.archivedAt == now)
+        #expect(archived?.archivedAt == clock.now())
     }
 
     /// Fix 7: a store-change notification landing while the coordinator has
@@ -242,7 +247,8 @@ struct AppLaunchCoordinatorReconciliationTests {
 
     private func coordinator(
         environment: AppEnvironment,
-        source: any ContactsSource
+        source: any ContactsSource,
+        clock: (@Sendable () -> Date)? = nil
     ) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(
@@ -251,7 +257,7 @@ struct AppLaunchCoordinatorReconciliationTests {
                     try await AppRuntime.makeProduction(environment: environment)
                 },
                 contactsSource: source,
-                clock: { now }
+                clock: clock ?? { now }
             )
         )
     }

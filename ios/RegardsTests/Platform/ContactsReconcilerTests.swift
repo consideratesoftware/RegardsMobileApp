@@ -47,22 +47,28 @@ struct ContactsReconcilerTests {
             SystemContact(identifier: "present-1", givenName: "Present", familyName: "Contact",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        let reconciler = ContactsReconciler(source: source, repo: repo, clock: { Self.now })
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: clock.now)
 
         // Round 9: a ref only archives once it's missing on two consecutive
         // `.authorized` passes (see `ContactsReconcilerAuthorizationTests`
         // for the dedicated ambiguous-partial-read regression) — the first
         // pass here just records "gone-1" as newly missing, not archived.
+        // Round 10: those two passes also need to be genuinely time-apart
+        // (`ContactsReconciler.archiveDebounceFloor`) — see
+        // `ContactsReconcilerAuthorizationTests` for the dedicated
+        // rapid-vs-floored regression pinning that specifically.
         let firstPass = try await reconciler.reconcile()
         #expect(firstPass.archived == 0)
         let stillActiveAfterFirstPass = try await repo.fetch(id: existing.id)
         #expect(stillActiveAfterFirstPass?.archivedAt == nil)
 
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
 
         #expect(secondPass.archived == 1)
         let reloaded = try await repo.fetch(id: existing.id)
-        #expect(reloaded?.archivedAt == Self.now)
+        #expect(reloaded?.archivedAt == clock.now())
         // History-bearing fields survive archival untouched.
         #expect(reloaded?.tracked == true)
         #expect(reloaded?.cadenceDays == 14)

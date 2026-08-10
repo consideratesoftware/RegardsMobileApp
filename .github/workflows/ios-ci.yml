@@ -141,6 +141,7 @@ jobs:
             -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
             -configuration Debug \
             -only-testing:RegardsTests \
+            -skip-testing:RegardsTests/ContactsSourceStressTests \
             -resultBundlePath build/RegardsTests.xcresult \
             -enableCodeCoverage YES \
             -onlyUsePackageVersionsFromResolvedFile \

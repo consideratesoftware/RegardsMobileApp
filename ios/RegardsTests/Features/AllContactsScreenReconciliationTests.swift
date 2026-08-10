@@ -17,7 +17,7 @@ struct AllContactsScreenReconciliationTests {
     @Test("The screen reloads via reconciliationGeneration observation, not a manual load() call")
     func reloadsWhenReconciliationGenerationChanges() async throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let repository = MutableAllContactsRepository(
+        let repository = SettableContactRepository(
             contacts: [Self.contact(name: "Before Reconcile")]
         )
         let viewModel = AllContactsViewModel(contacts: repository, clock: { now })
@@ -70,25 +70,5 @@ private struct ReconciliationGenerationHarness: View {
     }
 }
 
-private actor MutableAllContactsRepository: ContactRepository {
-    private var contacts: [Contact]
-
-    init(contacts: [Contact]) {
-        self.contacts = contacts
-    }
-
-    func fetchAll() async throws -> [Contact] { contacts }
-    func fetchTracked() async throws -> [Contact] {
-        contacts.filter { $0.tracked && $0.isActive }
-    }
-    func fetch(id: UUID) async throws -> Contact? { contacts.first { $0.id == id } }
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        contacts.filter { $0.contactGroupId == groupId }
-    }
-    func upsert(_ contact: Contact) async throws { contacts.append(contact) }
-    func archive(id: UUID, at: Date) async throws {}
-
-    func replaceContacts(_ newContacts: [Contact]) {
-        contacts = newContacts
-    }
-}
+// `SettableContactRepository` lives in RegardsTests/Support — shared across
+// the AllContacts reconciliation/announcement suites.

@@ -89,7 +89,7 @@ extension AppLaunchCoordinator {
             // missing — reset rather than leave stale refs from a prior
             // pass sitting around waiting to be "confirmed" by an unrelated
             // later pass's coincidentally-overlapping miss.
-            previouslyMissingContactRefs = []
+            previouslyMissingContactRefs = [:]
             Self.reconciliationLog.error("reconciliation failed: \(error, privacy: .private)")
         }
         recordReconciliationPass()

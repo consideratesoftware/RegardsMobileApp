@@ -76,22 +76,26 @@ struct ContactsReconcilerResilienceTests {
             phoneNumbers: [], emailAddresses: []
         )
         let deletionSource = MutableContactsSource(status: .authorized, contacts: [bystanderSystemContact])
-        let deletionReconciler = ContactsReconciler(source: deletionSource, repo: repo, clock: { Self.now })
-        // Round 9: a ref only archives once it's missing on two consecutive
-        // `.authorized` passes, so "deletion" here takes two calls.
+        let deletionClock = MutableClock(Self.now)
+        let deletionReconciler = ContactsReconciler(source: deletionSource, repo: repo, clock: deletionClock.now)
+        // Round 9/10: a ref only archives once it's missing on two
+        // consecutive `.authorized` passes at least `archiveDebounceFloor`
+        // apart, so "deletion" here takes two calls with the clock advanced
+        // between them.
         let firstDeletionPass = try await deletionReconciler.reconcile()
         #expect(firstDeletionPass.archived == 0)
+        deletionClock.advance(by: ContactsReconciler.archiveDebounceFloor)
         let secondDeletionPass = try await deletionReconciler.reconcile(
             previouslyMissingRefs: firstDeletionPass.missingRefs
         )
         #expect(secondDeletionPass.archived == 1)
         let archivedOriginal = try #require(try await repo.fetch(id: original.id))
-        #expect(archivedOriginal.archivedAt == Self.now)
+        #expect(archivedOriginal.archivedAt == deletionClock.now())
 
         // The system re-issues a *new* identifier for what the user
         // perceives as "the same" re-added contact — CNContactStore never
         // reuses an identifier across a delete-then-re-add.
-        let readdedAt = Self.now.addingTimeInterval(3_600)
+        let readdedAt = deletionClock.now().addingTimeInterval(3_600)
         let readdSource = MutableContactsSource(status: .authorized, contacts: [
             SystemContact(identifier: "new-identifier", givenName: "Original", familyName: "Person",
                           phoneNumbers: ["+15555550920"], emailAddresses: []),
@@ -109,7 +113,7 @@ struct ContactsReconcilerResilienceTests {
         let stillArchivedOriginal = try #require(try await repo.fetch(id: original.id))
         // The archived original's history-bearing fields are exactly as
         // they were the moment it was archived — a re-add never touches it.
-        #expect(stillArchivedOriginal.archivedAt == Self.now)
+        #expect(stillArchivedOriginal.archivedAt == deletionClock.now())
         #expect(stillArchivedOriginal.tracked == true)
         #expect(stillArchivedOriginal.cadenceDays == 21)
         let newRow = try #require(allContacts.first { $0.systemContactRef == "new-identifier" })
@@ -151,17 +155,20 @@ struct ContactsReconcilerResilienceTests {
             SystemContact(identifier: "bystander", givenName: "Bystander", familyName: "",
                           phoneNumbers: [], emailAddresses: []),
         ])
-        let reconciler = ContactsReconciler(source: source, repo: repositories.contacts, clock: { Self.now })
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repositories.contacts, clock: clock.now)
 
-        // Round 9: a ref only archives once it's missing on two consecutive
-        // `.authorized` passes.
+        // Round 9/10: a ref only archives once it's missing on two
+        // consecutive `.authorized` passes at least `archiveDebounceFloor`
+        // apart.
         let firstPass = try await reconciler.reconcile()
         #expect(firstPass.archived == 0)
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         let result = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
 
         #expect(result == .init(archived: 1, unchanged: 1))
         let archivedContact = try #require(try await repositories.contacts.fetch(id: contact.id))
-        #expect(archivedContact.archivedAt == Self.now)
+        #expect(archivedContact.archivedAt == clock.now())
         let survivingReminder = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(survivingReminder.map(\.id) == [reminder.id])
         let survivingLog = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)

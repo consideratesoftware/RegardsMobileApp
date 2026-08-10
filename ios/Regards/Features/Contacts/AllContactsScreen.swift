@@ -6,6 +6,19 @@ import SwiftUI
 public struct AllContactsScreen: View {
     @State private var viewModel: AllContactsViewModel
     @Binding private var searchText: String
+    /// Tracks whether this screen is the currently-displayed tab, via
+    /// `.onAppear`/`.onDisappear` below — SwiftUI fires those for a
+    /// `TabView` tab's content on every switch into/out of it, even though
+    /// the content stays mounted (and `.task`/`.onChange` keep running) the
+    /// whole time it's just a background tab. Gates the corruption
+    /// announcement (round 10): a `CNContactStoreDidChange` reconciling
+    /// while the user sits on Overdue/Detail/Settings still reloads this
+    /// screen's data (`reconciliationGeneration` doesn't care which tab is
+    /// frontmost), but interrupting VoiceOver on a *different* screen to
+    /// announce a Contacts-tab banner the user isn't looking at is wrong —
+    /// they'll reach the banner in normal reading order whenever they do
+    /// arrive at this tab.
+    @State private var isCurrentlyVisible = false
     /// Bumped by `AppLaunchCoordinator.reconciliationCount` (threaded down
     /// through `RootView` → `RegardsTabRoot` → here) once per completed
     /// reconciliation pass. Reloading on this instead of raw `scenePhase`
@@ -67,6 +80,8 @@ public struct AllContactsScreen: View {
         .task {
             await viewModel.load()
         }
+        .onAppear { isCurrentlyVisible = true }
+        .onDisappear { isCurrentlyVisible = false }
         .onChange(of: reconciliationGeneration) { _, _ in
             // §14 PR21 acceptance: a contact deleted/re-added/renamed in the
             // system app reflects here "next foreground" — and, for free,
@@ -82,8 +97,12 @@ public struct AllContactsScreen: View {
             // first load or a later `reconciliationGeneration`-driven
             // reload — not every change while it stays non-nil (the count
             // shifting from 1 to 2 corrupt rows doesn't need a fresh
-            // interruption) and not when it clears.
-            guard previous == nil, let message else { return }
+            // interruption) and not when it clears. And only while this
+            // screen is the one actually on screen (`isCurrentlyVisible`) —
+            // a reload that happens while the user is elsewhere shouldn't
+            // interrupt whatever they're doing there; they'll reach the
+            // banner in reading order when they arrive at this tab.
+            guard previous == nil, let message, isCurrentlyVisible else { return }
             corruptionAnnouncementEffects.announce(message)
         }
     }

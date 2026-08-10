@@ -143,4 +143,60 @@ struct AppLaunchCoordinatorImportFailureTests {
         let stored = try await environment.contacts.fetchAll()
         #expect(stored.map(\.systemContactRef) == [okContact.identifier])
     }
+
+    /// Round 10: `imported == 0 && failed > 0` alone isn't total failure
+    /// either — a *resumed* import (most rows already imported from an
+    /// earlier pass, one straggler row still failing) has `imported == 0`
+    /// too, since there's nothing new to write, but it's not a failure at
+    /// all: `runFirstLaunchImport` is correctly recognizing already-imported
+    /// rows and skipping them. Requiring `skipped == 0` in
+    /// `importEffectivelyFailed` is what tells this apart from a fresh
+    /// total failure, which never skips anything.
+    @Test("A resumed import that only re-encounters one already-failing row completes onboarding")
+    func resumedImportWithOnlyASkippedFailingRowCompletesOnboarding() async throws {
+        let alreadyImported = SystemContact(
+            identifier: "already-imported-contact",
+            givenName: "Chewbacca",
+            familyName: "",
+            phoneNumbers: [],
+            emailAddresses: []
+        )
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let environment = AppEnvironment(
+            contacts: FailingWriteContactRepository(failingIdentifiers: [Self.systemContact.identifier]),
+            groups: base.groups,
+            reminders: base.reminders,
+            interactions: base.interactions,
+            window: base.window,
+            profile: base.profile
+        )
+        // Simulates a prior pass that already imported "already-imported-
+        // contact" successfully — a resumed pass should skip it (existing
+        // ref), not treat it as new.
+        try await environment.contacts.upsert(
+            ContactsImporter.map(systemContact: alreadyImported, now: now)
+        )
+        let source = ScriptedLaunchContactsSource(
+            status: .authorized,
+            contacts: [alreadyImported, Self.systemContact]
+        )
+        let launch = AppLaunchCoordinator(
+            dependencies: .init(
+                makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
+                contactsSource: source,
+                clock: { self.now }
+            )
+        )
+
+        await launch.start()
+
+        #expect(launch.phase == .ready)
+        #expect(launch.statusMessage == nil)
+        #expect(!launch.canContinueWithoutContacts)
+        let profile = try await environment.profile.fetch()
+        #expect(
+            profile.onboardingCompletedAt == self.now,
+            "imported == 0 && skipped > 0 && failed > 0 is a resumed import, not a total failure."
+        )
+    }
 }

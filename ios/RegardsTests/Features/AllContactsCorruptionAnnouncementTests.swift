@@ -11,20 +11,34 @@ import Testing
 /// lifecycle, no UIKit accessibility-tree walking — that path is
 /// CI-fragile, see the deleted `AllContactsCorruptionAccessibilityTests`)
 /// and asserts through an injected effects closure instead.
+///
+/// Round 10: the announcement must only fire while this screen is actually
+/// the visible tab. `RegardsTabRoot` mounts every tab's content inside one
+/// `TabView`, so a background `CNContactStoreDidChange` reconciling while
+/// the user sits on Overdue/Detail/Settings still reloads this screen's
+/// data (`reconciliationGeneration` doesn't care which tab is frontmost) —
+/// interrupting VoiceOver on a screen the user isn't looking at to announce
+/// a banner on a different one is wrong; they reach it in reading order
+/// once they do arrive. Both tests below host `AllContactsScreen` inside a
+/// real 2-tab `TabView` and drive `selection` the same way a user switching
+/// tabs would, rather than conditionally mounting/unmounting the screen —
+/// mounted-but-backgrounded is exactly the shape `.onAppear`/`.onDisappear`
+/// need to distinguish from actually-visible, and conditional mounting
+/// wouldn't exercise that distinction (it would just stop `.task`/
+/// `.onChange` from running at all, which isn't the real scenario).
 @MainActor
 struct AllContactsCorruptionAnnouncementTests {
-    @Test("The corruption banner announces once when it newly appears, and doesn't re-announce while it stays non-nil")
-    func announcesOnlyOnNilToNonNilTransition() async throws {
+    @Test("The corruption banner announces once when it newly appears while the tab is visible")
+    func announcesOnlyOnNilToNonNilTransitionWhileVisible() async throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let healthy = Contact(systemContactRef: "healthy-1", displayName: "Healthy", tracked: false)
-        let repository = MutableDiagnosticsRepository(
-            report: ContactFetchReport(contacts: [healthy], corrupted: [])
-        )
+        let repository = SettableContactRepository(contacts: [healthy])
         let viewModel = AllContactsViewModel(contacts: repository, clock: { now })
         let model = ReconciliationGenerationModel()
+        let selection = TabSelectionModel(selectedTab: .contacts)
         let recorder = AnnouncementRecorder()
         let host = UIHostingController(
-            rootView: AnnouncementHarness(viewModel: viewModel, model: model, recorder: recorder)
+            rootView: AnnouncementHarness(viewModel: viewModel, model: model, selection: selection, recorder: recorder)
         )
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = host
@@ -55,6 +69,46 @@ struct AllContactsCorruptionAnnouncementTests {
         window.isHidden = true
     }
 
+    @Test("The corruption banner reloads but does not announce while a different tab is visible")
+    func doesNotAnnounceWhileScreenIsNotVisible() async throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let healthy = Contact(systemContactRef: "healthy-1", displayName: "Healthy", tracked: false)
+        let repository = SettableContactRepository(contacts: [healthy])
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { now })
+        let model = ReconciliationGenerationModel()
+        let selection = TabSelectionModel(selectedTab: .contacts)
+        let recorder = AnnouncementRecorder()
+        let host = UIHostingController(
+            rootView: AnnouncementHarness(viewModel: viewModel, model: model, selection: selection, recorder: recorder)
+        )
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        window.layoutIfNeeded()
+
+        // Land on the Contacts tab first so it actually mounts (SwiftUI's
+        // `TabView` only instantiates the selected tab's content) and its
+        // initial healthy load completes.
+        #expect(await eventually { viewModel.loadState == .loaded })
+
+        // Switch away — the screen stays mounted (`.task`/`.onChange` keep
+        // working, proven below by the reload actually happening) but is no
+        // longer the frontmost tab.
+        selection.selectedTab = .other
+        window.layoutIfNeeded()
+
+        await repository.setReport(Self.report(healthy: healthy, corruptedCount: 1))
+        model.reconciliationGeneration += 1
+
+        #expect(await eventually { viewModel.corruptionMessage != nil })
+        #expect(
+            recorder.announcements.isEmpty,
+            "a reload while a different tab is frontmost must not interrupt VoiceOver there"
+        )
+
+        window.isHidden = true
+    }
+
     private static func report(healthy: Contact, corruptedCount: Int) -> ContactFetchReport {
         ContactFetchReport(
             contacts: [healthy],
@@ -72,20 +126,43 @@ private final class ReconciliationGenerationModel: ObservableObject {
     @Published var reconciliationGeneration = 0
 }
 
+private enum HarnessTab: Hashable {
+    case contacts
+    case other
+}
+
 @MainActor
-private final class AnnouncementRecorder {
-    private(set) var announcements: [String] = []
-    func record(_ message: String) {
-        announcements.append(message)
+private final class TabSelectionModel: ObservableObject {
+    @Published var selectedTab: HarnessTab
+
+    init(selectedTab: HarnessTab) {
+        self.selectedTab = selectedTab
     }
 }
 
+/// Mirrors `RegardsTabRoot`'s shape closely enough to exercise real
+/// `TabView` mount/appear semantics: `AllContactsScreen` sits alongside a
+/// second, otherwise-irrelevant tab so switching `selection.selectedTab`
+/// drives genuine `.onAppear`/`.onDisappear` calls without ever removing
+/// the screen from the view tree.
 private struct AnnouncementHarness: View {
     let viewModel: AllContactsViewModel
     @ObservedObject var model: ReconciliationGenerationModel
+    @ObservedObject var selection: TabSelectionModel
     let recorder: AnnouncementRecorder
 
     var body: some View {
+        TabView(selection: $selection.selectedTab) {
+            Text("Other tab")
+                .tabItem { Text("Other") }
+                .tag(HarnessTab.other)
+            configuredScreen
+                .tabItem { Text("Contacts") }
+                .tag(HarnessTab.contacts)
+        }
+    }
+
+    private var configuredScreen: some View {
         var screen = AllContactsScreen(
             viewModel: viewModel,
             searchText: .constant(""),
@@ -98,26 +175,10 @@ private struct AnnouncementHarness: View {
     }
 }
 
-private actor MutableDiagnosticsRepository: ContactRepository {
-    private var report: ContactFetchReport
-
-    init(report: ContactFetchReport) {
-        self.report = report
-    }
-
-    func fetchAll() async throws -> [Contact] { report.contacts }
-    func fetchTracked() async throws -> [Contact] {
-        report.contacts.filter { $0.tracked && $0.isActive }
-    }
-    func fetch(id: UUID) async throws -> Contact? { report.contacts.first { $0.id == id } }
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        report.contacts.filter { $0.contactGroupId == groupId }
-    }
-    func upsert(_ contact: Contact) async throws {}
-    func archive(id: UUID, at: Date) async throws {}
-    func fetchAllWithDiagnostics() async throws -> ContactFetchReport { report }
-
-    func setReport(_ newReport: ContactFetchReport) {
-        report = newReport
+@MainActor
+private final class AnnouncementRecorder {
+    private(set) var announcements: [String] = []
+    func record(_ message: String) {
+        announcements.append(message)
     }
 }

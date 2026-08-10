@@ -24,8 +24,9 @@ import Foundation
 ///   matched, refreshed, nor archived, so a corrupt row is never mistaken for
 ///   a deleted one.
 /// - Under `.authorized`, a ref only archives once it's been missing across
-///   **two consecutive `.authorized` passes** — see the sweep's own comment
-///   below for why a single miss isn't enough (ARCHITECTURE.md §21).
+///   **two consecutive `.authorized` passes at least `archiveDebounceFloor`
+///   apart** — see the sweep's own comment below for why a single miss (or
+///   two rapid ones) isn't enough (ARCHITECTURE.md §21).
 public struct ContactsReconciler: Sendable {
     private let source: any ContactsSource
     private let repo: any ContactRepository
@@ -51,15 +52,16 @@ public struct ContactsReconciler: Sendable {
         public let failed: Int
         /// System refs this pass found missing under `.authorized` (present
         /// in the repo as active, absent from `fetchAllContacts()`) but
-        /// didn't yet archive because they weren't *also* missing on the
-        /// previous `.authorized` pass — the two-pass debounce below. Feed
-        /// this into the next call's `previouslyMissingRefs:` so a ref that
-        /// stays missing across two consecutive `.authorized` passes
-        /// archives on the second one. Deliberately excluded from
-        /// `Equatable` (see the hand-written `==` below): it's plumbing for
-        /// the *next* call, not part of what a test asserting on "this
-        /// pass's outcome" should have to spell out every time.
-        public let missingRefs: Set<String>
+        /// didn't yet archive, keyed to the clock time this ref was *first*
+        /// observed missing — the two-pass, time-floored debounce below.
+        /// Feed this into the next call's `previouslyMissingRefs:` so a ref
+        /// that's still missing on a later `.authorized` pass, at least
+        /// `archiveDebounceFloor` after it was first seen missing, archives
+        /// on that pass. Deliberately excluded from `Equatable` (see the
+        /// hand-written `==` below): it's plumbing for the *next* call, not
+        /// part of what a test asserting on "this pass's outcome" should
+        /// have to spell out every time.
+        public let missingRefs: [String: Date]
 
         public init(
             imported: Int = 0,
@@ -68,7 +70,7 @@ public struct ContactsReconciler: Sendable {
             unarchived: Int = 0,
             unchanged: Int = 0,
             failed: Int = 0,
-            missingRefs: Set<String> = []
+            missingRefs: [String: Date] = [:]
         ) {
             self.imported = imported
             self.refreshed = refreshed
@@ -95,7 +97,7 @@ public struct ContactsReconciler: Sendable {
     /// why only `.authorized` passes count). Threading it through is the
     /// caller's job (`AppLaunchCoordinator` holds it across passes); this
     /// method doesn't retain any state of its own between calls.
-    public func reconcile(previouslyMissingRefs: Set<String> = []) async throws -> Result {
+    public func reconcile(previouslyMissingRefs: [String: Date] = [:]) async throws -> Result {
         let status = await source.currentAuthorization()
         guard status == .authorized || status == .limited else {
             throw ReconciliationError.notAuthorized(status)
@@ -173,7 +175,7 @@ public struct ContactsReconciler: Sendable {
         // pass is `.authorized`, not just the one taken before the
         // (possibly long) enumeration — see the TOCTOU comment above.
         var archived = 0
-        var currentMissingRefs: Set<String> = []
+        var currentMissingRefs: [String: Date] = [:]
         if status == .authorized && statusAfterFetch == .authorized {
             // Round 9: a *single* miss isn't evidence of deletion either.
             // `fetchAllContacts()` reporting a ref absent — whether that's
@@ -183,20 +185,35 @@ public struct ContactsReconciler: Sendable {
             // like from this API, and a partial read is just as ambiguous
             // as an empty one: nothing distinguishes "this ref was deleted"
             // from "this ref hasn't reappeared in the resync yet" on a
-            // single pass. Requiring a ref to be missing on *this* pass
-            // *and* have already been missing on the previous `.authorized`
-            // pass (`previouslyMissingRefs`, threaded in by the caller) is
-            // what actually tells them apart: a resync completes and the
-            // ref reappears before a second consecutive miss; a genuine
-            // deletion doesn't. No per-iteration re-check inside the loop
-            // below: the two-point TOCTOU guard above already establishes
-            // "authorized at the start of the fetch and authorized right
-            // after it," and this loop does no further waiting on the
-            // source (only repository writes), so there's no additional
-            // window for a downgrade to land inside it.
+            // single pass.
+            //
+            // Round 10: "the previous pass also missed it" isn't enough on
+            // its own either, if that previous pass happened moments ago —
+            // two reconciliation passes seconds apart (e.g. a foreground
+            // racing a `CNContactStoreDidChange` for the same event) can
+            // both land mid-resync with nothing having had time to
+            // reappear, so "two consecutive misses" alone doesn't actually
+            // prove the resync is over. `archiveDebounceFloor` requires
+            // real wall-clock time between the *first* time a ref was
+            // observed missing and the pass that confirms it's still
+            // missing — long enough that a resync genuinely in progress has
+            // had a real chance to finish and repopulate it. A ref that's
+            // missing again after reappearing gets a fresh baseline (its
+            // ref simply won't be in `previouslyMissingRefs` that time,
+            // same as a first-ever miss), not credit for however long ago
+            // its *previous* disappearance was first seen.
+            //
+            // No per-iteration re-check inside the loop below: the
+            // two-point TOCTOU guard above already establishes "authorized
+            // at the start of the fetch and authorized right after it," and
+            // this loop does no further waiting on the source (only
+            // repository writes), so there's no additional window for a
+            // downgrade to land inside it.
             for (ref, contact) in byRef where !visibleRefs.contains(ref) && contact.archivedAt == nil {
-                currentMissingRefs.insert(ref)
-                guard previouslyMissingRefs.contains(ref) else { continue }
+                let firstMissingAt = previouslyMissingRefs[ref] ?? now
+                currentMissingRefs[ref] = firstMissingAt
+                guard previouslyMissingRefs[ref] != nil,
+                      now.timeIntervalSince(firstMissingAt) >= Self.archiveDebounceFloor else { continue }
                 do {
                     try await repo.archive(id: contact.id, at: now)
                     archived += 1
@@ -311,6 +328,15 @@ public struct ContactsReconciler: Sendable {
             return existingValue
         }
     }
+
+    /// Minimum real time between when a ref was first observed missing and
+    /// the `.authorized` pass that confirms it's still missing, before the
+    /// archive sweep treats that as a genuine deletion rather than a
+    /// resync-in-progress that hasn't had time to repopulate it yet. See
+    /// the sweep's own comment for why "two consecutive passes" alone
+    /// (round 9) wasn't sufficient — two passes moments apart prove
+    /// nothing about whether a resync actually had a chance to finish.
+    static let archiveDebounceFloor: TimeInterval = 5 * 60
 
     private static let log = RegardsLogger.feature("ContactsReconciler")
 }

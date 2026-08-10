@@ -131,9 +131,28 @@ func runOffCooperativePool<T: Sendable>(
 /// but Apple hasn't annotated it as `Sendable`.
 public struct CNContactsSource: ContactsSource, @unchecked Sendable {
     private let store: CNContactStore
+    /// R25 production-path seam (`ContactsSourceTests`, round 10): `nil` in
+    /// every production/preview call site, so `fetchAllContacts()` below
+    /// always performs the real `CNContactStore.enumerateContacts` call.
+    /// Set only by the test-only initializer, so a test can drive this
+    /// *actual* `fetchAllContacts()` method — including its real
+    /// `runOffCooperativePool` call, in the same closure, at the same call
+    /// site — with a synthetic enumeration instead of a real, populated
+    /// Contacts database, which `CNContactStore` itself can't be faked to
+    /// provide (Apple seals it).
+    private let enumerateOverride: (@Sendable () throws -> [SystemContact])?
 
     public init(store: CNContactStore = CNContactStore()) {
         self.store = store
+        self.enumerateOverride = nil
+    }
+
+    /// Test-only. Not `private`/`public`: `ContactsSourceTests` constructs
+    /// this via `@testable import Regards`; nothing outside the module can
+    /// see it.
+    init(store: CNContactStore, enumerateOverride: @escaping @Sendable () throws -> [SystemContact]) {
+        self.store = store
+        self.enumerateOverride = enumerateOverride
     }
 
     public func currentAuthorization() async -> ContactsAuthorizationStatus {
@@ -174,7 +193,14 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
         ].map { $0 as any CNKeyDescriptor }
         let request = CNContactFetchRequest(keysToFetch: keys)
         let box = UncheckedSendableBox((store: store, request: request))
+        let enumerateOverride = self.enumerateOverride
+        // The override check lives *inside* the closure `runOffCooperativePool`
+        // wraps, not as a separate branch around a second call to it — one
+        // call site, shared by production and the test seam, so a
+        // regression that drops `runOffCooperativePool` here can't leave a
+        // test-only path still exercising it while the real one doesn't.
         return try await runOffCooperativePool {
+            if let enumerateOverride { return try enumerateOverride() }
             var results: [SystemContact] = []
             try box.value.store.enumerateContacts(with: box.value.request) { cn, _ in
                 results.append(SystemContact(
@@ -189,19 +215,31 @@ public struct CNContactsSource: ContactsSource, @unchecked Sendable {
     }
 
     /// `@unchecked Sendable` because the `NSObjectProtocol` observer token
-    /// isn't `Sendable`, but the box only ever hands it between `start` and
-    /// `stop`, never touched from two places at once.
+    /// isn't `Sendable`. `queue: nil` in `start(name:onFire:)` below means
+    /// `NotificationCenter` invokes the observer block synchronously on
+    /// whichever thread posts the notification — not necessarily the thread
+    /// that calls `stop()` (the `AsyncStream`'s `onTermination`, which can
+    /// fire from anywhere) — so `token` genuinely can be read and written
+    /// from two places at once; `lock` guards every access, matching
+    /// `MutableContactsSource`'s (RegardsTests/Support) existing pattern for
+    /// the same kind of test-fake state.
     private final class NotificationObserverBox: @unchecked Sendable {
+        private let lock = NSLock()
         private var token: (any NSObjectProtocol)?
         private let center = NotificationCenter.default
 
         func start(name: Notification.Name, onFire: @escaping @Sendable () -> Void) {
-            token = center.addObserver(forName: name, object: nil, queue: nil) { _ in onFire() }
+            let newToken = center.addObserver(forName: name, object: nil, queue: nil) { _ in onFire() }
+            lock.withLock { token = newToken }
         }
 
         func stop() {
-            if let token { center.removeObserver(token) }
-            token = nil
+            let existingToken = lock.withLock { () -> (any NSObjectProtocol)? in
+                let existingToken = token
+                token = nil
+                return existingToken
+            }
+            if let existingToken { center.removeObserver(existingToken) }
         }
     }
 

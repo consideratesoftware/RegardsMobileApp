@@ -91,15 +91,17 @@ final class AppLaunchCoordinator {
     @ObservationIgnored var reconciliationPending = false
     /// `ContactsReconciler.Result.missingRefs` from the most recent pass —
     /// fed back in as the next call's `previouslyMissingRefs:` so a ref
-    /// missing on two consecutive `.authorized` passes archives on the
-    /// second one (round 9, ARCHITECTURE.md §7/§21). `ContactsReconciler`
-    /// itself is reconstructed fresh every pass and holds no state between
-    /// calls; this is that state. Unconditionally overwritten after every
-    /// pass, including a `.limited` or failed one — those return an empty
-    /// `missingRefs` (the sweep never runs), which resets this and means
-    /// the two-pass sequence has to restart cleanly rather than treat a
-    /// `.limited` interruption as still "consecutive".
-    @ObservationIgnored var previouslyMissingContactRefs: Set<String> = []
+    /// still missing on a later `.authorized` pass, at least
+    /// `ContactsReconciler.archiveDebounceFloor` after it was first seen
+    /// missing, archives on that pass (round 9 + round 10 time floor,
+    /// ARCHITECTURE.md §7/§21). `ContactsReconciler` itself is reconstructed
+    /// fresh every pass and holds no state between calls; this is that
+    /// state. Unconditionally overwritten after every pass, including a
+    /// `.limited` or failed one — those return an empty `missingRefs` (the
+    /// sweep never runs), which resets this and means the sequence has to
+    /// restart cleanly rather than treat a `.limited` interruption as still
+    /// "consecutive".
+    @ObservationIgnored var previouslyMissingContactRefs: [String: Date] = [:]
 
     init(dependencies: Dependencies) {
         self.phase = .loading
@@ -352,8 +354,18 @@ final class AppLaunchCoordinator {
     /// normally with `imported == 0`, and silently completing onboarding
     /// on that result would leave All Contacts empty with no visible sign
     /// anything went wrong.
+    ///
+    /// `skipped == 0` is required too (round 10): a *resumed* import — one
+    /// where most rows already exist from an earlier pass and only a
+    /// straggler row fails this time — also has `imported == 0` (nothing
+    /// new to write) but is not a failure at all, it's `runFirstLaunchImport`
+    /// correctly recognizing already-imported rows and skipping them.
+    /// `imported == 0 && failed > 0` alone can't tell that apart from "every
+    /// row failed" on a fresh import; `skipped == 0` rules out the resumed
+    /// case, since a fresh total failure never skips anything (there's
+    /// nothing yet to have already imported).
     private static func importEffectivelyFailed(_ result: ContactsImporter.Result) -> Bool {
-        result.failed > 0 && result.imported == 0
+        result.failed > 0 && result.imported == 0 && result.skipped == 0
     }
 
     private func completeOnboardingAfterImport(

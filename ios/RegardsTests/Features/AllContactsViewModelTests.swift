@@ -130,7 +130,17 @@ struct AllContactsViewModelTests {
             content: screen.frame(width: 402, height: 220)
         )
         #expect(renderer.uiImage != nil)
-        #expect(projectionCounter.count == 1)
+        // 2, not 1: round 10 added `AllContactsScreen`'s `isCurrentlyVisible`
+        // `@State` (tracked via `.onAppear`/`.onDisappear`, gating the
+        // corruption announcement to when this screen is actually the
+        // visible tab). Setting that `@State` from `.onAppear` on first
+        // render triggers exactly one extra `body` evaluation — a one-time
+        // cost on first appearance, not a per-scroll or per-frame one — so
+        // `filtered(searchText:)` runs twice instead of once. Still O(1)
+        // relative to the 750-contact dataset, which is what this guard
+        // actually cares about: bounded, deterministic re-filtering, not an
+        // exact call count untethered from why it matters.
+        #expect(projectionCounter.count == 2)
         #expect(!projectionCounter.constructedRowIDs.isEmpty)
         #expect(projectionCounter.constructedRowIDs.count < selected.count)
     }
@@ -178,7 +188,7 @@ struct AllContactsViewModelTests {
                 ContactCorruptionDiagnostic(rawId: "bad-3", systemContactRef: "bad-3", reason: "decode failed"),
             ]
         )
-        let repository = FixedDiagnosticsRepository(report: report)
+        let repository = SettableContactRepository(report: report)
         let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
 
         await viewModel.load()
@@ -304,21 +314,5 @@ private actor RecordingAllContactsRepository: ContactRepository {
     }
 }
 
-/// A `ContactRepository` whose `fetchAllWithDiagnostics()` always returns a
-/// fixed report, so a test can pin the exact corruption-count copy without
-/// needing a real corrupt GRDB row.
-private struct FixedDiagnosticsRepository: ContactRepository {
-    let report: ContactFetchReport
-
-    func fetchAll() async throws -> [Contact] { report.contacts }
-    func fetchTracked() async throws -> [Contact] {
-        report.contacts.filter { $0.tracked && $0.isActive }
-    }
-    func fetch(id: UUID) async throws -> Contact? { report.contacts.first { $0.id == id } }
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        report.contacts.filter { $0.contactGroupId == groupId }
-    }
-    func upsert(_ contact: Contact) async throws {}
-    func archive(id: UUID, at: Date) async throws {}
-    func fetchAllWithDiagnostics() async throws -> ContactFetchReport { report }
-}
+// `SettableContactRepository` lives in RegardsTests/Support — shared across
+// the AllContacts reconciliation/announcement suites.
