@@ -174,4 +174,59 @@ struct InteractionLoggingTests {
         let stored = try #require(await contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == nil)
     }
+
+    /// The orphan-log-row bug this pins (staged review round 9): before this
+    /// round, `record()` appended the `InteractionLog` row before
+    /// `updateLastInteractedAt`'s own archived-contact rejection (round 8)
+    /// ever ran, so every attempt against an already-archived contact left a
+    /// real log entry behind with no compensation — and no retry cleaned it
+    /// up, since each retry would just append another one. `markCaughtUp`
+    /// now checks `contact.isActive` before either write runs, so an
+    /// archived contact never reaches `record()` at all. Distinct from
+    /// `removedBetweenFetchAndWriteThrowsButLeavesLogPersisted` above: that
+    /// test's contact is still active at fetch time and only the write
+    /// later finds nothing to match (a real, if narrower, remaining race —
+    /// see `record()`'s own doc comment); this contact is already archived
+    /// at the point `markCaughtUp` itself runs.
+    @Test("Caught up on an archived contact throws notFound and leaves no orphan log row")
+    func markCaughtUpOnArchivedContactLeavesNoOrphanLog() async throws {
+        var contact = Self.contact(lastInteractedAt: nil)
+        contact.archivedAt = Self.now.addingTimeInterval(-3_600)
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+
+        do {
+            _ = try await logging.markCaughtUp(contactId: contact.id, at: Self.now)
+            Issue.record("Expected DataError.notFound")
+        } catch DataError.notFound {
+            // expected
+        }
+
+        #expect(await interactions.appendedLogs().isEmpty)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == nil)
+    }
+
+    /// Same shape as `markCaughtUpOnArchivedContactLeavesNoOrphanLog`, driven
+    /// through `logOther` instead — the shared `contact.isActive` guard
+    /// needs its own proof on this call site too, not an assumption that
+    /// `markCaughtUp`'s coverage carries over.
+    @Test("Log other on an archived contact throws notFound and leaves no orphan log row")
+    func logOtherOnArchivedContactLeavesNoOrphanLog() async throws {
+        var contact = Self.contact(lastInteractedAt: nil)
+        contact.archivedAt = Self.now.addingTimeInterval(-3_600)
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+
+        do {
+            _ = try await logging.logOther(contactId: contact.id, channel: .email, at: Self.now)
+            Issue.record("Expected DataError.notFound")
+        } catch DataError.notFound {
+            // expected
+        }
+
+        #expect(await interactions.appendedLogs().isEmpty)
+    }
 }

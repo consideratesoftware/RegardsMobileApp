@@ -349,6 +349,23 @@ public final class OverdueViewModel {
     /// falls through to the ordinary `lastInteractedAt`-based computation
     /// unchanged, so the row "returns" on its own the next time this runs
     /// after the snoozed date passes.
+    ///
+    /// The raw persisted `scheduledFor`, not a window-resolved one (nit,
+    /// staged review round 9): `UpcomingViewModel.buildRows` folds the same
+    /// value into `engine.nextAllowedSlot(...)` instead, so the two screens
+    /// can compute a different instant for "when this snooze's suppression
+    /// actually lifts" whenever the raw timestamp falls outside the
+    /// window's allowed hours/days. Not a regression this PR introduced so
+    /// much as the pre-existing Overdue/Upcoming split showing up in a new
+    /// place: Overdue has never been window-aware for its own cadence
+    /// math either (see `init`'s `calendar` doc comment — it reports
+    /// elapsed-day *perception*, deliberately not the scheduling clock),
+    /// while Upcoming has always resolved every date through the engine
+    /// because it promises an exact, window-legal "next reminder" time.
+    /// Unifying them would mean making one of those two properties untrue;
+    /// leaving them split is the correct call until TF-07 gives
+    /// `SchedulingPass` a single write path both screens read from instead
+    /// of each re-deriving it.
     static func makeOverdueRow(for contact: Contact,
                                now: Date,
                                calendar: Calendar,

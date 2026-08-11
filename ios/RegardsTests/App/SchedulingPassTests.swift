@@ -114,6 +114,34 @@ struct SchedulingPassTests {
         }
     }
 
+    /// Pins R54's own claim rather than leaving it asserted without
+    /// evidence (staged review round 9, closing the asymmetry with R56's
+    /// pinning test): `snooze` has no tracked/cadence precondition of its
+    /// own — it writes a pending cadence row for any contact that merely
+    /// exists. Not reachable through either shipped caller today
+    /// (Overdue/Contact Detail's Snooze only ever appear for a row already
+    /// computed as overdue, which requires `tracked && cadenceDays != nil`
+    /// by construction), but nothing in `SchedulingPass` itself enforces
+    /// that. `tracked: false` alone covers both halves of the gap at once —
+    /// `contractContact`'s own fixture ties `cadenceDays` to `tracked`.
+    @Test(
+        "R54: snooze writes a pending reminder for an untracked, no-cadence contact",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeSucceedsForUntrackedNoCadenceContact(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(516), suffix: "snooze-untracked", tracked: false)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+
+        try await scheduler.snooze(contactId: contact.id)
+
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.count == 1)
+        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
+    }
+
     // MARK: - Wall-clock snooze (DST)
 
     /// A DST-observing calendar pinned to a fixed identifier, not

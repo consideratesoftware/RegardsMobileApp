@@ -299,7 +299,13 @@ public final class ContactDetailViewModel {
     /// `ValueObservation`) this §14 PR22 slice was never scoped to carry,
     /// and touches every call site that constructs this view model. See R56.
     public var overdueSummary: (days: Int, isOverdue: Bool) {
-        guard let c = contact, let cadence = c.cadenceDays else {
+        // `c.tracked &&`, not `cadenceDays` alone (nit, staged review round
+        // 9): `OverdueViewModel.makeOverdueRow` and this screen's own Snooze
+        // button (`secondaryItems`) both gate on `tracked && cadenceDays !=
+        // nil` — a fourth, narrower spelling of the same predicate here
+        // wasn't wrong (an untracked contact can't currently carry a
+        // `cadenceDays`), just inconsistent with the other two.
+        guard let c = contact, c.tracked, let cadence = c.cadenceDays else {
             return (0, false)
         }
         // `?? c.createdAt`, not `lastInteractedAt` alone: the never-contacted

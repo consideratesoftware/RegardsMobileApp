@@ -21,9 +21,22 @@ struct InteractionLogging {
     /// contact's own preferred channel and moves `lastInteractedAt` to
     /// `occurredAt`. Returns the updated contact so the caller can refresh
     /// local state without a second fetch.
+    ///
+    /// `contact.isActive`, not just a non-nil fetch (staged review round 9):
+    /// this is the choke point every `markCaughtUp`/`logOther` call site
+    /// funnels through, and without the check here, `record()` would still
+    /// append a real `InteractionLog` row before `updateLastInteractedAt`'s
+    /// own archived-contact rejection (round 8) ever ran — an orphan log
+    /// entry left behind on every failed attempt, with no compensation and
+    /// no retry that cleans it up (unlike `contacts.updateLastInteractedAt`
+    /// itself, which never partially applies). Checking before either write
+    /// runs, in the one place both `markCaughtUp` and `logOther` already
+    /// fetch through, matches the point `OverdueViewModel.snooze` and
+    /// `ContactDetailViewModel.snooze` already gate at for the identical
+    /// archived-mid-session race.
     @discardableResult
     func markCaughtUp(contactId: UUID, at occurredAt: Date) async throws -> Contact {
-        guard let contact = try await contacts.fetch(id: contactId) else {
+        guard let contact = try await contacts.fetch(id: contactId), contact.isActive else {
             throw DataError.notFound
         }
         return try await record(
@@ -37,10 +50,11 @@ struct InteractionLogging {
     /// "Log other channel…": the same downstream effect as `markCaughtUp` —
     /// reaching a contact through any channel still counts as staying in
     /// touch — logged as `.manual` against the channel the user actually
-    /// used.
+    /// used. Same `contact.isActive` guard as `markCaughtUp`, for the same
+    /// orphan-log-row reason — see its doc comment.
     @discardableResult
     func logOther(contactId: UUID, channel: Channel, at occurredAt: Date) async throws -> Contact {
-        guard let contact = try await contacts.fetch(id: contactId) else {
+        guard let contact = try await contacts.fetch(id: contactId), contact.isActive else {
             throw DataError.notFound
         }
         return try await record(contact: contact, source: .manual, channel: channel, at: occurredAt)
@@ -74,7 +88,9 @@ struct InteractionLogging {
     /// `updateReconciledFields`, TF-03).
     ///
     /// Throws on a `false` return, rather than treating "no row matched" as
-    /// a quiet success: if the contact was archived or deleted between the
+    /// a quiet success: if the contact was deleted — or archived, in the
+    /// narrow window after `markCaughtUp`/`logOther`'s own `contact.isActive`
+    /// check above already passed but before this write runs — between the
     /// earlier `fetch` and this write, `lastInteractedAt` never actually
     /// moved, and a caller reporting success anyway would announce "Marked
     /// X caught up" for a write that changed nothing (staged review, same

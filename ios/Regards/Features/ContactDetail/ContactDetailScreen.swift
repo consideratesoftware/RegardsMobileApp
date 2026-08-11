@@ -202,10 +202,13 @@ extension ContactDetailScreen {
             secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
                 Task {
                     let succeeded = await viewModel.snooze()
+                    // `movesFocus: false` on both branches — see
+                    // `announceRowAction`'s doc comment for why Snooze never
+                    // moves focus, success or failure.
                     if succeeded {
-                        announceRowAction("Snoozed \(contact.displayName) 1 week")
+                        announceRowAction("Snoozed \(contact.displayName) 1 week", movesFocus: false)
                     } else {
-                        announceRowAction("Couldn't snooze \(contact.displayName).")
+                        announceRowAction("Couldn't snooze \(contact.displayName).", movesFocus: false)
                     }
                 }
             }
@@ -223,17 +226,36 @@ extension ContactDetailScreen {
     }
 
     /// Announces a row action's outcome — success or failure, every call
-    /// site above and the Log-other channel buttons below use this — and
-    /// lands focus on the Cadence card's "Status" value; sequencing lives in
-    /// `RowActionAnnouncer`, shared with `OverdueScreen`/`UpcomingScreen`.
+    /// site above and the Log-other channel buttons below use this — and,
+    /// when `movesFocus`, lands focus on the Cadence card's "Status" value;
+    /// sequencing lives in `RowActionAnnouncer`, shared with
+    /// `OverdueScreen`/`UpcomingScreen`.
     /// `private` (staged review round 8, nit) — every call site is inside
     /// this file, matching `OverdueScreen`/`UpcomingScreen`'s own
     /// `announceRowAction`; this one had drifted non-private with no caller
     /// outside this file to justify it, the one gap in an otherwise
     /// consistent trio that carries contact-name-bearing announcement text.
-    private func announceRowAction(_ message: String) {
+    ///
+    /// `movesFocus` defaults to `true` for Caught up and Log other, both of
+    /// which genuinely move `Contact.lastInteractedAt` — Status really has
+    /// changed by the time focus lands there. Snooze passes `false`
+    /// explicitly on both its success and failure branches (staged review
+    /// round 9): Snooze never touches `lastInteractedAt` at all (decision
+    /// #31), and this screen has no `ReminderRepository` of its own to
+    /// reflect the pending reminder it just wrote (R56), so `overdueSummary`
+    /// — the value Status reads — is byte-identical before and after either
+    /// outcome. Before this fix, focus landed there anyway and VoiceOver
+    /// read the same stale "N days overdue" straight after the
+    /// announcement, as if it were new — nothing was removed on this
+    /// screen the way a row disappearing from Overdue/Upcoming justifies
+    /// the same move there, so the cursor never needed to drop in the
+    /// first place. Skipping the move keeps the announcement as the only
+    /// spoken confirmation, which is the one true thing here.
+    private func announceRowAction(_ message: String, movesFocus: Bool = true) {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
-            isStatusFocused = true
+            if movesFocus {
+                isStatusFocused = true
+            }
         }
     }
 

@@ -37,6 +37,13 @@ struct LogOtherChannelSheet: View {
                     Button(channel.displayName) {
                         onSelect(channel)
                     }
+                    // Nit, staged review round 9: the review's framing
+                    // ("inconsistent with Cancel, which has a hint") didn't
+                    // hold — Cancel carries no hint either, checked directly
+                    // against the code below — but a hint here is still
+                    // worth adding on its own: the channel name alone
+                    // doesn't say what tapping it does.
+                    .accessibilityHint("Logs an interaction through \(channel.displayName) and closes this picker.")
                 }
                 Button("Cancel", role: .cancel, action: onCancel)
                     .frame(maxWidth: .infinity)
