@@ -3,7 +3,10 @@ import SwiftUI
 public struct ContactDetailScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    @State private var viewModel: ContactDetailViewModel
+    // Not `private`: the card builders live in
+    // `ContactDetailScreen+Cards.swift`, split out at SwiftLint's 500-line
+    // file limit, and `private` is file-scoped.
+    @State var viewModel: ContactDetailViewModel
     @State private var previewContact: Contact?
     @State private var showsLogOtherChannelPicker = false
     // Wrapped in `@State` via `init` — see `RowActionAnnouncer`'s doc comment for why.
@@ -13,7 +16,8 @@ public struct ContactDetailScreen: View {
     // plausibly changed (overdue → on track), and it survives every reload
     // `load()` can take — the hero/cadence card vanishes only on a total
     // contact-fetch failure, which none of these writes can cause.
-    @AccessibilityFocusState private var isStatusFocused: Bool
+    // Not `private` — see `viewModel` above; the Cards file binds to it.
+    @AccessibilityFocusState var isStatusFocused: Bool
     // No default: a missed injection silently falling back to `.live` is
     // exactly the class of bug that shipped unannounced/unfocused row
     // actions to device — every construction site must say which it means.
@@ -120,7 +124,12 @@ extension ContactDetailScreen {
     }
 }
 
-private extension ContactDetailScreen {
+// `internal`, not `private`: the card builders moved to
+// `ContactDetailScreen+Cards.swift` at SwiftLint's 500-line file limit and
+// call `detailRow`, `stubAction`, `nextReminderLabel`, and `valueColor`
+// from there. `private` is file-scoped, so keeping it would mean either
+// duplicating those helpers or threading them through as parameters.
+extension ContactDetailScreen {
 
     // MARK: - Sections
     // Moved out of the struct body for SwiftLint's type_body_length — a
@@ -221,167 +230,6 @@ private extension ContactDetailScreen {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
             isStatusFocused = true
         }
-    }
-
-    // MARK: - Cards
-
-    func cadenceCard(contact: Contact) -> some View {
-        VStack(spacing: 0) {
-            SectionHeader("Cadence")
-            RegardsCard {
-                VStack(spacing: 0) {
-                    detailRow(
-                        label: "Every",
-                        value: viewModel.cadenceLabel,
-                        action: "Change",
-                        actionIdentifier: "contact-detail.cadence-change-unavailable"
-                    )
-                    Hair(inset: 16)
-                    detailRow(label: "Next reminder", value: nextReminderLabel(contact: contact),
-                              isAccent: true)
-                    Hair(inset: 16)
-                    detailRow(label: "Last talked", value: viewModel.lastTalkedLabel)
-                    Hair(inset: 16)
-                    detailRow(
-                        label: "Status",
-                        value: statusValue,
-                        isDanger: viewModel.overdueSummary.isOverdue,
-                        valueFocus: $isStatusFocused
-                    )
-                }
-            }
-        }
-    }
-
-    func channelCard(contact: Contact) -> some View {
-        VStack(spacing: 0) {
-            SectionHeader("Preferred channel")
-            RegardsCard {
-                AccessibilityAdaptiveLayout {
-                    HStack(spacing: 12) {
-                        channelSummary(contact: contact)
-                        Spacer()
-                        stubAction(
-                            "Change",
-                            identifier: "contact-detail.channel-change-unavailable"
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                } accessibility: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        channelSummary(contact: contact)
-                        stubAction(
-                            "Change",
-                            identifier: "contact-detail.channel-change-unavailable"
-                        )
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-            }
-        }
-    }
-
-    func channelSummary(contact: Contact) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(RegardsDS.accentSoft)
-                    .frame(width: 36, height: 36)
-                ChannelGlyph(channel: contact.preferredChannel, size: 18, color: RegardsDS.accentInk)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(contact.preferredChannel.displayName)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(RegardsDS.ink)
-                Text(contact.preferredChannelValue)
-                    .font(RegardsFont.mono(.footnote))
-                    .foregroundStyle(RegardsDS.muted)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.channelSummaryAccessibilityLabel(contact: contact))
-        .accessibilityIdentifier("contact-detail.channel-summary")
-    }
-
-    var interactionsCard: some View {
-        VStack(spacing: 0) {
-            SectionHeader("Recent interactions")
-            RegardsCard {
-                if viewModel.interactions.isEmpty {
-                    Text("No interactions logged yet.")
-                        .font(.footnote)
-                        .foregroundStyle(RegardsDS.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(viewModel.interactions.enumerated()), id: \.element.id) { idx, entry in
-                            AccessibilityAdaptiveLayout {
-                                HStack(alignment: .top, spacing: 12) {
-                                    interactionDate(entry.dateLabel, fixedWidth: 64)
-                                    interactionDescription(entry.descriptionLabel)
-                                    Spacer()
-                                }
-                            } accessibility: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    interactionDate(entry.dateLabel)
-                                    interactionDescription(entry.descriptionLabel)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(interactionAccessibilityLabel(entry))
-                            .accessibilityIdentifier("contact-detail.interaction-row")
-                            if idx < viewModel.interactions.count - 1 {
-                                Hair(inset: 16)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // The label is derived on `InteractionEntry` so it can be asserted in unit
-    // tests without instantiating the view.
-    func interactionAccessibilityLabel(
-        _ entry: ContactDetailViewModel.InteractionEntry
-    ) -> String {
-        entry.accessibilityLabel
-    }
-
-    func notesCard(contact: Contact) -> some View {
-        VStack(spacing: 0) {
-            SectionHeader("Notes · private to Regards")
-            RegardsCard {
-                Text(contact.notes.isEmpty ? "No notes yet." : contact.notes)
-                    .font(.subheadline)
-                    .italic(!contact.notes.isEmpty)
-                    .foregroundStyle(contact.notes.isEmpty ? RegardsDS.muted : RegardsDS.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .lineSpacing(3)
-            }
-        }
-    }
-
-    func interactionDate(_ value: String, fixedWidth: CGFloat? = nil) -> some View {
-        Text(value)
-            .font(RegardsFont.mono(.footnote))
-            .foregroundStyle(RegardsDS.muted)
-            .frame(width: fixedWidth, alignment: .leading)
-    }
-
-    func interactionDescription(_ value: String) -> some View {
-        Text(value)
-            .font(.footnote)
-            .foregroundStyle(RegardsDS.ink)
     }
 
     // MARK: - Helpers
