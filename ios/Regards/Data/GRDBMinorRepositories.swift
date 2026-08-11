@@ -74,6 +74,16 @@ struct GRDBReminderRepository: ReminderRepository {
         }
     }
 
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE ScheduledReminder SET state = ? WHERE id = ? AND state = ?",
+                arguments: [to.rawValue, id.uuidString, from.rawValue])
+            return db.changesCount > 0
+        }
+    }
+
     func delete(id: UUID) async throws {
         try await dbQueue.write { db in
             _ = try ScheduledReminderRecord.deleteOne(db, key: id.uuidString)

@@ -103,4 +103,46 @@ struct UpdateLastInteractedAtContractTests {
         let reloaded = try #require(try await repositories.contacts.fetch(id: original.id))
         #expect(reloaded.lastInteractedAt == second)
     }
+
+    /// The gap this pins (staged review round 8): an archived contact used
+    /// to report `matched: true` on both backends, unlike a missing one —
+    /// the asymmetry `reportsFalseForMissingId` above didn't cover, since
+    /// that test's row never existed at all rather than existing-but-archived.
+    /// `InteractionLogging.record()`'s `guard matched else { throw
+    /// .notFound }` only closes the archived-between-fetch-and-write race
+    /// (round 6's blocker) if this write itself refuses an already-archived
+    /// row, matching the identical race `ContactDetailViewModel.snooze`'s
+    /// `contact.isActive` guard already closes for Snooze.
+    @Test(
+        "updateLastInteractedAt reports false and writes nothing for an archived contact",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func reportsFalseForArchivedContact(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let archivedAt = Date(timeIntervalSince1970: 1_799_999_000)
+        let original = contractContact(
+            id: try contractUUID(164),
+            suffix: "last-interacted-archived",
+            tracked: true,
+            archivedAt: archivedAt
+        )
+        try await repositories.contacts.upsert(original)
+        // Baseline read back from the store, not `original` in memory:
+        // `contractContact`'s `lastInteractedAt` carries a deliberate
+        // fractional second (`…100.875`) and both backends normalize
+        // timestamps to whole seconds on write, so comparing the fixture
+        // directly fails on the rounding rather than on anything this test
+        // is about.
+        let stored = try #require(try await repositories.contacts.fetch(id: original.id))
+
+        let matched = try await repositories.contacts.updateLastInteractedAt(
+            id: original.id,
+            at: Date(timeIntervalSince1970: 1_800_000_500)
+        )
+
+        #expect(matched == false)
+        let reloaded = try #require(try await repositories.contacts.fetch(id: original.id))
+        #expect(reloaded.lastInteractedAt == stored.lastInteractedAt)
+        #expect(reloaded.archivedAt == archivedAt)
+    }
 }

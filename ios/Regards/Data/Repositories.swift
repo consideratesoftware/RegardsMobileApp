@@ -177,9 +177,19 @@ public extension ContactRepository {
     /// Fallback mirroring `updateReconciledFields`' own: fetch, move the one
     /// field, upsert. `GRDBContactRepository` and `MockContactRepository`
     /// override this with a write that never reads the row first.
+    ///
+    /// Excludes an archived contact the same way as "the row doesn't exist"
+    /// (staged review round 8): `InteractionLogging.record()`'s `guard
+    /// matched else { throw .notFound }` already exists for exactly this
+    /// shape of failure — a contact archived between an earlier fetch and
+    /// this write — but until now only a *deleted* contact could produce
+    /// `matched == false`; an *archived* one silently succeeded here on
+    /// both backends while `ContactDetailViewModel.snooze`'s own
+    /// `contact.isActive` guard already rejected the identical race for
+    /// Snooze. All three actions now agree.
     @discardableResult
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
-        guard var contact = try await fetch(id: id) else { return false }
+        guard var contact = try await fetch(id: id), contact.isActive else { return false }
         contact.lastInteractedAt = date
         try await upsert(contact)
         return true
@@ -201,6 +211,19 @@ public protocol ReminderRepository: Sendable {
     func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder]
     func upsert(_ reminder: ScheduledReminder) async throws
     func updateState(id: UUID, state: ReminderState) async throws
+    /// Compare-and-set: transitions `id`'s state to `to` only if its
+    /// *current* state is still `from`, atomically with that check. Returns
+    /// whether the transition actually happened.
+    ///
+    /// `SchedulingPass.caughtUp` used to pair a separate `fetchPending` read
+    /// with `updateState` to learn whether a pending row existed (staged
+    /// review round 7); that left a window between the check and the write
+    /// where two concurrent callers could both observe the same
+    /// pre-transition state and each believe *it* was the one responsible
+    /// for the change (staged review round 8). This method closes that
+    /// window by making the check part of the same write.
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool
     func delete(id: UUID) async throws
 }
 
@@ -377,11 +400,18 @@ struct GRDBContactRepository: ContactRepository {
     /// `db.changesCount` after the `UPDATE` is SQLite's own
     /// `sqlite3_changes()` — the row count the statement actually matched,
     /// not an assumption that a well-formed `id` always exists.
+    ///
+    /// `AND archivedAt IS NULL` (staged review round 8): without it, this
+    /// silently matches — and "succeeds" — a contact the reconciler archived
+    /// between an earlier fetch and this write, the identical race
+    /// `ContactDetailViewModel.snooze`'s `contact.isActive` guard already
+    /// closes for Snooze. See the protocol doc comment for why "archived"
+    /// counts as "no match" here.
     @discardableResult
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         try await dbQueue.write { db in
             try db.execute(
-                sql: "UPDATE Contact SET lastInteractedAt = ? WHERE id = ?",
+                sql: "UPDATE Contact SET lastInteractedAt = ? WHERE id = ? AND archivedAt IS NULL",
                 arguments: [Int(date.timeIntervalSince1970), id.uuidString]
             )
             return db.changesCount > 0

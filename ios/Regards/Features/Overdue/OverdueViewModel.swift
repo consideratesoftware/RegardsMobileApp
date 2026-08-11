@@ -291,8 +291,32 @@ public final class OverdueViewModel {
     /// would leave the contact sitting in Overdue after a successful snooze,
     /// visibly failing §14 PR22's "moves the contact out of Overdue
     /// instantly" contract.
+    ///
+    /// Gated on a fresh `contact.isActive` read (staged review round 8,
+    /// same fix `ContactDetailViewModel.snooze` already got in round 7 for
+    /// the identical race): a row on screen reflects the *last* `load()`,
+    /// not this instant, so a contact a concurrent `ContactsReconciler` pass
+    /// archived after that load can still be tapped here before its own
+    /// `observeTracked()` broadcast reaches this screen.
+    /// `SchedulingPass.snooze` itself has no such check (R54: it writes for
+    /// any contact that merely exists), so without this guard the write
+    /// would still land — a pending cadence row that no `fetchTracked()`
+    /// screen will ever surface, orphaned until PR25 gives the scheduler its
+    /// own precondition. Re-fetches rather than trusting the row's own
+    /// staleness, since `rows` carries no `archivedAt` of its own to check.
+    /// A failed fetch here is treated the same as "inactive" — there's
+    /// nothing else safe to do with an unreadable precondition — but is
+    /// logged distinctly so it doesn't read as a silent no-op in the logs.
     @discardableResult
     public func snooze(contactId: UUID) async -> Bool {
+        let contact: Contact?
+        do {
+            contact = try await contacts.fetch(id: contactId)
+        } catch {
+            Self.log.error("failed to verify \(contactId, privacy: .private) is active: \(error, privacy: .private)")
+            contact = nil
+        }
+        guard let contact, contact.isActive else { return false }
         loadGeneration += 1
         rows.removeAll { $0.contactId == contactId }
         do {

@@ -79,6 +79,45 @@ struct UpcomingViewModelRaceTests {
         #expect(viewModel.groups.isEmpty)
     }
 
+    /// The double-failure this pins (staged review round 8) — see
+    /// `OverdueViewModelActionTests
+    /// .markCaughtUpDoubleFailureOnRestoreStillReportsFailure`'s sibling
+    /// doc comment for the full shape. `caughtUp` clears a real snooze,
+    /// `InteractionLogging` then fails, and the compensating
+    /// `restorePendingAfterFailedCaughtUp` also fails — the method must
+    /// still return cleanly, and the reload must show the truthfully
+    /// still-overdue contact, not a state the failed restore only wished for.
+    @Test("A caught-up write whose own restore also fails does not crash and still reports failure")
+    func markCaughtUpDoubleFailureOnRestoreStillReportsFailure() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
+        let contacts = StubContactRepository.failingUpsert([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: scheduler,
+            interactions: interactions,
+            window: window,
+            clock: { Self.now }
+        )
+        await viewModel.load()
+        #expect(viewModel.totalCount == 1)
+        try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
+        await reminders.armTransitionFailure(from: .userCaughtUp)
+
+        let succeeded = await viewModel.markCaughtUp(contactId: contact.id)
+
+        #expect(succeeded == false)
+        #expect(try await reminders.fetchPending(forContact: contact.id).isEmpty)
+        // `lastInteractedAt` never moved and no pending snooze survives to
+        // suppress the row, so the reload correctly shows the contact still
+        // due — 3 days overdue on a 7-day cadence, well inside the horizon.
+        #expect(viewModel.totalCount == 1)
+    }
+
     /// The blocker this closes (staged review, predates this round —
     /// missed by three earlier reviews): `markCaughtUp`'s optimistic
     /// mutation never bumped `loadGeneration`, so a `performLoad()` already
@@ -90,10 +129,11 @@ struct UpcomingViewModelRaceTests {
     /// `loadGeneration` — meaning a naive test that lets everything resolve
     /// and only checks the final state would pass whether or not the fix
     /// is present, since that trailing reload eventually self-corrects
-    /// either way. `GatedUpdateStateReminderRepository` closes that hole: it
-    /// holds `scheduler.caughtUp`'s write open, so this test can inspect
-    /// `totalCount` in the exact window *before* `markCaughtUp` reaches its
-    /// own reload — the only place the bug is actually observable.
+    /// either way. `GatedTransitionStateReminderRepository` closes that
+    /// hole: it holds `scheduler.caughtUp`'s write open, so this test can
+    /// inspect `totalCount` in the exact window *before* `markCaughtUp`
+    /// reaches its own reload — the only place the bug is actually
+    /// observable.
     @Test("A load() in flight when markCaughtUp fires does not overwrite the removal before its own reload lands")
     func markCaughtUpSurvivesConcurrentInFlightLoad() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
@@ -102,7 +142,7 @@ struct UpcomingViewModelRaceTests {
         let gatedContacts = GatedFetchTrackedContactRepository(wrapped: baseContacts, gate: contactsGate)
         let reminders = StubReminderRepository()
         let schedulerGate = AsyncGate()
-        let gatedReminders = GatedUpdateStateReminderRepository(wrapped: reminders, gate: schedulerGate)
+        let gatedReminders = GatedTransitionStateReminderRepository(wrapped: reminders, gate: schedulerGate)
         let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
         let viewModel = UpcomingViewModel(
             contacts: gatedContacts,

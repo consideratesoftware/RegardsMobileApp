@@ -334,10 +334,11 @@ extension MockStore {
 
     /// Mirrors `GRDBContactRepository.updateLastInteractedAt`: writes exactly this one field,
     /// same R23 broadcast parity as `updateReconciledFields` above, and reports whether `id`
-    /// matched — see the protocol doc comment for why the caller needs that.
+    /// matched — see the protocol doc comment for why the caller needs that, including why an
+    /// archived contact (round 8) counts as "no match" the same as a missing one.
     @discardableResult
     func updateLastInteractedAt(id: UUID, at date: Date) -> Bool {
-        guard var c = contacts[id] else { return false }
+        guard var c = contacts[id], c.isActive else { return false }
         c.lastInteractedAt = mockStoredDate(date)
         contacts[id] = c
         broadcastTrackedChange()
@@ -378,6 +379,19 @@ extension MockStore {
         guard var r = reminders[id] else { return }
         r.state = state
         reminders[id] = r
+    }
+    /// Compare-and-set counterpart to `updateReminderState` — see
+    /// `ReminderRepository.transitionState`'s doc comment. Safe from the mock
+    /// backend's own concurrency the same way `updateLastInteractedAt`'s
+    /// field-scoped write is: this actor serializes every call already, so
+    /// the "current state" check and the write below can't straddle a
+    /// suspension point the way two independent calls into GRDB could.
+    @discardableResult
+    func transitionReminderState(id: UUID, from: ReminderState, to: ReminderState) -> Bool {
+        guard var r = reminders[id], r.state == from else { return false }
+        r.state = to
+        reminders[id] = r
+        return true
     }
     func deleteReminder(id: UUID) { reminders.removeValue(forKey: id) }
 

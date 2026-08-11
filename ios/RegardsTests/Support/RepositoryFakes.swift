@@ -121,13 +121,14 @@ actor StubContactRepository: ContactRepository {
     /// this repository's own test double). Gated by `upsertFailure`, same as
     /// `upsert` above: this is the write that persists `lastInteractedAt`
     /// now, so a test reaching for `.failingUpsert()` to simulate that write
-    /// failing should still work unchanged.
+    /// failing should still work unchanged. Also excludes an archived
+    /// contact (round 8), matching both production backends.
     @discardableResult
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         try requireSuccess()
         if let upsertFailure { throw upsertFailure }
         guard !missesUpdateLastInteractedAt else { return false }
-        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return false }
+        guard let index = contacts.firstIndex(where: { $0.id == id && $0.isActive }) else { return false }
         contacts[index].lastInteractedAt = date
         broadcastTrackedChange()
         return true
@@ -153,9 +154,16 @@ actor StubContactRepository: ContactRepository {
     /// inside the closure-based initializer, so there's no window where a
     /// write landing right after subscribe is missed (mirrors
     /// `MockStore.observeTracked()`).
+    ///
+    /// `.bufferingNewest(1)`, not the `.unbounded` default (nit, staged
+    /// review round 8, correcting a fake that drifted from all three
+    /// production implementations' matching fix): an unbounded buffer here
+    /// would let an N-write test burst queue N full reloads for a slow
+    /// consumer instead of collapsing to the latest, same reasoning as
+    /// `GRDBContactRepository.observeTracked()`'s own comment.
     func observeTracked() async -> AsyncStream<[Contact]> {
         subscribeCount += 1
-        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
+        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self, bufferingPolicy: .bufferingNewest(1))
         let token = UUID()
         trackedObservers[token] = continuation
         continuation.onTermination = { [weak self] _ in
@@ -234,6 +242,19 @@ actor StubReminderRepository: ReminderRepository {
     /// through, so making the whole repository fail would fail the *restore*
     /// read too, not just the write under test.
     private let upsertFailure: RepositoryFakeFailure?
+    /// Independent of both above, and mutable rather than init-time (unlike
+    /// `upsertFailure`): a test needs a *real* `scheduler.snooze()` /
+    /// `caughtUp()` transition to succeed first, to set up the genuinely
+    /// pending row a later restore attempts to touch, and only THEN wants
+    /// the *restore's* own transition to fail — `armTransitionFailure`
+    /// lets a test flip this on partway through, after that setup, rather
+    /// than needing it armed from construction. Proves the double-failure
+    /// case none of the three ViewModels' restore call sites had before
+    /// (staged review round 8): `caughtUp` clears a real snooze, the
+    /// caller's own next write then fails, and the compensating restore
+    /// *also* fails — the method must still return cleanly, not throw
+    /// past its own catch block.
+    private var transitionFailureFrom: ReminderState?
 
     init(
         _ reminders: [ScheduledReminder] = [],
@@ -253,6 +274,13 @@ actor StubReminderRepository: ReminderRepository {
     /// Reads succeed normally; only `upsert` fails.
     static func failingUpsert() -> StubReminderRepository {
         StubReminderRepository([], upsertFailure: RepositoryFakeFailure())
+    }
+
+    /// From this point on, any `transitionState` moving *out of* `from`
+    /// fails — see the property doc comment for why this arms after
+    /// construction instead of at it.
+    func armTransitionFailure(from: ReminderState) {
+        transitionFailureFrom = from
     }
 
     private func requireSuccess() throws {
@@ -292,6 +320,19 @@ actor StubReminderRepository: ReminderRepository {
         try requireSuccess()
         guard let index = reminders.firstIndex(where: { $0.id == id }) else { return }
         reminders[index].state = state
+    }
+
+    /// This actor already serializes every call into it, so the check and
+    /// the write below can't straddle a suspension point the way two
+    /// independent GRDB write transactions could — matching
+    /// `MockStore.transitionReminderState`'s equivalent note.
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        try requireSuccess()
+        if let transitionFailureFrom, transitionFailureFrom == from { throw RepositoryFakeFailure() }
+        guard let index = reminders.firstIndex(where: { $0.id == id && $0.state == from }) else { return false }
+        reminders[index].state = to
+        return true
     }
 
     func delete(id: UUID) async throws {

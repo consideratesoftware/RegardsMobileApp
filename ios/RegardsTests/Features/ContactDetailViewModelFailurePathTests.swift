@@ -127,6 +127,48 @@ struct ContactDetailViewModelFailurePathTests {
         #expect(viewModel.interactions.count == 1)
     }
 
+    /// The double-failure this pins (staged review round 8) — see
+    /// `OverdueViewModelActionTests
+    /// .markCaughtUpDoubleFailureOnRestoreStillReportsFailure`'s sibling
+    /// doc comment for the full shape. `caughtUp` clears a real snooze,
+    /// `InteractionLogging` then fails, and the compensating
+    /// `restorePendingAfterFailedCaughtUp` also fails — `markCaughtUp` must
+    /// still return cleanly and reload to the truthfully still-overdue
+    /// state, not crash or leave the view model out of sync with what
+    /// actually persisted.
+    @Test("A caught-up write whose own restore also fails does not crash and still reports failure")
+    func markCaughtUpDoubleFailureOnRestoreStillReportsFailure() async throws {
+        let contact = Self.contact(
+            preferredChannel: .signal,
+            lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400)
+        )
+        let contacts = StubContactRepository.failingUpsert([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
+        await reminders.armTransitionFailure(from: .userCaughtUp)
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: interactions,
+            scheduler: scheduler,
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        let succeeded = await viewModel.markCaughtUp()
+
+        #expect(succeeded == false)
+        #expect(try await reminders.fetchPending(forContact: contact.id).isEmpty)
+        // The reload still landed — `contact` isn't `nil` and its own true
+        // state (untouched `lastInteractedAt`, the one append that
+        // genuinely persisted) is what's on screen, not a crash or a stale
+        // pre-action snapshot.
+        #expect(viewModel.contact?.lastInteractedAt == contact.lastInteractedAt)
+        #expect(viewModel.interactions.count == 1)
+    }
+
     /// Same shape as
     /// `markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows`, driven
     /// through `logOther` instead — the sibling should-fix #1 catch block on

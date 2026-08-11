@@ -86,15 +86,16 @@ struct GatedFetchTrackedContactRepository: ContactRepository {
     }
 }
 
-/// Wraps a `ReminderRepository`, delaying `updateState()` specifically — the
-/// call `SchedulingPass.caughtUp` makes. Pairs with
+/// Wraps a `ReminderRepository`, delaying `transitionState()` specifically —
+/// the call `SchedulingPass.caughtUp` makes (`updateState()` before staged
+/// review round 8's compare-and-set fix). Pairs with
 /// `GatedFetchTrackedContactRepository` in tests that need to hold
 /// `markCaughtUp` open *before* it reaches its own trailing `performLoad()`
 /// call: without also gating this, `markCaughtUp`'s scheduler and logging
 /// writes would race ahead unblocked, reach its own `performLoad()`, and
 /// self-correct before the test can observe the "flash" window the
 /// `loadGeneration` bump exists to close.
-struct GatedUpdateStateReminderRepository: ReminderRepository {
+struct GatedTransitionStateReminderRepository: ReminderRepository {
     let wrapped: any ReminderRepository
     let gate: AsyncGate
 
@@ -104,8 +105,12 @@ struct GatedUpdateStateReminderRepository: ReminderRepository {
     }
     func upsert(_ reminder: ScheduledReminder) async throws { try await wrapped.upsert(reminder) }
     func updateState(id: UUID, state: ReminderState) async throws {
-        await gate.wait()
         try await wrapped.updateState(id: id, state: state)
+    }
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        await gate.wait()
+        return try await wrapped.transitionState(id: id, from: from, to: to)
     }
     func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
 }

@@ -110,28 +110,46 @@ public actor SchedulingPass {
     /// deciding *whether* to write from a read first: a contact's pending
     /// cadence reminder, if one exists, is always exactly that id (this stub
     /// is the sole writer of cadence rows and never uses any other id), so
-    /// there's nothing to look up before writing. `updateState` is a no-op —
-    /// not an error — when nothing matches that id, which is exactly the
-    /// idempotence this needs: a contact with no pending snooze has nothing
-    /// to transition, and calling this twice in a row does nothing the
-    /// second time.
+    /// there's nothing to look up before writing. A no-op when nothing
+    /// matches — not an error — is exactly the idempotence this needs: a
+    /// contact with no pending snooze has nothing to transition, and calling
+    /// this twice in a row does nothing the second time.
     ///
-    /// The read before the write (staged review round 7) exists for a
-    /// different reason than deciding insert-vs-update: it reports back
-    /// *whether a pending row actually existed*, so a caller whose own later
-    /// write then fails knows whether this call cleared something worth
-    /// restoring. `restorePendingAfterFailedCaughtUp` below is that
-    /// compensation; a caller must check this return value before calling
-    /// it, since calling it unconditionally after every failure would risk
-    /// resurrecting a `.userCaughtUp` row a *different*, already-successful
-    /// caught-up left behind (this call's own `updateState` is a no-op
-    /// either way, so it can't tell those two cases apart on its own).
+    /// `reminders.transitionState(from: .pending, to: .userCaughtUp)`, not a
+    /// plain `updateState` — a compare-and-set, not a blind write (staged
+    /// review round 8, correcting round 7's fix). Round 7 paired a separate
+    /// `fetchPending` read with `updateState` to learn whether a pending row
+    /// existed, so a caller whose own later write then failed would know
+    /// whether to restore it; that left a window between the read and the
+    /// write where two *concurrent* callers for the same contact could both
+    /// observe the row as pending and both believe they were the one
+    /// responsible for clearing it — so if one succeeded and the other's
+    /// later write then failed, the failing caller's restore could re-pend a
+    /// snooze the successful caller had legitimately cleared.
+    /// `transitionState`'s single atomic statement means only the call that
+    /// actually wins the race — the one whose write lands while the row is
+    /// still genuinely `.pending` — gets `true` back; the loser sees the row
+    /// already `.userCaughtUp` and correctly gets `false`, so it never
+    /// attempts a restore that would undo the winner's legitimate success.
+    ///
+    /// This does not close every case, only the one two truly concurrent
+    /// callers can hit: if the row is re-snoozed and then caught up again by
+    /// someone else in the narrow gap between this call's own transition and
+    /// this same action's *later* restore call (below), that restore would
+    /// still revert the newer catch-up, since state alone can't distinguish
+    /// "the row this call transitioned" from "a different row some other
+    /// caller transitioned to the identical state afterward." Closing that
+    /// fully needs a per-write identity this schema doesn't carry — out of
+    /// scope for a stub PR25 replaces; the risk window is one failed write
+    /// nested inside another action's full round trip, narrower still than
+    /// the race this fixes.
     @discardableResult
     public func caughtUp(contactId: UUID) async throws -> Bool {
-        let id = Self.cadenceReminderID(contactId: contactId)
-        let wasPending = try await reminders.fetchPending(forContact: contactId).contains { $0.id == id }
-        try await reminders.updateState(id: id, state: .userCaughtUp)
-        return wasPending
+        try await reminders.transitionState(
+            id: Self.cadenceReminderID(contactId: contactId),
+            from: .pending,
+            to: .userCaughtUp
+        )
     }
 
     /// Compensates a `caughtUp(contactId:)` whose caller's own later write
@@ -145,12 +163,25 @@ public actor SchedulingPass {
     /// clock reading, fabricating a date the user never chose, in place of
     /// the one they did.
     ///
+    /// Also a compare-and-set (round 8), `from: .userCaughtUp, to: .pending`
+    /// — the mirror image of `caughtUp`'s own transition, and for the same
+    /// reason: if something else already moved the row away from
+    /// `.userCaughtUp` before this call runs, restoring unconditionally
+    /// would clobber whatever that other write left behind instead of
+    /// leaving it alone.
+    ///
     /// Call only when `caughtUp(contactId:)` returned `true` for this same
     /// action. Calling it after a `false` — or after some other action's
-    /// `caughtUp` — would blindly set `.pending` on a row this call has no
-    /// way to confirm was genuinely this action's to restore.
+    /// `caughtUp` — would attempt to set `.pending` on a row this call has
+    /// no way to confirm was genuinely this action's to restore; the
+    /// compare-and-set above prevents that attempt from doing damage, but
+    /// the caller-side check stays the first line of defense.
     public func restorePendingAfterFailedCaughtUp(contactId: UUID) async throws {
-        try await reminders.updateState(id: Self.cadenceReminderID(contactId: contactId), state: .pending)
+        try await reminders.transitionState(
+            id: Self.cadenceReminderID(contactId: contactId),
+            from: .userCaughtUp,
+            to: .pending
+        )
     }
 
     private static func cadenceNotificationId(contactId: UUID) -> String {
@@ -173,6 +204,14 @@ public actor SchedulingPass {
     /// back to a fresh random id per write resurrects the exact duplicate-row
     /// race this method exists to close (see `snooze(contactId:)`'s doc
     /// comment above).
+    /// The fixed `bytes[0]`...`bytes[15]` indexing below relies on
+    /// `contactId.uuid` (`uuid_t`) always unpacking to exactly 16 bytes
+    /// (nit, staged review round 8) — unstated in code, but not a guess:
+    /// `uuid_t` is Foundation's fixed 16-`UInt8` tuple mirroring RFC 4122's
+    /// 128-bit UUID layout, and `withUnsafeBytes(of:)` over a fixed-size C
+    /// tuple always yields a buffer of that tuple's exact byte width, so
+    /// `bytes.count` is always 16 here — never a source of out-of-bounds
+    /// indexing to guard against at runtime.
     private static func cadenceReminderID(contactId: UUID) -> UUID {
         let salt: [UInt8] = Array("cadence-reminder".utf8.prefix(16))
         var bytes = withUnsafeBytes(of: contactId.uuid) { Array($0) }

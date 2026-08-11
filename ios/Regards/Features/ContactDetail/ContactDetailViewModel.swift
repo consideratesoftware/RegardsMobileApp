@@ -283,6 +283,21 @@ public final class ContactDetailViewModel {
         return CadenceDescriptor.describe(days: days)
     }
 
+    /// Known gap (staged review round 8, register R56): computed purely
+    /// from `Contact`'s own fields — `cadenceDays`, `lastInteractedAt`,
+    /// `createdAt` — with no read of any pending `ScheduledReminder`. Unlike
+    /// `OverdueViewModel.makeOverdueRow`/`UpcomingViewModel.buildRows`, both
+    /// of which fold a pending snooze's `scheduledFor` into their date math
+    /// (and suppress the row entirely while it's still in the future), this
+    /// screen has no `ReminderRepository` of its own to do the same, so
+    /// right after a successful Snooze it keeps reporting "N days overdue"
+    /// against the same stale cadence math — a user-visible false statement
+    /// on the success path, the same category `markCaughtUp`'s VoiceOver
+    /// announcement and `nextReminderLabel`'s placeholder are already
+    /// tracked against. Wiring `reminders` in here is TF-07/PR25's job, not
+    /// a small patch to this property alone — it needs a live read (or
+    /// `ValueObservation`) this §14 PR22 slice was never scoped to carry,
+    /// and touches every call site that constructs this view model. See R56.
     public var overdueSummary: (days: Int, isOverdue: Bool) {
         guard let c = contact, let cadence = c.cadenceDays else {
             return (0, false)

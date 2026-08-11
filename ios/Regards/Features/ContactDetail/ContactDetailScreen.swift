@@ -226,7 +226,12 @@ extension ContactDetailScreen {
     /// site above and the Log-other channel buttons below use this — and
     /// lands focus on the Cadence card's "Status" value; sequencing lives in
     /// `RowActionAnnouncer`, shared with `OverdueScreen`/`UpcomingScreen`.
-    func announceRowAction(_ message: String) {
+    /// `private` (staged review round 8, nit) — every call site is inside
+    /// this file, matching `OverdueScreen`/`UpcomingScreen`'s own
+    /// `announceRowAction`; this one had drifted non-private with no caller
+    /// outside this file to justify it, the one gap in an otherwise
+    /// consistent trio that carries contact-name-bearing announcement text.
+    private func announceRowAction(_ message: String) {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
             isStatusFocused = true
         }

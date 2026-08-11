@@ -55,6 +55,10 @@ struct MockReminderRepository: ReminderRepository {
     func updateState(id: UUID, state: ReminderState) async throws {
         await store.updateReminderState(id: id, state: state)
     }
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        await store.transitionReminderState(id: id, from: from, to: to)
+    }
     func delete(id: UUID) async throws { await store.deleteReminder(id: id) }
 }
 

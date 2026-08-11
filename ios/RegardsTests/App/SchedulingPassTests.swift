@@ -186,6 +186,62 @@ struct SchedulingPassTests {
         #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
     }
 
+    /// Additional wall-clock coverage (staged review round 8): a snooze from
+    /// late December must land in the *following* year, not silently wrap
+    /// within the same one — `calendar.date(byAdding: .day, value: 7, to:)`
+    /// carries the year rollover for free, but nothing had pinned it, and a
+    /// naive component-based reimplementation (e.g. incrementing `.day` in
+    /// `DateComponents` without renormalizing month/year) could plausibly
+    /// get this wrong in a future rewrite without a test catching it.
+    @Test("Snooze across a year boundary rolls over to the next year")
+    func snoozeAcrossYearBoundaryRollsOverCorrectly() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Etc/UTC"))
+        let repositories = try RepositoryContractBackend.mock.makeRepositories()
+        let contact = contractContact(id: try contractUUID(514), suffix: "snooze-year-rollover", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 12, day: 28, hour: 8, minute: 0
+        )))
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+
+        try await scheduler.snooze(contactId: contact.id)
+
+        let expected = try #require(calendar.date(from: DateComponents(
+            year: 2028, month: 1, day: 4, hour: 8, minute: 0
+        )))
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending[0].scheduledFor == expected)
+    }
+
+    /// Additional wall-clock coverage (staged review round 8): every DST
+    /// fixture above uses an hour-aligned zone (`America/Los_Angeles`).
+    /// `Asia/Kolkata` is a fixed, non-DST-observing UTC+5:30 offset — this
+    /// isolates whether the half-hour offset itself (not a transition) has
+    /// any effect on the wall-clock math, which it should not: the 7-day
+    /// push lands at the identical local time regardless of how the zone's
+    /// UTC offset happens to be shaped.
+    @Test("Snooze in a half-hour-offset timezone lands on the same local wall-clock time")
+    func snoozeInHalfHourOffsetTimezoneStaysOnWallClock() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Kolkata"))
+        let repositories = try RepositoryContractBackend.mock.makeRepositories()
+        let contact = contractContact(id: try contractUUID(515), suffix: "snooze-half-hour-offset", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 6, day: 1, hour: 8, minute: 15
+        )))
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+
+        try await scheduler.snooze(contactId: contact.id)
+
+        let expected = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 6, day: 8, hour: 8, minute: 15
+        )))
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending[0].scheduledFor == expected)
+    }
+
     // MARK: - caughtUp (PR #49 hosted review fix)
 
     @Test(
@@ -239,6 +295,42 @@ struct SchedulingPassTests {
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
 
+    /// The blocker this pins (staged review round 8, "the worst of the
+    /// four" — the coordinator's own words): round 7's `caughtUp` paired a
+    /// separate `fetchPending` read with `updateState`, leaving a window
+    /// where two concurrent callers for the same contact could both observe
+    /// the row as pending and both report `true`. If one caller's later
+    /// write then failed, its restore would re-pend a snooze the *other*,
+    /// successful caller had legitimately cleared. `async let` drives two
+    /// genuinely concurrent `caughtUp` calls the same way
+    /// `concurrentSnoozeResolvesToOneRow` above drives two concurrent
+    /// `snooze` calls — Swift actor re-entrancy at `caughtUp`'s own `await`
+    /// lets both bodies interleave before either's `transitionState` write
+    /// lands, so this reproduces the race rather than assuming it.
+    @Test(
+        "Two concurrent caught-ups on the same pending row: only one reports having cleared it",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func concurrentCaughtUpOnlyOneWinsTheTransition(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(512), suffix: "caughtup-concurrent", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        try await scheduler.snooze(contactId: contact.id)
+
+        async let first = scheduler.caughtUp(contactId: contact.id)
+        async let second = scheduler.caughtUp(contactId: contact.id)
+        let (firstCleared, secondCleared) = try await (first, second)
+
+        // Exactly one call transitioned a genuinely pending row; the other
+        // found it already `.userCaughtUp` and correctly reported nothing to
+        // restore — the discriminator round 7's separate-read design could
+        // not make (it could report `true` for both).
+        #expect([firstCleared, secondCleared].filter { $0 }.count == 1)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
     // MARK: - restorePendingAfterFailedCaughtUp (staged review round 7)
 
     /// The compensation this pins: a caller's own later write fails after
@@ -288,5 +380,39 @@ struct SchedulingPassTests {
         try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contact.id)
 
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
+    /// The compare-and-set this pins (round 8): a re-snooze between
+    /// `caughtUp` and its would-be restore leaves the row `.pending` again
+    /// with a *new* `scheduledFor` — restoring must not fire at all here
+    /// (the row is no longer `.userCaughtUp`, the state this call is only
+    /// ever allowed to move away from), or it would silently discard the
+    /// fresh snooze the user just set.
+    @Test(
+        "Restoring after a re-snooze leaves the fresh snooze alone",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func restorePendingAfterFailedCaughtUpDoesNotClobberAFreshSnooze(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(513), suffix: "caughtup-restore-resnoozed", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let firstNow = Date(timeIntervalSince1970: 1_800_000_000)
+        let secondNow = firstNow.addingTimeInterval(3 * 86_400)
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { firstNow })
+        try await scheduler.snooze(contactId: contact.id)
+        _ = try await scheduler.caughtUp(contactId: contact.id)
+        // Re-snoozed from a later clock reading before the compensation for
+        // the *earlier* caught-up ever runs — simulates the user snoozing
+        // again while an earlier failed action's restore is still pending.
+        try await SchedulingPass(reminders: repositories.reminders, clock: { secondNow })
+            .snooze(contactId: contact.id)
+        let freshSnooze = try await repositories.reminders.fetchPending(forContact: contact.id)[0]
+
+        try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contact.id)
+
+        let afterRestore = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(afterRestore.count == 1)
+        #expect(afterRestore[0].scheduledFor == freshSnooze.scheduledFor)
+        #expect(afterRestore[0].scheduledFor == secondNow.addingTimeInterval(7 * 86_400))
     }
 }
