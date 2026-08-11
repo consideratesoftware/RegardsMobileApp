@@ -1,0 +1,13 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "OLD-UDID" }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-9-0": [
+      { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "WRONG-IF-STRING-SORTED" }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
+      { "name": "iPhone 17 Pro", "isAvailable": true, "udid": "NEW-UDID" }
+    ]
+  }
+}

@@ -1,9 +1,7 @@
 import Foundation
 
-/// In-memory repository fakes preloaded with a Star Wars sample cast (Leia,
-/// Padmé, Luke, Lando, Chewbacca, Anakin, Din, Shmi, Obi-Wan, Ahsoka). PR3's
-/// SwiftUI shell renders against these so we can iterate on the screens — and
-/// take demo screenshots — without integrating the Contacts framework.
+/// In-memory repository fakes preloaded with a Star Wars sample cast (Leia, Padmé, Luke, Lando, Chewbacca, Anakin,
+/// Din, Shmi, Obi-Wan, Ahsoka), so the SwiftUI shell can render without integrating the Contacts framework.
 public struct MockRepositories: Sendable {
 
     public let contacts: any ContactRepository
@@ -16,12 +14,14 @@ public struct MockRepositories: Sendable {
     public init(
         now: Date = MockRepositories.defaultNow,
         window: ReminderWindow = MockRepositories.defaultWindow,
-        includeDuplicateFixture: Bool = false
+        includeDuplicateFixture: Bool = false,
+        seedCorruptRow: Bool = false
     ) {
         let store = MockStore(
             now: now,
             window: window,
-            includeDuplicateFixture: includeDuplicateFixture
+            includeDuplicateFixture: includeDuplicateFixture,
+            seedCorruptRow: seedCorruptRow
         )
         self.contacts = MockContactRepository(store: store)
         self.groups = MockContactGroupRepository(store: store)
@@ -59,8 +59,7 @@ private enum MockRepositoryWriteError: Error {
     case duplicateSystemContactRef, missingGroup, missingContact, duplicateInteraction
 }
 
-/// GRDB stores timestamps as integer epoch seconds. Mock writes use the same
-/// precision so round trips, filtering, and tie ordering agree.
+/// GRDB stores timestamps as integer epoch seconds; mock writes match so round trips, filtering, and ordering agree.
 private func mockStoredDate(_ date: Date) -> Date {
     Date(timeIntervalSince1970: TimeInterval(Int(date.timeIntervalSince1970)))
 }
@@ -89,15 +88,15 @@ actor MockStore {
     var interactions: [UUID: InteractionLog] = [:]
     var window: ReminderWindow
     var profile: UserProfile
+    /// R50 fixture (`REGARDS_UI_TEST_SEED_CORRUPT_ROW`): fabricated, not real (every mock write round-trips through
+    /// `ContactRecord`) — exists so the XCUITest audit can reach the All Contacts corruption banner.
+    var corruptionDiagnostics: [ContactCorruptionDiagnostic] = []
 
-    /// Subscribers of `observeTracked()`, keyed by a per-subscription token so
-    /// termination can remove exactly one without racing a concurrent
-    /// subscribe. Mirrors `GRDBContactRepository.observeTracked()`'s
-    /// contract in-memory: a subscriber gets nothing on subscribe, only the
-    /// current tracked set again after any subsequent write.
+    /// Subscribers of `observeTracked()`, keyed per subscription so termination removes exactly one. Mirrors
+    /// `GRDBContactRepository.observeTracked()`: nothing on subscribe, only the tracked set after a later write.
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
-    init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
+    init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool, seedCorruptRow: Bool = false) {
         self.window = window
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
                                    entitlementTier: .trial,
@@ -119,13 +118,21 @@ actor MockStore {
         groups = representative.groups
         reminders = representative.reminders
         interactions = representative.interactions
+
+        if seedCorruptRow {
+            corruptionDiagnostics = [
+                ContactCorruptionDiagnostic(
+                    rawId: "ui-test-corrupt-row",
+                    systemContactRef: "ui-test-corrupt-row",
+                    reason: "REGARDS_UI_TEST_SEED_CORRUPT_ROW fixture: simulates an undecodable stored row"
+                ),
+            ]
+        }
     }
 
-    /// Phase 0 deliberately renders representative persisted states so the
-    /// corresponding UI does not exist only as unreachable implementation:
-    /// a virtual merge marker, recent interactions, and both occasion tags.
-    /// Production scheduling still belongs to TF-07; these rows are local
-    /// in-memory fixtures only.
+    /// Phase 0 deliberately renders representative persisted states (virtual merge marker, recent interactions, both
+    /// occasion tags) so the corresponding UI isn't unreachable implementation. Local in-memory fixtures only —
+    /// production scheduling still belongs to TF-07.
     private nonisolated static func seedRepresentativeStates(
         now: Date,
         window: ReminderWindow,
@@ -225,21 +232,11 @@ actor MockStore {
         return (contacts, groups, reminders, interactions)
     }
 
-    /// The seeded occasion instant `offset` days after `startOfToday`, at the
-    /// given local `hour`.
-    ///
-    /// `date(bySettingHour:)` is `Optional`, and the seeding used to sit
-    /// inside an `if let` chain that silently dropped the birthday and
-    /// anniversary whenever it returned nil. That would make the
-    /// representative occasion states R34 exists to guarantee unreachable and
-    /// unauditable, with no failure anywhere to say so.
-    ///
-    /// Measured on a real DST gap (US Pacific, 2026-03-08, hour 2): the API
-    /// does not return nil — it forgives the missing hour and snaps forward to
-    /// 03:00. So this is a defensive guard against API surface rather than a
-    /// reproduced drop. It stays because the seeds must never depend on that
-    /// leniency: fall forward to the first instant that does exist, and fall
-    /// back to the day start if even that fails.
+    /// The seeded occasion instant `offset` days after `startOfToday`, at the given local `hour`.
+    /// `date(bySettingHour:)` is `Optional`; the seeding used to sit in an `if let` that silently dropped occasions on
+    /// nil, making R34's representative states unreachable with nothing to say so. A real DST gap (US Pacific,
+    /// 2026-03-08, hour 2) never returns nil (the API snaps to 03:00), so this guard is defensive: fall forward to
+    /// the first instant that exists, then to the day start if even that fails.
     nonisolated static func occasionInstant(
         daysAfter startOfToday: Date,
         offset: Int,
@@ -372,6 +369,7 @@ actor MockStore {
 
 extension MockStore {
     func allContacts() -> [Contact] { Array(contacts.values) }
+    func corruptionDiagnosticsList() -> [ContactCorruptionDiagnostic] { corruptionDiagnostics }
     func tracked() -> [Contact] {
         contacts.values.filter { $0.tracked && $0.archivedAt == nil }
     }
@@ -399,17 +397,10 @@ extension MockStore {
 
     // MARK: - Live observation
 
-    /// Never replays the current value on subscribe — only a write *after*
-    /// subscribing reaches the stream (see the protocol doc on
-    /// `ContactRepository.observeTracked()` for why: an eager replay would
-    /// race a caller's own optimistic UI update).
-    ///
-    /// Registers the continuation synchronously, before returning, using
-    /// `AsyncStream.makeStream` instead of the closure-based initializer: the
-    /// closure form can't touch actor-isolated `trackedObservers` directly
-    /// (it isn't actor-isolated itself), and deferring registration into a
-    /// spawned `Task` would leave a window where a write landing between
-    /// subscribe and that `Task` running is silently missed.
+    /// Never replays the current value on subscribe — only a later write reaches the stream (see
+    /// `ContactRepository.observeTracked()`'s doc: an eager replay would race a caller's own optimistic update).
+    /// Registers synchronously via `AsyncStream.makeStream`, not the closure initializer: that form can't touch
+    /// actor-isolated `trackedObservers` directly, and deferring into a spawned `Task` could miss an early write.
     func observeTracked() -> AsyncStream<[Contact]> {
         let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
         let token = UUID()
@@ -431,6 +422,18 @@ extension MockStore {
         }
     }
 
+    /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the *current* entry (actor-isolated, so no
+    /// stale snapshot) and overwrites only these five fields — parity for `ContactsReconciler` across backends.
+    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) {
+        guard var c = contacts[id] else { return }
+        c.displayName = fields.displayName
+        c.phoneNumbers = fields.phoneNumbers
+        c.emailAddresses = fields.emailAddresses
+        c.preferredChannelValue = fields.preferredChannelValue
+        c.archivedAt = fields.archivedAt.map(mockStoredDate)
+        contacts[id] = c
+    }
+
     func allGroups() -> [ContactGroup] { Array(groups.values) }
     func group(id: UUID) -> ContactGroup? { groups[id] }
     func upsertGroup(_ g: ContactGroup) throws { groups[g.id] = try mockStoredGroup(g) }
@@ -441,14 +444,11 @@ extension MockStore {
             if updated.contactGroupId == id { updated.contactGroupId = nil }
             return updated
         }
-        // GRDB's real FK `ON DELETE SET NULL` writes every member row, and
-        // `observeTracked()`'s region-based observation fires on any write
-        // to the Contact table regardless of whether the *filtered* result
-        // changed — so a subscriber sees a fresh (if content-identical)
-        // emission after a group delete there. Without this call the mock
-        // silently drifted from that: a group delete never broadcast here,
-        // so a subscriber-driven parity test comparing the two backends
-        // would see GRDB emit and the mock stay silent.
+        // GRDB's real FK `ON DELETE SET NULL` writes every member row, and `observeTracked()`'s region-based
+        // observation fires on any write to the Contact table regardless of whether the *filtered* result changed —
+        // so a subscriber sees a fresh (if content-identical) emission after a group delete there. Without this call
+        // the mock silently drifted from that: a group delete never broadcast here, so a subscriber-driven parity
+        // test comparing the two backends would see GRDB emit and the mock stay silent.
         broadcastTrackedChange()
     }
 

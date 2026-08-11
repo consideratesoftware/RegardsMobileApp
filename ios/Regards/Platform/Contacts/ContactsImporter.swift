@@ -4,8 +4,9 @@ import Foundation
 /// authorized us to see, map each into our `Contact` domain type, and insert
 /// new rows into the `ContactRepository`. Existing rows (matched by
 /// `systemContactRef`) are left alone — this importer is additive, not a
-/// reconciler. Delete-detection and change-detection arrive in a follow-up
-/// (ARCHITECTURE.md §7 "Re-import logic").
+/// reconciler. Ongoing delete-detection, change-detection, and archive
+/// safety live in `ContactsReconciler` (ARCHITECTURE.md §7 "Re-import &
+/// reconciliation", PR21), which reuses `map(systemContact:now:)` below.
 ///
 /// All imported contacts land as `tracked: false`. The user opts each contact
 /// in from the All Contacts screen.
@@ -25,10 +26,19 @@ public struct ContactsImporter: Sendable {
     }
 
     /// Outcome of an import pass. `imported` is rows freshly written;
-    /// `skipped` is rows the importer found already in the DB and left alone.
+    /// `skipped` is rows the importer found already in the DB and left
+    /// alone; `failed` is rows whose write failed and were neither (R35 —
+    /// counted and logged, never silently dropped).
     public struct Result: Sendable, Equatable {
         public let imported: Int
         public let skipped: Int
+        public let failed: Int
+
+        public init(imported: Int, skipped: Int, failed: Int = 0) {
+            self.imported = imported
+            self.skipped = skipped
+            self.failed = failed
+        }
     }
 
     /// Errors the importer surfaces to the caller.
@@ -39,9 +49,11 @@ public struct ContactsImporter: Sendable {
 
     /// Reads everything from the system store and inserts new rows.
     /// Throws `ImportError.notAuthorized` if the source's current status
-    /// isn't `.authorized` or `.limited`. Each row commits independently;
-    /// rerunning after an interruption skips rows already written and resumes
-    /// with the remaining system contacts.
+    /// isn't `.authorized` or `.limited`. Each row commits independently: a
+    /// single row's write failure is logged and counted in `failed` rather
+    /// than aborting the pass (R35), so the rest of a large address book
+    /// still imports. A failed row never joins the resolved-identifier set,
+    /// so rerunning retries it along with anything not yet attempted.
     public func runFirstLaunchImport() async throws -> Result {
         let status = await source.currentAuthorization()
         guard status == .authorized || status == .limited else {
@@ -49,23 +61,39 @@ public struct ContactsImporter: Sendable {
         }
 
         let systemContacts = try await source.fetchAllContacts()
-        let existing = try await repo.fetchAll()
-        var existingRefs = Set(existing.map(\.systemContactRef))
+        // Corrupted existing rows still occupy their `systemContactRef` in
+        // the unique-constrained column even though they can't decode to a
+        // `Contact` — folding their refs in here keeps the importer from
+        // attempting a doomed duplicate insert against a row R50 deliberately
+        // preserves untouched.
+        let report = try await repo.fetchAllWithDiagnostics()
+        var existingRefs = Set(report.contacts.map(\.systemContactRef))
+        existingRefs.formUnion(report.corrupted.map(\.systemContactRef))
 
         var imported = 0
         var skipped = 0
+        var failed = 0
         let now = clock()
         for sc in systemContacts {
             if existingRefs.contains(sc.identifier) {
                 skipped += 1
                 continue
             }
-            try await repo.upsert(Self.map(systemContact: sc, now: now))
-            existingRefs.insert(sc.identifier)
-            imported += 1
+            do {
+                try await repo.upsert(Self.map(systemContact: sc, now: now))
+                existingRefs.insert(sc.identifier)
+                imported += 1
+            } catch {
+                failed += 1
+                Self.log.error(
+                    "import failed for \(sc.identifier, privacy: .private): \(error, privacy: .private)"
+                )
+            }
         }
-        return Result(imported: imported, skipped: skipped)
+        return Result(imported: imported, skipped: skipped, failed: failed)
     }
+
+    private static let log = RegardsLogger.feature("ContactsImporter")
 
     /// Pure mapping function. Exposed for unit tests so each translation
     /// rule can be checked without going through the importer's I/O.
@@ -99,10 +127,8 @@ public struct ContactsImporter: Sendable {
             return ChannelCatalog.normalizedPhone(trimmed)
         }
         let emailAddresses = sc.emailAddresses.map { $0.lowercased() }
-        let primaryPhone = phoneNumbers.first(where: ChannelCatalog.isPhoneE164) ?? ""
-        let primaryEmail = emailAddresses.first {
-            ChannelCatalog.validate(value: $0, for: .email)
-        } ?? ""
+        let primaryPhone = ChannelCatalog.primaryPhone(in: phoneNumbers)
+        let primaryEmail = ChannelCatalog.primaryEmail(in: emailAddresses)
         let preferredChannel: Channel
         let preferredChannelValue: String
         if !primaryPhone.isEmpty {

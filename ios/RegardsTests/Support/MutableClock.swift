@@ -1,29 +1,24 @@
 import Foundation
 
-/// A clock a test can advance between calls, for asserting "X happens after
-/// N days" without depending on wall-clock time. `@unchecked Sendable` is
-/// justified here (not on any production type): `current` is only ever
-/// mutated and read from the single `@MainActor` test that owns the
-/// instance, but `SchedulingPass.init` requires `@Sendable () -> Date` since
-/// it's an actor — the lock makes that requirement genuinely safe rather
-/// than merely quiet.
+/// A mutable clock for tests that need real elapsed time between two calls —
+/// e.g. `ContactsReconciler.archiveDebounceFloor` requires two `.authorized`
+/// passes to be genuinely separated in time, which a fixed `{ someDate }`
+/// closure (returning the exact same instant on every call) can never
+/// satisfy. `@unchecked Sendable` + `NSLock`: the closure this hands to
+/// `clock:` parameters can be called from any isolation context.
 final class MutableClock: @unchecked Sendable {
     private let lock = NSLock()
     private var current: Date
 
-    init(_ date: Date) {
-        current = date
+    init(_ start: Date) {
+        self.current = start
     }
 
     func now() -> Date {
-        lock.lock()
-        defer { lock.unlock() }
-        return current
+        lock.withLock { current }
     }
 
-    func advance(by seconds: TimeInterval) {
-        lock.lock()
-        defer { lock.unlock() }
-        current = current.addingTimeInterval(seconds)
+    func advance(by interval: TimeInterval) {
+        lock.withLock { current = current.addingTimeInterval(interval) }
     }
 }

@@ -31,12 +31,14 @@ public struct AppEnvironment: Sendable {
     public static func makeMock(
         now: Date = MockRepositories.defaultNow,
         window: ReminderWindow = MockRepositories.defaultWindow,
-        includeDuplicateFixture: Bool = false
+        includeDuplicateFixture: Bool = false,
+        seedCorruptRow: Bool = false
     ) -> AppEnvironment {
         let mocks = MockRepositories(
             now: now,
             window: window,
-            includeDuplicateFixture: includeDuplicateFixture
+            includeDuplicateFixture: includeDuplicateFixture,
+            seedCorruptRow: seedCorruptRow
         )
         return AppEnvironment(
             contacts: mocks.contacts,
@@ -79,14 +81,18 @@ public struct AppRuntime: Sendable {
 
     /// The frozen mock fixture is reserved for previews and explicit DEBUG
     /// launch arguments. Production launch always uses `makeProduction`.
-    public static func makeMock(includeDuplicateFixture: Bool = false) -> AppRuntime {
+    public static func makeMock(
+        includeDuplicateFixture: Bool = false,
+        seedCorruptRow: Bool = false
+    ) -> AppRuntime {
         let now = MockRepositories.defaultNow
         let window = MockRepositories.defaultWindow
         return AppRuntime(
             environment: .makeMock(
                 now: now,
                 window: window,
-                includeDuplicateFixture: includeDuplicateFixture
+                includeDuplicateFixture: includeDuplicateFixture,
+                seedCorruptRow: seedCorruptRow
             ),
             window: window,
             userCalendar: calendar(for: .current),

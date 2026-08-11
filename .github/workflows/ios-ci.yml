@@ -24,8 +24,12 @@ env:
   # `OS=latest` alone doesn't pick a device — xcodebuild needs a name to
   # disambiguate. iPhone 17 Pro is the project's pinned test device and
   # resolves to the image's latest installed iOS runtime. Keep this device
-  # pin aligned with AGENTS.md.
-  SIMULATOR: "platform=iOS Simulator,name=iPhone 17 Pro,OS=latest"
+  # pin aligned with AGENTS.md. Single source of truth: the unit-tests job's
+  # `-destination` and the accessibility-audit job's
+  # scripts/prepare-audit-simulator.sh argument are both built from this
+  # name, so a future rename can't split the two jobs onto different
+  # devices.
+  SIMULATOR_NAME: "iPhone 17 Pro"
   SCHEME: Regards
 
 jobs:
@@ -134,9 +138,10 @@ jobs:
           xcodebuild \
             -project Regards.xcodeproj \
             -scheme "$SCHEME" \
-            -destination "$SIMULATOR" \
+            -destination "platform=iOS Simulator,name=$SIMULATOR_NAME,OS=latest" \
             -configuration Debug \
             -only-testing:RegardsTests \
+            -skip-testing:RegardsTests/ContactsSourceStressTests \
             -resultBundlePath build/RegardsTests.xcresult \
             -enableCodeCoverage YES \
             -onlyUsePackageVersionsFromResolvedFile \
@@ -164,6 +169,23 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: macos-latest
     needs: build
+    # Derived, not guessed, from the pieces that are actually verifiable
+    # (nobody has a full-job wall-clock measurement to cite): run
+    # 31334462438's `xcodebuild test` step for all 29 accessibility tests
+    # measured 18m47s (~19 min) on its diagnosed rerun. This job also pays
+    # checkout + setup-xcode, up to 3 downloadPlatform attempts (15s backoff
+    # each), and the boot step's own 10-min allowance below -- 30 min has no
+    # headroom once those are added on top of the ~19-min test step, and
+    # 45 min covers that math with only a flat margin. But audit-stress.yml's
+    # own header documents a 2.1x spread on the same runner/test/scheme
+    # combination -- 23, 23, 29, 33, 38, and 49 minutes across six
+    # consecutive full-workflow runs of the 5x sweep -- and this job's
+    # single run shares that variance source (the same macos-latest image,
+    # the same xcodebuild/xcbeautify pipeline). 60 min keeps the 45-min
+    # budget's headroom intact even at the high end of that documented
+    # spread. Bounds the 2026-08-08-class hang at 8adeb0d instead of letting
+    # it run out the default 6-hour job limit.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
@@ -187,6 +209,15 @@ jobs:
           done
           echo "::error::xcodebuild -downloadPlatform iOS failed after 3 attempts"
           exit 1
+      - name: Boot accessibility simulator
+        # Resolves the pinned device to one UDID, boots it, and publishes
+        # SIMULATOR_UDID so the test step below pins its -destination to that
+        # exact device instead of re-resolving name=...,OS=latest. See
+        # scripts/prepare-audit-simulator.sh's header for what this does and
+        # does not address — it does not suppress the Apple Intelligence
+        # banner itself; no such toggle exists.
+        timeout-minutes: 10
+        run: scripts/prepare-audit-simulator.sh "$SIMULATOR_NAME"
       - name: Run RegardsAccessibilityTests
         working-directory: ios
         run: |
@@ -194,7 +225,7 @@ jobs:
           xcodebuild \
             -project Regards.xcodeproj \
             -scheme "$SCHEME" \
-            -destination "$SIMULATOR" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -configuration Debug \
             -only-testing:RegardsAccessibilityTests \
             -resultBundlePath build/RegardsAccessibilityTests.xcresult \

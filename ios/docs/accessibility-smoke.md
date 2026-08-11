@@ -51,6 +51,10 @@ Apply this checklist to every screen changed by the pull request:
       out; icons remain visible.
 - [ ] Priority indicators (inner-circle ring, overdue state) are still
       distinguishable without color.
+- [ ] All Contacts only, when a corrupt row is reachable: the corruption
+      banner reads as one sentence ("N contact(s) couldn't be read and
+      needs/need attention.") with no separate icon announcement, and
+      VoiceOver can still reach a healthy row below it.
 
 ## Reporting
 

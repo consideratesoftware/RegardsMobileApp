@@ -101,7 +101,7 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Launch failure | TF-02 / PR20 | Triggered by a production database-open failure; audits `launch.failure` and verifies “Try Again” recovers into onboarding. |
 | Overdue (landing after splash) | PR3 / TF-01 | Default tab after splash; native large title and iOS 26 route-control glass. |
 | Upcoming | PR3 / TF-01 | Native large title and modern empty state. |
-| All Contacts | PR3 / TF-01 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. |
+| All Contacts | PR3 / TF-01; corruption banner TF-03 / PR21 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. R50: when `fetchAllWithDiagnostics()` reports one or more undecodable rows, a conditional banner (`contacts.corruption-banner`, `.accessibilityElement(children: .combine)`, icon `.accessibilityHidden(true)`) renders above the list with a combined label equal to the visible "N contact(s) couldn't be read and need attention." message. Label composition (including pluralization) is covered by the plain-unit `AllContactsCorruptionAnnouncementTests`/`AllContactsViewModelTests.corruptionMessagePluralizesForMultipleRows`; the banner's real on-screen accessibility tree — reachable via the `REGARDS_UI_TEST_SEED_CORRUPT_ROW` launch-environment fixture — is proven by the XCUITest `ScreensAccessibilityTests.testContactsCorruptionBannerPassesAudit`, which runs where assistive technology is genuinely active — an in-process unit-level UIKit tree walk can't reproduce that on headless CI, so this PR dropped the earlier in-process version of this test rather than keep a check that only passed locally. Manual VoiceOver smoke for this state is outstanding — see `accessibility-smoke.md`. |
 | Settings | PR3 | |
 | Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
 | Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
@@ -120,11 +120,40 @@ Intelligence** notification can overlay the simulator during an audit. Run
 banner; its xcresult screenshot and failure attachment identified the targeted
 element inside the iOS notification rather than the Regards hierarchy.
 
+A second instance recurred on the accessibility-audit job in run `31346143276`,
+flagging the same banner as "Potentially inaccessible text" inside
+`LaunchAccessibilityTests.testProductionOpenFailurePassesAuditAndRetryRecovers()`.
+Both artifacts were inspected, matching the first instance's proof bar: the
+xcresult's failure identified the targeted element inside the iOS
+notification, and `.claude/a11y-failure-screenshot.png` shows the banner
+overlaying the app. A rerun on the identical commit `c873c648` passed with
+every job green, matching the first instance and confirming runner noise
+rather than a product regression.
+
 Classify a future finding as system UI only when the failed xcresult identifies
 the targeted element inside an operating-system banner or hierarchy and the
 screenshot shows that overlay. Inspect both artifacts and rerun the exact
 failed job. Without both proofs, or when an app-owned failure repeats under
 §17, treat it as a product finding.
+
+Both audit workflows (`ios-ci.yml`'s accessibility-audit job and
+`audit-stress.yml`'s nightly 5× sweep) run `scripts/prepare-audit-simulator.sh`
+before testing. `macos-latest` jobs are fresh ephemeral VMs, so there is no
+stale simulator state to clean between runs; what the script does instead is
+resolve the pinned device to one exact UDID and pin every subsequent
+`xcodebuild -destination` to it, normalize the status bar so a real runner
+glyph can't become its own finding, and bound the boot with a timeout. None of
+that suppresses the Apple Intelligence notification itself: what was checked
+is `simctl help` for every relevant subcommand and Apple's `defaults`
+documentation, and no CoreSimulator or `defaults` knob that disables the
+notification turned up there. So this is not a guarantee against the
+intrusion class above. In `audit-stress.yml` specifically, the boot step also
+adds an idle gap between the simulator finishing boot and the first test
+actually executing (the build-for-testing step runs in between) — one more
+timing variable for whether the notification's delivery window lines up with
+a test run, not a mitigation for it. If a similar finding appears, the
+response is the same rerun-and-triage procedure this section already
+describes.
 
 **Second precedent, different proof shape (TF-04, PR22).**
 `ScreensAccessibilityTests.testLogOtherChannelPickerPassesAudit` hits
