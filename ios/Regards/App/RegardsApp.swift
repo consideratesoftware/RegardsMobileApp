@@ -381,9 +381,11 @@ struct RegardsTabRoot: View {
         NavigationStack(path: $navigation.overduePath) {
             OverdueScreen(
                 viewModel: overdueVM,
+                accessibilityEffects: .live,
                 upcomingCount: upcomingVM.totalCount,
                 onTapContact: { contactId in navigation.overduePath.append(contactId) },
-                onSwitchToUpcoming: { navigation.selected = .upcoming }
+                onSwitchToUpcoming: { navigation.selected = .upcoming },
+                rowActionAnnouncer: RowActionAnnouncer()
             )
             .navigationDestination(for: UUID.self) { contactId in
                 contactDetail(for: contactId)
@@ -396,9 +398,11 @@ struct RegardsTabRoot: View {
         NavigationStack(path: $navigation.upcomingPath) {
             UpcomingScreen(
                 viewModel: upcomingVM,
+                accessibilityEffects: .live,
                 overdueCount: overdueVM.overdueCount,
                 onTapContact: { contactId in navigation.upcomingPath.append(contactId) },
-                onSwitchToOverdue: { navigation.selected = .overdue }
+                onSwitchToOverdue: { navigation.selected = .overdue },
+                rowActionAnnouncer: RowActionAnnouncer()
             )
             .navigationDestination(for: UUID.self) { contactId in
                 contactDetail(for: contactId)

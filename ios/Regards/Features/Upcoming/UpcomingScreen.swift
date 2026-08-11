@@ -7,17 +7,20 @@ public struct UpcomingScreen: View {
     // property — see `RowActionAnnouncer`'s doc comment for why.
     @State private var rowActionAnnouncer: RowActionAnnouncer
     @AccessibilityFocusState private var isSubtitleFocused: Bool
-    var accessibilityEffects = RowActionAccessibilityEffects.live
+    // No default — see `OverdueScreen`'s identical property for why.
+    var accessibilityEffects: RowActionAccessibilityEffects
     private let overdueCount: Int
     private let onTapContact: (UUID) -> Void
     private let onSwitchToOverdue: () -> Void
 
     public init(viewModel: UpcomingViewModel,
+                accessibilityEffects: RowActionAccessibilityEffects,
                 overdueCount: Int = 0,
                 onTapContact: @escaping (UUID) -> Void = { _ in },
                 onSwitchToOverdue: @escaping () -> Void = {},
-                rowActionAnnouncer: RowActionAnnouncer = RowActionAnnouncer()) {
+                rowActionAnnouncer: RowActionAnnouncer) {
         self.viewModel = viewModel
+        self.accessibilityEffects = accessibilityEffects
         self.overdueCount = overdueCount
         self.onTapContact = onTapContact
         self.onSwitchToOverdue = onSwitchToOverdue

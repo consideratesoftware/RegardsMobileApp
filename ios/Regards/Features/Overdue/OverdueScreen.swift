@@ -11,17 +11,23 @@ public struct OverdueScreen: View {
     // property — see `RowActionAnnouncer`'s doc comment for why.
     @State private var rowActionAnnouncer: RowActionAnnouncer
     @AccessibilityFocusState private var isSubtitleFocused: Bool
-    var accessibilityEffects = RowActionAccessibilityEffects.live
+    // No default: a missed injection silently falling back to `.live` here
+    // is exactly the class of bug that shipped unannounced/unfocused row
+    // actions to device — every construction site must say which effects it
+    // means, including production's own factory.
+    var accessibilityEffects: RowActionAccessibilityEffects
     private let upcomingCount: Int
     private let onTapContact: (UUID) -> Void
     private let onSwitchToUpcoming: () -> Void
 
     public init(viewModel: OverdueViewModel,
+                accessibilityEffects: RowActionAccessibilityEffects,
                 upcomingCount: Int = 7,
                 onTapContact: @escaping (UUID) -> Void = { _ in },
                 onSwitchToUpcoming: @escaping () -> Void = {},
-                rowActionAnnouncer: RowActionAnnouncer = RowActionAnnouncer()) {
+                rowActionAnnouncer: RowActionAnnouncer) {
         self.viewModel = viewModel
+        self.accessibilityEffects = accessibilityEffects
         self.upcomingCount = upcomingCount
         self.onTapContact = onTapContact
         self.onSwitchToUpcoming = onSwitchToUpcoming

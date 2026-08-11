@@ -78,9 +78,14 @@ struct RowActionAccessibilityEffectsTests {
 
     /// Mirrors `OnboardingAccessibilityEffectsTests.newerStatusCancelsStaleEffects`:
     /// a second `fire` call before the first's paused sequence resumes past
-    /// its first yield invalidates the first's still-pending announcement
-    /// and focus — only the later call's effects land.
-    @Test("Two fire calls in quick succession: only the later one's announce and focus land")
+    /// its first yield invalidates the first's still-pending focus move and
+    /// announcement — only the later call's effects land. Order matters
+    /// here: `fire` moves focus *before* announcing (see its doc comment for
+    /// why — a focus change flushes VoiceOver's speech queue, so announcing
+    /// first would let the later focus move cut the announcement off), so
+    /// the winning call's `focus`/`didFocus` land on the *second* resume,
+    /// not the third, and its `announce` lands on the third.
+    @Test("Two fire calls in quick succession: only the later one's focus and announce land")
     func staleFireEffectsAreDropped() async {
         let recorder = RowActionEffectsRecorder()
         let suspension = RowActionEffectsSuspension()
@@ -102,27 +107,29 @@ struct RowActionAccessibilityEffectsTests {
         #expect(await Self.eventually { suspension.arrivalCount == 2 })
 
         // Resume the first (stale) call's first yield: its generation check
-        // now fails, so it returns without announcing or focusing.
+        // now fails, so it returns without ever calling `focus()` or
+        // `announce`.
         suspension.resumeNext()
         await Task.yield()
-        #expect(recorder.announcements.isEmpty)
+        #expect(recorder.focusCalls == 0)
         #expect(recorder.focusAssignments == 0)
+        #expect(recorder.announcements.isEmpty)
 
         // Resume the second (current) call's first yield: its generation
-        // still matches, so it announces, then yields again before focusing.
+        // still matches, so focus lands now, then it yields again before
+        // announcing.
         suspension.resumeNext()
         #expect(await Self.eventually { suspension.arrivalCount == 3 })
-        #expect(recorder.announcements == ["Snoozed Han Solo 1 week"])
-        #expect(recorder.focusAssignments == 0)
-
-        // Resume its second yield: focus lands.
-        suspension.resumeNext()
-        #expect(await Self.eventually { recorder.focusAssignments == 1 })
-        #expect(recorder.announcements == ["Snoozed Han Solo 1 week"])
-        // Only the winning call's `focus` closure ever runs — the stale
-        // call's generation check fails before it reaches `focus()` at all,
-        // not just before `didFocus()`.
         #expect(recorder.focusCalls == 1)
+        #expect(recorder.focusAssignments == 1)
+        #expect(recorder.announcements.isEmpty)
+
+        // Resume its second yield: the announcement lands last, with
+        // nothing after it in the sequence to flush it.
+        suspension.resumeNext()
+        #expect(await Self.eventually { recorder.announcements == ["Snoozed Han Solo 1 week"] })
+        #expect(recorder.focusCalls == 1)
+        #expect(recorder.focusAssignments == 1)
     }
 
     // MARK: - Screen wiring smoke tests
@@ -160,7 +167,11 @@ struct RowActionAccessibilityEffectsTests {
         #expect(viewModel.rows.count == 1)
 
         let announcer = RowActionAnnouncer()
-        let screen = OverdueScreen(viewModel: viewModel, rowActionAnnouncer: announcer)
+        let screen = OverdueScreen(
+            viewModel: viewModel,
+            accessibilityEffects: .live,
+            rowActionAnnouncer: announcer
+        )
         let host = UIHostingController(rootView: screen)
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = host
@@ -208,7 +219,11 @@ struct RowActionAccessibilityEffectsTests {
         #expect(viewModel.totalCount == 1)
 
         let announcer = RowActionAnnouncer()
-        let screen = UpcomingScreen(viewModel: viewModel, rowActionAnnouncer: announcer)
+        let screen = UpcomingScreen(
+            viewModel: viewModel,
+            accessibilityEffects: .live,
+            rowActionAnnouncer: announcer
+        )
         let host = UIHostingController(rootView: screen)
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = host

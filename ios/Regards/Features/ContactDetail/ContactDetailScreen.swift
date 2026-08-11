@@ -62,6 +62,13 @@ public struct ContactDetailScreen: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        // Without this, this many choices renders as an anchored popover on
+        // this device/OS rather than a bottom action sheet — and a popover
+        // presentation drops the Cancel row entirely (dismiss becomes
+        // tap-outside-only), which is how a real Cancel action disappeared
+        // from a screen that declares one. `.sheet` forces the standard
+        // iPhone action-sheet presentation regardless of size class.
+        .presentationCompactAdaptation(.sheet)
         .toolbar {
             if viewModel.contact != nil {
                 ToolbarItem(placement: .topBarTrailing) {
