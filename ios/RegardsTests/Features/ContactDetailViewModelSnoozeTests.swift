@@ -152,6 +152,41 @@ struct ContactDetailViewModelSnoozeTests {
         #expect(try await reminders.fetchPending(forContact: contact.id).isEmpty)
     }
 
+    /// The stale-cache bug this pins (staged review round 10, fixing what
+    /// round 7 shipped): `snooze()`'s `isActive` guard used to check
+    /// `self.contact` — the snapshot `load()` cached — instead of a fresh
+    /// read, so a contact archived *after* this screen's `load()` still
+    /// read as active from that stale snapshot and got a snooze written
+    /// anyway. `snoozeOnArchivedContactWritesNothing` above doesn't
+    /// discriminate a cached check from a fresh one — its contact is
+    /// already archived *before* `load()` even runs, so both a stale-cache
+    /// check and a fresh one see it as inactive. This test archives
+    /// strictly after `load()` completes, the one case a cached check gets
+    /// wrong and a fresh one gets right — mirroring
+    /// `OverdueViewModelSnoozeTests`, whose `snooze()` already re-fetches.
+    @Test("Snooze refuses a contact archived after load(), not just before it")
+    func snoozeRefusesContactArchivedAfterLoad() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+        #expect(viewModel.contact?.isActive == true) // genuinely active at load time
+
+        try await contacts.archive(id: contact.id, at: Self.now)
+
+        let succeeded = await viewModel.snooze()
+
+        #expect(succeeded == false)
+        #expect(try await reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
     /// The hosted-review blocker this pins: `logOther` originally never
     /// called `scheduler.caughtUp`, unlike `markCaughtUp` — both route
     /// through `InteractionLogging`, which moves `lastInteractedAt` and

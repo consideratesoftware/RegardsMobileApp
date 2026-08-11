@@ -220,9 +220,30 @@ public final class ContactDetailViewModel {
     /// would still land — a pending cadence row that no `fetchTracked()`
     /// screen (Overdue, Upcoming) will ever surface, orphaned until PR25
     /// gives the scheduler its own precondition.
+    ///
+    /// Re-fetches rather than checking the cached `self.contact` (staged
+    /// review round 10, fixing what round 7 shipped): `self.contact` is a
+    /// snapshot from the *last* `load()`, so checking it instead of a fresh
+    /// read left exactly the race this guard exists to close — a contact
+    /// archived after this screen's `load()` but before this tap still
+    /// read as active from the stale snapshot and got a snooze written
+    /// anyway. `OverdueViewModel.snooze` re-fetches for the identical
+    /// reason; this now matches it. A failed re-fetch is treated the same
+    /// as "inactive" — there's nothing else safe to do with an unreadable
+    /// precondition — but logged distinctly so it doesn't read as a silent
+    /// no-op.
     @discardableResult
     public func snooze() async -> Bool {
-        guard let contact, contact.isActive else { return false }
+        let freshContact: Contact?
+        do {
+            freshContact = try await contacts.fetch(id: contactId)
+        } catch {
+            Self.log.error(
+                "failed to verify \(self.contactId, privacy: .private) is active: \(error, privacy: .private)"
+            )
+            freshContact = nil
+        }
+        guard let freshContact, freshContact.isActive else { return false }
         do {
             try await scheduler.snooze(contactId: contactId)
             return true

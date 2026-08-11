@@ -36,7 +36,17 @@ public final class OverdueViewModel {
     private let clock: () -> Date
     private let calendar: Calendar
     private var loadGeneration = 0
-    private var observationTask: Task<Void, Never>?
+    // `ObservationSubscriptionToken`, not a plain `Task<Void, Never>?`
+    // stored property (staged review round 10 coverage gap; see that
+    // type's own doc comment for the full reasoning): a `deinit` directly
+    // on this `@MainActor` class can't cancel a plain stored property —
+    // `deinit` is itself nonisolated in this language mode, and
+    // `nonisolated` cannot be applied to a mutable stored property to
+    // bridge that gap. Delegating ownership to this ordinary reference
+    // type's own `deinit` ends the subscription deterministically when
+    // this view model deallocates, instead of only on the underlying
+    // stream's next emission (which may never come).
+    private let observationTaskToken = ObservationSubscriptionToken()
 
     /// `calendar` is injected so tests (and future multi-timezone logic)
     /// can pin the day math to a fixed TZ. Production uses `.current`
@@ -84,7 +94,7 @@ public final class OverdueViewModel {
     /// would keep this long-lived subscription alive for as long as the
     /// repository keeps emitting, defeating `[weak self]` entirely.
     private func startObservingIfNeeded() async {
-        guard observationTask == nil else { return }
+        guard observationTaskToken.task == nil else { return }
         // A placeholder, set synchronously before the first suspension
         // below: the guard above and this assignment run back-to-back with
         // no `await` between them, so no second concurrent `load()` can slip
@@ -92,11 +102,11 @@ public final class OverdueViewModel {
         // assignment waited for `observeTracked()` to return. Without this,
         // two `load()` calls racing at launch (or a fast pull-to-refresh
         // right after) could both see `nil`, both subscribe, and leave one
-        // subscription's `Task` orphaned in `observationTask`'s overwrite —
-        // never cancelled, running for the screen's entire lifetime.
-        observationTask = Task {}
+        // subscription's `Task` orphaned in the token's overwrite — never
+        // cancelled, running for the screen's entire lifetime.
+        observationTaskToken.task = Task {}
         let updates = await contacts.observeTracked()
-        observationTask = Task { [weak self] in
+        observationTaskToken.task = Task { [weak self] in
             for await _ in updates {
                 if Task.isCancelled { return }
                 guard let self else { return }
@@ -104,14 +114,14 @@ public final class OverdueViewModel {
             }
             // The stream ended on its own — GRDB's `onError` finished it, or
             // the mock's subscription was torn down — without this Task
-            // itself being cancelled. Leaving `observationTask` set would
-            // make every future `load()`'s `guard observationTask == nil`
-            // find a non-nil but permanently-dead Task and skip
-            // re-subscribing forever: live cross-screen updates gone for the
-            // rest of the process, with nothing surfacing that anywhere.
-            // Clearing it here lets the next `load()` open a fresh one.
+            // itself being cancelled. Leaving the token's task set would
+            // make every future `load()`'s `guard ... == nil` find a
+            // non-nil but permanently-dead Task and skip re-subscribing
+            // forever: live cross-screen updates gone for the rest of the
+            // process, with nothing surfacing that anywhere. Clearing it
+            // here lets the next `load()` open a fresh one.
             guard let self, !Task.isCancelled else { return }
-            self.observationTask = nil
+            self.observationTaskToken.task = nil
         }
     }
 
@@ -350,22 +360,15 @@ public final class OverdueViewModel {
     /// unchanged, so the row "returns" on its own the next time this runs
     /// after the snoozed date passes.
     ///
-    /// The raw persisted `scheduledFor`, not a window-resolved one (nit,
-    /// staged review round 9): `UpcomingViewModel.buildRows` folds the same
-    /// value into `engine.nextAllowedSlot(...)` instead, so the two screens
-    /// can compute a different instant for "when this snooze's suppression
-    /// actually lifts" whenever the raw timestamp falls outside the
-    /// window's allowed hours/days. Not a regression this PR introduced so
-    /// much as the pre-existing Overdue/Upcoming split showing up in a new
-    /// place: Overdue has never been window-aware for its own cadence
-    /// math either (see `init`'s `calendar` doc comment — it reports
-    /// elapsed-day *perception*, deliberately not the scheduling clock),
-    /// while Upcoming has always resolved every date through the engine
-    /// because it promises an exact, window-legal "next reminder" time.
-    /// Unifying them would mean making one of those two properties untrue;
-    /// leaving them split is the correct call until TF-07 gives
-    /// `SchedulingPass` a single write path both screens read from instead
-    /// of each re-deriving it.
+    /// The raw persisted `scheduledFor`, not a window-resolved one:
+    /// `UpcomingViewModel.buildRows` folds the same value into
+    /// `engine.nextAllowedSlot(...)` instead, so the two screens can
+    /// disagree on the exact instant a snooze lapses whenever the raw
+    /// timestamp falls outside the window's allowed hours/days — tracked,
+    /// not silently accepted, as R57 (ARCHITECTURE.md §19): real, deferred
+    /// to TF-07/PR25's joined observation rather than fixed here, since a
+    /// fix now would be rewritten the moment that lands. Delete R57 when
+    /// it does; do not let this comment quietly outlive it.
     static func makeOverdueRow(for contact: Contact,
                                now: Date,
                                calendar: Calendar,

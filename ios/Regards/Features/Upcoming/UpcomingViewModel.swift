@@ -76,7 +76,12 @@ public final class UpcomingViewModel {
     private let window: ReminderWindow
     private let clock: () -> Date
     private var loadGeneration = 0
-    private var observationTask: Task<Void, Never>?
+    // `ObservationSubscriptionToken`, not a plain `Task<Void, Never>?`
+    // stored property — see `OverdueViewModel`'s matching property and
+    // that type's own doc comment for the full reasoning (staged review
+    // round 10 coverage gap; a `deinit` directly on this `@MainActor`
+    // class can't cancel a plain stored property in this language mode).
+    private let observationTaskToken = ObservationSubscriptionToken()
 
     /// `reminders`, `scheduler`, and `window` are deliberately undefaulted.
     ///
@@ -126,7 +131,7 @@ public final class UpcomingViewModel {
     /// emission, not just once before the loop starts, since capturing it
     /// non-weakly would keep this subscription alive indefinitely.
     private func startObservingIfNeeded() async {
-        guard observationTask == nil else { return }
+        guard observationTaskToken.task == nil else { return }
         // A placeholder, set synchronously before the first suspension
         // below: the guard above and this assignment run back-to-back with
         // no `await` between them, so no second concurrent `load()` can slip
@@ -134,11 +139,11 @@ public final class UpcomingViewModel {
         // assignment waited for `observeTracked()` to return. Without this,
         // two `load()` calls racing at launch (or a fast pull-to-refresh
         // right after) could both see `nil`, both subscribe, and leave one
-        // subscription's `Task` orphaned in `observationTask`'s overwrite —
-        // never cancelled, running for the screen's entire lifetime.
-        observationTask = Task {}
+        // subscription's `Task` orphaned in the token's overwrite — never
+        // cancelled, running for the screen's entire lifetime.
+        observationTaskToken.task = Task {}
         let updates = await contacts.observeTracked()
-        observationTask = Task { [weak self] in
+        observationTaskToken.task = Task { [weak self] in
             for await _ in updates {
                 if Task.isCancelled { return }
                 guard let self else { return }
@@ -146,9 +151,9 @@ public final class UpcomingViewModel {
             }
             // See `OverdueViewModel.startObservingIfNeeded`'s sibling comment:
             // the stream ending without this Task being cancelled must clear
-            // `observationTask` too, or `load()` never re-subscribes.
+            // the token's task too, or `load()` never re-subscribes.
             guard let self, !Task.isCancelled else { return }
-            self.observationTask = nil
+            self.observationTaskToken.task = nil
         }
     }
 

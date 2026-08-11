@@ -352,7 +352,14 @@ extension ContactDetailScreen {
 
     var statusValue: String {
         let (days, overdue) = viewModel.overdueSummary
-        return overdue ? "\(days) days overdue" : "on track"
+        guard overdue else { return "on track" }
+        // Singular "1 day overdue" (nit, staged review round 9's own
+        // review, fixed round 10): newly reachable for a never-contacted
+        // contact exactly 1 day past its cadence, since decision #29's
+        // `?? createdAt` anchor (R8) made `days == 1` a real value here for
+        // the first time — same `N == 1 ? singular : plural` pattern as
+        // `Contact.relativeDescription`'s week/month/year branches.
+        return days == 1 ? "1 day overdue" : "\(days) days overdue"
     }
 }
 

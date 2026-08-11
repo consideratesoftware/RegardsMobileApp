@@ -66,6 +66,27 @@ struct InteractionLoggingTests {
         #expect(logs[0].channel == .email)
     }
 
+    /// `Channel.allCases`-parametric (nit, staged review round 10):
+    /// `logOtherLogsChosenChannel` above proves the mechanism once, against
+    /// `.email` — this proves every channel `LogOtherChannelSheet` actually
+    /// offers a button for round-trips through the same write path, not
+    /// just the one the earlier test happened to pick.
+    @Test("Log other logs the exact channel picked, for every channel", arguments: Channel.allCases)
+    func logOtherLogsEveryChannel(channel: Channel) async throws {
+        let contact = Self.contact(preferredChannel: .whatsapp, lastInteractedAt: nil)
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+
+        let updated = try await logging.logOther(contactId: contact.id, channel: channel, at: Self.now)
+
+        #expect(updated.lastInteractedAt == Self.now)
+        let logs = await interactions.appendedLogs()
+        #expect(logs.count == 1)
+        #expect(logs[0].source == .manual)
+        #expect(logs[0].channel == channel)
+    }
+
     @Test("A later action moves lastInteractedAt forward")
     func markCaughtUpMovesLastInteractedAtForward() async throws {
         let earlier = Self.now.addingTimeInterval(-30 * 86_400)
