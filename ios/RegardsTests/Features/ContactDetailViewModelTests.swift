@@ -328,33 +328,4 @@ struct ContactDetailViewModelTests {
         #expect(sawFreshDate)
     }
 
-    /// The earlier version of this test made `load()` itself fail (via a
-    /// failing interaction fetch), so `viewModel.contact` was already `nil`
-    /// before the action ran — the assertion after the action compared `nil`
-    /// to `nil` and would pass no matter what `markCaughtUp()` did. This
-    /// version makes `load()` succeed and only the action's own write fail,
-    /// so there is a real prior state for the failed action to (correctly)
-    /// leave alone.
-    @Test("A failing action leaves the view model's previously loaded state untouched")
-    func failingActionLeavesStateUntouched() async throws {
-        let contact = Self.contact(lastInteractedAt: nil)
-        let contacts = StubContactRepository.failingUpsert([contact])
-        let viewModel = ContactDetailViewModel(
-            contactId: contact.id,
-            contacts: contacts,
-            interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
-            clock: { Self.now }
-        )
-        await viewModel.load()
-        #expect(viewModel.contact?.lastInteractedAt == nil) // a real, successfully loaded state
-
-        await viewModel.markCaughtUp()
-
-        // The write fails after a successful interaction log (documented on
-        // `InteractionLogging.record`), and `markCaughtUp()` only calls
-        // `load()` again on success — so the view model still shows the
-        // pre-action state, not a fabricated caught-up contact.
-        #expect(viewModel.contact?.lastInteractedAt == nil)
-    }
 }

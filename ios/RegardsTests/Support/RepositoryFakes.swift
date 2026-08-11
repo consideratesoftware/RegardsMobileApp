@@ -195,15 +195,26 @@ actor StubReminderRepository: ReminderRepository {
     /// through, so making the whole repository fail would fail the *restore*
     /// read too, not just the write under test.
     private let upsertFailure: RepositoryFakeFailure?
+    /// Independent of both `failure` and `upsertFailure`: lets a test make
+    /// only `updateState` fail — the call `SchedulingPass.caughtUp` makes.
+    /// `OverdueViewModel.markCaughtUp`/`UpcomingViewModel.markCaughtUp`/
+    /// `ContactDetailViewModel.markCaughtUp`/`logOther` all reload through
+    /// this same `reminders` reference after a failure, and Overdue's/
+    /// Upcoming's reload reads `fetchAllPending()` on it — `.failing()` would
+    /// break that reload too, masking whether it actually restores the true
+    /// state or just clears everything.
+    private let updateStateFailure: RepositoryFakeFailure?
 
     init(
         _ reminders: [ScheduledReminder] = [],
         failure: RepositoryFakeFailure? = nil,
-        upsertFailure: RepositoryFakeFailure? = nil
+        upsertFailure: RepositoryFakeFailure? = nil,
+        updateStateFailure: RepositoryFakeFailure? = nil
     ) {
         self.reminders = reminders
         self.failure = failure
         self.upsertFailure = upsertFailure
+        self.updateStateFailure = updateStateFailure
     }
 
     /// A repository whose every read throws.
@@ -214,6 +225,13 @@ actor StubReminderRepository: ReminderRepository {
     /// Reads succeed normally; only `upsert` fails.
     static func failingUpsert() -> StubReminderRepository {
         StubReminderRepository([], upsertFailure: RepositoryFakeFailure())
+    }
+
+    /// Reads and `upsert` succeed normally; only `updateState` fails — the
+    /// shape of "the caught-up write is the one that fails" (`SchedulingPass
+    /// .caughtUp` calls `updateState`, never `upsert` or a read).
+    static func failingUpdateState() -> StubReminderRepository {
+        StubReminderRepository([], updateStateFailure: RepositoryFakeFailure())
     }
 
     private func requireSuccess() throws {
@@ -251,6 +269,7 @@ actor StubReminderRepository: ReminderRepository {
 
     func updateState(id: UUID, state: ReminderState) async throws {
         try requireSuccess()
+        if let updateStateFailure { throw updateStateFailure }
         guard let index = reminders.firstIndex(where: { $0.id == id }) else { return }
         reminders[index].state = state
     }

@@ -132,6 +132,55 @@ struct UpcomingViewModelActionTests {
         #expect(viewModel.totalCount == 1)
     }
 
+    /// The three-write partial-failure shape `markCaughtUpFailureReloads`
+    /// above doesn't reach: that test fails `interactions.append` itself
+    /// (via `StubInteractionRepository.failing()`), so nothing persists at
+    /// all. Here `InteractionLogging`'s two writes both succeed and only the
+    /// later `scheduler.caughtUp` call throws. `.failingUpdateState()`, not
+    /// `.failing()`: `performLoad()`'s reload reads
+    /// `reminders.fetchAllPending()` through this same repository reference,
+    /// so a broader failure would break the reload this test means to
+    /// observe, not just the write under test. Reusing
+    /// `markCaughtUpRemovesRowsAndPersists`'s exact contact/window shape
+    /// (5-day horizon, default 7-day cadence, 10 days since last contact) so
+    /// the only variable is which write fails — the persisted result should
+    /// be identical either way.
+    @Test("A caught-up write that fails only at the scheduler step still reloads to the truly persisted state")
+    func markCaughtUpSchedulerFailureReloadsToPersistedState() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository.failingUpdateState()
+        let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            interactions: interactions,
+            window: window,
+            clock: { Self.now }
+        )
+        await viewModel.load()
+        #expect(viewModel.totalCount == 1)
+
+        await viewModel.markCaughtUp(contactId: contact.id)
+
+        // The first two writes truly persisted even though the scheduler
+        // call threw.
+        let logs = await interactions.appendedLogs()
+        #expect(logs.count == 1)
+        #expect(logs[0].source == .reminderCaughtUp)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == Self.now)
+
+        // `markCaughtUp` reloads unconditionally on both the success and
+        // failure paths (see its doc comment on the observeTracked-race
+        // fix) — the reload reflects the truly persisted state: freshly
+        // caught up, next cadence due at now + 7d, outside the 5-day
+        // horizon.
+        #expect(viewModel.totalCount == 0)
+    }
+
     @Test("A write on the same repository through a different reference is reflected live")
     func liveUpdateReflectsWriteFromAnotherReference() async throws {
         // A horizon *shorter* than the cadence, deliberately: with the

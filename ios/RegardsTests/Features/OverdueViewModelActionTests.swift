@@ -82,6 +82,45 @@ struct OverdueViewModelActionTests {
         #expect(viewModel.rows.map(\.contactId) == [contact.id])
     }
 
+    /// The three-write partial-failure shape `markCaughtUpFailureReloads`
+    /// above doesn't reach: that test fails `interactions.append` itself, so
+    /// nothing persists at all. Here `InteractionLogging`'s two writes both
+    /// succeed and only the later `scheduler.caughtUp` call throws.
+    /// `.failingUpdateState()`, not `.failing()`: `performLoad()`'s reload
+    /// reads `reminders.fetchAllPending()` through this same repository
+    /// reference, so a broader failure would break the reload this test
+    /// means to observe, not just the write under test. This is also a real
+    /// discriminator, not a trivially-true assertion: `markCaughtUp` removes
+    /// the row optimistically before either write runs, so if `performLoad()`
+    /// recomputed from a stale (pre-action) contacts snapshot instead of a
+    /// fresh fetch, this still-overdue contact would come right back — the
+    /// empty result below only holds if the reload genuinely picked up the
+    /// persisted `lastInteractedAt`.
+    @Test("A caught-up write that fails only at the scheduler step still reloads to the truly persisted state")
+    func markCaughtUpSchedulerFailureReloadsToPersistedState() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository.failingUpdateState()
+        let viewModel = Self.viewModel(contacts: contacts, interactions: interactions, reminders: reminders)
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        await viewModel.markCaughtUp(contactId: contact.id)
+
+        // The first two writes truly persisted even though the scheduler
+        // call threw.
+        let logs = await interactions.appendedLogs()
+        #expect(logs.count == 1)
+        #expect(logs[0].source == .reminderCaughtUp)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == Self.now)
+
+        // And the reload the catch block runs reflects that persisted
+        // state, not a stale re-add of the pre-action row.
+        #expect(viewModel.rows.isEmpty)
+    }
+
     @Test("A write on the same repository through a different reference is reflected live")
     func liveUpdateReflectsWriteFromAnotherReference() async throws {
         let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))

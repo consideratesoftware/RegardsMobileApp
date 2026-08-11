@@ -88,6 +88,17 @@ public final class ContactDetailViewModel {
     /// `SchedulingPass.caughtUp` once the log succeeds — see
     /// `OverdueViewModel.markCaughtUp`'s doc comment for why this is
     /// required so Overdue/Upcoming don't keep showing a stale snoozed date.
+    ///
+    /// This is now two writes, not one: `InteractionLogging` (which itself
+    /// appends the log, then upserts the contact) can succeed while the
+    /// later `scheduler.caughtUp` call throws. That leaves the interaction
+    /// row and `lastInteractedAt` genuinely persisted with the screen still
+    /// rendering pre-write state — worse than a clean failure, since
+    /// nothing here otherwise tells the user their action actually landed.
+    /// The catch block reloads unconditionally (not just on total failure)
+    /// so the view always ends up consistent with whatever combination of
+    /// the two writes actually persisted, mirroring why
+    /// `OverdueViewModel.markCaughtUp`'s catch reloads too.
     public func markCaughtUp() async {
         let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
         do {
@@ -98,6 +109,7 @@ public final class ContactDetailViewModel {
             Self.log.error(
                 "failed to mark caught up for \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )
+            await load()
         }
     }
 
@@ -111,6 +123,12 @@ public final class ContactDetailViewModel {
     /// contact logged through another channel would keep showing the stale
     /// snoozed date in Overdue/Upcoming (see `OverdueViewModel.markCaughtUp`'s
     /// doc comment).
+    ///
+    /// Same two-write reload rationale as `markCaughtUp`: the catch block
+    /// reloads unconditionally, not only when both writes fail, because
+    /// `InteractionLogging` can succeed and the later `scheduler.caughtUp`
+    /// call can still throw — leaving the log and `lastInteractedAt`
+    /// genuinely persisted while the screen keeps rendering pre-write state.
     public func logOther(channel: Channel) async {
         let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
         do {
@@ -121,6 +139,7 @@ public final class ContactDetailViewModel {
             Self.log.error(
                 "failed to log other channel for \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )
+            await load()
         }
     }
 
