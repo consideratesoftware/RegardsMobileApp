@@ -17,6 +17,29 @@ final class AppLaunchCoordinator {
         let makeRuntime: @Sendable () async throws -> AppRuntime
         let contactsSource: any ContactsSource
         let clock: @Sendable () -> Date
+        /// Round 11: persists `ContactsReconciler`'s archive-debounce state
+        /// across launches — see `MissingContactRefStore`'s doc comment for
+        /// why in-memory-only state (rounds 9–10) wasn't enough.
+        let missingContactRefStore: MissingContactRefStore
+
+        /// Explicit, not relying on the synthesized memberwise init to pick
+        /// up `missingContactRefStore`'s default: it defaults to
+        /// `.ephemeral()` (a throwaway temp-directory store) here so every
+        /// existing `Dependencies(makeRuntime:contactsSource:clock:)` call
+        /// site that doesn't care about cross-launch persistence keeps
+        /// compiling unchanged; `production()` below passes
+        /// `.applicationSupport()` explicitly.
+        init(
+            makeRuntime: @escaping @Sendable () async throws -> AppRuntime,
+            contactsSource: any ContactsSource,
+            clock: @escaping @Sendable () -> Date,
+            missingContactRefStore: MissingContactRefStore = .ephemeral()
+        ) {
+            self.makeRuntime = makeRuntime
+            self.contactsSource = contactsSource
+            self.clock = clock
+            self.missingContactRefStore = missingContactRefStore
+        }
     }
 
     private(set) var phase: Phase
@@ -26,9 +49,87 @@ final class AppLaunchCoordinator {
     private(set) var canContinueWithoutContacts = false
     private(set) var onboardingCompletionPending = false
 
-    @ObservationIgnored private let dependencies: Dependencies?
+    /// Backing storage for `reconciliationCount`/`reconciliationCoalesceCount`
+    /// below. Nested and `private` on purpose, unlike the file-split
+    /// properties further down: `AppLaunchCoordinator+Reconciliation.swift`
+    /// can only advance these counts through `recordReconciliationPass()` /
+    /// `recordReconciliationCoalesce()`, never assign them directly. Kept as
+    /// a plain (non-`@ObservationIgnored`) stored property so reads through
+    /// the computed properties below still register with `@Observable`
+    /// tracking — `RootView` depends on that to re-render `RegardsTabRoot`
+    /// with a fresh `reconciliationGeneration` after every pass.
+    private struct ReconciliationCounters {
+        var passes = 0
+        var coalesces = 0
+    }
+    private var reconciliationCounters = ReconciliationCounters()
+
+    /// Completed reconciliation passes (launch + foreground + store-change).
+    /// `AllContactsScreen` reloads when this changes (via `RootView` →
+    /// `RegardsTabRoot`'s `reconciliationGeneration`); tests also await a
+    /// specific pass deterministically instead of sleeping.
+    var reconciliationCount: Int { reconciliationCounters.passes }
+    /// Incremented each time a trigger arrived while a pass was already in
+    /// flight and coalesced into it instead of starting a concurrent one
+    /// (fix 9). Test-only signal, same role as `reconciliationCount`.
+    var reconciliationCoalesceCount: Int { reconciliationCounters.coalesces }
+
+    /// Called only from `AppLaunchCoordinator+Reconciliation.swift`.
+    func recordReconciliationPass() {
+        reconciliationCounters.passes += 1
+    }
+
+    /// Called only from `AppLaunchCoordinator+Reconciliation.swift`.
+    func recordReconciliationCoalesce() {
+        reconciliationCounters.coalesces += 1
+    }
+
+    /// Set by `beginObservingContactStoreChanges` when a `CNContactStoreDidChange`
+    /// notification arrives while `runtime` is `nil` (e.g. mid-`retry()`) — see
+    /// that method's guard. `continue`-ing past it there would drop the
+    /// notification for good; this flag lets `start()` replay it into exactly
+    /// one reconciliation pass once a runtime exists again, instead of the
+    /// change sitting unaddressed until some unrelated later trigger.
+    @ObservationIgnored var pendingStoreChangeReplay = false
+
+    // Not `private`: AppLaunchCoordinator+Reconciliation.swift reads/writes
+    // these across the file split (see that file's header comment). Still
+    // `internal`, i.e. module-scoped like everything else in this app
+    // target — never exposed outside `AppLaunchCoordinator` itself in
+    // practice, just not enforced by the compiler across the split. Unlike
+    // the counters above, nothing outside the coordinator reads these, so
+    // there's no external write-protection guarantee to restore.
+    @ObservationIgnored let dependencies: Dependencies?
     @ObservationIgnored private var didStart = false
     @ObservationIgnored private var onboardingActionGeneration = 0
+    @ObservationIgnored var changeObservationTask: Task<Void, Never>?
+    /// Non-nil while a reconciliation pass is in flight — the "isReconciling"
+    /// gate. A concurrent trigger joins this task instead of starting a
+    /// second pass.
+    @ObservationIgnored var reconciliationTask: Task<Void, Never>?
+    /// Set by a trigger that arrived while `reconciliationTask` was already
+    /// running; the in-flight loop checks this after each pass and runs
+    /// exactly one more before clearing `reconciliationTask`, coalescing any
+    /// number of overlapping triggers into at most one extra pass.
+    @ObservationIgnored var reconciliationPending = false
+    /// `ContactsReconciler.Result.missingRefs` from the most recent pass —
+    /// fed back in as the next call's `previouslyMissingRefs:` so a ref
+    /// still missing on a later `.authorized` pass, at least
+    /// `ContactsReconciler.archiveDebounceFloor` after it was first seen
+    /// missing, archives on that pass (round 9 + round 10 time floor,
+    /// ARCHITECTURE.md §7/§21). `ContactsReconciler` itself is reconstructed
+    /// fresh every pass and holds no state between calls; this is that
+    /// state, mirrored to `Dependencies.missingContactRefStore` (round 11)
+    /// so it survives a relaunch — in-memory-only meant the required two
+    /// passes almost never both landed inside one process lifetime, so a
+    /// genuine deletion effectively never archived. Loaded once in
+    /// `start()`, unconditionally overwritten *and re-persisted* after
+    /// every pass (see `AppLaunchCoordinator+Reconciliation.swift`),
+    /// including a `.limited` or failed one — those return an empty
+    /// `missingRefs` (the sweep never runs), which resets this and means
+    /// the sequence has to restart cleanly rather than treat a `.limited`
+    /// interruption as still "consecutive".
+    @ObservationIgnored var previouslyMissingContactRefs: [String: Date] = [:]
 
     init(dependencies: Dependencies) {
         self.phase = .loading
@@ -43,11 +144,18 @@ final class AppLaunchCoordinator {
     }
 #endif
 
-    private init(mockRuntime: AppRuntime) {
+    /// Not `private`: `AppLaunchCoordinator+DebugLaunch.swift` calls this
+    /// across the file split (see that file's header comment).
+    init(mockRuntime: AppRuntime) {
         self.phase = .ready
         self.runtime = mockRuntime
         self.dependencies = nil
         self.didStart = true
+    }
+
+    deinit {
+        changeObservationTask?.cancel()
+        reconciliationTask?.cancel()
     }
 
     static func production() -> AppLaunchCoordinator {
@@ -60,74 +168,32 @@ final class AppLaunchCoordinator {
                     return try await AppRuntime.makeProduction(environment: environment)
                 },
                 contactsSource: CNContactsSource(),
-                clock: { Date() }
+                clock: { Date() },
+                // `try?` + `.ephemeral()` fallback, not `production()`
+                // itself becoming `throws`: Application Support being
+                // unavailable is exceptionally rare, and this state is
+                // disposable debounce plumbing (see `MissingContactRefStore`'s
+                // doc comment) — degrading to "doesn't persist across
+                // launches this session" is far better than the app
+                // refusing to launch over it.
+                missingContactRefStore: (try? MissingContactRefStore.applicationSupport())
+                    ?? MissingContactRefStore.ephemeral()
             )
         )
     }
 
-#if DEBUG
-    static func configuredForCurrentProcess() -> AppLaunchCoordinator {
-        let environment = ProcessInfo.processInfo.environment
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("--regards-mock-runtime") {
-            return AppLaunchCoordinator(
-                mockRuntime: .makeMock(
-                    includeDuplicateFixture:
-                        environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1"
-                )
-            )
-        }
-        if arguments.contains("--regards-launch-fails-once") {
-            let runtimeFactory = FirstLaunchUITestRuntimeFactory()
-            return AppLaunchCoordinator(
-                dependencies: Dependencies(
-                    makeRuntime: { try await runtimeFactory.makeRuntime() },
-                    contactsSource: FirstLaunchUITestContactsSource(outcome: .authorized),
-                    clock: { Date(timeIntervalSince1970: 1_785_600_000) }
-                )
-            )
-        }
-        if arguments.contains("--regards-first-launch-runtime") {
-            let contactsOutcome = FirstLaunchUITestContactsOutcome(
-                rawValue: environment["REGARDS_UI_TEST_CONTACTS_OUTCOME"] ?? "authorized"
-            ) ?? .authorized
-            return AppLaunchCoordinator(
-                dependencies: Dependencies(
-                    makeRuntime: {
-                        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
-                        return try await AppRuntime.makeProduction(environment: environment)
-                    },
-                    contactsSource: FirstLaunchUITestContactsSource(outcome: contactsOutcome),
-                    clock: { Date(timeIntervalSince1970: 1_785_600_000) }
-                )
-            )
-        }
-        if arguments.contains("--regards-ready-without-runtime") {
-            return AppLaunchCoordinator(
-                dependencies: Dependencies(
-                    makeRuntime: {
-                        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
-                        return try await AppRuntime.makeProduction(environment: environment)
-                    },
-                    contactsSource: FirstLaunchUITestContactsSource(outcome: .authorized),
-                    clock: { Date(timeIntervalSince1970: 1_785_600_000) }
-                ),
-                testingPhase: .ready
-            )
-        }
-        return production()
-    }
-#else
-    static func configuredForCurrentProcess() -> AppLaunchCoordinator {
-        production()
-    }
-#endif
+    // `configuredForCurrentProcess()` (the DEBUG launch-argument factory)
+    // lives in AppLaunchCoordinator+DebugLaunch.swift.
 
     func start() async {
         guard !didStart, let dependencies else { return }
         didStart = true
         phase = .loading
         statusMessage = nil
+        // Round 11: load before the first reconcile pass below, so it has
+        // whatever the *previous* process launch last persisted, not an
+        // empty map every single time.
+        previouslyMissingContactRefs = dependencies.missingContactRefStore.load()
 
         do {
             let runtime = try await dependencies.makeRuntime()
@@ -146,8 +212,21 @@ final class AppLaunchCoordinator {
             }
 
             self.runtime = runtime
+            // A store-change notification arriving while `runtime` was `nil`
+            // (see `pendingStoreChangeReplay`'s doc comment) gets exactly one
+            // catch-up pass now that there's a runtime to run it against.
+            await replayPendingStoreChangeIfNeeded(runtime: runtime, dependencies: dependencies)
             guard profile.onboardingCompletedAt == nil else {
+                // Subscribe *before* the launch reconcile below, not after:
+                // that reconcile can run long (up to a full Contacts
+                // enumeration, moved off the cooperative pool by R25), and a
+                // CNContactStoreDidChange landing during it must be caught by
+                // the listener rather than lost until the next foreground.
+                // Flipping `phase` first still means the tab root appears
+                // immediately — neither of these delays that.
                 phase = .ready
+                beginObservingContactStoreChanges(dependencies: dependencies)
+                await reconcileNow(runtime: runtime, dependencies: dependencies)
                 return
             }
 
@@ -194,6 +273,7 @@ final class AppLaunchCoordinator {
         onboardingCompletionPending = false
         defer { isImporting = false }
 
+        let result: ContactsImporter.Result
         do {
             let status = try await dependencies.contactsSource.requestAccess()
             guard status == .authorized || status == .limited else {
@@ -207,8 +287,13 @@ final class AppLaunchCoordinator {
                 repo: runtime.environment.contacts,
                 clock: dependencies.clock
             )
-            _ = try await importer.runFirstLaunchImport()
+            result = try await importer.runFirstLaunchImport()
         } catch {
+            statusMessage = Self.importFailureMessage
+            canContinueWithoutContacts = true
+            return
+        }
+        guard !Self.importEffectivelyFailed(result) else {
             statusMessage = Self.importFailureMessage
             canContinueWithoutContacts = true
             return
@@ -244,6 +329,30 @@ final class AppLaunchCoordinator {
         canContinueWithoutContacts = false
         onboardingCompletionPending = false
         phase = .ready
+        // First-launch import already read the full system store this
+        // session, so skip an immediate re-reconcile here — foreground and
+        // store-change triggers cover everything from this point on.
+        if let dependencies {
+            beginObservingContactStoreChanges(dependencies: dependencies)
+        }
+    }
+
+    // Reconciliation triggers (`handleSceneActivation`, store-change
+    // observation, single-flight coalescing) live in
+    // AppLaunchCoordinator+Reconciliation.swift.
+
+    /// Drains `pendingStoreChangeReplay` into exactly one reconciliation
+    /// pass, now that `runtime` is set. A no-op when nothing was pending —
+    /// which is the common case, since `beginObservingContactStoreChanges`
+    /// only ever sets the flag if a notification arrives during the narrow
+    /// window this coordinator has no runtime to reconcile against.
+    private func replayPendingStoreChangeIfNeeded(
+        runtime: AppRuntime,
+        dependencies: Dependencies
+    ) async {
+        guard pendingStoreChangeReplay else { return }
+        pendingStoreChangeReplay = false
+        await reconcileNow(runtime: runtime, dependencies: dependencies)
     }
 
     private func importAuthorizedContacts(
@@ -257,20 +366,47 @@ final class AppLaunchCoordinator {
         onboardingCompletionPending = false
         defer { isImporting = false }
 
+        let result: ContactsImporter.Result
         do {
             let importer = ContactsImporter(
                 source: dependencies.contactsSource,
                 repo: runtime.environment.contacts,
                 clock: dependencies.clock
             )
-            _ = try await importer.runFirstLaunchImport()
+            result = try await importer.runFirstLaunchImport()
         } catch {
+            statusMessage = Self.importFailureMessage
+            canContinueWithoutContacts = true
+            return
+        }
+        guard !Self.importEffectivelyFailed(result) else {
             statusMessage = Self.importFailureMessage
             canContinueWithoutContacts = true
             return
         }
 
         await completeOnboardingAfterImport(runtime: runtime, clock: dependencies.clock)
+    }
+
+    /// R35 made a single row's write failure non-throwing — logged and
+    /// counted in `Result.failed` instead of aborting the pass — which is
+    /// correct when the pass still imported *something*. But if every
+    /// attempted row failed, `runFirstLaunchImport()` still returns
+    /// normally with `imported == 0`, and silently completing onboarding
+    /// on that result would leave All Contacts empty with no visible sign
+    /// anything went wrong.
+    ///
+    /// `skipped == 0` is required too (round 10): a *resumed* import — one
+    /// where most rows already exist from an earlier pass and only a
+    /// straggler row fails this time — also has `imported == 0` (nothing
+    /// new to write) but is not a failure at all, it's `runFirstLaunchImport`
+    /// correctly recognizing already-imported rows and skipping them.
+    /// `imported == 0 && failed > 0` alone can't tell that apart from "every
+    /// row failed" on a fresh import; `skipped == 0` rules out the resumed
+    /// case, since a fresh total failure never skips anything (there's
+    /// nothing yet to have already imported).
+    private static func importEffectivelyFailed(_ result: ContactsImporter.Result) -> Bool {
+        result.failed > 0 && result.imported == 0 && result.skipped == 0
     }
 
     private func completeOnboardingAfterImport(
@@ -291,70 +427,3 @@ final class AppLaunchCoordinator {
     private static let postImportCompletionFailureMessage =
         "Contacts were imported, but Regards couldn't finish setup. Try again."
 }
-
-#if DEBUG
-private enum FirstLaunchUITestContactsOutcome: String {
-    case authorized
-    case denied
-    case deniedAtLaunch = "denied-at-launch"
-    case importFailsOnce = "import-fails-once"
-}
-
-private enum FirstLaunchUITestContactsError: Error {
-    case fetchFailed
-}
-
-private enum FirstLaunchUITestRuntimeError: Error {
-    case openFailed
-}
-
-private actor FirstLaunchUITestRuntimeFactory {
-    private var shouldFail = true
-
-    func makeRuntime() async throws -> AppRuntime {
-        if shouldFail {
-            shouldFail = false
-            throw FirstLaunchUITestRuntimeError.openFailed
-        }
-        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
-        return try await AppRuntime.makeProduction(environment: environment)
-    }
-}
-
-private actor FirstLaunchUITestContactsSource: ContactsSource {
-    private let outcome: FirstLaunchUITestContactsOutcome
-    private var status: ContactsAuthorizationStatus = .notDetermined
-    private var remainingFetchFailures: Int
-
-    init(outcome: FirstLaunchUITestContactsOutcome) {
-        self.outcome = outcome
-        if outcome == .deniedAtLaunch {
-            self.status = .denied
-        }
-        self.remainingFetchFailures = outcome == .importFailsOnce ? 1 : 0
-    }
-
-    func currentAuthorization() async -> ContactsAuthorizationStatus { status }
-
-    func requestAccess() async throws -> ContactsAuthorizationStatus {
-        status = outcome == .denied || outcome == .deniedAtLaunch ? .denied : .authorized
-        return status
-    }
-
-    func fetchAllContacts() async throws -> [SystemContact] {
-        if remainingFetchFailures > 0 {
-            remainingFetchFailures -= 1
-            throw FirstLaunchUITestContactsError.fetchFailed
-        }
-        return [
-            SystemContact(
-                identifier: "ui-test-contact",
-                givenName: "Leia",
-                familyName: "Organa",
-                phoneNumbers: ["+1 555 010 2000"],
-                emailAddresses: ["leia@example.com"]
-            ),
-        ]
-    }
-}
-#endif

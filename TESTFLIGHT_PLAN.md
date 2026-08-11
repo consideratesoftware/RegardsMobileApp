@@ -55,6 +55,132 @@ never pick up Android work.
   Standing mitigation for any agent working in this worktree: never
   `git add -A`. Stage explicit paths, and check `find . -name "* 2.*"`
   before committing.
+- TF-03 implementation landed on branch `claude/tf-03-contacts-reconciliation`
+  in the linked worktree `Regards Mobile App TF03`, not yet reviewed or
+  merged. `ContactsReconciler` (new, `Platform/Contacts/`) reconciles the
+  persisted `Contact` table against the system store on launch (returning
+  users), foreground (`AppLaunchCoordinator.handleSceneActivation()` via
+  `RootView`'s `scenePhase`), and `CNContactStoreDidChange`
+  (`ContactsSource.changeNotifications()`, new protocol requirement with a
+  never-emitting default so existing fakes compile unchanged): new refs
+  import untracked, missing refs archive (never hard-delete), reappearing
+  refs un-archive, changed name/phones/emails refresh, corrupt rows are
+  matched by neither path and left untouched. `ContactRepository
+  .fetchAllWithDiagnostics()` (new, default-extension-backed for in-memory
+  backends, real per-row decode in `GRDBContactRepository`) closes R50:
+  `AllContactsViewModel` now shows healthy contacts plus a corruption
+  count/banner instead of going fully unavailable on one bad row; `fetchAll()`
+  is unchanged and still fail-closed for callers that need all-or-nothing
+  (duplicate detection, the importer's existing-ref check). R35: `ContactsImp
+  orter.runFirstLaunchImport()` now tolerates a per-row write failure
+  (logged + counted in `Result.failed`, never joins the resolved-ref set so a
+  rerun retries it) instead of aborting the batch. R25: `CNContactsSource
+  .fetchAllContacts()` now runs `enumerateContacts` via a new
+  `runOffCooperativePool` helper (GCD global queue) instead of the calling
+  cooperative-pool thread; a synthetic 5k-contact regression proves the pool
+  stays responsive during the enumeration. Local evidence only: strict
+  SwiftLint clean, temp-dir `xcodegen generate` byte-identical to the
+  committed project, and `xcodebuild test` green — 60/60 in the newly
+  added/touched suites and 282/282 across the complete `RegardsTests` target,
+  on a dedicated `RegardsTF03` simulator (iOS 26.5) with a dedicated
+  `/tmp/RegardsTF03DerivedData`. No physical-device run yet (that's TF-18's
+  A15 budget confirmation for R25, and general device acceptance before this
+  closes). Open design question flagged for review: a contact that drops out
+  of a `.limited` selection (not deleted from the system, just deselected) is
+  archived by this reconciler exactly like a deletion, since Regards can't
+  tell the two apart from `fetchAllContacts()` alone; it un-archives cleanly
+  if the user re-adds it to the selection. §21's OS-beta-season note calls
+  out limited-access behavior drift as the likeliest silent breaker, so this
+  interaction is worth explicit scrutiny before it closes.
+- A staged review of that commit returned `REQUEST_CHANGES` and the ruling on
+  the open design question above: archive-on-deselect is **not** acceptable —
+  a `.limited` deselection (or an `.authorized → .limited` downgrade) must be
+  a no-op for archiving. A consolidated fix batch on the same branch
+  addresses it plus 11 further items, committed separately (never amending
+  the original commit): the archive sweep now runs only under `.authorized`,
+  with regressions for both the steady-state and the downgrade-mid-session
+  case; `ContactsReconciler.refreshed()` now re-derives a stale `preferred
+  ChannelValue` for phone/email channels instead of leaving a deep link
+  pointed at a number the contact no longer has (a live bug the original
+  commit shipped, caught by review, fixed with a guard so an unset value is
+  never invented from scratch); `AllContactsScreen` reloads on `scenePhase`
+  becoming active so an already-open tab reflects reconciliation results,
+  not just a fresh `.task` appearance (Overdue/Upcoming stay TF-04's); the
+  5k-contact off-pool regression was rewritten to saturate
+  `activeProcessorCount` concurrent enumerations and prove pool
+  responsiveness via signal-gated counting instead of a wall-clock sleep
+  assertion (the original version passed even against pre-fix code whenever
+  the host had spare cores); reconciliation triggers are now single-flight
+  with coalescing (`reconciliationTask`/`reconciliationPending`) so an
+  overlapping foreground and store-change notification serialize into at
+  most one extra pass instead of racing concurrent `.reconcile()` calls
+  against the same database; the corrupt-row unit proof for plain
+  `fetchAll()` (fail-closed, unchanged by R50) was restored after the
+  original commit's AllContactsViewModel test switch left it uncovered; and
+  the R50 corruption banner now has a unit-level accessibility-tree
+  inspection proving its combined VoiceOver label, since the XCUITest mock
+  fixtures have no way to seed a corrupt row. `AppLaunchCoordinator.swift`'s
+  reconciliation methods moved to `AppLaunchCoordinator+Reconciliation.swift`
+  (lint length). Full local evidence after the fix batch: 297/297
+  `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen generate`
+  byte-identical. Manual VoiceOver smoke for the corruption-banner state is
+  still outstanding — needs a supervisor-arranged recorded pass before merge
+  (checklist in the fix-batch report). Not pushed as of this round; later
+  pushed as GitHub PR #48 (`claude/tf-03-contacts-reconciliation` → `main`)
+  — see below.
+- A third review round found one further blocker in that fix batch: the
+  `AllContactsScreen` reload was keyed off raw `scenePhase`, which races
+  `AppLaunchCoordinator`'s own reconciliation pass (the scene-phase handler
+  and the screen's reload both fire off the same foreground transition with
+  no ordering guarantee, so the screen almost always read the store before
+  reconciliation finished) and never fired at all for a
+  `CNContactStoreDidChange` landing while the user was already sitting on
+  the Contacts tab. Fixed by threading `AppLaunchCoordinator
+  .reconciliationCount` down through `RootView` → `RegardsTabRoot` →
+  `AllContactsScreen` as `reconciliationGeneration`, which only advances
+  strictly *after* a pass completes for every trigger kind — the screen now
+  reloads on that instead. A new test hosts the real screen and proves the
+  reload happens through `reconciliationGeneration` observation alone (no
+  direct `viewModel.load()` call in the test). Also landed: a TOCTOU guard
+  in `ContactsReconciler` (re-reads authorization after `fetchAllContacts()`
+  and requires both reads `.authorized` before the archive sweep, so a
+  downgrade landing mid-enumeration can't mass-archive under a stale
+  status), a comment flagging that the preferred-value re-derivation's
+  exact-string-match assumption breaks once `EditContactScreen` (PR27)
+  lets a user edit that value directly, restored write protection on
+  `reconciliationCount`/`reconciliationCoalesceCount` (a private nested
+  counters struct plus narrow `recordReconciliationPass()`/
+  `recordReconciliationCoalesce()` mutators, since the file split had left
+  them as plain settable `var`s), and a burst-coalescing test proving
+  `changeNotifications()`'s real `.bufferingNewest(1)` policy collapses many
+  rapid store-change notifications into far fewer than one pass each.
+  299/299 `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen
+  generate` byte-identical. Not pushed as of this round either; a fourth
+  review round returned APPROVE (a burst-coalescing test fix, the last
+  non-blocking item) and the branch was then pushed and opened as GitHub PR
+  #48 (`claude/tf-03-contacts-reconciliation` → `main`).
+- PR #48 has been through five further hosted-review rounds since opening,
+  none merged yet: round 5 fixed a CI-only flake in the corruption-banner
+  accessibility test (in-process UIKit tree inspection never materializes
+  assistive technology on a headless runner); round 6 replaced that test
+  with an XCUI-driven one seeded via a new `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
+  launch flag, closed a silent-onboarding-completion gap when every import
+  row fails, and fixed a wrong doc comment about which channels re-derive a
+  stale preferred value; round 7 added a mass-archive guard, field-scoped
+  reconciliation writes (so a concurrent `lastInteractedAt` write can't be
+  reverted by a reconcile pass), and store-change replay/ordering fixes;
+  round 8 empirically re-proved the off-pool-saturation regression actually
+  discriminates (three earlier "fixes" to it turned out not to, only caught
+  by reverting the implementation and running the suite), added
+  `updateReconciledFields` contract coverage on both backends, and gated
+  reconciliation on a genuine background→active scenePhase edge; round 9
+  (in progress) fixes a production-breaking bug the round 8 gate shipped
+  with — real foregrounding never delivers `.background` directly to
+  `.active` (it routes through `.inactive`), so that gate could never fire
+  on a device — plus extends the mass-archive guard to a two-consecutive-pass
+  rule covering ambiguous partial reads, not just wholesale-empty ones. Not
+  yet merged; the manual VoiceOver smoke recording for the corruption-banner
+  state remains outstanding.
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
@@ -398,7 +524,7 @@ numbers.
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
 | TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R22, R27–R34, R40, R42–R43 |
 | TF-02 | DONE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
-| TF-03 | READY | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
+| TF-03 | ACTIVE | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
 | TF-04 | READY | TF-02 | Caught up, Snooze, and Log other persist from every surface; live lists update; interaction and ViewModel tests pass | PR22; R11, R24, R34, R36, R46 |
 | TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
 | TF-06 | BLOCKED | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests | PR24; R11 |

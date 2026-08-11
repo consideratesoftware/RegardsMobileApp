@@ -16,12 +16,14 @@ public struct MockRepositories: Sendable {
     public init(
         now: Date = MockRepositories.defaultNow,
         window: ReminderWindow = MockRepositories.defaultWindow,
-        includeDuplicateFixture: Bool = false
+        includeDuplicateFixture: Bool = false,
+        seedCorruptRow: Bool = false
     ) {
         let store = MockStore(
             now: now,
             window: window,
-            includeDuplicateFixture: includeDuplicateFixture
+            includeDuplicateFixture: includeDuplicateFixture,
+            seedCorruptRow: seedCorruptRow
         )
         self.contacts = MockContactRepository(store: store)
         self.groups = MockContactGroupRepository(store: store)
@@ -89,8 +91,17 @@ actor MockStore {
     var interactions: [UUID: InteractionLog] = [:]
     var window: ReminderWindow
     var profile: UserProfile
+    /// R50 fixture (`REGARDS_UI_TEST_SEED_CORRUPT_ROW`): the mock store never
+    /// holds an actually-undecodable row (every write round-trips through
+    /// `ContactRecord` first), so this is a fabricated diagnostic rather
+    /// than a real decode failure — it exists purely to make the All
+    /// Contacts corruption banner reachable for the XCUITest audit, which
+    /// needs a real assistive-technology-active process to render SwiftUI's
+    /// accessibility tree at all (unlike a plain unit test hosting the
+    /// screen in-process).
+    var corruptionDiagnostics: [ContactCorruptionDiagnostic] = []
 
-    init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool) {
+    init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool, seedCorruptRow: Bool = false) {
         self.window = window
         self.profile = UserProfile(onboardingCompletedAt: now.addingTimeInterval(-86_400 * 30),
                                    entitlementTier: .trial,
@@ -112,6 +123,16 @@ actor MockStore {
         groups = representative.groups
         reminders = representative.reminders
         interactions = representative.interactions
+
+        if seedCorruptRow {
+            corruptionDiagnostics = [
+                ContactCorruptionDiagnostic(
+                    rawId: "ui-test-corrupt-row",
+                    systemContactRef: "ui-test-corrupt-row",
+                    reason: "REGARDS_UI_TEST_SEED_CORRUPT_ROW fixture: simulates an undecodable stored row"
+                ),
+            ]
+        }
     }
 
     /// Phase 0 deliberately renders representative persisted states so the
@@ -365,6 +386,7 @@ actor MockStore {
 
 extension MockStore {
     func allContacts() -> [Contact] { Array(contacts.values) }
+    func corruptionDiagnosticsList() -> [ContactCorruptionDiagnostic] { corruptionDiagnostics }
     func tracked() -> [Contact] {
         contacts.values.filter { $0.tracked && $0.archivedAt == nil }
     }
@@ -385,6 +407,21 @@ extension MockStore {
     func archiveContact(id: UUID, at: Date) {
         guard var c = contacts[id] else { return }
         c.archivedAt = mockStoredDate(at)
+        contacts[id] = c
+    }
+
+    /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the
+    /// *current* dictionary entry (actor-isolated, so there's no separate
+    /// snapshot to go stale) and overwrites only these five fields, same as
+    /// the real field-scoped `UPDATE` — parity for `ContactsReconciler`'s
+    /// refresh writes between the production and mock/preview backends.
+    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) {
+        guard var c = contacts[id] else { return }
+        c.displayName = fields.displayName
+        c.phoneNumbers = fields.phoneNumbers
+        c.emailAddresses = fields.emailAddresses
+        c.preferredChannelValue = fields.preferredChannelValue
+        c.archivedAt = fields.archivedAt.map(mockStoredDate)
         contacts[id] = c
     }
 

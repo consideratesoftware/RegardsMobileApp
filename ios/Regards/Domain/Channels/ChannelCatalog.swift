@@ -146,6 +146,22 @@ public enum ChannelCatalog {
         return value.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 
+    /// The first E.164-parseable phone in `phoneNumbers`, or `""` if none
+    /// qualifies. Single source of truth for "primary phone" selection:
+    /// `ContactsImporter.map` (first-launch import) and `ContactsReconciler`
+    /// (re-deriving a stale `preferredChannelValue`) both need the exact
+    /// same rule, and R8 is the reminder of what happens when two call
+    /// sites hand-roll the same selection independently and quietly drift.
+    public static func primaryPhone(in phoneNumbers: [String]) -> String {
+        phoneNumbers.first(where: isPhoneE164) ?? ""
+    }
+
+    /// The first catalog-valid email in `emailAddresses`, or `""` if none
+    /// qualifies. Same "single source of truth" rationale as `primaryPhone`.
+    public static func primaryEmail(in emailAddresses: [String]) -> String {
+        emailAddresses.first { validate(value: $0, for: .email) } ?? ""
+    }
+
     public static func isHandle(_ value: String) -> Bool {
         guard !value.isEmpty, value.count <= 64 else { return false }
         let allowed = CharacterSet(charactersIn:

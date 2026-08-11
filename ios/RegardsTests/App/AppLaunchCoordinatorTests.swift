@@ -6,8 +6,8 @@ import Testing
 struct AppLaunchCoordinatorTests {
     let now = Date(timeIntervalSince1970: 1_785_600_000)
 
-    @Test("Completed onboarding opens the production runtime without Contacts access")
-    func completedProfileBypassesContacts() async throws {
+    @Test("Completed onboarding opens the production runtime immediately, then reconciles Contacts")
+    func completedProfileOpensImmediatelyThenReconciles() async throws {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         try await environment.profile.save(
             UserProfile(
@@ -17,6 +17,10 @@ struct AppLaunchCoordinatorTests {
                 trialStartedAt: now
             )
         )
+        // A returning user's launch reconciles against whatever the system
+        // store currently exposes (ARCHITECTURE.md §7). `.denied` here still
+        // proves the tab root opens before that reconciliation resolves —
+        // `start()` doesn't fail or block on a reconciliation error.
         let source = ScriptedLaunchContactsSource(status: .denied)
         let launch = coordinator(environment: environment, source: source)
 
@@ -24,7 +28,8 @@ struct AppLaunchCoordinatorTests {
 
         #expect(launch.phase == .ready)
         #expect(launch.runtime != nil)
-        #expect(await source.counts() == .init(current: 0, requests: 0, fetches: 0))
+        #expect(launch.reconciliationCount == 1)
+        #expect(await source.counts() == .init(current: 1, requests: 0, fetches: 0))
     }
 
     @Test("Fresh launch records the trial and waits for the permission CTA")

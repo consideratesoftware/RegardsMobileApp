@@ -2,12 +2,10 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// Tests for the platform-layer Contacts importer. Avoids `CNContactStore`
-/// entirely by injecting a `FakeContactsSource`; the only thing CI runs
-/// against is the in-memory GRDB DB plus the fake.
-struct ContactsImporterTests {
-
-    // MARK: - map(systemContact:now:) — pure rules
+/// Tests for `ContactsImporter.map(systemContact:now:)` — the pure mapping
+/// rules, split from `ContactsImporterTests` (orchestration) below to keep
+/// each type under the lint length limit.
+struct ContactsImporterMappingTests {
 
     @Test("Display name uses 'Given Family' when both are present")
     func mapDisplayNameFullName() {
@@ -163,7 +161,14 @@ struct ContactsImporterTests {
         #expect(contact.preferredChannelValue.isEmpty)
     }
 
-    // MARK: - runFirstLaunchImport — orchestration
+    private static let now = Date(timeIntervalSince1970: 1_800_000_000)
+}
+
+/// Tests for `ContactsImporter.runFirstLaunchImport()` — orchestration
+/// (existing-ref matching, per-row tolerance, resumability). Avoids
+/// `CNContactStore` entirely by injecting a `FakeContactsSource`; the only
+/// thing CI runs against is the in-memory GRDB DB plus the fake.
+struct ContactsImporterTests {
 
     @Test("Empty source returns 0 imported, 0 skipped")
     func runImportEmptySource() async throws {
@@ -327,8 +332,8 @@ struct ContactsImporterTests {
         #expect(result == .init(imported: 1, skipped: 0))
     }
 
-    @Test("A retry resumes after the last contact written before interruption")
-    func runImportResumesAfterInterruption() async throws {
+    @Test("A single row's write failure is tolerated: the rest of the batch still imports (R35)")
+    func runImportTolerantOfOneRowFailure() async throws {
         let sources = [
             SystemContact(identifier: "resume-A", givenName: "A", familyName: "",
                           phoneNumbers: ["+15555550801"], emailAddresses: []),
@@ -338,21 +343,36 @@ struct ContactsImporterTests {
                           phoneNumbers: ["+15555550803"], emailAddresses: []),
         ]
         let source = FakeContactsSource(status: .authorized, contacts: sources)
-        let repo = InterruptingContactRepository(interruptBeforeWrite: 2)
-        let importer = ContactsImporter(source: source, repo: repo,
-                                        clock: { Self.now })
+        let repo = FailingWriteContactRepository(failingIdentifiers: ["resume-B"])
+        let importer = ContactsImporter(source: source, repo: repo, clock: { Self.now })
 
-        do {
-            _ = try await importer.runFirstLaunchImport()
-            Issue.record("Expected the first import attempt to be interrupted")
-        } catch ImportInterruption.interrupted {
-            #expect(try await repo.fetchAll().map(\.systemContactRef) == ["resume-A"])
-        }
+        let result = try await importer.runFirstLaunchImport()
 
-        let resumed = try await importer.runFirstLaunchImport()
-        #expect(resumed == .init(imported: 2, skipped: 1))
-        #expect(Set(try await repo.fetchAll().map(\.systemContactRef))
-                == Set(sources.map(\.identifier)))
+        #expect(result == .init(imported: 2, skipped: 0, failed: 1))
+        #expect(Set(try await repo.fetchAll().map(\.systemContactRef)) == Set(["resume-A", "resume-C"]))
+    }
+
+    @Test("Rerunning after a per-row failure retries only the still-missing row, not the whole batch")
+    func runImportRerunRetriesOnlyTheFailedRow() async throws {
+        let sources = [
+            SystemContact(identifier: "resume-A", givenName: "A", familyName: "",
+                          phoneNumbers: ["+15555550801"], emailAddresses: []),
+            SystemContact(identifier: "resume-B", givenName: "B", familyName: "",
+                          phoneNumbers: ["+15555550802"], emailAddresses: []),
+            SystemContact(identifier: "resume-C", givenName: "C", familyName: "",
+                          phoneNumbers: ["+15555550803"], emailAddresses: []),
+        ]
+        let source = FakeContactsSource(status: .authorized, contacts: sources)
+        // Fails permanently — proves a still-broken row is reported every
+        // pass (no silent discard) rather than the pass giving up entirely.
+        let repo = FailingWriteContactRepository(failingIdentifiers: ["resume-B"])
+        let importer = ContactsImporter(source: source, repo: repo, clock: { Self.now })
+
+        _ = try await importer.runFirstLaunchImport()
+        let rerun = try await importer.runFirstLaunchImport()
+
+        #expect(rerun == .init(imported: 0, skipped: 2, failed: 1))
+        #expect(Set(try await repo.fetchAll().map(\.systemContactRef)) == Set(["resume-A", "resume-C"]))
     }
 
     // MARK: - Helpers
@@ -387,45 +407,6 @@ private final class FakeContactsSource: ContactsSource, @unchecked Sendable {
     }
 }
 
-private enum ImportInterruption: Error {
-    case interrupted
-}
-
-private actor InterruptingContactRepository: ContactRepository {
-    private var contacts: [Contact] = []
-    private let interruptBeforeWrite: Int
-    private var writeAttempts = 0
-
-    init(interruptBeforeWrite: Int) {
-        self.interruptBeforeWrite = interruptBeforeWrite
-    }
-
-    func fetchAll() async throws -> [Contact] {
-        contacts
-    }
-
-    func fetchTracked() async throws -> [Contact] {
-        contacts.filter { $0.tracked && $0.isActive }
-    }
-
-    func fetch(id: UUID) async throws -> Contact? {
-        contacts.first { $0.id == id }
-    }
-
-    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
-        contacts.filter { $0.contactGroupId == groupId }
-    }
-
-    func upsert(_ contact: Contact) async throws {
-        writeAttempts += 1
-        if writeAttempts == interruptBeforeWrite {
-            throw ImportInterruption.interrupted
-        }
-        contacts.append(contact)
-    }
-
-    func archive(id: UUID, at: Date) async throws {
-        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return }
-        contacts[index].archivedAt = at
-    }
-}
+// `FailingWriteContactRepository` (RegardsTests/Support/ContactWriteTrackingFakes.swift)
+// covers the same "permanently fails specific identifiers" shape this file
+// used to duplicate as `InterruptingContactRepository`.

@@ -130,25 +130,33 @@ struct AllContactsViewModelTests {
             content: screen.frame(width: 402, height: 220)
         )
         #expect(renderer.uiImage != nil)
-        #expect(projectionCounter.count == 1)
+        // 2, not 1: round 10 added `AllContactsScreen`'s `isCurrentlyVisible`
+        // `@State` (tracked via `.onAppear`/`.onDisappear`, gating the
+        // corruption announcement to when this screen is actually the
+        // visible tab). Setting that `@State` from `.onAppear` on first
+        // render triggers exactly one extra `body` evaluation — a one-time
+        // cost on first appearance, not a per-scroll or per-frame one — so
+        // `filtered(searchText:)` runs twice instead of once. Still O(1)
+        // relative to the 750-contact dataset, which is what this guard
+        // actually cares about: bounded, deterministic re-filtering, not an
+        // exact call count untethered from why it matters.
+        #expect(projectionCounter.count == 2)
         #expect(!projectionCounter.constructedRowIDs.isEmpty)
         #expect(projectionCounter.constructedRowIDs.count < selected.count)
     }
 
-    @Test("A corrupt stored contact fails visibly instead of disappearing")
-    func corruptStoredContactMakesAllContactsUnavailable() async throws {
+    @Test("A corrupt stored contact fails visibly, but healthy contacts stay usable")
+    func corruptStoredContactStaysIsolatedFromHealthyContacts() async throws {
         let database = try DatabaseFactory.makeInMemoryDatabase()
         let environment = ProductionRepositoryFactory.makeEnvironment(database: database)
-        let contact = Self.contact(
-            id: UUID(),
-            name: "Preserved Corrupt Contact",
-            tracked: false
-        )
-        try await environment.contacts.upsert(contact)
+        let healthy = Self.contact(id: UUID(), name: "Healthy Contact", tracked: false)
+        let corrupt = Self.contact(id: UUID(), name: "Preserved Corrupt Contact", tracked: false)
+        try await environment.contacts.upsert(healthy)
+        try await environment.contacts.upsert(corrupt)
         try await database.write { db in
             try db.execute(
                 sql: "UPDATE Contact SET phonesJson = ? WHERE id = ?",
-                arguments: ["null", contact.id.uuidString]
+                arguments: ["null", corrupt.id.uuidString]
             )
         }
         let viewModel = AllContactsViewModel(
@@ -158,13 +166,51 @@ struct AllContactsViewModelTests {
 
         await viewModel.load()
 
-        #expect(viewModel.loadState == .failed)
-        #expect(viewModel.contacts.isEmpty)
-        #expect(viewModel.summary == "Unavailable")
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.map(\.id) == [healthy.id])
+        #expect(viewModel.summary == "1 contact")
+        #expect(viewModel.corruptedContactCount == 1)
+        #expect(viewModel.corruptionMessage == "1 contact couldn't be read and needs attention.")
         let storedRows = try await database.read { db in
             try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM Contact")
         }
-        #expect(storedRows == 1)
+        #expect(storedRows == 2)
+    }
+
+    @Test("The corruption message pluralizes correctly for more than one unreadable row")
+    func corruptionMessagePluralizesForMultipleRows() async throws {
+        let healthy = Self.contact(id: UUID(), name: "Healthy Contact", tracked: false)
+        let report = ContactFetchReport(
+            contacts: [healthy],
+            corrupted: [
+                ContactCorruptionDiagnostic(rawId: "bad-1", systemContactRef: "bad-1", reason: "decode failed"),
+                ContactCorruptionDiagnostic(rawId: "bad-2", systemContactRef: "bad-2", reason: "decode failed"),
+                ContactCorruptionDiagnostic(rawId: "bad-3", systemContactRef: "bad-3", reason: "decode failed"),
+            ]
+        )
+        let repository = SettableContactRepository(report: report)
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        await viewModel.load()
+
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.contacts.map(\.id) == [healthy.id])
+        #expect(viewModel.corruptedContactCount == 3)
+        #expect(viewModel.corruptionMessage == "3 contacts couldn't be read and need attention.")
+    }
+
+    @Test("A repository read failure that isn't about one row still fails the whole load")
+    func genuineReadFailureStillMarksLoadFailed() async throws {
+        let repository = StubContactRepository.failing()
+        let viewModel = AllContactsViewModel(contacts: repository, clock: { Self.now })
+
+        await viewModel.load()
+
+        #expect(viewModel.loadState == .failed)
+        #expect(viewModel.contacts.isEmpty)
+        #expect(viewModel.corruptedContactCount == 0)
+        #expect(viewModel.corruptionMessage == nil)
+        #expect(viewModel.summary == "Unavailable")
     }
 
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -267,3 +313,6 @@ private actor RecordingAllContactsRepository: ContactRepository {
         writes
     }
 }
+
+// `SettableContactRepository` lives in RegardsTests/Support — shared across
+// the AllContacts reconciliation/announcement suites.

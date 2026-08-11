@@ -67,6 +67,55 @@ actor StubContactRepository: ContactRepository {
     func storedCount() -> Int { contacts.count }
 }
 
+/// A `ContactRepository` whose backing `ContactFetchReport` (healthy
+/// contacts plus corruption diagnostics) can be replaced after
+/// construction — for tests that mutate the store mid-test to simulate
+/// what a completed reconciliation pass, a newly-discovered corrupt row, or
+/// a fresh import would produce, then assert a view model or screen reacts
+/// through its real observation path rather than a direct reload call. A
+/// fixed report that's never replaced works too (just don't call
+/// `setReport`/`replaceContacts`), so this also covers what a `Stub`-style
+/// fixed fake would have needed. Consolidates three near-identical
+/// single-call-site fakes (`MutableAllContactsRepository`,
+/// `MutableDiagnosticsRepository`, `FixedDiagnosticsRepository`) that had
+/// accumulated one per test file across TF-03.
+actor SettableContactRepository: ContactRepository {
+    private var report: ContactFetchReport
+
+    init(contacts: [Contact] = [], corrupted: [ContactCorruptionDiagnostic] = []) {
+        self.report = ContactFetchReport(contacts: contacts, corrupted: corrupted)
+    }
+
+    init(report: ContactFetchReport) {
+        self.report = report
+    }
+
+    func fetchAll() async throws -> [Contact] { report.contacts }
+    func fetchTracked() async throws -> [Contact] {
+        report.contacts.filter { $0.tracked && $0.isActive }
+    }
+    func fetch(id: UUID) async throws -> Contact? { report.contacts.first { $0.id == id } }
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        report.contacts.filter { $0.contactGroupId == groupId }
+    }
+    func upsert(_ contact: Contact) async throws {
+        report = ContactFetchReport(contacts: report.contacts + [contact], corrupted: report.corrupted)
+    }
+    func archive(id: UUID, at: Date) async throws {}
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport { report }
+
+    /// Replaces the healthy contacts, leaving the current corruption
+    /// diagnostics untouched.
+    func replaceContacts(_ newContacts: [Contact]) {
+        report = ContactFetchReport(contacts: newContacts, corrupted: report.corrupted)
+    }
+
+    /// Replaces the entire report — contacts and diagnostics both.
+    func setReport(_ newReport: ContactFetchReport) {
+        report = newReport
+    }
+}
+
 actor StubReminderRepository: ReminderRepository {
     private let reminders: [ScheduledReminder]
     private let failure: RepositoryFakeFailure?

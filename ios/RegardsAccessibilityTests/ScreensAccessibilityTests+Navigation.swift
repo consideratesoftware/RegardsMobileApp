@@ -23,7 +23,8 @@ extension ScreensAccessibilityTests {
     @MainActor
     func launchToOverdue(
         dynamicTypeSize: String? = nil,
-        includeDuplicateFixture: Bool = false
+        includeDuplicateFixture: Bool = false,
+        seedCorruptRow: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("--regards-mock-runtime")
@@ -32,6 +33,9 @@ extension ScreensAccessibilityTests {
         }
         if includeDuplicateFixture {
             app.launchEnvironment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] = "1"
+        }
+        if seedCorruptRow {
+            app.launchEnvironment["REGARDS_UI_TEST_SEED_CORRUPT_ROW"] = "1"
         }
         app.launch()
         let overdue = app.descendants(matching: .any)["screen.overdue"]

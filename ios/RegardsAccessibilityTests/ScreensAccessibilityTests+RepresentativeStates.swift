@@ -43,6 +43,48 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
+    /// R50 (TF-03 / PR21): a stored `Contact` row that fails to decode must
+    /// stay visible on All Contacts, with a banner surfacing the diagnostic,
+    /// instead of the whole screen going unavailable. This can only be
+    /// proven with real assistive technology active — SwiftUI's UIKit-facing
+    /// accessibility tree doesn't materialize in a plain hosted unit test,
+    /// only here, where an `XCUIApplication` talks to the real accessibility
+    /// server.
+    @MainActor
+    func testContactsCorruptionBannerPassesAudit() throws {
+        let app = launchToOverdue(seedCorruptRow: true)
+        navigateToTab(
+            named: "Contacts",
+            from: "screen.overdue",
+            to: "screen.contacts",
+            in: app
+        )
+
+        let banner = app.descendants(matching: .any)["contacts.corruption-banner"]
+        XCTAssertTrue(
+            banner.waitForExistence(timeout: 10),
+            "The corruption banner must remain reachable when a stored row can't be read."
+        )
+        XCTAssertEqual(
+            banner.label,
+            "1 contact couldn't be read and needs attention.",
+            "The banner's combined accessibility label must equal the visible message exactly"
+                + " — a passing icon glyph would append extra text."
+        )
+        // The seeded cast's healthy rows must stay usable alongside the
+        // banner, not just present in some non-visible form — reuse the same
+        // first-row activation `launchToContactDetailFromContacts` relies on
+        // (All Contacts rows have no shared stable identifier to query by).
+        let firstRow = app.descendants(matching: .any)["screen.contacts"]
+            .descendants(matching: .button).firstMatch
+        XCTAssertTrue(
+            waitUntilLiveAndHittable(firstRow, timeout: 10),
+            "A healthy contact row must remain reachable alongside the corruption banner."
+        )
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
     /// Exercises the stable-ID Contact Detail push from Overdue. The
     /// Contacts test covers the same destination flow from All Contacts.
     @MainActor
