@@ -90,18 +90,18 @@ public final class ContactDetailViewModel {
     /// showing a stale snoozed date.
     ///
     /// `scheduler.caughtUp` runs *before* `InteractionLogging`, not after:
-    /// `InteractionLogging`'s `contacts.upsert` broadcasts through
-    /// `observeTracked()` the instant it lands, and a concurrently observing
-    /// Overdue/Upcoming view model reloading off that broadcast would compute
-    /// its row before the reminder-state write had cleared the snooze —
-    /// briefly showing the stale date anyway, even though this method
-    /// "already" cleared it moments later. Doing the reminder-state write
-    /// first means every broadcast this method can trigger only ever fires
-    /// after the snooze is already gone.
+    /// `InteractionLogging`'s `contacts.updateLastInteractedAt` broadcasts
+    /// through `observeTracked()` the instant it lands, and a concurrently
+    /// observing Overdue/Upcoming view model reloading off that broadcast
+    /// would compute its row before the reminder-state write had cleared the
+    /// snooze — briefly showing the stale date anyway, even though this
+    /// method "already" cleared it moments later. Doing the reminder-state
+    /// write first means every broadcast this method can trigger only ever
+    /// fires after the snooze is already gone.
     ///
     /// This is still two writes, not one: `scheduler.caughtUp` can succeed
     /// while the later `InteractionLogging` call throws (or partially
-    /// applies — it appends the log, then upserts the contact, with no
+    /// applies — it appends the log, then moves `lastInteractedAt`, with no
     /// compensation if the second half fails). Any of those partial
     /// combinations leaves the screen possibly rendering pre-write state —
     /// worse than a clean failure, since nothing here otherwise tells the

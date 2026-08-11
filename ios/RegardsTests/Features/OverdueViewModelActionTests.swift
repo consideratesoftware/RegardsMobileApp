@@ -209,6 +209,15 @@ struct OverdueViewModelActionTests {
         #expect(viewModel.rows.isEmpty)
     }
 
+    /// Rerouted off a hand-rolled `contacts.upsert(...)` (staged review round
+    /// 6): production's "Caught up"/"Log other" write goes through
+    /// `InteractionLogging.record()`, which calls
+    /// `contacts.updateLastInteractedAt`, not `upsert`. A test that simulated
+    /// the other screen's write with `upsert` directly proved
+    /// `observeTracked()` fires on *that* method, not the one the app
+    /// actually calls — see `ContactObservationContractTests
+    /// .observeTrackedEmitsOnUpdateLastInteractedAt` for the emission
+    /// contract this test's write path now shares with.
     @Test("A write on the same repository through a different reference is reflected live")
     func liveUpdateReflectsWriteFromAnotherReference() async throws {
         let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
@@ -217,11 +226,11 @@ struct OverdueViewModelActionTests {
         await viewModel.load()
         #expect(viewModel.rows.map(\.contactId) == [contact.id])
 
-        // Simulates Contact Detail's ContactDetailViewModel, holding its own
-        // reference to the same repository, marking the contact caught up.
-        var updated = contact
-        updated.lastInteractedAt = Self.now
-        try await contacts.upsert(updated)
+        // Simulates Contact Detail's own `ContactDetailViewModel.markCaughtUp`
+        // — its `InteractionLogging` call — marking the contact caught up
+        // through the same repository reference.
+        let logging = InteractionLogging(contacts: contacts, interactions: StubInteractionRepository())
+        try await logging.markCaughtUp(contactId: contact.id, at: Self.now)
 
         // The write reaches Overdue through `observeTracked()`'s subscriber
         // Task, not a call this test itself awaits — `waitUntil` yields

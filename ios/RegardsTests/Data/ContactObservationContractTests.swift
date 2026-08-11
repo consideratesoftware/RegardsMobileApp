@@ -134,4 +134,43 @@ struct ContactObservationContractTests {
         let afterUpdate = try #require(await iterator.next())
         #expect(!afterUpdate.map(\.id).contains(contactID))
     }
+
+    /// Blocker (staged review round 6): "Caught up" and "Log other channel…"
+    /// went through `InteractionLogging`'s `contacts.upsert` when the
+    /// cross-screen live-update tests (`OverdueViewModelActionTests`/
+    /// `UpcomingViewModelActionTests`'
+    /// `liveUpdateReflectsWriteFromAnotherReference`) were written, so those
+    /// tests hand-rolling an `upsert` genuinely exercised the production
+    /// write path at the time. `InteractionLogging.record()` now writes
+    /// through the field-scoped `updateLastInteractedAt` instead (TF-03/R23
+    /// parity fix), and nothing had re-proven `observeTracked()` still fires
+    /// on *that* write specifically — same shape as
+    /// `observeTrackedEmitsOnReconciledFieldsUpdate` above pins for
+    /// `updateReconciledFields`, which is exactly the sibling bug that method
+    /// exists to catch: a field-scoped write that forgets to broadcast.
+    @Test(
+        "observeTracked emits after updateLastInteractedAt moves a contact's last-contacted date",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeTrackedEmitsOnUpdateLastInteractedAt(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contactID = try contractUUID(137)
+        try await repositories.contacts.upsert(
+            contractContact(id: contactID, suffix: "last-interacted-update", tracked: true)
+        )
+
+        let stream = await repositories.contacts.observeTracked()
+        var iterator = stream.makeAsyncIterator()
+
+        _ = try await repositories.contacts.updateLastInteractedAt(
+            id: contactID,
+            at: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        // The emission itself is what's under test: both backends must
+        // broadcast after this write, even though the tracked *set* is
+        // unchanged by it (only a field on an already-tracked row moved).
+        let afterUpdate = try #require(await iterator.next())
+        #expect(Set(afterUpdate.map(\.id)).contains(contactID))
+    }
 }

@@ -31,24 +31,35 @@ struct UpcomingViewModelStateTests {
         #expect(viewModel.totalCount == 0)
     }
 
-    @Test("A failing pending-reminder fetch clears rows and reports failure")
-    func failedReminderFetchReportsFailure() async throws {
-        // `fetchAllPending()` made the catch branch reachable for the first
-        // time: contacts can load fine and the reminder read can still throw.
+    /// Consistency fix (staged review round 6): this used to propagate a
+    /// failed `reminders.fetchAllPending()` straight out of `performLoad()`'s
+    /// `do` block, blanking the entire screen even though
+    /// `contacts.fetchTracked()` had already succeeded — the same shape of
+    /// bug `OverdueViewModel.performLoadDegradesWhenPendingRemindersReadFails`
+    /// pins, and the two screens disagreeing about it (one blanked, one
+    /// degraded) for the identical error was the actual defect. A cadence
+    /// contact — not the default `cadenceDays: nil` fixture — so a real row
+    /// surviving the failure discriminates "degraded" from "coincidentally
+    /// empty either way."
+    @Test("A failing pending-reminder fetch degrades to no known snoozes/occasions, not a blanked screen")
+    func failedReminderFetchDegradesInsteadOfBlanking() async throws {
+        let contact = UpcomingFixtures.contact(systemRef: "reminder-failure", cadenceDays: 7)
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([UpcomingFixtures.contact(systemRef: "reminder-failure")]),
+            contacts: StubContactRepository([contact]),
             reminders: StubReminderRepository.failing(),
             scheduler: SchedulingPass(reminders: StubReminderRepository.failing(), clock: { UpcomingFixtures.now }),
             interactions: StubInteractionRepository(),
-            window: .defaultV1(timezone: UpcomingFixtures.utc),
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
         )
 
         await viewModel.load()
 
-        #expect(viewModel.loadState == .failed)
-        #expect(viewModel.groups.isEmpty)
-        #expect(viewModel.totalCount == 0)
+        // The contact's own data loaded fine — its cadence row belongs on
+        // screen, snooze/occasion state or not.
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.totalCount == 1)
+        #expect(viewModel.groups.flatMap(\.rows).map(\.contactId) == [contact.id])
     }
 
     @Test("A failure after a successful load discards the stale rows")

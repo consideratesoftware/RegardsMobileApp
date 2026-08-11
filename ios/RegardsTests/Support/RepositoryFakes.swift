@@ -21,16 +21,29 @@ actor StubContactRepository: ContactRepository {
     /// `failure` alone can't isolate that, since it applies uniformly to
     /// every method.
     private let upsertFailure: RepositoryFakeFailure?
+    /// Independent of both `failure` and `upsertFailure`: lets a test make
+    /// `fetch` find the contact and `updateLastInteractedAt` report "no row
+    /// matched" (`false`, not a thrown error) for that same id — the
+    /// archived-or-deleted-between-fetch-and-write race
+    /// `InteractionLogging.record()`'s `guard matched else { throw
+    /// DataError.notFound }` exists to catch (staged review round 6). Real
+    /// callers can't drive `fetch` and `updateLastInteractedAt` to disagree
+    /// through this fake's single `contacts` array — the id is either
+    /// present for both or neither — so this flag stands in for "a
+    /// concurrent write removed the row in the gap between them."
+    private let missesUpdateLastInteractedAt: Bool
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
     init(
         _ contacts: [Contact] = [],
         failure: RepositoryFakeFailure? = nil,
-        upsertFailure: RepositoryFakeFailure? = nil
+        upsertFailure: RepositoryFakeFailure? = nil,
+        missesUpdateLastInteractedAt: Bool = false
     ) {
         self.contacts = contacts
         self.failure = failure
         self.upsertFailure = upsertFailure
+        self.missesUpdateLastInteractedAt = missesUpdateLastInteractedAt
     }
 
     /// A repository whose every read throws.
@@ -41,6 +54,12 @@ actor StubContactRepository: ContactRepository {
     /// Reads succeed normally; only `upsert` fails.
     static func failingUpsert(_ contacts: [Contact] = []) -> StubContactRepository {
         StubContactRepository(contacts, upsertFailure: RepositoryFakeFailure())
+    }
+
+    /// Reads succeed normally; `updateLastInteractedAt` always reports "no
+    /// row matched" instead of throwing or writing.
+    static func missingUpdateLastInteractedAt(_ contacts: [Contact] = []) -> StubContactRepository {
+        StubContactRepository(contacts, missesUpdateLastInteractedAt: true)
     }
 
     private func requireSuccess() throws {
@@ -107,6 +126,7 @@ actor StubContactRepository: ContactRepository {
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         try requireSuccess()
         if let upsertFailure { throw upsertFailure }
+        guard !missesUpdateLastInteractedAt else { return false }
         guard let index = contacts.firstIndex(where: { $0.id == id }) else { return false }
         contacts[index].lastInteractedAt = date
         broadcastTrackedChange()

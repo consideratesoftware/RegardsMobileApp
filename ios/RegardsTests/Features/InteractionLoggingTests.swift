@@ -139,4 +139,39 @@ struct InteractionLoggingTests {
         let stored = try #require(await contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == nil)
     }
+
+    /// The archived-or-deleted-between-fetch-and-write race `record()`'s
+    /// `guard matched else { throw DataError.notFound }` exists to catch
+    /// (staged review round 6): the `fetch` at the top of `markCaughtUp`
+    /// finds the contact, but by the time `updateLastInteractedAt` runs the
+    /// row is gone — a concurrent `ContactsReconciler` archive, or another
+    /// screen's delete — and the field-scoped write matches no row (`false`,
+    /// not a thrown error). Distinct from `failingContactWriteLeavesLogPersisted`
+    /// above: that test's write throws; this one's write returns cleanly
+    /// with "nothing matched," which `record()` has to notice on its own
+    /// rather than relying on a caught exception. The interaction log write
+    /// already landed by then, so — same documented drift as `record()`'s
+    /// own doc comment describes for "append succeeds, then the move
+    /// throws" — it's provably left persisted even though the call as a
+    /// whole throws.
+    @Test("A contact removed between fetch and write throws notFound but leaves the log persisted")
+    func removedBetweenFetchAndWriteThrowsButLeavesLogPersisted() async throws {
+        let contact = Self.contact(lastInteractedAt: nil)
+        let contacts = StubContactRepository.missingUpdateLastInteractedAt([contact])
+        let interactions = StubInteractionRepository()
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+
+        do {
+            _ = try await logging.markCaughtUp(contactId: contact.id, at: Self.now)
+            Issue.record("Expected DataError.notFound")
+        } catch DataError.notFound {
+            // expected
+        }
+
+        let logs = await interactions.appendedLogs()
+        #expect(logs.count == 1)
+        #expect(logs[0].source == .reminderCaughtUp)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == nil)
+    }
 }

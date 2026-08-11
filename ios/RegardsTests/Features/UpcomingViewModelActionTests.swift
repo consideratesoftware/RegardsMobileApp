@@ -137,6 +137,10 @@ struct UpcomingViewModelActionTests {
     /// (via `StubInteractionRepository.failing()`), so nothing persists at
     /// all. Correctness fix (staged review #7) reordered `markCaughtUp` to
     /// run `scheduler.caughtUp` *before* `InteractionLogging` — see its doc
+    /// Rerouted off a hand-rolled `contacts.upsert(...)` (staged review round
+    /// 6) — see `OverdueViewModelActionTests`'s sibling test for why: it
+    /// used to prove `observeTracked()` fires on a write method production no
+    /// longer calls for this action.
     @Test("A write on the same repository through a different reference is reflected live")
     func liveUpdateReflectsWriteFromAnotherReference() async throws {
         // A horizon *shorter* than the cadence, deliberately: with the
@@ -167,12 +171,12 @@ struct UpcomingViewModelActionTests {
         // due date is effectively `now` → inside the 5-day horizon.
         #expect(viewModel.totalCount == 1)
 
-        // Simulates Contact Detail marking the contact caught up through its
-        // own reference to the same repository. Post-write due date is
+        // Simulates Contact Detail's own `ContactDetailViewModel.markCaughtUp`
+        // — its `InteractionLogging` call — marking the contact caught up
+        // through the same repository reference. Post-write due date is
         // `now + 7d`, outside the 5-day horizon.
-        var updated = contact
-        updated.lastInteractedAt = Self.now
-        try await contacts.upsert(updated)
+        let logging = InteractionLogging(contacts: contacts, interactions: StubInteractionRepository())
+        try await logging.markCaughtUp(contactId: contact.id, at: Self.now)
 
         // The write reaches Upcoming through `observeTracked()`'s subscriber
         // Task, not a call this test itself awaits — `waitUntil` yields

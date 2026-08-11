@@ -194,11 +194,11 @@ public final class OverdueViewModel {
     /// doc comment for the exact mechanism).
     ///
     /// `scheduler.caughtUp` first, `InteractionLogging` second — not the
-    /// reverse: `InteractionLogging`'s `contacts.upsert` broadcasts through
-    /// `observeTracked()` the moment it lands, and a concurrently observing
-    /// Upcoming (or Contact Detail) reloading off that broadcast would
-    /// compute its row before the reminder-state write had cleared the
-    /// snooze, briefly showing the stale date anyway. Doing the
+    /// reverse: `InteractionLogging`'s `contacts.updateLastInteractedAt`
+    /// broadcasts through `observeTracked()` the moment it lands, and a
+    /// concurrently observing Upcoming (or Contact Detail) reloading off that
+    /// broadcast would compute its row before the reminder-state write had
+    /// cleared the snooze, briefly showing the stale date anyway. Doing the
     /// reminder-state write first means every broadcast this method can
     /// trigger only ever fires after the snooze is already gone.
     @discardableResult
