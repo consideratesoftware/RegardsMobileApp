@@ -90,6 +90,41 @@ extension ScreensAccessibilityTests {
         )
     }
 
+    /// Same coverage as `testOverdueRowActionsDoNotOverlapAtAccessibility5`,
+    /// for Upcoming's row button and Caught up button — this screen had no
+    /// intra-row overlap assertion at all despite carrying the identical
+    /// two-control `AccessibilityAdaptiveLayout` shape (row button stacks
+    /// above `caughtUpButton` at accessibility5 — see `UpcomingRow.body`'s
+    /// `accessibility:` closure).
+    @MainActor
+    func testUpcomingRowActionDoesNotOverlapRowAtAccessibility5() {
+        let app = launchToOverdue(dynamicTypeSize: "accessibility5")
+        navigateToTab(
+            named: "Upcoming",
+            from: "screen.overdue",
+            to: "screen.upcoming",
+            in: app
+        )
+        // Plain subscript first — see the matching comment in
+        // `testOverdueRowActionsAreWiredAndLabeled` above.
+        let plainRow = app.descendants(matching: .any)["upcoming.row"]
+        let plainCaughtUp = app.descendants(matching: .any)["upcoming.caught-up"]
+        XCTAssertTrue(plainRow.waitForExistence(timeout: 10))
+        XCTAssertTrue(plainCaughtUp.waitForExistence(timeout: 10))
+
+        let firstRow = app.descendants(matching: .any)
+            .matching(identifier: "upcoming.row")
+            .firstMatch
+        let firstCaughtUp = app.descendants(matching: .any)
+            .matching(identifier: "upcoming.caught-up")
+            .firstMatch
+        assertStacked(
+            firstCaughtUp,
+            below: firstRow,
+            "Caught up must stack below the row button at accessibility5 on an Upcoming row."
+        )
+    }
+
     /// Accessibility FIX item, not optional (staged review): Log other's
     /// picker is presented UI with its own accessibility tree — it needs the
     /// same audit coverage every other screen gets, not just a "the trigger

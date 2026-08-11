@@ -50,6 +50,15 @@ public protocol ContactRepository: Sendable {
     /// snapshot and write. This method can't do that — it never reads the
     /// row it's writing. A no-op if `id` doesn't match a stored row.
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws
+    /// Field-scoped write for "Caught up" / "Log other channel…"
+    /// (`InteractionLogging.record`) — moves exactly `lastInteractedAt`,
+    /// same reason as `updateReconciledFields` above: `InteractionLogging`
+    /// builds its write from a `Contact` snapshot fetched at the *start* of
+    /// the action, so a whole-row `upsert` could silently clobber a
+    /// concurrent `ContactsReconciler` field write on the same row in
+    /// between (including un-archiving a contact that pass just archived).
+    /// Never reads the row it's writing. A no-op if `id` doesn't match one.
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws
     /// Corruption-aware read (R50, `AllContactsViewModel`): every row that
     /// decodes, plus a diagnostic for each row that doesn't. Never mutates,
     /// deletes, or silently skips the corrupt row — it stays exactly as
@@ -68,7 +77,11 @@ public protocol ContactRepository: Sendable {
 
 extension ContactRepository {
     public func observeTracked() async -> AsyncStream<[Contact]> {
-        AsyncStream { $0.finish() }
+        // `.bufferingNewest(1)`, not the `.unbounded` default: matches every
+        // real conformer's own `observeTracked()` (see
+        // `GRDBContactRepository`'s and `MockStore`'s), even though this
+        // no-op default finishes immediately and never buffers anything.
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { $0.finish() }
     }
 }
 
@@ -148,6 +161,15 @@ public extension ContactRepository {
         contact.emailAddresses = fields.emailAddresses
         contact.preferredChannelValue = fields.preferredChannelValue
         contact.archivedAt = fields.archivedAt
+        try await upsert(contact)
+    }
+
+    /// Fallback mirroring `updateReconciledFields`' own: fetch, move the one
+    /// field, upsert. `GRDBContactRepository` and `MockContactRepository`
+    /// override this with a write that never reads the row first.
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
+        guard var contact = try await fetch(id: id) else { return }
+        contact.lastInteractedAt = date
         try await upsert(contact)
     }
 }
@@ -262,7 +284,15 @@ struct GRDBContactRepository: ContactRepository {
                 .filter(Column("tracked") == true && Column("archivedAt") == nil)
                 .fetchAll(db)
         }
-        return AsyncStream { continuation in
+        // `.bufferingNewest(1)`, not the `.unbounded` default: TF-03's
+        // `ContactsReconciler` broadcasts once per changed contact through
+        // `upsertContact`/`updateReconciledFields`, so an N-contact
+        // reconciliation pass would otherwise queue N full `fetchTracked()`
+        // reloads per subscribed screen — this collapses that burst to the
+        // single latest snapshot, which is all any subscriber ever needs
+        // (`observeTracked()`'s own contract is "the current tracked set,"
+        // not "every intermediate state along the way").
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             // `ValueObservation.start` always fires once immediately with the
             // current value — that first call is the replay the protocol doc
             // says never to send; only a later change reaches `continuation`.
@@ -329,6 +359,18 @@ struct GRDBContactRepository: ContactRepository {
         }
     }
 
+    /// Real field-scoped `UPDATE` — see the protocol doc comment. Never
+    /// reads the row first, so it can't clobber a concurrent
+    /// `ContactsReconciler` write to any other column on the same row.
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE Contact SET lastInteractedAt = ? WHERE id = ?",
+                arguments: [Int(date.timeIntervalSince1970), id.uuidString]
+            )
+        }
+    }
+
     /// Duplicates `Records.swift`'s file-private `encodeJSON` (same
     /// `JSONEncoder` + UTF-8 encoding) rather than widening its visibility
     /// for one extra call site.
@@ -359,137 +401,5 @@ struct GRDBContactRepository: ContactRepository {
             }
             return ContactFetchReport(contacts: healthy, corrupted: corrupted)
         }
-    }
-}
-
-struct GRDBContactGroupRepository: ContactGroupRepository {
-    let dbQueue: DatabaseQueue
-
-    func fetchAll() async throws -> [ContactGroup] {
-        try await dbQueue.read { db in
-            try ContactGroupRecord.fetchAll(db).map { try $0.toDomain() }
-        }
-    }
-
-    func fetch(id: UUID) async throws -> ContactGroup? {
-        try await dbQueue.read { db in
-            try ContactGroupRecord.fetchOne(db, key: id.uuidString).map { try $0.toDomain() }
-        }
-    }
-
-    func upsert(_ group: ContactGroup) async throws {
-        let record = ContactGroupRecord(from: group)
-        try await dbQueue.write { db in try record.save(db) }
-    }
-
-    func delete(id: UUID) async throws {
-        try await dbQueue.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET contactGroupId = NULL WHERE contactGroupId = ?",
-                arguments: [id.uuidString])
-            _ = try ContactGroupRecord.deleteOne(db, key: id.uuidString)
-        }
-    }
-}
-
-struct GRDBReminderRepository: ReminderRepository {
-    let dbQueue: DatabaseQueue
-
-    func fetchAllPending() async throws -> [ScheduledReminder] {
-        try await dbQueue.read { db in
-            try ScheduledReminderRecord
-                .filter(Column("state") == ReminderState.pending.rawValue)
-                .order(Column("scheduledFor"), Column("id"))
-                .fetchAll(db)
-                .map { try $0.toDomain() }
-        }
-    }
-
-    func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder] {
-        try await dbQueue.read { db in
-            try ScheduledReminderRecord
-                .filter(Column("contactId") == contactId.uuidString
-                        && Column("state") == ReminderState.pending.rawValue)
-                .order(Column("scheduledFor"), Column("id"))
-                .fetchAll(db)
-                .map { try $0.toDomain() }
-        }
-    }
-
-    func upsert(_ reminder: ScheduledReminder) async throws {
-        let record = ScheduledReminderRecord(from: reminder)
-        try await dbQueue.write { db in try record.save(db) }
-    }
-
-    func updateState(id: UUID, state: ReminderState) async throws {
-        try await dbQueue.write { db in
-            try db.execute(
-                sql: "UPDATE ScheduledReminder SET state = ? WHERE id = ?",
-                arguments: [state.rawValue, id.uuidString])
-        }
-    }
-
-    func delete(id: UUID) async throws {
-        try await dbQueue.write { db in
-            _ = try ScheduledReminderRecord.deleteOne(db, key: id.uuidString)
-        }
-    }
-}
-
-struct GRDBInteractionRepository: InteractionRepository {
-    let dbQueue: DatabaseQueue
-
-    func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
-        guard limit > 0 else { return [] }
-        return try await dbQueue.read { db in
-            try InteractionLogRecord
-                .filter(Column("contactId") == contactId.uuidString)
-                .order(Column("occurredAt").desc, Column("id"))
-                .limit(limit)
-                .fetchAll(db)
-                .map { try $0.toDomain() }
-        }
-    }
-
-    func append(_ log: InteractionLog) async throws {
-        let record = InteractionLogRecord(from: log)
-        try await dbQueue.write { db in try record.insert(db) }
-    }
-}
-
-struct GRDBReminderWindowRepository: ReminderWindowRepository {
-    let dbQueue: DatabaseQueue
-
-    func fetchGlobal() async throws -> ReminderWindow {
-        try await dbQueue.read { db in
-            guard let rec = try ReminderWindowRecord.fetchOne(db, key: 1) else {
-                throw DataError.notFound
-            }
-            return try rec.toDomain()
-        }
-    }
-
-    func saveGlobal(_ window: ReminderWindow) async throws {
-        try window.validate()
-        let record = try ReminderWindowRecord(from: window)
-        try await dbQueue.write { db in try record.save(db) }
-    }
-}
-
-struct GRDBUserProfileRepository: UserProfileRepository {
-    let dbQueue: DatabaseQueue
-
-    func fetch() async throws -> UserProfile {
-        try await dbQueue.read { db in
-            guard let rec = try UserProfileRecord.fetchOne(db, key: 1) else {
-                throw DataError.notFound
-            }
-            return rec.toDomain()
-        }
-    }
-
-    func save(_ profile: UserProfile) async throws {
-        let record = UserProfileRecord(from: profile)
-        try await dbQueue.write { db in try record.save(db) }
     }
 }

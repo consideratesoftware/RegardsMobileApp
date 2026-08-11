@@ -20,6 +20,12 @@ struct MockContactRepository: ContactRepository {
         await store.updateReconciledFields(id: id, fields: fields)
     }
 
+    /// Overrides the protocol's default the same way, for the same reason —
+    /// see `updateReconciledFields` immediately above.
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
+        await store.updateLastInteractedAt(id: id, at: date)
+    }
+
     /// Overrides the protocol's default (which reports zero corruption for
     /// any in-memory backend) so the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
     /// fixture can make the All Contacts corruption banner reachable.

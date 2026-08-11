@@ -403,7 +403,7 @@ Sources, merged per contact (Contacts wins over Calendar): `CNContact.birthday` 
 
 ## 9a. SchedulingPass — the orchestrator (new in v1.0)
 
-Single `actor SchedulingPass` (App layer, constructed in `AppEnvironment`), the only writer of `ScheduledReminder` rows and OS notifications.
+Single `actor SchedulingPass` (App layer, constructed in `AppRuntime.init` alongside `environment`, sharing `AppRuntime`'s `userCalendar` — §14 PR22), the only writer of `ScheduledReminder` rows and OS notifications.
 
 ```
 protocol NotificationScheduling: Sendable {          // Platform/Notifications

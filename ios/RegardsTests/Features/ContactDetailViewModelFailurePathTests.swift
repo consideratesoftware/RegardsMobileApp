@@ -156,4 +156,64 @@ struct ContactDetailViewModelFailurePathTests {
         #expect(viewModel.contact?.lastInteractedAt == contact.lastInteractedAt)
         #expect(viewModel.interactions.count == 1)
     }
+
+    /// The doc comments on `markCaughtUp`/`logOther` claim `scheduler
+    /// .caughtUp` runs first and a failure there "blocks everything after
+    /// it by construction" — nothing tested that claim directly. Every
+    /// other failure test in this file fails a *later* write, so a
+    /// scheduler failure always had something already persisted to check.
+    /// This is the missing case: the reminder-state write itself throws,
+    /// and `InteractionLogging` must never run at all — proved here by
+    /// asserting no interaction was logged and `lastInteractedAt` never
+    /// moved, not just that the final state "looks" untouched.
+    /// `.failing()`, not a narrower toggle: `ContactDetailViewModel.load()`
+    /// never reads `reminders`, so a blanket reminders failure can't also
+    /// break the reload this test's assertions depend on.
+    @Test("A caught-up write that fails at the scheduler step never reaches InteractionLogging")
+    func markCaughtUpNeverLogsWhenSchedulerThrowsFirst() async throws {
+        let contact = Self.contact(preferredChannel: .signal, lastInteractedAt: nil)
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository.failing()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: interactions,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        await viewModel.markCaughtUp()
+
+        #expect(await interactions.appendedLogs().isEmpty)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == nil)
+        #expect(viewModel.contact?.lastInteractedAt == nil)
+    }
+
+    /// Same shape as `markCaughtUpNeverLogsWhenSchedulerThrowsFirst`, driven
+    /// through `logOther` instead — see that test's doc comment.
+    @Test("A log-other write that fails at the scheduler step never reaches InteractionLogging")
+    func logOtherNeverLogsWhenSchedulerThrowsFirst() async throws {
+        let contact = Self.contact(preferredChannel: .whatsapp, lastInteractedAt: nil)
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository.failing()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: interactions,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        await viewModel.logOther(channel: .email)
+
+        #expect(await interactions.appendedLogs().isEmpty)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == nil)
+        #expect(viewModel.contact?.lastInteractedAt == nil)
+    }
 }

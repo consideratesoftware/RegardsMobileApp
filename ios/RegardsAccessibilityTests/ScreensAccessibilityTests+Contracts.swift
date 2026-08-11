@@ -236,7 +236,10 @@ extension ScreensAccessibilityTests {
         XCTAssertTrue(snooze.waitForExistence(timeout: 10))
         XCTAssertTrue(logOther.waitForExistence(timeout: 10))
         XCTAssertEqual(caughtUp.label, "Caught up")
-        XCTAssertEqual(snooze.label, "Snooze 1 wk")
+        // Spelled out, not the on-screen "1 wk" — VoiceOver reads that
+        // abbreviation literally. No contact name here, unlike Overdue and
+        // Upcoming's row buttons; see the label's own comment for why.
+        XCTAssertEqual(snooze.label, "Snooze 1 week")
         XCTAssertEqual(logOther.label, "Log other")
         XCTAssertTrue(caughtUp.isEnabled)
         XCTAssertTrue(snooze.isEnabled)

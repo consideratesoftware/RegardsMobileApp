@@ -46,22 +46,32 @@ struct InteractionLogging {
         return try await record(contact: contact, source: .manual, channel: channel, at: occurredAt)
     }
 
-    /// Writes in a fixed order — `interactions.append` before
-    /// `contacts.upsert` — with no compensation if the second write fails.
-    /// If `append` succeeds and `upsert` then throws, the `InteractionLog`
-    /// row is left persisted with no matching `lastInteractedAt` move: a
-    /// caller re-reading the contact sees it still due, while its own
-    /// interaction history already claims otherwise. Neither list rereads
-    /// interaction history to decide overdue-ness (only `Contact
-    /// .lastInteractedAt`), so this doesn't produce a visibly wrong Overdue
-    /// row — the drift is confined to the interactions list disagreeing with
-    /// the contact's own state, and self-heals the next time this contact is
-    /// caught up successfully. Reordering to upsert-then-append would trade
-    /// this for the opposite drift (the contact reads caught-up with no log
-    /// entry to show for it) rather than removing it — a stub that doesn't
-    /// touch `ScheduledReminder` has no transactional primitive spanning two
+    /// Writes in a fixed order — `interactions.append` before the
+    /// `lastInteractedAt` move — with no compensation if the second write
+    /// fails. If `append` succeeds and the move then throws, the
+    /// `InteractionLog` row is left persisted with no matching
+    /// `lastInteractedAt` move: a caller re-reading the contact sees it
+    /// still due, while its own interaction history already claims
+    /// otherwise. Neither list rereads interaction history to decide
+    /// overdue-ness (only `Contact.lastInteractedAt`), so this doesn't
+    /// produce a visibly wrong Overdue row — the drift is confined to the
+    /// interactions list disagreeing with the contact's own state, and
+    /// self-heals the next time this contact is caught up successfully.
+    /// Reordering to move-then-append would trade this for the opposite
+    /// drift (the contact reads caught-up with no log entry to show for it)
+    /// rather than removing it — a stub that doesn't touch
+    /// `ScheduledReminder` has no transactional primitive spanning two
     /// repositories to close the gap with; that arrives with SchedulingPass's
     /// full write surface (TF-07 / PR25).
+    ///
+    /// `contacts.updateLastInteractedAt`, not `contacts.upsert` from the
+    /// `contact` snapshot passed in: that snapshot was fetched at the start
+    /// of `markCaughtUp`/`logOther`, and a whole-row `upsert` from it could
+    /// silently clobber a concurrent `ContactsReconciler` field write
+    /// landing on the same row in between — including un-archiving a contact
+    /// the reconciler just archived. The field-scoped write never reads the
+    /// row, so it can't revert anything it doesn't touch (same reasoning as
+    /// `updateReconciledFields`, TF-03).
     private func record(
         contact: Contact,
         source: InteractionSource,
@@ -71,9 +81,9 @@ struct InteractionLogging {
         try await interactions.append(
             InteractionLog(contactId: contact.id, occurredAt: occurredAt, source: source, channel: channel)
         )
+        try await contacts.updateLastInteractedAt(id: contact.id, at: occurredAt)
         var updated = contact
         updated.lastInteractedAt = occurredAt
-        try await contacts.upsert(updated)
         return updated
     }
 }

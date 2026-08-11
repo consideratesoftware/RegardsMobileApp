@@ -126,8 +126,24 @@ public final class OverdueViewModel {
             // `PendingSnoozeLookup` — shared with `UpcomingViewModel`.
             // Building it here, once per load, keeps `makeOverdueRow` a pure
             // function of its inputs.
+            //
+            // A failed `fetchAllPending()` degrades to "no snoozes known"
+            // instead of propagating and blanking the whole screen: `all`
+            // above already succeeded, so the only thing actually missing is
+            // which contacts are snoozed, and losing that temporarily is far
+            // less harmful than losing every row (R50 reasoning — same
+            // per-row/per-field tolerance as `observeTracked()`'s
+            // `compactMap` fix, applied here to a read scoped to one lookup
+            // rather than the whole load).
+            let pendingReminders: [ScheduledReminder]
+            do {
+                pendingReminders = try await reminders.fetchAllPending()
+            } catch {
+                Self.log.error("failed to load pending reminders for snooze lookup: \(error, privacy: .private)")
+                pendingReminders = []
+            }
             let snoozedUntilByContact = PendingSnoozeLookup.snoozedUntilByContact(
-                pendingReminders: try await reminders.fetchAllPending()
+                pendingReminders: pendingReminders
             )
             let now = clock()
             let loadedRows = all.compactMap {
@@ -187,6 +203,17 @@ public final class OverdueViewModel {
     /// trigger only ever fires after the snooze is already gone.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
+        // Bumped synchronously with the optimistic mutation below, not left
+        // to `performLoad()` alone: a `load()` already in flight when this
+        // is called has already captured its own `generation` and is
+        // awaiting a suspension point. Without this bump, that stale load
+        // can still finish afterward, pass `guard generation ==
+        // loadGeneration` (nothing here would have changed it), and
+        // overwrite this method's optimistic removal with its own
+        // pre-action row set — the contact reappears. Bumping here
+        // invalidates that in-flight load the same way a genuine
+        // `performLoad()` call would.
+        loadGeneration += 1
         rows.removeAll { $0.contactId == contactId }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
@@ -210,8 +237,18 @@ public final class OverdueViewModel {
     ///
     /// Returns whether the write succeeded — see `markCaughtUp`'s doc
     /// comment for why the caller needs this.
+    ///
+    /// Same `loadGeneration` bump as `markCaughtUp`, and it matters even
+    /// more here: this method's success path never calls `performLoad()` —
+    /// a snoozed contact needs no fresh row data, only removal — so there is
+    /// no later reload to self-heal a stale one overwriting this row back
+    /// in. Without the bump, a `load()` in flight at the moment of the tap
+    /// would leave the contact sitting in Overdue after a successful snooze,
+    /// visibly failing §14 PR22's "moves the contact out of Overdue
+    /// instantly" contract.
     @discardableResult
     public func snooze(contactId: UUID) async -> Bool {
+        loadGeneration += 1
         rows.removeAll { $0.contactId == contactId }
         do {
             try await scheduler.snooze(contactId: contactId)

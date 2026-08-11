@@ -187,12 +187,10 @@ private extension ContactDetailScreen {
                 }
             }
         }
-        // Overdue and Upcoming both gate a contact's cadence row on
-        // `tracked && cadenceDays != nil`; an untracked or no-cadence
-        // contact has no `ScheduledReminder` either list would ever read,
-        // so Snooze here would write an inert row and control a state that
-        // doesn't exist — the no-inert-controls rule this repo enforces
-        // everywhere else.
+        .accessibilityHint("Logs an interaction now and updates status.")
+        // Overdue/Upcoming gate a cadence row on `tracked && cadenceDays !=
+        // nil`; an untracked/no-cadence contact has no `ScheduledReminder`
+        // either list reads, so Snooze would write an inert row otherwise.
         if contact.tracked, contact.cadenceDays != nil {
             secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
                 Task {
@@ -202,10 +200,18 @@ private extension ContactDetailScreen {
                     }
                 }
             }
+            // "1 wk" reads as a literal abbreviation without this. No
+            // contact name, unlike Overdue/Upcoming's "Snooze <name> 1
+            // week": there the name distinguishes rows, while this screen
+            // is about one contact and its siblings are plain "Caught up"
+            // and "Log other".
+            .accessibilityLabel("Snooze 1 week")
+            .accessibilityHint("Pushes the next reminder out one week.")
         }
         secondaryAction("Log other", identifier: "contact-detail.log-other") {
             showsLogOtherChannelPicker = true
         }
+        .accessibilityHint("Choose the channel you used to reach them.")
     }
 
     /// Announces a row action's result and lands focus on the Cadence

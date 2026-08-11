@@ -26,14 +26,12 @@ public struct UpcomingRowState: Sendable, Identifiable, Equatable {
     public let dayHeader: String
 
     /// The spoken VoiceOver label for this row, e.g.
-    /// "Leia Organa, Jedi Order anniversary at 6:00 pm".
-    ///
-    /// This lives on the state, not in the view, so it is unit-testable: the
-    /// row previously interpolated `kind` directly and VoiceOver read the raw
-    /// enum case name ("customOccasion") instead of the occasion's label.
-    /// Cadence rows speak their cadence text; every other kind speaks its
-    /// occasion text. A row with neither omits the phrase rather than
-    /// speaking an empty fragment.
+    /// "Leia Organa, Jedi Order anniversary at 6:00 pm". Lives on the state,
+    /// not the view, so it's unit-testable: the row previously interpolated
+    /// `kind` directly and VoiceOver read the raw enum case name
+    /// ("customOccasion") instead of the occasion's label. Cadence rows
+    /// speak their cadence text; every other kind speaks its occasion text.
+    /// A row with neither omits the phrase rather than speaking empty.
     public var accessibilityLabel: String {
         let what = kind == .cadence ? cadenceText : occasionText
         guard let what, !what.isEmpty else {
@@ -114,22 +112,19 @@ public final class UpcomingViewModel {
 
     /// Subscribes once to `contacts.observeTracked()` so this screen reflects
     /// an action taken elsewhere — Contact Detail's Caught up / Log other, or
-    /// Overdue's own row action — without the user having to leave and
-    /// return (ARCHITECTURE.md §14 PR22: "live lists update"). `load()` can
-    /// be called again afterward (pull-to-refresh, retry) without
+    /// Overdue's own row action — without leaving and returning
+    /// (ARCHITECTURE.md §14 PR22: "live lists update"). `load()` can be
+    /// called again afterward (pull-to-refresh, retry) without
     /// re-subscribing. Scoped to `Contact` changes only: occasion rows still
     /// come from the on-the-fly `reminders.fetchAllPending()` read until
     /// TF-07's `ScheduledReminder ⋈ Contact` pipeline exists (R10).
     ///
-    /// Awaits `observeTracked()` itself (registering the subscription)
-    /// before spawning the Task that consumes it — see `OverdueViewModel`'s
-    /// sibling method for why subscribing inside the spawned Task would race
-    /// a write that lands right after `load()` returns.
-    ///
-    /// `self` is re-checked weakly on every emission, not just once before
-    /// the loop starts: capturing `self` non-weakly for the loop's duration
-    /// would keep this long-lived subscription alive for as long as the
-    /// repository keeps emitting, defeating `[weak self]` entirely.
+    /// Awaits `observeTracked()` itself before spawning the Task that
+    /// consumes it — see `OverdueViewModel`'s sibling method for why
+    /// subscribing inside the spawned Task would race a write landing right
+    /// after `load()` returns. `self` is re-checked weakly on every
+    /// emission, not just once before the loop starts, since capturing it
+    /// non-weakly would keep this subscription alive indefinitely.
     private func startObservingIfNeeded() async {
         guard observationTask == nil else { return }
         // A placeholder, set synchronously before the first suspension
@@ -214,20 +209,29 @@ public final class UpcomingViewModel {
     ///
     /// Also clears any pending snooze through `SchedulingPass.caughtUp`
     /// *before* the interaction log runs — see `OverdueViewModel.markCaughtUp`'s
-    /// doc comment for why this ordering matters and why clearing the snooze
-    /// is required at all: without it a short-cadence contact's stale
+    /// doc comment for why: without it a short-cadence contact's stale
     /// snoozed date keeps winning `buildRows`'
     /// `max(now, overdueAt, snoozedUntil)` over the freshly computed one.
     ///
-    /// Reloads explicitly on success too, unlike `OverdueViewModel`'s
-    /// sibling method: the optimistic update above only *removes* the
-    /// cadence row, but a freshly caught-up contact can legitimately owe a
-    /// *new* one inside the horizon — Overdue skips this since its
-    /// `overdueDays` is always 0 once caught up. This reload also used to be
-    /// the only fix for a stale-snooze race the write-order change above now
-    /// closes at the source, so it stays for the "new row owed" case only.
+    /// Reloads explicitly on success too, unlike `OverdueViewModel`: the
+    /// optimistic update above only *removes* the cadence row, but a
+    /// freshly caught-up contact can legitimately owe a *new* one inside
+    /// the horizon — Overdue skips this since its `overdueDays` is always 0
+    /// once caught up. This reload also used to be the only fix for a
+    /// stale-snooze race the write-order change above now closes at the
+    /// source, so it stays for the "new row owed" case only.
+    ///
+    /// `loadGeneration` is bumped synchronously with the optimistic mutation
+    /// below, mirroring `OverdueViewModel.markCaughtUp` — a `load()` already
+    /// in flight when this is called has captured its own `generation`, and
+    /// without this bump it could finish afterward and overwrite the
+    /// optimistic removal with stale, pre-action rows. The explicit
+    /// `performLoad()` on success below masks the race most of the time
+    /// (correct data lands moments later), but the stale row can still
+    /// flash back for a frame before that happens.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
+        loadGeneration += 1
         groups = groups.map { header, rows in
             (header, rows.filter { !($0.contactId == contactId && $0.kind == .cadence) })
         }.filter { !$0.rows.isEmpty }
@@ -252,13 +256,10 @@ public final class UpcomingViewModel {
     // DateFormatter construction is slow, the format we want — "h:mm a" with
     // lowercase am/pm — is locale-sensitive without an explicit POSIX pin,
     // and mutating a shared formatter's `timeZone` per call is fragile
-    // (Swift 6 strict concurrency would also flag a single non-Sendable
-    // static being written from multiple call sites). We cache one formatter
-    // per TZ identifier, created on first use and reused forever after.
-    //
-    // `@MainActor` on the caches matches the isolation of every call site
-    // (every view model is `@MainActor`) — static members don't inherit
-    // class isolation, so this has to be explicit.
+    // (Swift 6 strict concurrency would also flag a non-Sendable static
+    // written from multiple call sites). One formatter per TZ identifier,
+    // cached on first use. `@MainActor` on the caches matches every call
+    // site's isolation — static members don't inherit class isolation.
 
     @MainActor
     private static var timeFormattersByTZ: [String: DateFormatter] = [:]
@@ -396,13 +397,12 @@ public final class UpcomingViewModel {
         // Known deviation: §9 contract 6 (an occasion suppresses a same-day
         // cadence reminder for the same contact) is NOT enforced here. This
         // view model computes cadence rows independently of the persisted
-        // reminders it reads, so it cannot be the place that decides which of
-        // two candidate reminders survives without duplicating the scheduler.
-        // SchedulingPass is the sole idempotent reminder writer and owns
-        // no-double-up (§14 PR25 / TF-07, R6). Until it lands, a contact whose
-        // cadence falls on the same local day as an occasion can appear twice
-        // in Upcoming. The rows carry distinct IDs (R36), so the duplicate is
-        // visible rather than corrupting identity or ordering.
+        // reminders it reads, so it can't decide which of two candidates
+        // survives without duplicating the scheduler — that's SchedulingPass's
+        // job (§14 PR25 / TF-07, R6). Until it lands, a contact whose cadence
+        // falls on the same local day as an occasion can appear twice; the
+        // rows carry distinct IDs (R36), so the duplicate is visible rather
+        // than corrupting identity or ordering.
         let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
         let startOfToday = calendar.startOfDay(for: now)
         for reminder in reminders where reminder.kind != .cadence {

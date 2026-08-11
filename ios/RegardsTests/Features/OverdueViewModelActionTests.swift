@@ -47,6 +47,30 @@ struct OverdueViewModelActionTests {
         )
     }
 
+    /// Correctness fix (staged review): `performLoad()` used to propagate a
+    /// failed `reminders.fetchAllPending()` straight out of its `do` block,
+    /// blanking the entire screen (`rows = []`, `loadState = .failed`) even
+    /// though `contacts.fetchTracked()` had already succeeded — losing every
+    /// overdue row over a problem scoped to one lookup (which contacts are
+    /// snoozed). `.failing()` on `reminders` alone, `contacts` untouched, so
+    /// this discriminates "degrades the snooze lookup only" from "fails the
+    /// whole load": if the fix regressed, `rows` would be empty and
+    /// `loadState` would be `.failed` here instead.
+    @Test("A failing pending-reminders read degrades to no known snoozes, not a blanked screen")
+    func performLoadDegradesWhenPendingRemindersReadFails() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository.failing()
+        let viewModel = Self.viewModel(contacts: contacts, reminders: reminders)
+
+        await viewModel.load()
+
+        // The contact is genuinely overdue and nothing about its own data
+        // failed to load — the row belongs on screen, snooze state or not.
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+        #expect(viewModel.loadState == .loaded)
+    }
+
     @Test("Caught up removes the row instantly and persists the interaction")
     func markCaughtUpRemovesRowAndPersists() async throws {
         let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
@@ -134,6 +158,55 @@ struct OverdueViewModelActionTests {
         let stored = try #require(await contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == contact.lastInteractedAt)
         #expect(viewModel.rows.map(\.contactId) == [contact.id])
+    }
+
+    /// The blocker this closes (staged review, predates this round —
+    /// missed by three earlier reviews): `markCaughtUp`'s optimistic
+    /// `rows.removeAll` never bumped `loadGeneration`, so a `performLoad()`
+    /// already in flight when the action fired would still pass its own
+    /// `guard generation == loadGeneration` after finishing and overwrite
+    /// the optimistic removal with its own pre-action row set — the contact
+    /// reappears. `GatedFetchTrackedContactRepository` makes this
+    /// deterministic instead of hoping a real race reproduces: it holds
+    /// `fetchTracked()` open until the test releases it, so the stale
+    /// `load()` genuinely straddles the action instead of merely racing it.
+    @Test("A load() in flight when markCaughtUp fires does not overwrite the optimistic removal")
+    func markCaughtUpSurvivesConcurrentInFlightLoad() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let baseContacts = StubContactRepository([contact])
+        let gate = AsyncGate()
+        let gatedContacts = GatedFetchTrackedContactRepository(wrapped: baseContacts, gate: gate)
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository()
+        let viewModel = OverdueViewModel(
+            contacts: gatedContacts,
+            interactions: interactions,
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await gate.open()
+        await viewModel.load() // populates the initial row; gate open, so this doesn't block
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        // A second load, held open at fetchTracked() — simulates a reload
+        // (pull-to-refresh, a cross-screen observeTracked() broadcast) that
+        // started just before the user tapped Caught up.
+        await gate.close()
+        let staleLoad = Task { await viewModel.load() }
+        await gate.waitUntilArrived()
+
+        await viewModel.markCaughtUp(contactId: contact.id)
+        // The action's own work (fetch/updateLastInteractedAt/append) never
+        // touches the gated fetchTracked(), so it completes immediately,
+        // independent of the stale load still parked at the gate.
+        #expect(viewModel.rows.isEmpty)
+
+        // Release the stale load and let it finish. If the generation bump
+        // didn't happen, this is where the contact would reappear.
+        await gate.open()
+        await staleLoad.value
+        #expect(viewModel.rows.isEmpty)
     }
 
     @Test("A write on the same repository through a different reference is reflected live")
@@ -335,6 +408,47 @@ struct OverdueViewModelActionTests {
         // rather than leaving the optimistic removal standing — mirrors
         // `markCaughtUpFailureReloads`.
         #expect(viewModel.rows.map(\.contactId) == [contact.id])
+    }
+
+    /// Same blocker as `markCaughtUpSurvivesConcurrentInFlightLoad`, for
+    /// `snooze` — and the more serious half of it: `snooze`'s success path
+    /// never calls `performLoad()` on its own (a snoozed contact needs no
+    /// fresh row data, only removal), so without the `loadGeneration` bump a
+    /// stale load winning this race has nothing later to self-heal it — the
+    /// contact would sit in Overdue indefinitely after a successful snooze,
+    /// failing §14 PR22's "moves the contact out of Overdue instantly"
+    /// contract outright, not just for one frame.
+    @Test("A load() in flight when snooze fires does not overwrite the optimistic removal")
+    func snoozeSurvivesConcurrentInFlightLoad() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let baseContacts = StubContactRepository([contact])
+        let gate = AsyncGate()
+        let gatedContacts = GatedFetchTrackedContactRepository(wrapped: baseContacts, gate: gate)
+        let reminders = StubReminderRepository()
+        let viewModel = OverdueViewModel(
+            contacts: gatedContacts,
+            interactions: StubInteractionRepository(),
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await gate.open()
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        await gate.close()
+        let staleLoad = Task { await viewModel.load() }
+        await gate.waitUntilArrived()
+
+        await viewModel.snooze(contactId: contact.id)
+        #expect(viewModel.rows.isEmpty)
+
+        await gate.open()
+        await staleLoad.value
+        // No reload of this method's own follows a successful snooze — if
+        // the stale load's stale row won here, nothing else would ever
+        // correct it for the rest of this screen's lifetime.
+        #expect(viewModel.rows.isEmpty)
     }
 
     @Test("Two concurrent load() calls subscribe to observeTracked() exactly once")

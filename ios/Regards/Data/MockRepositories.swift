@@ -259,109 +259,6 @@ actor MockStore {
         return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
     }
 
-    static func seedCast(
-        now: Date,
-        includeDuplicateFixture: Bool
-    ) -> [Contact] {
-        let day: TimeInterval = 86_400
-        var contacts = [
-            Contact(
-                systemContactRef: "sys-leia",
-                displayName: "Leia Organa",
-                tracked: true, cadenceDays: 14,
-                priorityTier: .innerCircle,
-                preferredChannel: .whatsapp,
-                preferredChannelValue: "+1 415 555 0140",
-                lastInteractedAt: now.addingTimeInterval(-day * 23),
-                notes: "Son is Ben. Ask about the diplomatic posting on Chandrila."),
-            Contact(
-                systemContactRef: "sys-padme",
-                displayName: "Padmé Amidala",
-                tracked: true, cadenceDays: 7,
-                priorityTier: .innerCircle,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0134",
-                lastInteractedAt: now.addingTimeInterval(-day * 11)),
-            Contact(
-                systemContactRef: "sys-luke",
-                displayName: "Luke Skywalker",
-                tracked: true, cadenceDays: 30,
-                priorityTier: .close,
-                preferredChannel: .signal,
-                preferredChannelValue: "+1 415 555 0198",
-                lastInteractedAt: now.addingTimeInterval(-day * 36)),
-            Contact(
-                systemContactRef: "sys-lando",
-                displayName: "Lando Calrissian",
-                tracked: true, cadenceDays: 21,
-                priorityTier: .close,
-                preferredChannel: .sms,
-                preferredChannelValue: "+1 212 555 0176",
-                lastInteractedAt: now.addingTimeInterval(-day * 23)),
-            Contact(
-                systemContactRef: "sys-chewbacca",
-                displayName: "Chewbacca",
-                tracked: true, cadenceDays: 30,
-                priorityTier: .regular,
-                preferredChannel: .whatsapp,
-                preferredChannelValue: "+1 415 555 0141",
-                lastInteractedAt: now.addingTimeInterval(-day * 28)),
-            Contact(
-                systemContactRef: "sys-anakin",
-                displayName: "Anakin Skywalker",
-                tracked: true, cadenceDays: 14,
-                priorityTier: .innerCircle,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0177",
-                lastInteractedAt: now.addingTimeInterval(-day * 8)),
-            Contact(
-                systemContactRef: "sys-din",
-                displayName: "Din Djarin",
-                tracked: true, cadenceDays: 42,
-                priorityTier: .regular,
-                preferredChannel: .signal,
-                preferredChannelValue: "+1 415 555 0142",
-                lastInteractedAt: now.addingTimeInterval(-day * 42)),
-            Contact(
-                systemContactRef: "sys-shmi",
-                displayName: "Shmi Skywalker",
-                tracked: true, cadenceDays: 10,
-                priorityTier: .innerCircle,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0111",
-                lastInteractedAt: now.addingTimeInterval(-day * 2)),
-            Contact(
-                systemContactRef: "sys-obiwan",
-                displayName: "Obi-Wan Kenobi",
-                tracked: true, cadenceDays: 90,
-                priorityTier: .regular,
-                preferredChannel: .email,
-                preferredChannelValue: "obiwan@jeditemple.example",
-                lastInteractedAt: now.addingTimeInterval(-day * 84)),
-            Contact(
-                systemContactRef: "sys-ahsoka",
-                displayName: "Ahsoka Tano",
-                tracked: true, cadenceDays: 90,
-                priorityTier: .close,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0143",
-                lastInteractedAt: now.addingTimeInterval(-day * 87)),
-        ]
-        if includeDuplicateFixture {
-            contacts.append(Contact(
-                systemContactRef: "ui-test-luke-duplicate",
-                displayName: "Luke Skywalker",
-                tracked: true,
-                cadenceDays: 30,
-                priorityTier: .close,
-                preferredChannel: .signal,
-                preferredChannelValue: "+1 415 555 0198",
-                lastInteractedAt: now.addingTimeInterval(-day * 36)
-            ))
-        }
-        return contacts
-    }
-
 }
 
 extension MockStore {
@@ -398,8 +295,9 @@ extension MockStore {
     /// `ContactRepository.observeTracked()`'s doc: an eager replay would race a caller's own optimistic update).
     /// Registers synchronously via `AsyncStream.makeStream`, not the closure initializer, which can't touch
     /// actor-isolated `trackedObservers` directly and could miss an early write from a deferred spawned `Task`.
+    /// `.bufferingNewest(1)`, not `.unbounded` — see `GRDBContactRepository.observeTracked()`'s matching comment.
     func observeTracked() -> AsyncStream<[Contact]> {
-        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
+        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self, bufferingPolicy: .bufferingNewest(1))
         let token = UUID()
         trackedObservers[token] = continuation
         continuation.onTermination = { [weak self] _ in
@@ -430,6 +328,15 @@ extension MockStore {
         c.emailAddresses = fields.emailAddresses
         c.preferredChannelValue = fields.preferredChannelValue
         c.archivedAt = fields.archivedAt.map(mockStoredDate)
+        contacts[id] = c
+        broadcastTrackedChange()
+    }
+
+    /// Mirrors `GRDBContactRepository.updateLastInteractedAt`: writes exactly this one field,
+    /// same R23 broadcast parity as `updateReconciledFields` above.
+    func updateLastInteractedAt(id: UUID, at date: Date) {
+        guard var c = contacts[id] else { return }
+        c.lastInteractedAt = mockStoredDate(date)
         contacts[id] = c
         broadcastTrackedChange()
     }
