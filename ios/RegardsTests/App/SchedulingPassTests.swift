@@ -201,8 +201,11 @@ struct SchedulingPassTests {
         try await scheduler.snooze(contactId: contact.id)
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count == 1)
 
-        try await scheduler.caughtUp(contactId: contact.id)
+        // The return value (round 7): `true` — a pending row genuinely
+        // existed and was transitioned, not just "the write ran."
+        let clearedSomething = try await scheduler.caughtUp(contactId: contact.id)
 
+        #expect(clearedSomething)
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
         #expect(try await repositories.reminders.fetchAllPending()
             .contains { $0.contactId == contact.id } == false)
@@ -222,13 +225,68 @@ struct SchedulingPassTests {
         )
 
         // Never snoozed — no pending cadence row exists for this contact.
-        try await scheduler.caughtUp(contactId: contact.id)
+        // The `false` return (round 7) is the signal a caller uses to skip
+        // any later restore-on-failure compensation.
+        let clearedSomething = try await scheduler.caughtUp(contactId: contact.id)
+        #expect(clearedSomething == false)
 
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
 
         // Calling it again (the "twice in a row" half of idempotence) is
-        // equally uneventful.
-        try await scheduler.caughtUp(contactId: contact.id)
+        // equally uneventful, and still reports nothing was pending to clear.
+        let secondCall = try await scheduler.caughtUp(contactId: contact.id)
+        #expect(secondCall == false)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
+    // MARK: - restorePendingAfterFailedCaughtUp (staged review round 7)
+
+    /// The compensation this pins: a caller's own later write fails after
+    /// `caughtUp` already cleared a real snooze, and the exact same row
+    /// (same id, same `scheduledFor`) comes back — not a freshly computed
+    /// `now + 7d` from a second `snooze()` call.
+    @Test(
+        "Restoring after a failed caught-up brings back the exact same pending row",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func restorePendingAfterFailedCaughtUpBringsBackSameRow(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(510), suffix: "caughtup-restore", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        try await scheduler.snooze(contactId: contact.id)
+        let original = try await repositories.reminders.fetchPending(forContact: contact.id)[0]
+        _ = try await scheduler.caughtUp(contactId: contact.id)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+
+        try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contact.id)
+
+        let restored = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(restored.count == 1)
+        #expect(restored[0].id == original.id)
+        #expect(restored[0].scheduledFor == original.scheduledFor)
+        #expect(restored[0].state == .pending)
+    }
+
+    /// Calling this without a preceding `caughtUp` in the same action is
+    /// meant to be safe (no row exists at the deterministic id yet), matching
+    /// `caughtUp`'s own no-op-when-nothing-matches idempotence.
+    @Test(
+        "Restoring with nothing to restore is a no-op, not an error",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func restorePendingAfterFailedCaughtUpWithNothingPendingIsNoOp(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(511), suffix: "caughtup-restore-noop", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            clock: { Date(timeIntervalSince1970: 1_800_000_000) }
+        )
+
+        try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contact.id)
+
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
 }

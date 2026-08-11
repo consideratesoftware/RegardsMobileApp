@@ -286,6 +286,36 @@ struct ContactDetailViewModelTests {
         #expect(stored.lastInteractedAt == contact.lastInteractedAt)
     }
 
+    /// The gap this pins (staged review round 7): `load()` fetches through
+    /// `contacts.fetch(id:)`, which — unlike `fetchTracked()` — doesn't
+    /// filter `archivedAt`, so this screen can still hold an archived
+    /// contact if a concurrent `ContactsReconciler` pass archived it after
+    /// the push. Without `snooze()`'s `contact.isActive` guard, the write
+    /// would still land: `SchedulingPass.snooze` has no precondition of its
+    /// own (R54), so it would write a pending cadence row that no
+    /// `fetchTracked()`-backed screen (Overdue, Upcoming) will ever surface
+    /// — an orphaned row, not a merely-stale one.
+    @Test("Snooze on an archived contact does nothing and writes no reminder")
+    func snoozeOnArchivedContactWritesNothing() async throws {
+        var contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        contact.archivedAt = Self.now.addingTimeInterval(-3_600)
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        let succeeded = await viewModel.snooze()
+
+        #expect(succeeded == false)
+        #expect(try await reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
     /// The hosted-review blocker this pins: `logOther` originally never
     /// called `scheduler.caughtUp`, unlike `markCaughtUp` — both route
     /// through `InteractionLogging`, which moves `lastInteractedAt` and

@@ -24,11 +24,17 @@ struct UpcomingViewModelRaceTests {
     /// not the scheduler: a scheduler failure now blocks everything after it
     /// by construction, so it can no longer produce a partial-persistence
     /// case. This sets up a real pending snooze first, specifically so "the
-    /// snooze is cleared" is provable rather than assumed — `caughtUp`
-    /// against a contact with nothing pending is a silent no-op either way,
-    /// which wouldn't discriminate "ran" from "was skipped."
-    @Test("A caught-up write that fails only at the final contact-upsert step still clears the snooze and logs it")
-    func markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
+    /// snooze is restored" is provable rather than assumed — `caughtUp`
+    /// against a contact with nothing pending returns `false`, which
+    /// wouldn't discriminate "ran and cleared something" from "was skipped."
+    ///
+    /// Superseded assertion, staged review round 7: this test used to assert
+    /// the pending snooze stayed cleared through the failure. It now asserts
+    /// the corrected behavior — the catch block restores the exact row
+    /// `caughtUp` cleared, mirroring `OverdueViewModelActionTests
+    /// .markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows`.
+    @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
+    func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
@@ -45,31 +51,32 @@ struct UpcomingViewModelRaceTests {
         )
         await viewModel.load()
         #expect(viewModel.totalCount == 1)
-        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
 
         await viewModel.markCaughtUp(contactId: contact.id)
 
-        // The first write (reminder-state) truly persisted: the pending
-        // snooze this test set up above is gone, even though the write
-        // after it failed.
+        // The reminder-state write ran, then was reverted by the catch
+        // block: the same pending cadence row is back, same id, same date —
+        // not a freshly computed `now + 7d`.
         let pending = try await reminders.fetchPending(forContact: contact.id)
-        #expect(pending.isEmpty)
-        // The second write's first half (interactions.append) also truly
+        #expect(pending.count == 1)
+        #expect(pending[0].kind == .cadence)
+        #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
+        // The second write's first half (interactions.append) still truly
         // persisted — only its second half (contacts.upsert) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)
 
         // The one field that genuinely failed to write stays at its
-        // pre-action value, and `performLoad()`'s reload reflects exactly
-        // that: `lastInteractedAt` never moved, so the contact is still
-        // exactly as overdue as before the action, and the snooze that
-        // would otherwise have suppressed it is already gone — the row
-        // belongs back in view, not left in its optimistically-removed
-        // state.
+        // pre-action value, and the restored snooze (now + 7d) falls outside
+        // this 5-day horizon — `performLoad()`'s reload correctly shows
+        // nothing for this contact, mirroring what the screen showed before
+        // the action ran, not a freshly exposed overdue row.
         let stored = try #require(await contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == contact.lastInteractedAt)
-        #expect(viewModel.totalCount == 1)
+        #expect(viewModel.totalCount == 0)
+        #expect(viewModel.groups.isEmpty)
     }
 
     /// The blocker this closes (staged review, predates this round —

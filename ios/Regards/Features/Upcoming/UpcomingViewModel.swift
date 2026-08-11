@@ -244,6 +244,11 @@ public final class UpcomingViewModel {
     /// `performLoad()` on success below masks the race most of the time
     /// (correct data lands moments later), but the stale row can still
     /// flash back for a frame before that happens.
+    ///
+    /// The catch block also restores a snooze `scheduler.caughtUp` genuinely
+    /// cleared before `InteractionLogging` then failed (staged review round
+    /// 7) — see `OverdueViewModel.markCaughtUp`'s doc comment for why this
+    /// matters and why it's a state-revert, not a fresh `snooze()` call.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         loadGeneration += 1
@@ -252,8 +257,9 @@ public final class UpcomingViewModel {
         }.filter { !$0.rows.isEmpty }
         totalCount = groups.reduce(0) { $0 + $1.rows.count }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+        var clearedPendingSnooze = false
         do {
-            try await scheduler.caughtUp(contactId: contactId)
+            clearedPendingSnooze = try await scheduler.caughtUp(contactId: contactId)
             try await logging.markCaughtUp(contactId: contactId, at: clock())
             await performLoad()
             return true
@@ -261,8 +267,21 @@ public final class UpcomingViewModel {
             Self.log.error(
                 "failed to mark caught up for \(contactId, privacy: .private): \(error, privacy: .private)"
             )
+            if clearedPendingSnooze {
+                await restorePendingSnooze(contactId: contactId)
+            }
             await performLoad()
             return false
+        }
+    }
+
+    private func restorePendingSnooze(contactId: UUID) async {
+        do {
+            try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
+        } catch {
+            Self.log.error(
+                "failed to restore snooze for \(contactId, privacy: .private): \(error, privacy: .private)"
+            )
         }
     }
 
@@ -284,11 +303,28 @@ public final class UpcomingViewModel {
             ?? now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
-        // `PendingSnoozeLookup` — shared with `OverdueViewModel`. Once a
-        // snooze lapses this map is simply not consulted and the ordinary
-        // computation below decides the date unchanged, so the row "returns"
-        // on its own the next load after the snoozed date passes.
-        let snoozedUntilByContact = PendingSnoozeLookup.snoozedUntilByContact(pendingReminders: reminders)
+        // A contact's pending cadence reminder's `scheduledFor`, keyed by
+        // contact id — Snooze's only persisted trace (§14 PR22's
+        // `SchedulingPass.snooze` stub; no separate "snoozed" flag exists on
+        // `Contact`). Inlined rather than a shared `PendingSnoozeLookup`
+        // helper (staged review round 7: two call sites, below §17's
+        // abstraction floor of three) — `OverdueViewModel.performLoad` has
+        // its own identical copy. Once a snooze lapses this map is simply
+        // not consulted and the ordinary computation below decides the date
+        // unchanged, so the row "returns" on its own the next load after the
+        // snoozed date passes.
+        let snoozedUntilByContact = Dictionary(
+            reminders
+                .filter { $0.kind == .cadence }
+                .map { ($0.contactId, $0.scheduledFor) },
+            // `max($0, $1)`, not "whichever comes last in the array": two
+            // pending cadence rows for one contact shouldn't happen (the
+            // deterministic `cadenceReminderID` write-path is meant to keep
+            // it to one), but if it ever did, picking by array order would
+            // make the winner depend on fetch ordering rather than on which
+            // row is actually later — `max` is correct regardless of order.
+            uniquingKeysWith: { max($0, $1) }
+        )
 
         func appendCadenceRow(contact: Contact, cadence: Int, fires: Date) {
             guard fires < horizonEnd else { return }

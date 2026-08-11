@@ -115,11 +115,21 @@ public final class ContactDetailViewModel {
     /// `OverdueViewModel.markCaughtUp`'s same-shaped return value and the
     /// same reasoning: announcing "marked caught up" against a write that
     /// then failed would tell a VoiceOver user something that didn't happen.
+    ///
+    /// The catch block also restores a snooze `scheduler.caughtUp` genuinely
+    /// cleared before `InteractionLogging` then failed (staged review round
+    /// 7): without this, a failed Caught up silently destroyed an existing
+    /// snooze — the user heard only "Couldn't mark X caught up," with
+    /// nothing about the reload above restoring the reminder their earlier
+    /// Snooze tap had set. See `SchedulingPass.restorePendingAfterFailedCaughtUp`'s
+    /// doc comment for why this reverts the same row rather than fabricating
+    /// a fresh date via a second `snooze()` call.
     @discardableResult
     public func markCaughtUp() async -> Bool {
         let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
+        var clearedPendingSnooze = false
         do {
-            try await scheduler.caughtUp(contactId: contactId)
+            clearedPendingSnooze = try await scheduler.caughtUp(contactId: contactId)
             try await logging.markCaughtUp(contactId: contactId, at: clock())
             await load()
             return true
@@ -127,6 +137,9 @@ public final class ContactDetailViewModel {
             Self.log.error(
                 "failed to mark caught up for \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )
+            if clearedPendingSnooze {
+                await restorePendingSnooze()
+            }
             await load()
             return false
         }
@@ -148,12 +161,14 @@ public final class ContactDetailViewModel {
     /// rendering pre-write state otherwise.
     ///
     /// Returns whether the write succeeded — see `markCaughtUp`'s doc
-    /// comment for why the screen needs this.
+    /// comment for why the screen needs this, and for why the catch block
+    /// also restores a snooze `scheduler.caughtUp` genuinely cleared.
     @discardableResult
     public func logOther(channel: Channel) async -> Bool {
         let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
+        var clearedPendingSnooze = false
         do {
-            try await scheduler.caughtUp(contactId: contactId)
+            clearedPendingSnooze = try await scheduler.caughtUp(contactId: contactId)
             try await logging.logOther(contactId: contactId, channel: channel, at: clock())
             await load()
             return true
@@ -161,8 +176,26 @@ public final class ContactDetailViewModel {
             Self.log.error(
                 "failed to log other channel for \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )
+            if clearedPendingSnooze {
+                await restorePendingSnooze()
+            }
             await load()
             return false
+        }
+    }
+
+    /// Shared by `markCaughtUp` and `logOther` above. Logs its own failure
+    /// separately from the caller's: a failure here means the user's snooze
+    /// is genuinely lost, not merely that this method didn't get to try —
+    /// worth its own diagnostic line rather than folding into the outer
+    /// catch's message.
+    private func restorePendingSnooze() async {
+        do {
+            try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
+        } catch {
+            Self.log.error(
+                "failed to restore snooze for \(self.contactId, privacy: .private): \(error, privacy: .private)"
+            )
         }
     }
 
@@ -176,8 +209,20 @@ public final class ContactDetailViewModel {
     ///
     /// Returns whether the write succeeded — see `markCaughtUp`'s doc
     /// comment for why the screen needs this.
+    ///
+    /// Gated on `contact.isActive` (staged review round 7): `load()` fetches
+    /// through `contacts.fetch(id:)`, which — unlike `fetchTracked()` —
+    /// doesn't filter `archivedAt`, so a contact this screen already has
+    /// open can be archived out from under it by a concurrent
+    /// `ContactsReconciler` pass mid-session, with Snooze staying tappable.
+    /// `SchedulingPass.snooze` itself has no such check (R54: it writes for
+    /// any contact that merely exists), so without this guard the write
+    /// would still land — a pending cadence row that no `fetchTracked()`
+    /// screen (Overdue, Upcoming) will ever surface, orphaned until PR25
+    /// gives the scheduler its own precondition.
     @discardableResult
     public func snooze() async -> Bool {
+        guard let contact, contact.isActive else { return false }
         do {
             try await scheduler.snooze(contactId: contactId)
             return true

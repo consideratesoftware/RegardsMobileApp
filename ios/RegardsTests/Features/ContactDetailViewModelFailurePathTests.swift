@@ -75,11 +75,17 @@ struct ContactDetailViewModelFailurePathTests {
     /// `scheduler.caughtUp` (a scheduler failure now blocks everything after
     /// it by construction, so it can't produce a partial-persistence case at
     /// all). This sets up a real pending snooze first, specifically so
-    /// "the snooze is cleared" is provable rather than assumed: `caughtUp`
-    /// against a contact with nothing pending is a silent no-op either way,
-    /// which wouldn't discriminate "ran" from "was skipped."
-    @Test("A caught-up write that fails only at the final contact-upsert step still clears the snooze and logs it")
-    func markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
+    /// "the snooze is restored" is provable rather than assumed: `caughtUp`
+    /// against a contact with nothing pending returns `false`, which
+    /// wouldn't discriminate "ran and cleared something" from "was skipped."
+    ///
+    /// Superseded assertion, staged review round 7: this test used to assert
+    /// the pending snooze stayed cleared through the failure — the bug the
+    /// coordinator's own round-4 instruction introduced (`caughtUp` before
+    /// `InteractionLogging`, uncompensated). It now asserts the corrected
+    /// behavior: the catch block restores the exact row `caughtUp` cleared.
+    @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
+    func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.contact(
             preferredChannel: .signal,
             lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400)
@@ -88,7 +94,7 @@ struct ContactDetailViewModelFailurePathTests {
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
         let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
-        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,
@@ -100,12 +106,14 @@ struct ContactDetailViewModelFailurePathTests {
 
         await viewModel.markCaughtUp()
 
-        // The first write (reminder-state) truly persisted: the pending
-        // snooze this test set up above is gone, even though the write
-        // after it failed.
+        // The reminder-state write ran, then was reverted by the catch
+        // block: the same pending cadence row is back, same id, same date —
+        // not a freshly computed `now + 7d`.
         let pending = try await reminders.fetchPending(forContact: contact.id)
-        #expect(pending.isEmpty)
-        // The second write's first half (interactions.append) also truly
+        #expect(pending.count == 1)
+        #expect(pending[0].kind == .cadence)
+        #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
+        // The second write's first half (interactions.append) still truly
         // persisted — only its second half (contacts.upsert) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
@@ -120,12 +128,12 @@ struct ContactDetailViewModelFailurePathTests {
     }
 
     /// Same shape as
-    /// `markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows`, driven
+    /// `markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows`, driven
     /// through `logOther` instead — the sibling should-fix #1 catch block on
     /// this method needs its own proof, not an assumption that
     /// `markCaughtUp`'s coverage carries over.
-    @Test("A log-other write that fails only at the final contact-upsert step still clears the snooze and logs it")
-    func logOtherClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
+    @Test("A log-other write that fails at the final upsert step restores the cleared snooze and still logs it")
+    func logOtherRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.contact(
             preferredChannel: .whatsapp,
             lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400)
@@ -134,7 +142,7 @@ struct ContactDetailViewModelFailurePathTests {
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
         let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
-        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,
@@ -147,7 +155,9 @@ struct ContactDetailViewModelFailurePathTests {
         await viewModel.logOther(channel: .email)
 
         let pending = try await reminders.fetchPending(forContact: contact.id)
-        #expect(pending.isEmpty)
+        #expect(pending.count == 1)
+        #expect(pending[0].kind == .cadence)
+        #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .manual)

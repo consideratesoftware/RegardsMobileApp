@@ -106,16 +106,51 @@ public actor SchedulingPass {
     /// to drop out of every read site's "pending" view — no caller-side
     /// filtering needed.
     ///
-    /// Targets `cadenceReminderID(contactId:)` directly rather than reading
-    /// first: a contact's pending cadence reminder, if one exists, is always
-    /// exactly that id (this stub is the sole writer of cadence rows and
-    /// never uses any other id), so there's nothing to look up.
-    /// `updateState` is a no-op — not an error — when nothing matches that
-    /// id, which is exactly the idempotence this needs: a contact with no
-    /// pending snooze has nothing to transition, and calling this twice in a
-    /// row does nothing the second time.
-    public func caughtUp(contactId: UUID) async throws {
-        try await reminders.updateState(id: Self.cadenceReminderID(contactId: contactId), state: .userCaughtUp)
+    /// Writes to `cadenceReminderID(contactId:)` directly rather than
+    /// deciding *whether* to write from a read first: a contact's pending
+    /// cadence reminder, if one exists, is always exactly that id (this stub
+    /// is the sole writer of cadence rows and never uses any other id), so
+    /// there's nothing to look up before writing. `updateState` is a no-op —
+    /// not an error — when nothing matches that id, which is exactly the
+    /// idempotence this needs: a contact with no pending snooze has nothing
+    /// to transition, and calling this twice in a row does nothing the
+    /// second time.
+    ///
+    /// The read before the write (staged review round 7) exists for a
+    /// different reason than deciding insert-vs-update: it reports back
+    /// *whether a pending row actually existed*, so a caller whose own later
+    /// write then fails knows whether this call cleared something worth
+    /// restoring. `restorePendingAfterFailedCaughtUp` below is that
+    /// compensation; a caller must check this return value before calling
+    /// it, since calling it unconditionally after every failure would risk
+    /// resurrecting a `.userCaughtUp` row a *different*, already-successful
+    /// caught-up left behind (this call's own `updateState` is a no-op
+    /// either way, so it can't tell those two cases apart on its own).
+    @discardableResult
+    public func caughtUp(contactId: UUID) async throws -> Bool {
+        let id = Self.cadenceReminderID(contactId: contactId)
+        let wasPending = try await reminders.fetchPending(forContact: contactId).contains { $0.id == id }
+        try await reminders.updateState(id: id, state: .userCaughtUp)
+        return wasPending
+    }
+
+    /// Compensates a `caughtUp(contactId:)` whose caller's own later write
+    /// then failed (staged review round 7): a failed "Caught up"/"Log other"
+    /// used to leave the cleared snooze gone for good — the user heard only
+    /// "Couldn't mark X caught up," with no reload restoring the reminder
+    /// their earlier Snooze tap had set. Reverts the state transition back
+    /// to `.pending`, restoring exactly the row `caughtUp` changed: same id,
+    /// same `scheduledFor`. Deliberately not a second `snooze(contactId:)`
+    /// call — that would compute a fresh `now + 7d` from this call's own
+    /// clock reading, fabricating a date the user never chose, in place of
+    /// the one they did.
+    ///
+    /// Call only when `caughtUp(contactId:)` returned `true` for this same
+    /// action. Calling it after a `false` — or after some other action's
+    /// `caughtUp` — would blindly set `.pending` on a row this call has no
+    /// way to confirm was genuinely this action's to restore.
+    public func restorePendingAfterFailedCaughtUp(contactId: UUID) async throws {
+        try await reminders.updateState(id: Self.cadenceReminderID(contactId: contactId), state: .pending)
     }
 
     private static func cadenceNotificationId(contactId: UUID) -> String {
