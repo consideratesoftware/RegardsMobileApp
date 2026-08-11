@@ -312,9 +312,15 @@ private final class BlockingFetchContactsSource: ContactsSource, @unchecked Send
     /// forces the continuation closed and records a failure past `timeout`;
     /// the common (passing) path cancels the watchdog once the real start
     /// signal arrives, well under it.
+    ///
+    /// The `fetchStarted` check and the `startWaiter` install happen under a
+    /// single lock acquisition, because `fetchAllContacts()` runs off the
+    /// main actor: reading the flag, releasing the lock, and only then
+    /// installing the waiter leaves a window where the fetch's own lock
+    /// section sees `startWaiter == nil`, resumes nobody, and the waiter
+    /// installed a moment later waits for a signal that has already been
+    /// sent. That lost wakeup is what fails this test at exactly `timeout`.
     func waitUntilFetchStarts(timeout: Duration = .seconds(10)) async {
-        let alreadyStarted = lock.withLock { fetchStarted }
-        guard !alreadyStarted else { return }
         let watchdog = Task {
             try? await Task.sleep(for: timeout)
             let leftoverWaiter = lock.withLock { () -> CheckedContinuation<Void, Never>? in
@@ -328,7 +334,12 @@ private final class BlockingFetchContactsSource: ContactsSource, @unchecked Send
             }
         }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            lock.withLock { startWaiter = continuation }
+            let alreadyStarted = lock.withLock { () -> Bool in
+                guard !fetchStarted else { return true }
+                startWaiter = continuation
+                return false
+            }
+            if alreadyStarted { continuation.resume() }
         }
         watchdog.cancel()
     }
