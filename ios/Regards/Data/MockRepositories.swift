@@ -88,8 +88,7 @@ actor MockStore {
     var interactions: [UUID: InteractionLog] = [:]
     var window: ReminderWindow
     var profile: UserProfile
-    /// R50 fixture (`REGARDS_UI_TEST_SEED_CORRUPT_ROW`): fabricated, not real (every mock write round-trips through
-    /// `ContactRecord`) — exists so the XCUITest audit can reach the All Contacts corruption banner.
+    /// R50 fixture: fabricated (mocks round-trip `ContactRecord`) — reaches the corruption banner in XCUI.
     var corruptionDiagnostics: [ContactCorruptionDiagnostic] = []
 
     /// Subscribers of `observeTracked()`, keyed per subscription so termination removes exactly one. Mirrors
@@ -130,9 +129,8 @@ actor MockStore {
         }
     }
 
-    /// Phase 0 deliberately renders representative persisted states (virtual merge marker, recent interactions, both
-    /// occasion tags) so the corresponding UI isn't unreachable implementation. Local in-memory fixtures only —
-    /// production scheduling still belongs to TF-07.
+    /// Phase 0 deliberately renders representative persisted states (virtual merge marker, recent interactions,
+    /// both occasion tags) so the corresponding UI isn't unreachable implementation. Local fixtures only.
     private nonisolated static func seedRepresentativeStates(
         now: Date,
         window: ReminderWindow,
@@ -233,10 +231,9 @@ actor MockStore {
     }
 
     /// The seeded occasion instant `offset` days after `startOfToday`, at the given local `hour`.
-    /// `date(bySettingHour:)` is `Optional`; the seeding used to sit in an `if let` that silently dropped occasions on
+    /// `date(bySettingHour:)` is `Optional`; seeding used to sit in an `if let` that silently dropped occasions on
     /// nil, making R34's representative states unreachable with nothing to say so. A real DST gap (US Pacific,
-    /// 2026-03-08, hour 2) never returns nil (the API snaps to 03:00), so this guard is defensive: fall forward to
-    /// the first instant that exists, then to the day start if even that fails.
+    /// 2026-03-08, hour 2) never returns nil, but this guard stays defensive: fall forward, then to the day start.
     nonisolated static func occasionInstant(
         daysAfter startOfToday: Date,
         offset: Int,
@@ -399,8 +396,8 @@ extension MockStore {
 
     /// Never replays the current value on subscribe — only a later write reaches the stream (see
     /// `ContactRepository.observeTracked()`'s doc: an eager replay would race a caller's own optimistic update).
-    /// Registers synchronously via `AsyncStream.makeStream`, not the closure initializer: that form can't touch
-    /// actor-isolated `trackedObservers` directly, and deferring into a spawned `Task` could miss an early write.
+    /// Registers synchronously via `AsyncStream.makeStream`, not the closure initializer, which can't touch
+    /// actor-isolated `trackedObservers` directly and could miss an early write from a deferred spawned `Task`.
     func observeTracked() -> AsyncStream<[Contact]> {
         let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self)
         let token = UUID()
@@ -424,6 +421,8 @@ extension MockStore {
 
     /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the *current* entry (actor-isolated, so no
     /// stale snapshot) and overwrites only these five fields — parity for `ContactsReconciler` across backends.
+    /// `broadcastTrackedChange()` at the end is the same R23 parity `deleteGroup` below needs it for — see its
+    /// comment for why a GRDB-matching mock has to broadcast here too.
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) {
         guard var c = contacts[id] else { return }
         c.displayName = fields.displayName
@@ -432,6 +431,7 @@ extension MockStore {
         c.preferredChannelValue = fields.preferredChannelValue
         c.archivedAt = fields.archivedAt.map(mockStoredDate)
         contacts[id] = c
+        broadcastTrackedChange()
     }
 
     func allGroups() -> [ContactGroup] { Array(groups.values) }

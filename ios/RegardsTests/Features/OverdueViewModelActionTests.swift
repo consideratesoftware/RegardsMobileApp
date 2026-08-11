@@ -84,41 +84,56 @@ struct OverdueViewModelActionTests {
 
     /// The three-write partial-failure shape `markCaughtUpFailureReloads`
     /// above doesn't reach: that test fails `interactions.append` itself, so
-    /// nothing persists at all. Here `InteractionLogging`'s two writes both
-    /// succeed and only the later `scheduler.caughtUp` call throws.
-    /// `.failingUpdateState()`, not `.failing()`: `performLoad()`'s reload
-    /// reads `reminders.fetchAllPending()` through this same repository
-    /// reference, so a broader failure would break the reload this test
-    /// means to observe, not just the write under test. This is also a real
-    /// discriminator, not a trivially-true assertion: `markCaughtUp` removes
-    /// the row optimistically before either write runs, so if `performLoad()`
-    /// recomputed from a stale (pre-action) contacts snapshot instead of a
-    /// fresh fetch, this still-overdue contact would come right back — the
-    /// empty result below only holds if the reload genuinely picked up the
-    /// persisted `lastInteractedAt`.
-    @Test("A caught-up write that fails only at the scheduler step still reloads to the truly persisted state")
-    func markCaughtUpSchedulerFailureReloadsToPersistedState() async throws {
+    /// nothing persists at all. Correctness fix (staged review #7) reordered
+    /// `markCaughtUp` to run `scheduler.caughtUp` *before*
+    /// `InteractionLogging` — see its doc comment — so "only the last write
+    /// fails" now means `InteractionLogging`'s own second write
+    /// (`contacts.upsert`), not the scheduler: a scheduler failure now blocks
+    /// everything after it by construction, so it can no longer produce a
+    /// partial-persistence case. This sets up a real pending snooze first,
+    /// specifically so "the snooze is cleared" is provable rather than
+    /// assumed — `caughtUp` against a contact with nothing pending is a
+    /// silent no-op either way, which wouldn't discriminate "ran" from "was
+    /// skipped."
+    @Test("A caught-up write that fails only at the final contact-upsert step still clears the snooze and logs it")
+    func markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
-        let contacts = StubContactRepository([contact])
+        let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
-        let reminders = StubReminderRepository.failingUpdateState()
-        let viewModel = Self.viewModel(contacts: contacts, interactions: interactions, reminders: reminders)
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let viewModel = OverdueViewModel(
+            contacts: contacts,
+            interactions: interactions,
+            reminders: reminders,
+            scheduler: scheduler,
+            clock: { Self.now }
+        )
         await viewModel.load()
         #expect(viewModel.rows.map(\.contactId) == [contact.id])
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
 
         await viewModel.markCaughtUp(contactId: contact.id)
 
-        // The first two writes truly persisted even though the scheduler
-        // call threw.
+        // The first write (reminder-state) truly persisted: the pending
+        // snooze this test set up above is gone, even though the write
+        // after it failed.
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+        // The second write's first half (interactions.append) also truly
+        // persisted — only its second half (contacts.upsert) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)
-        let stored = try #require(await contacts.fetch(id: contact.id))
-        #expect(stored.lastInteractedAt == Self.now)
 
-        // And the reload the catch block runs reflects that persisted
-        // state, not a stale re-add of the pre-action row.
-        #expect(viewModel.rows.isEmpty)
+        // The one field that genuinely failed to write stays at its
+        // pre-action value, and `performLoad()`'s reload reflects exactly
+        // that: `lastInteractedAt` never moved, so the contact is still
+        // exactly as overdue as before the action — the row belongs back on
+        // screen, not left in its optimistically-removed state.
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == contact.lastInteractedAt)
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
     }
 
     @Test("A write on the same repository through a different reference is reflected live")
@@ -255,7 +270,20 @@ struct OverdueViewModelActionTests {
         clock.advance(by: 4 * 86_400)
         await viewModel.load()
 
-        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+        // `waitUntil`, not a bare `#expect`: `markCaughtUp`'s
+        // `logging.markCaughtUp` call broadcasts through `contacts.upsert`,
+        // which can still have a background `observeTracked()`-driven
+        // reload in flight from earlier in this test — correctness fix
+        // (staged review #7) reordered `markCaughtUp` to run
+        // `scheduler.caughtUp` first specifically so that broadcast always
+        // fires *after* the snooze is cleared, but the broadcast's own
+        // reload is still a separate, unawaited Task racing this explicit
+        // `load()` above. Harmless once it resolves to the same correct
+        // state — mirrors `UpcomingViewModelActionTests`'s
+        // `caughtUpAfterSnoozeShowsFreshDateWithShortCadence`, which polls
+        // for the identical reason.
+        let sawFreshRow = await waitUntil { viewModel.rows.map(\.contactId) == [contact.id] }
+        #expect(sawFreshRow)
     }
 
     /// `makeOverdueRow`'s guard is `snoozedUntil > now`, not `>=` — at the

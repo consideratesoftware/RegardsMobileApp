@@ -251,6 +251,41 @@ struct ContactDetailViewModelTests {
         #expect(stored.lastInteractedAt == contact.lastInteractedAt) // untouched (decision #31)
     }
 
+    /// `snoozePushesCadenceReminderAndLogsNothing`'s failure-path sibling —
+    /// every other action on this view model (`markCaughtUp`, `logOther`)
+    /// already has one, `snooze` didn't. Mirrors
+    /// `OverdueViewModelActionTests.snoozeFailureReloadsToRestoreTrueState`'s
+    /// `.failingUpsert()` choice: `SchedulingPass.snooze` calls
+    /// `reminders.upsert`, and reads stay healthy so the assertions below
+    /// aren't themselves blocked by the same failure. `snooze()`'s own doc
+    /// comment says why there's no reload here to test: this screen holds no
+    /// state derived from the pending reminder, so a failure has nothing of
+    /// this view model's own to leave stale — the proof is simply that
+    /// nothing crashed and no row was ever written.
+    @Test("A failing snooze write doesn't crash and leaves no pending reminder behind")
+    func snoozeFailureLeavesNoPendingReminder() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let reminders = StubReminderRepository.failingUpsert()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: interactions,
+            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        await viewModel.snooze()
+
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+        #expect(await interactions.appendedLogs().isEmpty)
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == contact.lastInteractedAt)
+    }
+
     /// The hosted-review blocker this pins: `logOther` originally never
     /// called `scheduler.caughtUp`, unlike `markCaughtUp` — both route
     /// through `InteractionLogging`, which moves `lastInteractedAt` and

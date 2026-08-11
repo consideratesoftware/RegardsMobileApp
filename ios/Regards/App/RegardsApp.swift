@@ -469,7 +469,9 @@ struct RegardsTabRoot: View {
             viewModel: Self.makeContactDetailViewModel(
                 contactId: contactId,
                 runtime: runtime
-            )
+            ),
+            accessibilityEffects: .live,
+            rowActionAnnouncer: RowActionAnnouncer()
         )
     }
 }

@@ -19,25 +19,30 @@ import Foundation
 public actor SchedulingPass {
     private let reminders: any ReminderRepository
     private let clock: @Sendable () -> Date
+    private let calendar: Calendar
 
     public init(
         reminders: any ReminderRepository,
-        clock: @escaping @Sendable () -> Date = { Date() }
+        clock: @escaping @Sendable () -> Date = { Date() },
+        calendar: Calendar = .current
     ) {
         self.reminders = reminders
         self.clock = clock
+        self.calendar = calendar
     }
 
     /// Snooze 1 week (decision #31): pushes the contact's cadence reminder to
-    /// fire `now + 7 days`; state stays `.pending`. No interaction is logged
-    /// and `lastInteractedAt` is never touched — snoozing is not talking to
-    /// someone. `86_400` is exact seconds-per-day, not calendar days — a
-    /// snooze that spans a DST transition lands at a wall-clock time 1 hour
-    /// off from "the same time, 7 days later." PR25's engine-driven version
-    /// (see below) is where that gets fixed; this stub inherits the same
-    /// elapsed-time semantics `ReminderEngine.nextAllowedSlot` explicitly
-    /// rejects for the real scheduling walk (R1), scoped down here to a
-    /// single fixed offset with no window to re-validate against.
+    /// fire 7 *calendar* days out; state stays `.pending`. No interaction is
+    /// logged and `lastInteractedAt` is never touched — snoozing is not
+    /// talking to someone. `calendar.date(byAdding: .day, value: 7, to:)`,
+    /// not `addingTimeInterval(7 * 86_400)`: elapsed seconds cross a DST
+    /// transition at a different wall-clock time than they started —
+    /// exactly the class of bug §19's R1 closed for the engine's own
+    /// `nextAllowedSlot` walk, and §9 contract 1 is wall-clock-only for this
+    /// stub too. `addingTimeInterval` remains only as the graceful fallback
+    /// below for the near-impossible case `byAdding` returns `nil`, mirroring
+    /// `UpcomingViewModel.buildRows`' horizon-end fallback: degrade to
+    /// elapsed time rather than silently produce no reminder at all.
     ///
     /// Idempotent by re-push, not by stacking: calling this again computes a
     /// fresh `now + 7 days` from *that* call's clock reading, replacing
@@ -65,11 +70,14 @@ public actor SchedulingPass {
     /// last simply overwrites the other's row instead of coexisting beside
     /// it. No read, no in-actor lock, no lost update.
     public func snooze(contactId: UUID) async throws {
+        let now = clock()
+        let scheduledFor = calendar.date(byAdding: .day, value: 7, to: now)
+            ?? now.addingTimeInterval(7 * 86_400)
         let reminder = ScheduledReminder(
             id: Self.cadenceReminderID(contactId: contactId),
             contactId: contactId,
             kind: .cadence,
-            scheduledFor: clock().addingTimeInterval(7 * 86_400),
+            scheduledFor: scheduledFor,
             osNotificationId: Self.cadenceNotificationId(contactId: contactId),
             state: .pending
         )

@@ -114,6 +114,78 @@ struct SchedulingPassTests {
         }
     }
 
+    // MARK: - Wall-clock snooze (DST)
+
+    /// A DST-observing calendar pinned to a fixed identifier, not
+    /// `.current`: these two tests exist specifically to prove the 7-day
+    /// push lands on the correct wall-clock day across a DST transition, so
+    /// the transition has to be guaranteed present regardless of whichever
+    /// timezone the machine running the test happens to be in.
+    private static var losAngelesCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
+        return calendar
+    }
+
+    /// The bug this pins (staged review, correctness #4): `snooze` used to
+    /// compute `clock().addingTimeInterval(7 * 86_400)` — 7 days of *elapsed
+    /// seconds*, not 7 *calendar* days. Spring-forward loses an hour of wall
+    /// clock inside that window (2027-03-14 in America/Los_Angeles: 2:00 am
+    /// becomes 3:00 am), so the elapsed-time math would land the reminder at
+    /// 9:00 am local instead of 8:00 am — an hour later than the row's own
+    /// "same time next week" label promises, and enough drift for §19's R1
+    /// class of bug (already closed for the engine's `nextAllowedSlot` walk)
+    /// to reopen here.
+    @Test("Snooze across a spring-forward transition lands on the same local wall-clock time")
+    func snoozeAcrossSpringForwardStaysOnWallClock() async throws {
+        let calendar = Self.losAngelesCalendar
+        let repositories = try RepositoryContractBackend.mock.makeRepositories()
+        let contact = contractContact(id: try contractUUID(508), suffix: "snooze-spring-forward", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        // 2027-03-08 08:00 local — a week before the 2027-03-14 transition.
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 3, day: 8, hour: 8, minute: 0
+        )))
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+
+        try await scheduler.snooze(contactId: contact.id)
+
+        let expected = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 3, day: 15, hour: 8, minute: 0
+        )))
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending[0].scheduledFor == expected)
+        // The bug's own value, named explicitly: proves this is a real
+        // discriminator, not incidentally true either way.
+        #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
+    }
+
+    /// Mirrors `snoozeAcrossSpringForwardStaysOnWallClock` for the other
+    /// direction: fall-back *gains* an hour (2027-11-07 in
+    /// America/Los_Angeles: 2:00 am becomes 1:00 am), so the old elapsed-time
+    /// math would land the reminder at 7:00 am local instead of 8:00 am.
+    @Test("Snooze across a fall-back transition lands on the same local wall-clock time")
+    func snoozeAcrossFallBackStaysOnWallClock() async throws {
+        let calendar = Self.losAngelesCalendar
+        let repositories = try RepositoryContractBackend.mock.makeRepositories()
+        let contact = contractContact(id: try contractUUID(509), suffix: "snooze-fall-back", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        // 2027-11-01 08:00 local — a week before the 2027-11-07 transition.
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 11, day: 1, hour: 8, minute: 0
+        )))
+        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+
+        try await scheduler.snooze(contactId: contact.id)
+
+        let expected = try #require(calendar.date(from: DateComponents(
+            year: 2027, month: 11, day: 8, hour: 8, minute: 0
+        )))
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending[0].scheduledFor == expected)
+        #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
+    }
+
     // MARK: - caughtUp (PR #49 hosted review fix)
 
     @Test(

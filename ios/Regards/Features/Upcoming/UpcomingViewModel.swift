@@ -149,6 +149,11 @@ public final class UpcomingViewModel {
                 guard let self else { return }
                 await self.performLoad()
             }
+            // See `OverdueViewModel.startObservingIfNeeded`'s sibling comment:
+            // the stream ending without this Task being cancelled must clear
+            // `observationTask` too, or `load()` never re-subscribes.
+            guard let self, !Task.isCancelled else { return }
+            self.observationTask = nil
         }
     }
 
@@ -207,23 +212,20 @@ public final class UpcomingViewModel {
     /// Returns whether the write succeeded so the screen can gate its
     /// VoiceOver announcement on it — mirrors `OverdueViewModel.markCaughtUp`.
     ///
-    /// Also clears any pending snooze through `SchedulingPass.caughtUp` once
-    /// the interaction log succeeds — see `OverdueViewModel.markCaughtUp`'s
-    /// doc comment for why this is required: without it a short-cadence
-    /// contact's stale snoozed date keeps winning `buildRows`'
+    /// Also clears any pending snooze through `SchedulingPass.caughtUp`
+    /// *before* the interaction log runs — see `OverdueViewModel.markCaughtUp`'s
+    /// doc comment for why this ordering matters and why clearing the snooze
+    /// is required at all: without it a short-cadence contact's stale
+    /// snoozed date keeps winning `buildRows`'
     /// `max(now, overdueAt, snoozedUntil)` over the freshly computed one.
     ///
     /// Reloads explicitly on success too, unlike `OverdueViewModel`'s
-    /// sibling method: `logging.markCaughtUp`'s `contacts.upsert` broadcasts
-    /// through `observeTracked()` as soon as it lands, which can win the
-    /// race against this function's later `scheduler.caughtUp` call and
-    /// recompute this contact's new row from the still-stale snoozed date —
-    /// nothing else would correct it, since reminder writes have no
-    /// `observeTracked()`-style push (confirmed: removing this line makes
-    /// `caughtUpAfterSnoozeShowsFreshDateWithShortCadence` fail
-    /// intermittently on exactly that stale date). Overdue doesn't need
-    /// this: a freshly caught-up contact's `overdueDays` is 0 regardless of
-    /// snooze state, so the same race there just filters the row out anyway.
+    /// sibling method: the optimistic update above only *removes* the
+    /// cadence row, but a freshly caught-up contact can legitimately owe a
+    /// *new* one inside the horizon — Overdue skips this since its
+    /// `overdueDays` is always 0 once caught up. This reload also used to be
+    /// the only fix for a stale-snooze race the write-order change above now
+    /// closes at the source, so it stays for the "new row owed" case only.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         groups = groups.map { header, rows in
@@ -232,8 +234,8 @@ public final class UpcomingViewModel {
         totalCount = groups.reduce(0) { $0 + $1.rows.count }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
-            try await logging.markCaughtUp(contactId: contactId, at: clock())
             try await scheduler.caughtUp(contactId: contactId)
+            try await logging.markCaughtUp(contactId: contactId, at: clock())
             await performLoad()
             return true
         } catch {

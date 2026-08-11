@@ -102,6 +102,16 @@ public final class OverdueViewModel {
                 guard let self else { return }
                 await self.performLoad()
             }
+            // The stream ended on its own — GRDB's `onError` finished it, or
+            // the mock's subscription was torn down — without this Task
+            // itself being cancelled. Leaving `observationTask` set would
+            // make every future `load()`'s `guard observationTask == nil`
+            // find a non-nil but permanently-dead Task and skip
+            // re-subscribing forever: live cross-screen updates gone for the
+            // rest of the process, with nothing surfacing that anywhere.
+            // Clearing it here lets the next `load()` open a fresh one.
+            guard let self, !Task.isCancelled else { return }
+            self.observationTask = nil
         }
     }
 
@@ -159,20 +169,29 @@ public final class OverdueViewModel {
     /// a write that then fails and reloads the row back in would tell a
     /// VoiceOver user something that didn't happen.
     ///
-    /// Also clears any pending snooze through `SchedulingPass.caughtUp` once
-    /// the interaction log succeeds (§9's caught-up trigger: "cancel pending
-    /// reminder(s)... reschedule") — without this, a short-cadence contact's
-    /// stale snoozed date would keep winning the `max(...)` in
+    /// Also clears any pending snooze through `SchedulingPass.caughtUp`
+    /// *before* the interaction log runs (§9's caught-up trigger: "cancel
+    /// pending reminder(s)... reschedule") — without this, a short-cadence
+    /// contact's stale snoozed date would keep winning the `max(...)` in
     /// `makeOverdueRow`/`UpcomingViewModel.buildRows` over the freshly
     /// computed one (PR #49 hosted review; see `SchedulingPass.caughtUp`'s
     /// doc comment for the exact mechanism).
+    ///
+    /// `scheduler.caughtUp` first, `InteractionLogging` second — not the
+    /// reverse: `InteractionLogging`'s `contacts.upsert` broadcasts through
+    /// `observeTracked()` the moment it lands, and a concurrently observing
+    /// Upcoming (or Contact Detail) reloading off that broadcast would
+    /// compute its row before the reminder-state write had cleared the
+    /// snooze, briefly showing the stale date anyway. Doing the
+    /// reminder-state write first means every broadcast this method can
+    /// trigger only ever fires after the snooze is already gone.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         rows.removeAll { $0.contactId == contactId }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
-            try await logging.markCaughtUp(contactId: contactId, at: clock())
             try await scheduler.caughtUp(contactId: contactId)
+            try await logging.markCaughtUp(contactId: contactId, at: clock())
             return true
         } catch {
             Self.log.error(

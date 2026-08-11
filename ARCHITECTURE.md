@@ -268,7 +268,12 @@ ScheduledReminder
   kind: TEXT                        -- 'cadence' | 'birthday' | 'anniversary' | 'custom_occasion'
   occasionDate: TEXT?               -- ISO "MM-DD" for annual kinds; null for cadence
   occasionLabel: TEXT?              -- free-text for anniversaries/custom
-  scheduledFor: INTEGER             -- epoch seconds, ALREADY SNAPPED to an allowed-window slot start (§9)
+  scheduledFor: INTEGER             -- epoch seconds, ALREADY SNAPPED to an allowed-window slot start (§9).
+                                     -- Caveat: §14 PR22's DB-only `SchedulingPass` stub (TF-04) is the one
+                                     -- exception — its `snooze`/`caughtUp` writes are plain calendar-day
+                                     -- arithmetic with no `ReminderWindow`/`ReminderEngine` involved at all,
+                                     -- so this invariant does not hold for rows it writes until PR25 folds
+                                     -- it into the real engine.
   osNotificationId: TEXT            -- UNUserNotificationCenter identifier for cancel/replace
   state: TEXT                       -- pending | fired | cancelled | user_caught_up
 
@@ -484,6 +489,7 @@ The claim: **"no data collected, no call-home, ever."** Stacked technical, legal
 4. **All data at rest encrypted.** iOS: `NSFileProtectionCompleteUntilFirstUserAuthentication` on the DB (shipped in `DatabaseFactory.makeDatabase()`). Android: SQLCipher + Keystore.
 5. **Data export / delete.** JSON export to Files; "Delete everything" wipes DB + resets first-run.
 6. **Permission transparency.** Pre-prompt screens before each system prompt explaining exactly what we read and why.
+7. **Contact names surface in more than one on-device channel, never off it.** Digest notification copy (§9: *"3 people are overdue: Leia, Luke, Padmé"*) and VoiceOver row-action announcements (e.g. "Marked Leia Organa caught up," §14 PR22) both speak or display a contact's name — still local rendering and system TTS, not a new data flow.
 
 ### Technical anti-call-home guarantees
 
@@ -1000,7 +1006,7 @@ Every known defect, drift, or stale artifact in the repo as of 2026-07-01, numbe
 | R47 | Invalid persisted timezone identifiers silently fall back to the device timezone, changing reminder timing without consent | `ReminderWindow.swift`, `Records.swift` | Validate IANA identifier and reject malformed persisted windows | ✅ **closed in PR16 review** |
 | R48 | Slot-start snapping can schedule a future-due contact before `overdueAt`; repeated-hour snapping can choose a boundary from the wrong UTC occurrence | `ReminderEngine.swift` | Distinguish already-overdue from future-due targets; resolve fall-back boundaries relative to the search instant; regression tests | ✅ **closed in PR16 review** |
 | R51 | `ContactsReconciler.redeterminedPreferredChannelValue` only re-derives a stale `preferredChannelValue` for `.phoneCall`/`.email`. `sms`/`whatsapp`/`signal` are phone-sourced and `facetime` is phone-or-email-sourced too (`ChannelCatalog.metadata`), so they can go just as stale — not a live bug today only because nothing before PR27 lets a user set or edit `preferredChannelValue` directly (importer-derived preferreds are always `.phoneCall`/`.email`), so there's nothing yet that could diverge for those four channels | `ContactsReconciler.swift` | Extend re-derivation to `sms`/`whatsapp`/`signal`/`facetime` as part of PR27 (`EditContactScreen`), the PR that first makes `preferredChannelValue` user-editable and turns this from a scope gap into a live correctness requirement | PR27 |
-| R52 | Overdue and Upcoming ship Caught up / Snooze as real per-row buttons, not the swipe actions §10 describes: both screens are `ScrollView`/`RegardsCard`-based, and SwiftUI's `.swipeActions` only functions inside `List`. Per-row buttons are the accessible interim shape (native VoiceOver custom actions come free with `List` swipe actions; a bespoke gesture would have to reimplement that manually) | `OverdueScreen.swift`, `UpcomingScreen.swift` | Deliberate, owner-approved deviation (§14 PR22 review) — no fix required now; revisit as a `List`-backed swipe redesign if TF-16 polish scope wants the literal gesture | TF-16 candidate |
+| R52 | Overdue and Upcoming ship Caught up / Snooze as real per-row buttons, not the swipe actions §10 describes: both screens are `ScrollView`/`RegardsCard`-based, and SwiftUI's `.swipeActions` only functions inside `List`. Per-row buttons are the accessible interim shape (an ordinary `Button` is VoiceOver-focusable and activatable with no custom-action wiring at all; `.accessibilityAction(named:)` can give a bespoke swipe gesture the same rotor-action parity independently of `List`, but only if someone builds and keeps that wiring in sync with the gesture — buttons get it for free by construction, not because `List` is the only route to it) | `OverdueScreen.swift`, `UpcomingScreen.swift` | Deliberate, owner-approved deviation (§14 PR22 review) — no fix required now; revisit as a `List`-backed swipe redesign if TF-16 polish scope wants the literal gesture | TF-16 candidate |
 
 ## 20. Release engineering & App Store playbook
 

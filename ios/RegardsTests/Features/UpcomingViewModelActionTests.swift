@@ -135,50 +135,59 @@ struct UpcomingViewModelActionTests {
     /// The three-write partial-failure shape `markCaughtUpFailureReloads`
     /// above doesn't reach: that test fails `interactions.append` itself
     /// (via `StubInteractionRepository.failing()`), so nothing persists at
-    /// all. Here `InteractionLogging`'s two writes both succeed and only the
-    /// later `scheduler.caughtUp` call throws. `.failingUpdateState()`, not
-    /// `.failing()`: `performLoad()`'s reload reads
-    /// `reminders.fetchAllPending()` through this same repository reference,
-    /// so a broader failure would break the reload this test means to
-    /// observe, not just the write under test. Reusing
-    /// `markCaughtUpRemovesRowsAndPersists`'s exact contact/window shape
-    /// (5-day horizon, default 7-day cadence, 10 days since last contact) so
-    /// the only variable is which write fails — the persisted result should
-    /// be identical either way.
-    @Test("A caught-up write that fails only at the scheduler step still reloads to the truly persisted state")
-    func markCaughtUpSchedulerFailureReloadsToPersistedState() async throws {
+    /// all. Correctness fix (staged review #7) reordered `markCaughtUp` to
+    /// run `scheduler.caughtUp` *before* `InteractionLogging` — see its doc
+    /// comment — so "only the last write fails" now means
+    /// `InteractionLogging`'s own second write (`contacts.upsert`), not the
+    /// scheduler: a scheduler failure now blocks everything after it by
+    /// construction, so it can no longer produce a partial-persistence case.
+    /// This sets up a real pending snooze first, specifically so "the
+    /// snooze is cleared" is provable rather than assumed — `caughtUp`
+    /// against a contact with nothing pending is a silent no-op either way,
+    /// which wouldn't discriminate "ran" from "was skipped."
+    @Test("A caught-up write that fails only at the final contact-upsert step still clears the snooze and logs it")
+    func markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
-        let contacts = StubContactRepository([contact])
+        let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
-        let reminders = StubReminderRepository.failingUpdateState()
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
         let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: scheduler,
             interactions: interactions,
             window: window,
             clock: { Self.now }
         )
         await viewModel.load()
         #expect(viewModel.totalCount == 1)
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
 
         await viewModel.markCaughtUp(contactId: contact.id)
 
-        // The first two writes truly persisted even though the scheduler
-        // call threw.
+        // The first write (reminder-state) truly persisted: the pending
+        // snooze this test set up above is gone, even though the write
+        // after it failed.
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+        // The second write's first half (interactions.append) also truly
+        // persisted — only its second half (contacts.upsert) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)
-        let stored = try #require(await contacts.fetch(id: contact.id))
-        #expect(stored.lastInteractedAt == Self.now)
 
-        // `markCaughtUp` reloads unconditionally on both the success and
-        // failure paths (see its doc comment on the observeTracked-race
-        // fix) — the reload reflects the truly persisted state: freshly
-        // caught up, next cadence due at now + 7d, outside the 5-day
-        // horizon.
-        #expect(viewModel.totalCount == 0)
+        // The one field that genuinely failed to write stays at its
+        // pre-action value, and `performLoad()`'s reload reflects exactly
+        // that: `lastInteractedAt` never moved, so the contact is still
+        // exactly as overdue as before the action, and the snooze that
+        // would otherwise have suppressed it is already gone — the row
+        // belongs back in view, not left in its optimistically-removed
+        // state.
+        let stored = try #require(await contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == contact.lastInteractedAt)
+        #expect(viewModel.totalCount == 1)
     }
 
     @Test("A write on the same repository through a different reference is reflected live")

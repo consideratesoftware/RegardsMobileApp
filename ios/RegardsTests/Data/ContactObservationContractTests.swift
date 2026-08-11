@@ -91,4 +91,47 @@ struct ContactObservationContractTests {
         let afterDelete = try #require(await iterator.next())
         #expect(Set(afterDelete.map(\.id)).contains(primaryID))
     }
+
+    /// Pins the same R23 parity `observeTrackedEmitsOnGroupDelete` above
+    /// pins, for `updateReconciledFields` instead of `deleteGroup`:
+    /// `MockStore.updateReconciledFields` didn't call
+    /// `broadcastTrackedChange()`, while GRDB's real `UPDATE` fires
+    /// `observeTracked()`'s region-based observation on any write to the
+    /// Contact table. Flipping `archivedAt` here specifically (not just
+    /// `displayName`) is deliberate: an archiving reconciliation write is
+    /// the shape whose *filtered* tracked set could plausibly change too, so
+    /// it's the case most likely to have been "accidentally correct" if the
+    /// broadcast were only reached through some other path — this test
+    /// wants the direct call, not a coincidence.
+    @Test(
+        "observeTracked emits after updateReconciledFields archives a contact",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeTrackedEmitsOnReconciledFieldsUpdate(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contactID = try contractUUID(136)
+        try await repositories.contacts.upsert(
+            contractContact(id: contactID, suffix: "reconciled-update", tracked: true)
+        )
+
+        let stream = await repositories.contacts.observeTracked()
+        var iterator = stream.makeAsyncIterator()
+
+        try await repositories.contacts.updateReconciledFields(
+            id: contactID,
+            fields: ReconciledContactFields(
+                displayName: "Reconciled Update",
+                phoneNumbers: [],
+                emailAddresses: [],
+                preferredChannelValue: "",
+                archivedAt: Date(timeIntervalSince1970: 1_800_000_000)
+            )
+        )
+
+        // Content, not just emission: this write also removes the contact
+        // from the tracked set, so the next emission should no longer
+        // contain it.
+        let afterUpdate = try #require(await iterator.next())
+        #expect(!afterUpdate.map(\.id).contains(contactID))
+    }
 }

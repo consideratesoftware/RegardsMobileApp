@@ -6,9 +6,28 @@ public struct ContactDetailScreen: View {
     @State private var viewModel: ContactDetailViewModel
     @State private var previewContact: Contact?
     @State private var showsLogOtherChannelPicker = false
+    // Wrapped in `@State` via `init` — see `RowActionAnnouncer`'s doc comment for why.
+    @State private var rowActionAnnouncer: RowActionAnnouncer
+    // Focus target for all three row actions: the Cadence card's "Status"
+    // value, mirroring `OverdueScreen`/`UpcomingScreen`'s subtitle. Content
+    // plausibly changed (overdue → on track), and it survives every reload
+    // `load()` can take — the hero/cadence card only vanishes on a total
+    // contact-fetch failure, which none of these writes can cause.
+    @AccessibilityFocusState private var isStatusFocused: Bool
+    // No default: a missed injection silently falling back to `.live` here
+    // is exactly the class of bug that shipped unannounced/unfocused row
+    // actions to device — every construction site must say which effects it
+    // means, including production's own factory.
+    var accessibilityEffects: RowActionAccessibilityEffects
 
-    public init(viewModel: ContactDetailViewModel) {
+    public init(
+        viewModel: ContactDetailViewModel,
+        accessibilityEffects: RowActionAccessibilityEffects,
+        rowActionAnnouncer: RowActionAnnouncer
+    ) {
         self._viewModel = State(initialValue: viewModel)
+        self.accessibilityEffects = accessibilityEffects
+        self._rowActionAnnouncer = State(initialValue: rowActionAnnouncer)
     }
 
     public var body: some View {
@@ -50,25 +69,29 @@ public struct ContactDetailScreen: View {
         .navigationDestination(item: $previewContact) { contact in
             EditContactScreen(contact: contact)
         }
-        .confirmationDialog(
-            "Log other channel",
-            isPresented: $showsLogOtherChannelPicker,
-            titleVisibility: .visible
-        ) {
-            ForEach(Channel.allCases, id: \.self) { channel in
-                Button(channel.displayName) {
-                    Task { await viewModel.logOther(channel: channel) }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
+        // See `LogOtherChannelSheet`'s doc comment: this used to be a
+        // `confirmationDialog`, which rendered as a popover with no reachable
+        // Cancel control on the OS this shipped against. A `.sheet` we build
+        // ourselves removes that dependency entirely.
+        .sheet(isPresented: $showsLogOtherChannelPicker) {
+            LogOtherChannelSheet(
+                onSelect: { channel in
+                    showsLogOtherChannelPicker = false
+                    Task {
+                        let succeeded = await viewModel.logOther(channel: channel)
+                        // `viewModel.contact?.displayName`, not a captured
+                        // local: this sheet is declared outside the
+                        // `if let c = viewModel.contact` scope below (it has
+                        // to stay presentable even mid-reload), so there is
+                        // no `contact` local here to close over.
+                        if succeeded, let name = viewModel.contact?.displayName {
+                            announceRowAction("Logged \(channel.displayName) with \(name)")
+                        }
+                    }
+                },
+                onCancel: { showsLogOtherChannelPicker = false }
+            )
         }
-        // Without this, this many choices renders as an anchored popover on
-        // this device/OS rather than a bottom action sheet — and a popover
-        // presentation drops the Cancel row entirely (dismiss becomes
-        // tap-outside-only), which is how a real Cancel action disappeared
-        // from a screen that declares one. `.sheet` forces the standard
-        // iPhone action-sheet presentation regardless of size class.
-        .presentationCompactAdaptation(.sheet)
         .toolbar {
             if viewModel.contact != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -84,10 +107,30 @@ public struct ContactDetailScreen: View {
         }
         .task { await viewModel.load() }
     }
+}
+
+extension ContactDetailScreen {
+    // Not `private`: `ContactAccessibilityTests` (another file) calls this
+    // directly, and a `private extension` isn't visible outside its file.
+    static func channelSummaryAccessibilityLabel(contact: Contact) -> String {
+        ContactValueAccessibility.label(
+            contact.preferredChannel.displayName,
+            displayedValue: contact.preferredChannelValue,
+            channel: contact.preferredChannel,
+            annotation: "preferred"
+        )
+    }
+}
+
+private extension ContactDetailScreen {
 
     // MARK: - Sections
+    //
+    // Moved out of the struct body for SwiftLint's type_body_length — a
+    // `private extension` in the same file has the same visibility as a
+    // `private` struct member, so this is a pure move.
 
-    private func hero(contact: Contact) -> some View {
+    func hero(contact: Contact) -> some View {
         VStack(spacing: 12) {
             Avatar(name: contact.displayName, size: 88,
                    hasAccentRing: contact.priorityTier == .innerCircle)
@@ -103,7 +146,7 @@ public struct ContactDetailScreen: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func primaryCTA(contact: Contact) -> some View {
+    func primaryCTA(contact: Contact) -> some View {
         HStack(spacing: 10) {
             ChannelGlyph(channel: contact.preferredChannel, size: 20, color: RegardsDS.muted)
             Text("Open \(contact.preferredChannel.displayName)")
@@ -122,7 +165,7 @@ public struct ContactDetailScreen: View {
         .accessibilityIdentifier("contact-detail.open-channel-unavailable")
     }
 
-    private func secondaryActions(contact: Contact) -> some View {
+    func secondaryActions(contact: Contact) -> some View {
         AccessibilityAdaptiveLayout {
             HStack(spacing: 8) {
                 secondaryItems(contact: contact)
@@ -135,9 +178,14 @@ public struct ContactDetailScreen: View {
     }
 
     @ViewBuilder
-    private func secondaryItems(contact: Contact) -> some View {
+    func secondaryItems(contact: Contact) -> some View {
         secondaryAction("Caught up", identifier: "contact-detail.caught-up") {
-            Task { await viewModel.markCaughtUp() }
+            Task {
+                let succeeded = await viewModel.markCaughtUp()
+                if succeeded {
+                    announceRowAction("Marked \(contact.displayName) caught up")
+                }
+            }
         }
         // Overdue and Upcoming both gate a contact's cadence row on
         // `tracked && cadenceDays != nil`; an untracked or no-cadence
@@ -147,7 +195,12 @@ public struct ContactDetailScreen: View {
         // everywhere else.
         if contact.tracked, contact.cadenceDays != nil {
             secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
-                Task { await viewModel.snooze() }
+                Task {
+                    let succeeded = await viewModel.snooze()
+                    if succeeded {
+                        announceRowAction("Snoozed \(contact.displayName) 1 week")
+                    }
+                }
             }
         }
         secondaryAction("Log other", identifier: "contact-detail.log-other") {
@@ -155,9 +208,19 @@ public struct ContactDetailScreen: View {
         }
     }
 
+    /// Announces a row action's result and lands focus on the Cadence
+    /// card's "Status" value — sequencing lives in `RowActionAnnouncer`,
+    /// shared with `OverdueScreen`/`UpcomingScreen`. Also called from Log
+    /// other's channel buttons below: choosing a channel is the success signal.
+    func announceRowAction(_ message: String) {
+        rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
+            isStatusFocused = true
+        }
+    }
+
     // MARK: - Cards
 
-    private func cadenceCard(contact: Contact) -> some View {
+    func cadenceCard(contact: Contact) -> some View {
         VStack(spacing: 0) {
             SectionHeader("Cadence")
             RegardsCard {
@@ -174,13 +237,18 @@ public struct ContactDetailScreen: View {
                     Hair(inset: 16)
                     detailRow(label: "Last talked", value: viewModel.lastTalkedLabel)
                     Hair(inset: 16)
-                    detailRow(label: "Status", value: statusValue, isDanger: viewModel.overdueSummary.isOverdue)
+                    detailRow(
+                        label: "Status",
+                        value: statusValue,
+                        isDanger: viewModel.overdueSummary.isOverdue,
+                        valueFocus: $isStatusFocused
+                    )
                 }
             }
         }
     }
 
-    private func channelCard(contact: Contact) -> some View {
+    func channelCard(contact: Contact) -> some View {
         VStack(spacing: 0) {
             SectionHeader("Preferred channel")
             RegardsCard {
@@ -211,7 +279,7 @@ public struct ContactDetailScreen: View {
         }
     }
 
-    private func channelSummary(contact: Contact) -> some View {
+    func channelSummary(contact: Contact) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -233,16 +301,7 @@ public struct ContactDetailScreen: View {
         .accessibilityIdentifier("contact-detail.channel-summary")
     }
 
-    static func channelSummaryAccessibilityLabel(contact: Contact) -> String {
-        ContactValueAccessibility.label(
-            contact.preferredChannel.displayName,
-            displayedValue: contact.preferredChannelValue,
-            channel: contact.preferredChannel,
-            annotation: "preferred"
-        )
-    }
-
-    private var interactionsCard: some View {
+    var interactionsCard: some View {
         VStack(spacing: 0) {
             SectionHeader("Recent interactions")
             RegardsCard {
@@ -285,13 +344,13 @@ public struct ContactDetailScreen: View {
 
     // The label is derived on `InteractionEntry` so it can be asserted in unit
     // tests without instantiating the view.
-    private func interactionAccessibilityLabel(
+    func interactionAccessibilityLabel(
         _ entry: ContactDetailViewModel.InteractionEntry
     ) -> String {
         entry.accessibilityLabel
     }
 
-    private func notesCard(contact: Contact) -> some View {
+    func notesCard(contact: Contact) -> some View {
         VStack(spacing: 0) {
             SectionHeader("Notes · private to Regards")
             RegardsCard {
@@ -307,21 +366,18 @@ public struct ContactDetailScreen: View {
         }
     }
 
-    private func interactionDate(_ value: String, fixedWidth: CGFloat? = nil) -> some View {
+    func interactionDate(_ value: String, fixedWidth: CGFloat? = nil) -> some View {
         Text(value)
             .font(RegardsFont.mono(.footnote))
             .foregroundStyle(RegardsDS.muted)
             .frame(width: fixedWidth, alignment: .leading)
     }
 
-    private func interactionDescription(_ value: String) -> some View {
+    func interactionDescription(_ value: String) -> some View {
         Text(value)
             .font(.footnote)
             .foregroundStyle(RegardsDS.ink)
     }
-}
-
-private extension ContactDetailScreen {
 
     // MARK: - Helpers
 
@@ -347,16 +403,17 @@ private extension ContactDetailScreen {
                    action: String? = nil,
                    actionIdentifier: String? = nil,
                    isAccent: Bool = false,
-                   isDanger: Bool = false) -> some View {
+                   isDanger: Bool = false,
+                   valueFocus: AccessibilityFocusState<Bool>.Binding? = nil) -> some View {
         AccessibilityAdaptiveLayout {
             HStack(spacing: 12) {
-                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
+                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger, valueFocus: valueFocus)
                 Spacer()
                 stubAction(action, identifier: actionIdentifier)
             }
         } accessibility: {
             VStack(alignment: .leading, spacing: 8) {
-                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger)
+                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger, valueFocus: valueFocus)
                 stubAction(action, identifier: actionIdentifier)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -368,7 +425,8 @@ private extension ContactDetailScreen {
     func detailValue(label: String,
                      value: String,
                      isAccent: Bool,
-                     isDanger: Bool) -> some View {
+                     isDanger: Bool,
+                     valueFocus: AccessibilityFocusState<Bool>.Binding? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.caption2)
@@ -380,6 +438,11 @@ private extension ContactDetailScreen {
                 .accessibilityIdentifier(
                     "contact-detail.detail-value-\(label.lowercased().replacingOccurrences(of: " ", with: "-"))"
                 )
+                // Optional, not unconditional: only the "Status" row (the
+                // one call site that passes `valueFocus`) is this screen's
+                // row-action focus target — see `ContactDetailScreen`'s
+                // `isStatusFocused` doc comment for why that row specifically.
+                .modifier(OptionalAccessibilityFocus(focus: valueFocus))
         }
     }
 
@@ -410,5 +473,22 @@ private extension ContactDetailScreen {
     var statusValue: String {
         let (days, overdue) = viewModel.overdueSummary
         return overdue ? "\(days) days overdue" : "on track"
+    }
+}
+
+/// `.accessibilityFocused(_:)` takes a concrete, non-optional
+/// `AccessibilityFocusState<Bool>.Binding` — this lets `detailValue` accept
+/// one only for the single call site (Contact Detail's "Status" row) that
+/// needs to be a row-action focus target, without every other `detailRow`
+/// call threading through a throwaway binding of its own.
+private struct OptionalAccessibilityFocus: ViewModifier {
+    let focus: AccessibilityFocusState<Bool>.Binding?
+
+    func body(content: Content) -> some View {
+        if let focus {
+            content.accessibilityFocused(focus)
+        } else {
+            content
+        }
     }
 }

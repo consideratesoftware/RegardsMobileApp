@@ -155,28 +155,32 @@ a test run, not a mitigation for it. If a similar finding appears, the
 response is the same rerun-and-triage procedure this section already
 describes.
 
-**Second precedent, different proof shape (TF-04, PR22).**
-`ScreensAccessibilityTests.testLogOtherChannelPickerPassesAudit` hits
-`.elementDetection` "Potentially inaccessible text" four times against
-Contact Detail's Log other `confirmationDialog`. Unlike the banner case
-above, Xcode's `.elementDetection` audit never populates `XCUIAccessibilityAuditIssue.element`
-for this message — confirmed by dumping every issue property in a debug
-run — so the first proof (xcresult identifies the targeted element inside
-an OS hierarchy) isn't obtainable for this audit type at all. The
-classification instead rests on source plus screenshot: every row this
-dialog declares is a plain `Button(channel.displayName)` with no custom
-drawing, and on this simulator/OS a `confirmationDialog` with this many
-choices renders as a translucent "glass" popover (not a bottom action
-sheet) whose system-owned material lets blurred Contact Detail content
-from behind the dialog show through specific rows — visible in an xcresult
-screenshot from run `TargetedRun-1786354772`
-(`AF67B7AA-83EB-4E25-9A4A-C6E5ECE2ACBC.png`) as text-shaped blur on both
-sides of the FaceTime row's label. Every element the dialog actually
-declares already carries a correct label, so nothing legible goes
-unreported. `ScreensAccessibilityTests+RowActions.swift`'s
-`suppressKnownPopoverGlassBleedThrough` filters only this exact audit type and
-message, only inside that one test's audit call — every other finding,
-and this same category everywhere else, still fails normally.
+**Former second precedent, now closed (TF-04, PR22) — kept as a worked
+example of a plausible-looking system-UI classification that turned out to
+be wrong.** An earlier version of `testLogOtherChannelPickerPassesAudit`
+carried a `suppressKnownPopoverGlassBleedThrough` filter for `.elementDetection`
+"Potentially inaccessible text" findings against Contact Detail's Log other
+picker, then a `confirmationDialog`. The classification rested on source plus
+screenshot (Xcode's `.elementDetection` audit never populates
+`XCUIAccessibilityAuditIssue.element` for this message, so the xcresult/OS-hierarchy
+proof this section otherwise requires wasn't obtainable): a
+`confirmationDialog` with this many choices rendered as a translucent "glass"
+popover whose system material let blurred Contact Detail content bleed
+through specific rows, visible in a screenshot as text-shaped blur on the
+FaceTime row. That reasoning was real, but it was answering the wrong
+question — the popover rendering itself was the actual defect, not a
+cosmetic audit false-positive to suppress around. `.presentationCompactAdaptation(.sheet)`,
+added to force the standard action-sheet presentation instead, did not
+change the popover rendering (confirmed live via an accessibility-tree
+dump), and the popover's only dismissal — tap-outside a `PopoverDismissRegion`
+— was unreachable by VoiceOver (device report: "I can't get the voiceover
+to dismiss the picker"). `LogOtherChannelSheet` replaces the
+`confirmationDialog` with a `.sheet` the app builds and controls outright,
+with a real, labeled Cancel button; the suppression is gone because the
+translucent popover material it existed for is gone. The lesson: a
+suppressed audit finding needs the same scrutiny as a passing one — "this
+looks like system chrome" is not the same claim as "this is not a real
+defect."
 
 ## Sensory-audit carve-outs
 

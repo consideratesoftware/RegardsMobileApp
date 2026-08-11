@@ -38,6 +38,15 @@ public struct RowActionAccessibilityEffects {
     /// focus move silently missed. Scheduling through `RunLoop.current`
     /// instead waits for a real pass of the run loop this view is hosted on.
     ///
+    /// `inModes: [.common]`, not the `.default`-only mode `perform(_:)`
+    /// implies: `.default` mode is suspended for the duration of an
+    /// in-flight scroll or other tracking loop, so a row action taken while
+    /// the list is still decelerating would sit queued until scrolling
+    /// stops — the announcement and focus move landing late enough to read
+    /// as not having happened at all. `.common` includes both `.default`
+    /// and `.tracking`, so this fires on the next run-loop turn regardless
+    /// of what the list is doing.
+    ///
     /// `public`: used as the `yieldControl` default argument value in the
     /// `public init` above, and default-argument expressions are evaluated
     /// at the call site, so this needs to be at least as visible as that
@@ -45,7 +54,7 @@ public struct RowActionAccessibilityEffects {
     @MainActor
     public static func settleRunLoop() async {
         await withCheckedContinuation { continuation in
-            RunLoop.current.perform { continuation.resume() }
+            RunLoop.current.perform(inModes: [.common]) { continuation.resume() }
         }
     }
 

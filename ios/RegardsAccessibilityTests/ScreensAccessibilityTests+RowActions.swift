@@ -9,14 +9,22 @@ extension ScreensAccessibilityTests {
     @MainActor
     func testOverdueRowActionsAreWiredAndLabeled() {
         let app = launchToOverdue()
+        // `ios/docs/accessibility.md` §1: `waitForExistence` only on a plain
+        // element query, never on a `.matching(identifier:)` predicate
+        // query — the predicate pass can observe existence well ahead of
+        // its own match, and under simulator slowness that lag can exceed
+        // the timeout even though the element is already on screen.
+        let plainCaughtUp = app.descendants(matching: .any)["overdue.caught-up"]
+        let plainSnooze = app.descendants(matching: .any)["overdue.snooze"]
+        XCTAssertTrue(plainCaughtUp.waitForExistence(timeout: 10))
+        XCTAssertTrue(plainSnooze.waitForExistence(timeout: 10))
+
         let firstCaughtUp = app.descendants(matching: .any)
             .matching(identifier: "overdue.caught-up")
             .firstMatch
         let firstSnooze = app.descendants(matching: .any)
             .matching(identifier: "overdue.snooze")
             .firstMatch
-        XCTAssertTrue(firstCaughtUp.waitForExistence(timeout: 10))
-        XCTAssertTrue(firstSnooze.waitForExistence(timeout: 10))
 
         // Real, hittable buttons — not the muted unavailable-text shape
         // `assertUnavailableElement` checks elsewhere on this screen (the
@@ -40,10 +48,14 @@ extension ScreensAccessibilityTests {
             to: "screen.upcoming",
             in: app
         )
+        // Plain subscript first — see the matching comment in
+        // `testOverdueRowActionsAreWiredAndLabeled` above.
+        let plainCaughtUp = app.descendants(matching: .any)["upcoming.caught-up"]
+        XCTAssertTrue(plainCaughtUp.waitForExistence(timeout: 10))
+
         let firstCaughtUp = app.descendants(matching: .any)
             .matching(identifier: "upcoming.caught-up")
             .firstMatch
-        XCTAssertTrue(firstCaughtUp.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(identifier: "upcoming.caught-up").firstMatch.exists)
         XCTAssertTrue(firstCaughtUp.isEnabled)
         XCTAssertTrue(firstCaughtUp.label.hasPrefix("Mark "))
@@ -58,14 +70,19 @@ extension ScreensAccessibilityTests {
     @MainActor
     func testOverdueRowActionsDoNotOverlapAtAccessibility5() {
         let app = launchToOverdue(dynamicTypeSize: "accessibility5")
+        // Plain subscript first — see the matching comment in
+        // `testOverdueRowActionsAreWiredAndLabeled` above.
+        let plainCaughtUp = app.descendants(matching: .any)["overdue.caught-up"]
+        let plainSnooze = app.descendants(matching: .any)["overdue.snooze"]
+        XCTAssertTrue(plainCaughtUp.waitForExistence(timeout: 10))
+        XCTAssertTrue(plainSnooze.waitForExistence(timeout: 10))
+
         let firstCaughtUp = app.descendants(matching: .any)
             .matching(identifier: "overdue.caught-up")
             .firstMatch
         let firstSnooze = app.descendants(matching: .any)
             .matching(identifier: "overdue.snooze")
             .firstMatch
-        XCTAssertTrue(firstCaughtUp.waitForExistence(timeout: 10))
-        XCTAssertTrue(firstSnooze.waitForExistence(timeout: 10))
         assertStacked(
             firstSnooze,
             below: firstCaughtUp,
@@ -74,9 +91,37 @@ extension ScreensAccessibilityTests {
     }
 
     /// Accessibility FIX item, not optional (staged review): Log other's
-    /// `confirmationDialog` is new, presented UI with its own accessibility
-    /// tree — it needs the same audit coverage every other screen gets, not
-    /// just a "the trigger button exists" check.
+    /// picker is presented UI with its own accessibility tree — it needs the
+    /// same audit coverage every other screen gets, not just a "the trigger
+    /// button exists" check.
+    ///
+    /// This used to open a `confirmationDialog`, which on the OS this
+    /// shipped against rendered as an anchored, translucent popover with no
+    /// reachable Cancel control at all — `.presentationCompactAdaptation
+    /// (.sheet)`, added to force the standard action-sheet presentation,
+    /// didn't change that (confirmed live via an accessibility-tree dump:
+    /// still a `Popover` container, no "Cancel" button anywhere, dismissal
+    /// only through a `PopoverDismissRegion` VoiceOver can't discover —
+    /// device report: "I can't get the voiceover to dismiss the picker").
+    /// `LogOtherChannelSheet` replaces it with a `.sheet` this app controls
+    /// outright, with a real, labeled Cancel button — this test is the
+    /// assertion that would have caught the original defect, and its
+    /// absence is why the `.presentationCompactAdaptation` fix shipped
+    /// without actually fixing anything.
+    ///
+    /// "Picker is open" is detected on `cancel` itself, a leaf, not a
+    /// container: an earlier version queried the `List`'s own identifier for
+    /// this, and a live accessibility-tree dump showed that identifier
+    /// resolving fine while `cancel` — placed as a trailing row *inside*
+    /// that same `List` at the time — didn't exist in the tree at all
+    /// (`List` is a lazy, virtualized `UICollectionView`; a row placed after
+    /// all 13 channel rows is never scrolled into view by anything in this
+    /// flow, so it's never instantiated). `LogOtherChannelSheet` now puts
+    /// Cancel outside the `List` for exactly this reason — see its doc
+    /// comment — which also makes it the right leaf to gate on here: no
+    /// container identifier anywhere in that view for this test to depend
+    /// on, and one query serves both "is it open" and the dismissal
+    /// assertion below.
     @MainActor
     func testLogOtherChannelPickerPassesAudit() throws {
         let app = launchToOverdue()
@@ -89,93 +134,27 @@ extension ScreensAccessibilityTests {
         let logOther = app.descendants(matching: .any)["contact-detail.log-other"]
         XCTAssertTrue(logOther.waitForExistence(timeout: 10))
 
-        // On this simulator/OS, `confirmationDialog` renders as an
-        // anchored popover rather than a bottom action sheet, and a
-        // popover-style presentation drops the explicit `Button("Cancel",
-        // role: .cancel)` row entirely — dismissal is tap-outside only
-        // (confirmed by dumping the failure-state accessibility tree: the
-        // "Log other channel" sheet and its 13 channel buttons are present,
-        // no "Cancel" button anywhere). So the stable proof the sheet is up
-        // is the dialog itself, queried by the title it's declared with,
-        // not a Cancel row that may not exist. A single bare tap on
-        // `logOther` can still be dropped by the simulator the same way
-        // row/tab taps can (the documented PR #11/#12 flake this file's
-        // other navigation helpers all guard against with bounded retries) —
-        // this one needs its own retry loop since `navigate(...)` assumes
-        // the source screen disappears, which a modal sheet over Contact
-        // Detail never does.
-        let channelPicker = app.sheets["Log other channel"]
+        // A single bare tap on `logOther` can still be dropped by the
+        // simulator the same way row/tab taps can (the documented PR
+        // #11/#12 flake this file's other navigation helpers all guard
+        // against with bounded retries) — this one needs its own retry loop
+        // since `navigate(...)` assumes the source screen disappears, which
+        // a modal sheet over Contact Detail never does.
+        let cancel = app.descendants(matching: .any)["contact-detail.log-other-cancel"]
         for attempt in 0..<3 {
             guard waitUntilLiveAndHittable(logOther) else { continue }
             activate(logOther, attempt: attempt)
-            if channelPicker.waitForExistence(timeout: 5) { break }
+            if cancel.waitForExistence(timeout: 5) { break }
         }
-        XCTAssertTrue(channelPicker.exists, "Log other should open the channel picker.")
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories, suppressKnownPopoverGlassBleedThrough)
+        XCTAssertTrue(cancel.exists, "Log other should open the channel picker.")
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
 
-        // Dismiss by tapping outside the popover's bounds — left edge,
-        // vertical middle, well clear of both the anchored card (x roughly
-        // 81–321 of a 402pt-wide screen) and the status bar / Dynamic
-        // Island exclusion zone near y=0, which can swallow a tap before it
-        // reaches the app. Not a Cancel row: confirmed above that this
-        // popover presentation doesn't expose one.
-        let dismissRegion = app.otherElements["PopoverDismissRegion"]
-        XCTAssertTrue(dismissRegion.waitForExistence(timeout: 5))
-        dismissRegion.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5)).tap()
-        XCTAssertTrue(channelPicker.waitForNonExistence(timeout: 10))
-    }
-
-    /// `ios/docs/accessibility.md`'s "Known system-UI audit interruption"
-    /// section already carves out one precedent for this exact message
-    /// ("Potentially inaccessible text" against an OS "Ready for Apple
-    /// Intelligence" banner), classified from the failed run's element
-    /// identification plus its screenshot. `.elementDetection` issues on
-    /// this popover don't offer that first proof — `issue.element` is `nil`
-    /// for all four findings this dialog produces (confirmed by dumping
-    /// every `XCUIAccessibilityAuditIssue` property in a debug run: `auditType`,
-    /// `compactDescription`, and `detailedDescription` are populated,
-    /// `element` is not — Xcode 26's `.elementDetection` audit doesn't
-    /// attach an element handle to this finding at all). So this
-    /// classification rests on the second kind of proof instead: source and
-    /// screenshot.
-    ///
-    /// `ContactDetailScreen`'s channel rows are exactly
-    /// `Button(channel.displayName) { ... }` inside a system
-    /// `.confirmationDialog` — no custom drawing, no fixed font size, no
-    /// image, nothing app code could style differently. On this
-    /// simulator/OS a `confirmationDialog` with this many choices renders
-    /// as an anchored, translucent "glass" popover rather than a bottom
-    /// action sheet (see the Cancel-row note above), and that system
-    /// material lets faint, blurred Contact Detail content from behind the
-    /// dialog show through specific rows — most visibly the FaceTime row,
-    /// where an xcresult screenshot from this exact test
-    /// (`AF67B7AA-83EB-4E25-9A4A-C6E5ECE2ACBC.png`, run
-    /// `TargetedRun-1786354772`) shows text-shaped blur bleeding through on
-    /// both sides of the label. That bled-through content belongs to a
-    /// different screen and was never meant to be read here; every element
-    /// this dialog actually declares (title, each channel button) already
-    /// carries a correct, non-empty accessibility label per the source
-    /// above, so nothing legible is going unreported to VoiceOver. This
-    /// reads as the audit's OCR-based text detection picking up backdrop
-    /// blur through system-owned "Liquid Glass" chrome — not app content.
-    /// Neither Dynamic Type nor a fixed size is the cause: this test never
-    /// sets `REGARDS_UI_TEST_DYNAMIC_TYPE`, so it runs at the system
-    /// default, and the bleed-through was still present.
-    ///
-    /// Scope stays as narrow as `structuralAuditCategories` itself: this
-    /// filters only `.elementDetection` "Potentially inaccessible text"
-    /// findings, only inside this one test's audit call. Every other audit
-    /// type, and this same category on every other screen, still fails
-    /// normally.
-    ///
-    /// `performAccessibilityAuditWithAuditTypes:issueHandler:error:`'s
-    /// header doc: "return YES to handle it yourself" — the handler's
-    /// `Bool` means *suppress*, not *keep failing*, which is the inverse of
-    /// the intuitive reading. `true` here means "handled, don't record."
-    @MainActor
-    private func suppressKnownPopoverGlassBleedThrough(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
-        issue.auditType == .elementDetection
-            && issue.compactDescription == "Potentially inaccessible text"
+        // The blocker this closes: a real, labeled, hittable Cancel control
+        // that actually dismisses the picker — not a tap-outside region
+        // VoiceOver never surfaces.
+        XCTAssertTrue(waitUntilLiveAndHittable(cancel))
+        activate(cancel, attempt: 0)
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 10))
     }
 
     /// Pins what the app actually does after a Contact Detail Snooze, not

@@ -271,6 +271,13 @@ struct GRDBContactRepository: ContactRepository {
             // indefinitely in the contract-test suite (both backends) for
             // reasons not further investigated. Reverted to this proven form.
             var isInitialValue = true
+            // `onTermination` assigned *before* `start(...)` runs, not
+            // after: a synchronous `onError` inside `start(...)` triggers it
+            // before a cancellable exists to cancel. See `CancellableBox`
+            // for how `set`/`cancel` stay safe regardless of which runs
+            // first.
+            let box = CancellableBox()
+            continuation.onTermination = { _ in box.cancel() }
             let cancellable = observation.start(
                 in: dbQueue,
                 onError: { _ in
@@ -284,23 +291,20 @@ struct GRDBContactRepository: ContactRepository {
                         isInitialValue = false
                         return
                     }
-                    let contacts = (try? records.map { try $0.toDomain() }) ?? []
-                    continuation.yield(contacts)
+                    // `compactMap`, not `(try? records.map { ... }) ?? []`:
+                    // the earlier form let one undecodable row collapse the
+                    // *entire* emission to empty — Overdue would render "all
+                    // caught up" while every other contact the user still
+                    // owes is just as real, silently misreporting their
+                    // relationships. `compactMap` drops only the row that
+                    // fails, matching `fetchAllWithDiagnostics()`'s R50
+                    // per-row tolerance on the ordinary read path — this is
+                    // that same tolerance applied to the live-observation
+                    // path, which R50 didn't originally reach.
+                    continuation.yield(records.compactMap { try? $0.toDomain() })
                 }
             )
-            // `AnyDatabaseCancellable` predates GRDB's own Sendable audit.
-            // Boxing it — rather than a file-wide `@preconcurrency import
-            // GRDB` that would downgrade every Sendable diagnostic in this
-            // file — scopes `@unchecked` to exactly the one call this makes:
-            // `cancel()`. That call isn't thread-safe by itself (GRDB 6.29's
-            // implementation is an unguarded `_cancel?(); _cancel = nil`);
-            // safety here comes from cardinality, not synchronization —
-            // `AsyncStream.onTermination` fires at most once, so exactly one
-            // caller ever reaches `cancel()` through it. Invariant this
-            // depends on: `box.cancellable.cancel()` must never gain a
-            // second call site outside `onTermination` below.
-            let box = CancellableBox(cancellable)
-            continuation.onTermination = { _ in box.cancellable.cancel() }
+            box.set(cancellable)
         }
     }
 
@@ -355,15 +359,6 @@ struct GRDBContactRepository: ContactRepository {
             }
             return ContactFetchReport(contacts: healthy, corrupted: corrupted)
         }
-    }
-}
-
-/// See `GRDBContactRepository.observeTracked()`'s doc comment for why this
-/// exists instead of a file-wide `@preconcurrency import GRDB`.
-private final class CancellableBox: @unchecked Sendable {
-    let cancellable: AnyDatabaseCancellable
-    init(_ cancellable: AnyDatabaseCancellable) {
-        self.cancellable = cancellable
     }
 }
 

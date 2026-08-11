@@ -8,10 +8,11 @@ import Testing
 /// from that type rather than being duplicated here.
 ///
 /// What these pin: `markCaughtUp` and `logOther` are each two writes now
-/// (`InteractionLogging`, then `SchedulingPass.caughtUp`), so the first can
-/// persist while the second throws. Both catch blocks reload
-/// unconditionally so the screen ends up agreeing with whatever actually
-/// landed.
+/// (`SchedulingPass.caughtUp`, then `InteractionLogging`, in that order —
+/// see `markCaughtUp`'s doc comment for why the reminder-state write goes
+/// first), so the first can persist while the second throws or partially
+/// applies. Both catch blocks reload unconditionally so the screen ends up
+/// agreeing with whatever actually landed.
 @MainActor
 struct ContactDetailViewModelFailurePathTests {
 
@@ -52,87 +53,107 @@ struct ContactDetailViewModelFailurePathTests {
 
         await viewModel.markCaughtUp()
 
-        // `upsert` throws right after `interactions.append` already
-        // succeeded (documented on `InteractionLogging.record`), so
-        // `scheduler.caughtUp` never runs and the catch block's `load()`
-        // fires. That reload re-reads the same contact whose `upsert` just
-        // failed, so `lastInteractedAt` comes back nil — the same value
-        // already on screen. The stable-looking result below is the reload
-        // agreeing with what's truly persisted, not evidence `load()` was
-        // skipped: the catch block calls it unconditionally now (see
-        // `markCaughtUp`'s doc comment on why a bare reload belongs there).
+        // `scheduler.caughtUp` runs first now and succeeds (a no-op — this
+        // contact has no pending snooze). `interactions.append` then
+        // succeeds too; `upsert` throws right after (documented on
+        // `InteractionLogging.record`), so the catch block's `load()` fires.
+        // That reload re-reads the same contact whose `upsert` just failed,
+        // so `lastInteractedAt` comes back nil — the same value already on
+        // screen. The stable-looking result below is the reload agreeing
+        // with what's truly persisted, not evidence `load()` was skipped:
+        // the catch block calls it unconditionally now (see `markCaughtUp`'s
+        // doc comment on why a bare reload belongs there).
         #expect(viewModel.contact?.lastInteractedAt == nil)
     }
 
     /// The three-write partial-failure shape `markCaughtUp`'s doc comment
-    /// added a reload for: `InteractionLogging`'s two writes
-    /// (`interactions.append`, `contacts.upsert`) both succeed, and only the
-    /// later `scheduler.caughtUp` call throws. Before that fix the catch
-    /// block only logged the error — the interaction row and the moved
-    /// `lastInteractedAt` were genuinely persisted, but `viewModel.contact`/
-    /// `viewModel.interactions` kept showing the pre-action state until the
-    /// screen was left and re-entered. `.failingUpdateState()`, not
-    /// `.failing()`: only `SchedulingPass.caughtUp`'s `updateState` call
-    /// needs to fail here — `ContactDetailViewModel.load()` never reads
-    /// `reminders` at all, so a broader failure would prove nothing extra.
-    @Test("A caught-up write that fails only at the scheduler step still reloads to the truly persisted state")
-    func markCaughtUpReloadsPersistedStateWhenSchedulerThrows() async throws {
-        let contact = Self.contact(preferredChannel: .signal, lastInteractedAt: nil)
-        let contacts = StubContactRepository([contact])
+    /// added a reload for, updated for correctness #4's write-order fix
+    /// (`scheduler.caughtUp` now runs *before* `InteractionLogging`, not
+    /// after — see `markCaughtUp`'s doc comment): with the reminder-state
+    /// write first, "only the last write fails" now means `contacts.upsert`
+    /// — `InteractionLogging`'s second internal write — not
+    /// `scheduler.caughtUp` (a scheduler failure now blocks everything after
+    /// it by construction, so it can't produce a partial-persistence case at
+    /// all). This sets up a real pending snooze first, specifically so
+    /// "the snooze is cleared" is provable rather than assumed: `caughtUp`
+    /// against a contact with nothing pending is a silent no-op either way,
+    /// which wouldn't discriminate "ran" from "was skipped."
+    @Test("A caught-up write that fails only at the final contact-upsert step still clears the snooze and logs it")
+    func markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
+        let contact = Self.contact(
+            preferredChannel: .signal,
+            lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400)
+        )
+        let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
-        let reminders = StubReminderRepository.failingUpdateState()
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: scheduler,
             clock: { Self.now }
         )
         await viewModel.load()
 
         await viewModel.markCaughtUp()
 
-        // The first two writes truly persisted even though the third threw.
+        // The first write (reminder-state) truly persisted: the pending
+        // snooze this test set up above is gone, even though the write
+        // after it failed.
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+        // The second write's first half (interactions.append) also truly
+        // persisted — only its second half (contacts.upsert) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)
-        let stored = try #require(await contacts.fetch(id: contact.id))
-        #expect(stored.lastInteractedAt == Self.now)
 
-        // And the reload the catch block now runs makes the view model agree
-        // with that persisted state, not the pre-action snapshot.
-        #expect(viewModel.contact?.lastInteractedAt == Self.now)
+        // The one field that genuinely failed to write stays at its
+        // pre-action value, and the catch block's reload reflects exactly
+        // this mixed, truly-persisted state — not an all-succeeded or
+        // all-failed story.
+        #expect(viewModel.contact?.lastInteractedAt == contact.lastInteractedAt)
         #expect(viewModel.interactions.count == 1)
     }
 
-    /// Same shape as `markCaughtUpReloadsPersistedStateWhenSchedulerThrows`,
-    /// driven through `logOther` instead — the sibling should-fix #1 catch
-    /// block on this method needs its own proof, not an assumption that
+    /// Same shape as
+    /// `markCaughtUpClearsSnoozeAndLogsEvenWhenContactUpsertThrows`, driven
+    /// through `logOther` instead — the sibling should-fix #1 catch block on
+    /// this method needs its own proof, not an assumption that
     /// `markCaughtUp`'s coverage carries over.
-    @Test("A log-other write that fails only at the scheduler step still reloads to the truly persisted state")
-    func logOtherReloadsPersistedStateWhenSchedulerThrows() async throws {
-        let contact = Self.contact(preferredChannel: .whatsapp, lastInteractedAt: nil)
-        let contacts = StubContactRepository([contact])
+    @Test("A log-other write that fails only at the final contact-upsert step still clears the snooze and logs it")
+    func logOtherClearsSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
+        let contact = Self.contact(
+            preferredChannel: .whatsapp,
+            lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400)
+        )
+        let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
-        let reminders = StubReminderRepository.failingUpdateState()
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to clear
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: scheduler,
             clock: { Self.now }
         )
         await viewModel.load()
 
         await viewModel.logOther(channel: .email)
 
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .manual)
         #expect(logs[0].channel == .email)
-        let stored = try #require(await contacts.fetch(id: contact.id))
-        #expect(stored.lastInteractedAt == Self.now)
 
-        #expect(viewModel.contact?.lastInteractedAt == Self.now)
+        #expect(viewModel.contact?.lastInteractedAt == contact.lastInteractedAt)
         #expect(viewModel.interactions.count == 1)
-    }}
+    }
+}

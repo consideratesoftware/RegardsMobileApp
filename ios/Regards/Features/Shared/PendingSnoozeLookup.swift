@@ -20,7 +20,13 @@ enum PendingSnoozeLookup {
             pendingReminders
                 .filter { $0.kind == .cadence }
                 .map { ($0.contactId, $0.scheduledFor) },
-            uniquingKeysWith: { _, latest in latest }
+            // `max($0, $1)`, not "whichever comes last in the array": two
+            // pending cadence rows for one contact shouldn't happen (the
+            // deterministic `cadenceReminderID` write-path is meant to keep
+            // it to one), but if it ever did, picking by array order would
+            // make the winner depend on fetch ordering rather than on which
+            // row is actually later — `max` is correct regardless of order.
+            uniquingKeysWith: { max($0, $1) }
         )
     }
 }
