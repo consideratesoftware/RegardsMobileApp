@@ -19,7 +19,7 @@ public struct ContactDetailScreen: View {
                     primaryCTA(contact: c)
                         .padding(.horizontal, 16)
                         .padding(.top, 14)
-                    secondaryActions
+                    secondaryActions(contact: c)
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
 
@@ -122,25 +122,33 @@ public struct ContactDetailScreen: View {
         .accessibilityIdentifier("contact-detail.open-channel-unavailable")
     }
 
-    private var secondaryActions: some View {
+    private func secondaryActions(contact: Contact) -> some View {
         AccessibilityAdaptiveLayout {
             HStack(spacing: 8) {
-                secondaryItems
+                secondaryItems(contact: contact)
             }
         } accessibility: {
             VStack(spacing: 8) {
-                secondaryItems
+                secondaryItems(contact: contact)
             }
         }
     }
 
     @ViewBuilder
-    private var secondaryItems: some View {
+    private func secondaryItems(contact: Contact) -> some View {
         secondaryAction("Caught up", identifier: "contact-detail.caught-up") {
             Task { await viewModel.markCaughtUp() }
         }
-        secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
-            Task { await viewModel.snooze() }
+        // Overdue and Upcoming both gate a contact's cadence row on
+        // `tracked && cadenceDays != nil`; an untracked or no-cadence
+        // contact has no `ScheduledReminder` either list would ever read,
+        // so Snooze here would write an inert row and control a state that
+        // doesn't exist — the no-inert-controls rule this repo enforces
+        // everywhere else.
+        if contact.tracked, contact.cadenceDays != nil {
+            secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
+                Task { await viewModel.snooze() }
+            }
         }
         secondaryAction("Log other", identifier: "contact-detail.log-other") {
             showsLogOtherChannelPicker = true

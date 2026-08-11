@@ -6,8 +6,10 @@ import Testing
 /// `ContactDetailViewModel` (R24 — this VM previously had only
 /// `ContactDetailInteractionLabelTests`' spoken-label coverage). The action
 /// tests (`markCaughtUp`, `logOther`) lock in ARCHITECTURE.md §14 PR22: both
-/// persist through `ContactRepository`/`InteractionRepository` only, never
-/// touching `ScheduledReminder` (decision #36).
+/// persist through `ContactRepository`/`InteractionRepository` directly, and
+/// both also clear any pending snooze through `SchedulingPass.caughtUp` —
+/// `ScheduledReminder`'s sole writer stays `SchedulingPass` (decision #36),
+/// never a direct write from this view model.
 @MainActor
 struct ContactDetailViewModelTests {
 
@@ -247,6 +249,83 @@ struct ContactDetailViewModelTests {
         #expect(await interactions.appendedLogs().isEmpty)
         let stored = try #require(await contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == contact.lastInteractedAt) // untouched (decision #31)
+    }
+
+    /// The hosted-review blocker this pins: `logOther` originally never
+    /// called `scheduler.caughtUp`, unlike `markCaughtUp` — both route
+    /// through `InteractionLogging`, which moves `lastInteractedAt` and
+    /// never touches `ScheduledReminder`, so without the call a contact
+    /// logged through another channel after a snooze kept showing the stale
+    /// snoozed date. Mirrors `UpcomingViewModelActionTests`'s
+    /// `caughtUpAfterSnoozeShowsFreshDateWithShortCadence`: cadence stays at
+    /// the default 7 days *reduced* to 3, deliberately short enough that the
+    /// fresh `overdueAt` (now + 3d) lands *before* the stale `snoozedUntil`
+    /// (now + 7d) — the same shape `caughtUpAfterSnoozeBeatsStaleSnooze`
+    /// widens to 10 days specifically to avoid, since a wider cadence would
+    /// make the fresh date win regardless of whether the stale snooze was
+    /// ever cleared, proving nothing about this bug.
+    @Test("Log other after a snooze clears the stale snoozed date, not just the interaction log")
+    func logOtherAfterSnoozeClearsStaleSnoozeWithShortCadence() async throws {
+        // `nextAllowedSlot`'s slot-start snapping shifts a target date by up
+        // to a day if the window's allowed range doesn't start at `Self.now`'s
+        // exact time-of-day (08:00 UTC, matching `UpcomingViewModelActionTests`'s
+        // `eightAMWindow`) — `.allDayEveryDay`'s midnight-anchored range would
+        // otherwise turn the exact-equality assertions below into a same-day
+        // check instead.
+        let window = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay(hour: 23, minute: 59))],
+            timezoneIdentifier: UpcomingFixtures.utc.identifier
+        )
+        let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: StubInteractionRepository(),
+            scheduler: scheduler,
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        try await scheduler.snooze(contactId: contact.id) // pending cadence @ now + 7d
+        let beforeUpcoming = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: scheduler,
+            interactions: StubInteractionRepository(),
+            window: window,
+            clock: { Self.now }
+        )
+        await beforeUpcoming.load()
+        #expect(beforeUpcoming.groups.flatMap(\.rows).first?.scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
+
+        await viewModel.logOther(channel: .email)
+
+        // The pending cadence row is gone outright — direct proof
+        // `scheduler.caughtUp` ran, independent of any Upcoming math.
+        let pending = try await reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+
+        // And the downstream effect actually visible to a user: a fresh
+        // Upcoming load computes the row from now + 3d, not the stale
+        // now + 7d snooze.
+        let afterUpcoming = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: scheduler,
+            interactions: StubInteractionRepository(),
+            window: window,
+            clock: { Self.now }
+        )
+        await afterUpcoming.load()
+        let expected = Self.now.addingTimeInterval(3 * 86_400)
+        let sawFreshDate = await waitUntil {
+            afterUpcoming.groups.flatMap(\.rows).first?.scheduledFor == expected
+        }
+        #expect(sawFreshDate)
     }
 
     /// The earlier version of this test made `load()` itself fail (via a

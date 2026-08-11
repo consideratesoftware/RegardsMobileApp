@@ -104,11 +104,18 @@ public final class ContactDetailViewModel {
     /// "Log other channel…": the same downstream effect as `markCaughtUp` —
     /// reaching a contact through any channel still counts as staying in
     /// touch — logged as `.manual` against the channel the user actually
-    /// used.
+    /// used. Also clears any pending snooze through `SchedulingPass.caughtUp`
+    /// once the log succeeds, exactly like `markCaughtUp` does: both route
+    /// through `InteractionLogging`, which moves `lastInteractedAt` and
+    /// never touches `ScheduledReminder`, so without this call a snoozed
+    /// contact logged through another channel would keep showing the stale
+    /// snoozed date in Overdue/Upcoming (see `OverdueViewModel.markCaughtUp`'s
+    /// doc comment).
     public func logOther(channel: Channel) async {
         let logging = InteractionLogging(contacts: contacts, interactions: interactionsRepo)
         do {
             try await logging.logOther(contactId: contactId, channel: channel, at: clock())
+            try await scheduler.caughtUp(contactId: contactId)
             await load()
         } catch {
             Self.log.error(
