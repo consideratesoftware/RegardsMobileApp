@@ -18,9 +18,14 @@ public struct RowActionAccessibilityEffects {
     let didFocus: @MainActor () -> Void
     let yieldControl: @MainActor () async -> Void
 
+    // No default on `didFocus`: an unjustified default here is exactly what
+    // let the original inert-announcement bug ship — `.live` needing an
+    // explicit no-op (see its own doc comment for *why* it's a no-op) forces
+    // every construction site to make the same call deliberately, rather
+    // than silently inheriting "nothing happens" from an omitted argument.
     public init(
         announce: @escaping @MainActor (String) -> Void,
-        didFocus: @escaping @MainActor () -> Void = {},
+        didFocus: @escaping @MainActor () -> Void,
         yieldControl: @escaping @MainActor () async -> Void = { await Self.settleRunLoop() }
     ) {
         self.announce = announce

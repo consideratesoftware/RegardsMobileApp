@@ -107,6 +107,8 @@ public struct UpcomingScreen: View {
                                         let succeeded = await viewModel.markCaughtUp(contactId: row.contactId)
                                         if succeeded {
                                             announceRowAction("Marked \(row.name) caught up")
+                                        } else {
+                                            announceRowAction("Couldn't mark \(row.name) caught up.")
                                         }
                                     }
                                 }
@@ -121,10 +123,12 @@ public struct UpcomingScreen: View {
         }
     }
 
-    /// Announces a row-removing action and lands focus on the subtitle
-    /// (already updated to the new count by the time this fires) once the
-    /// list has settled — the generation-guarded sequencing itself lives in
-    /// `RowActionAnnouncer`, shared with `OverdueScreen`.
+    /// Announces a row action's outcome — success or failure, see the call
+    /// site above — and lands focus on the subtitle (whose count reflects
+    /// whichever actually happened) once the list has settled. The
+    /// generation-guarded sequencing lives in `RowActionAnnouncer`, shared
+    /// with `OverdueScreen`. A failure with no announcement would leave a
+    /// VoiceOver user believing a silently reverted removal succeeded.
     private func announceRowAction(_ message: String) {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
             isSubtitleFocused = true
@@ -173,12 +177,26 @@ struct UpcomingRow: View {
         AccessibilityAdaptiveLayout {
             HStack(spacing: 12) {
                 rowButton
-                caughtUpButton
+                // Blocker (staged review): "Caught up" only makes sense for
+                // a cadence row — `markCaughtUp`/`SchedulingPass.caughtUp`
+                // only ever clear a *cadence* reminder (see their doc
+                // comments), so on a birthday/anniversary/custom-occasion
+                // row this button used to log an interaction, leave the row
+                // in place, and still announce "Marked X caught up" — a
+                // false confirmation on the plain success path. An occasion
+                // isn't something you get caught up on; scoping the control
+                // out entirely (rather than giving it copy that's true but
+                // does nothing useful) is the honest fix.
+                if row.kind == .cadence {
+                    caughtUpButton
+                }
             }
         } accessibility: {
             VStack(alignment: .leading, spacing: 8) {
                 rowButton
-                caughtUpButton
+                if row.kind == .cadence {
+                    caughtUpButton
+                }
             }
         }
         .padding(.horizontal, 16)

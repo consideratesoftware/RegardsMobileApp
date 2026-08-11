@@ -51,7 +51,7 @@ struct RowActionAccessibilityEffectsTests {
             focus: { recorder.focusCalls += 1 }
         )
 
-        let settled = await Self.eventually { recorder.isComplete }
+        let settled = await waitUntil { recorder.isComplete }
         #expect(settled)
         #expect(recorder.announcements == ["Marked Leia Organa caught up"])
         #expect(recorder.focusAssignments == 1)
@@ -99,12 +99,12 @@ struct RowActionAccessibilityEffectsTests {
         announcer.fire("Marked Leia Organa caught up", effects: effects) {
             recorder.focusCalls += 1
         }
-        #expect(await Self.eventually { suspension.arrivalCount == 1 })
+        #expect(await waitUntil { suspension.arrivalCount == 1 })
 
         announcer.fire("Snoozed Han Solo 1 week", effects: effects) {
             recorder.focusCalls += 1
         }
-        #expect(await Self.eventually { suspension.arrivalCount == 2 })
+        #expect(await waitUntil { suspension.arrivalCount == 2 })
 
         // Resume the first (stale) call's first yield: its generation check
         // now fails, so it returns without ever calling `focus()` or
@@ -119,7 +119,7 @@ struct RowActionAccessibilityEffectsTests {
         // still matches, so focus lands now, then it yields again before
         // announcing.
         suspension.resumeNext()
-        #expect(await Self.eventually { suspension.arrivalCount == 3 })
+        #expect(await waitUntil { suspension.arrivalCount == 3 })
         #expect(recorder.focusCalls == 1)
         #expect(recorder.focusAssignments == 1)
         #expect(recorder.announcements.isEmpty)
@@ -127,7 +127,7 @@ struct RowActionAccessibilityEffectsTests {
         // Resume its second yield: the announcement lands last, with
         // nothing after it in the sequence to flush it.
         suspension.resumeNext()
-        #expect(await Self.eventually { recorder.announcements == ["Snoozed Han Solo 1 week"] })
+        #expect(await waitUntil { recorder.announcements == ["Snoozed Han Solo 1 week"] })
         #expect(recorder.focusCalls == 1)
         #expect(recorder.focusAssignments == 1)
     }
@@ -184,9 +184,9 @@ struct RowActionAccessibilityEffectsTests {
         let recorder = RowActionEffectsRecorder()
         announcer.fire(
             "Marked Leia Organa caught up",
-            effects: RowActionAccessibilityEffects(announce: { recorder.announcements.append($0) })
+            effects: RowActionAccessibilityEffects(announce: { recorder.announcements.append($0) }, didFocus: {})
         ) {}
-        let settled = await Self.eventually { recorder.announcements.count == 1 }
+        let settled = await waitUntil { recorder.announcements.count == 1 }
         #expect(settled)
         window.isHidden = true
     }
@@ -233,19 +233,11 @@ struct RowActionAccessibilityEffectsTests {
         let recorder = RowActionEffectsRecorder()
         announcer.fire(
             "Marked Leia Organa caught up",
-            effects: RowActionAccessibilityEffects(announce: { recorder.announcements.append($0) })
+            effects: RowActionAccessibilityEffects(announce: { recorder.announcements.append($0) }, didFocus: {})
         ) {}
-        let settled = await Self.eventually { recorder.announcements.count == 1 }
+        let settled = await waitUntil { recorder.announcements.count == 1 }
         #expect(settled)
         window.isHidden = true
-    }
-
-    private static func eventually(_ condition: @escaping @MainActor () -> Bool) async -> Bool {
-        for _ in 0..<200 {
-            if condition() { return true }
-            await Task.yield()
-        }
-        return condition()
     }
 }
 

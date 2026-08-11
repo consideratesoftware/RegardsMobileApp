@@ -11,13 +11,12 @@ public struct ContactDetailScreen: View {
     // Focus target for all three row actions: the Cadence card's "Status"
     // value, mirroring `OverdueScreen`/`UpcomingScreen`'s subtitle. Content
     // plausibly changed (overdue → on track), and it survives every reload
-    // `load()` can take — the hero/cadence card only vanishes on a total
+    // `load()` can take — the hero/cadence card vanishes only on a total
     // contact-fetch failure, which none of these writes can cause.
     @AccessibilityFocusState private var isStatusFocused: Bool
-    // No default: a missed injection silently falling back to `.live` here
-    // is exactly the class of bug that shipped unannounced/unfocused row
-    // actions to device — every construction site must say which effects it
-    // means, including production's own factory.
+    // No default: a missed injection silently falling back to `.live` is
+    // exactly the class of bug that shipped unannounced/unfocused row
+    // actions to device — every construction site must say which it means.
     var accessibilityEffects: RowActionAccessibilityEffects
 
     public init(
@@ -69,23 +68,22 @@ public struct ContactDetailScreen: View {
         .navigationDestination(item: $previewContact) { contact in
             EditContactScreen(contact: contact)
         }
-        // See `LogOtherChannelSheet`'s doc comment: this used to be a
-        // `confirmationDialog`, which rendered as a popover with no reachable
-        // Cancel control on the OS this shipped against. A `.sheet` we build
-        // ourselves removes that dependency entirely.
+        // See `LogOtherChannelSheet`'s doc comment: a `.sheet` we build
+        // ourselves, replacing an earlier `confirmationDialog` that rendered
+        // as a popover with no reachable Cancel control.
         .sheet(isPresented: $showsLogOtherChannelPicker) {
             LogOtherChannelSheet(
                 onSelect: { channel in
                     showsLogOtherChannelPicker = false
                     Task {
                         let succeeded = await viewModel.logOther(channel: channel)
-                        // `viewModel.contact?.displayName`, not a captured
-                        // local: this sheet is declared outside the
-                        // `if let c = viewModel.contact` scope below (it has
-                        // to stay presentable even mid-reload), so there is
-                        // no `contact` local here to close over.
-                        if succeeded, let name = viewModel.contact?.displayName {
+                        // `viewModel.contact?.displayName`: this sheet is outside `if let c =
+                        // viewModel.contact` below. `?? "this contact"` covers a failed reload too.
+                        let name = viewModel.contact?.displayName ?? "this contact"
+                        if succeeded {
                             announceRowAction("Logged \(channel.displayName) with \(name)")
+                        } else {
+                            announceRowAction("Couldn't log \(channel.displayName) with \(name).")
                         }
                     }
                 },
@@ -125,7 +123,6 @@ extension ContactDetailScreen {
 private extension ContactDetailScreen {
 
     // MARK: - Sections
-    //
     // Moved out of the struct body for SwiftLint's type_body_length — a
     // `private extension` in the same file has the same visibility as a
     // `private` struct member, so this is a pure move.
@@ -184,27 +181,29 @@ private extension ContactDetailScreen {
                 let succeeded = await viewModel.markCaughtUp()
                 if succeeded {
                     announceRowAction("Marked \(contact.displayName) caught up")
+                } else {
+                    announceRowAction("Couldn't mark \(contact.displayName) caught up.")
                 }
             }
         }
         .accessibilityHint("Logs an interaction now and updates status.")
         // Overdue/Upcoming gate a cadence row on `tracked && cadenceDays !=
-        // nil`; an untracked/no-cadence contact has no `ScheduledReminder`
-        // either list reads, so Snooze would write an inert row otherwise.
+        // nil`; an untracked/no-cadence contact has no `ScheduledReminder`.
         if contact.tracked, contact.cadenceDays != nil {
             secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
                 Task {
                     let succeeded = await viewModel.snooze()
                     if succeeded {
                         announceRowAction("Snoozed \(contact.displayName) 1 week")
+                    } else {
+                        announceRowAction("Couldn't snooze \(contact.displayName).")
                     }
                 }
             }
-            // "1 wk" reads as a literal abbreviation without this. No
-            // contact name, unlike Overdue/Upcoming's "Snooze <name> 1
-            // week": there the name distinguishes rows, while this screen
-            // is about one contact and its siblings are plain "Caught up"
-            // and "Log other".
+            // "1 wk" reads as a literal abbreviation without this. No name,
+            // unlike Overdue/Upcoming's "Snooze <name> 1 week": the name
+            // distinguishes rows there, while this screen is about one
+            // contact and its siblings are plain "Caught up"/"Log other".
             .accessibilityLabel("Snooze 1 week")
             .accessibilityHint("Pushes the next reminder out one week.")
         }
@@ -214,10 +213,10 @@ private extension ContactDetailScreen {
         .accessibilityHint("Choose the channel you used to reach them.")
     }
 
-    /// Announces a row action's result and lands focus on the Cadence
-    /// card's "Status" value — sequencing lives in `RowActionAnnouncer`,
-    /// shared with `OverdueScreen`/`UpcomingScreen`. Also called from Log
-    /// other's channel buttons below: choosing a channel is the success signal.
+    /// Announces a row action's outcome — success or failure, every call
+    /// site above and the Log-other channel buttons below use this — and
+    /// lands focus on the Cadence card's "Status" value; sequencing lives in
+    /// `RowActionAnnouncer`, shared with `OverdueScreen`/`UpcomingScreen`.
     func announceRowAction(_ message: String) {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
             isStatusFocused = true

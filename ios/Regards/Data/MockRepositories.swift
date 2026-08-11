@@ -333,12 +333,15 @@ extension MockStore {
     }
 
     /// Mirrors `GRDBContactRepository.updateLastInteractedAt`: writes exactly this one field,
-    /// same R23 broadcast parity as `updateReconciledFields` above.
-    func updateLastInteractedAt(id: UUID, at date: Date) {
-        guard var c = contacts[id] else { return }
+    /// same R23 broadcast parity as `updateReconciledFields` above, and reports whether `id`
+    /// matched — see the protocol doc comment for why the caller needs that.
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) -> Bool {
+        guard var c = contacts[id] else { return false }
         c.lastInteractedAt = mockStoredDate(date)
         contacts[id] = c
         broadcastTrackedChange()
+        return true
     }
 
     func allGroups() -> [ContactGroup] { Array(groups.values) }

@@ -239,10 +239,17 @@ public final class ContactDetailViewModel {
     }
 
     public var overdueSummary: (days: Int, isOverdue: Bool) {
-        guard let c = contact, let cadence = c.cadenceDays,
-              let last = c.lastInteractedAt else {
+        guard let c = contact, let cadence = c.cadenceDays else {
             return (0, false)
         }
+        // `?? c.createdAt`, not `lastInteractedAt` alone: the never-contacted
+        // anchor (decision #29 / R8) — `OverdueViewModel.makeOverdueRow` and
+        // `UpcomingViewModel.buildRows` both fall back to `createdAt` for a
+        // tracked contact never yet logged as contacted. Guarding this
+        // property on `lastInteractedAt` being non-nil was a third,
+        // disagreeing implementation: it reported "on track" for exactly the
+        // contacts the other two screens correctly show as overdue.
+        let last = c.lastInteractedAt ?? c.createdAt
         let overdueAt = last.addingTimeInterval(TimeInterval(cadence) * 86_400)
         // Calendar-based day delta to honor DST and timezone boundaries.
         let days = calendar.dateComponents([.day], from: overdueAt, to: clock()).day ?? 0

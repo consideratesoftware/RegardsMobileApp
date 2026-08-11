@@ -72,6 +72,13 @@ struct InteractionLogging {
     /// the reconciler just archived. The field-scoped write never reads the
     /// row, so it can't revert anything it doesn't touch (same reasoning as
     /// `updateReconciledFields`, TF-03).
+    ///
+    /// Throws on a `false` return, rather than treating "no row matched" as
+    /// a quiet success: if the contact was archived or deleted between the
+    /// earlier `fetch` and this write, `lastInteractedAt` never actually
+    /// moved, and a caller reporting success anyway would announce "Marked
+    /// X caught up" for a write that changed nothing (staged review, same
+    /// class of false confirmation as blocker 1's occasion-row fix).
     private func record(
         contact: Contact,
         source: InteractionSource,
@@ -81,7 +88,10 @@ struct InteractionLogging {
         try await interactions.append(
             InteractionLog(contactId: contact.id, occurredAt: occurredAt, source: source, channel: channel)
         )
-        try await contacts.updateLastInteractedAt(id: contact.id, at: occurredAt)
+        let matched = try await contacts.updateLastInteractedAt(id: contact.id, at: occurredAt)
+        guard matched else {
+            throw DataError.notFound
+        }
         var updated = contact
         updated.lastInteractedAt = occurredAt
         return updated

@@ -77,7 +77,8 @@ struct GatedFetchTrackedContactRepository: ContactRepository {
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
         try await wrapped.updateReconciledFields(id: id, fields: fields)
     }
-    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         try await wrapped.updateLastInteractedAt(id: id, at: date)
     }
     func fetchAllWithDiagnostics() async throws -> ContactFetchReport {

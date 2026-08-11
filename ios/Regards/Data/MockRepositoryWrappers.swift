@@ -22,7 +22,8 @@ struct MockContactRepository: ContactRepository {
 
     /// Overrides the protocol's default the same way, for the same reason —
     /// see `updateReconciledFields` immediately above.
-    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         await store.updateLastInteractedAt(id: id, at: date)
     }
 

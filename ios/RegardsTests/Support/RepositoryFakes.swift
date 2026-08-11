@@ -94,6 +94,25 @@ actor StubContactRepository: ContactRepository {
         broadcastTrackedChange()
     }
 
+    /// Overrides the protocol's default (fetch + apply + upsert) with a real
+    /// field-scoped write — matching both production backends, not the
+    /// generic fallback (staged review: every `markCaughtUp`/`logOther`
+    /// action test in this suite was exercising the fallback instead of the
+    /// write GRDB actually ships, leaving the field-scoped fix unproven by
+    /// this repository's own test double). Gated by `upsertFailure`, same as
+    /// `upsert` above: this is the write that persists `lastInteractedAt`
+    /// now, so a test reaching for `.failingUpsert()` to simulate that write
+    /// failing should still work unchanged.
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
+        try requireSuccess()
+        if let upsertFailure { throw upsertFailure }
+        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return false }
+        contacts[index].lastInteractedAt = date
+        broadcastTrackedChange()
+        return true
+    }
+
     func storedCount() -> Int { contacts.count }
 
     private var subscribeCount = 0

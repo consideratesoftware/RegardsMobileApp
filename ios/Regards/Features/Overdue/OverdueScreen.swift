@@ -204,6 +204,8 @@ public struct OverdueScreen: View {
                             let succeeded = await viewModel.markCaughtUp(contactId: row.contactId)
                             if succeeded {
                                 announceRowAction("Marked \(row.name) caught up")
+                            } else {
+                                announceRowAction("Couldn't mark \(row.name) caught up. Still overdue.")
                             }
                         }
                     },
@@ -212,6 +214,8 @@ public struct OverdueScreen: View {
                             let succeeded = await viewModel.snooze(contactId: row.contactId)
                             if succeeded {
                                 announceRowAction("Snoozed \(row.name) 1 week")
+                            } else {
+                                announceRowAction("Couldn't snooze \(row.name). Still overdue.")
                             }
                         }
                     }
@@ -223,10 +227,13 @@ public struct OverdueScreen: View {
         }
     }
 
-    /// Announces a row-removing action and lands focus on the subtitle
-    /// (which the removal itself has already updated to the new count) once
-    /// the list has settled — the generation-guarded sequencing itself lives
-    /// in `RowActionAnnouncer`, shared with `UpcomingScreen`.
+    /// Announces a row action's outcome — success or failure, both call
+    /// sites above use this — and lands focus on the subtitle (whose count
+    /// reflects whichever actually happened by the time this fires) once the
+    /// list has settled. The generation-guarded sequencing itself lives in
+    /// `RowActionAnnouncer`, shared with `UpcomingScreen`. A failure with no
+    /// announcement at all would leave a VoiceOver user believing a silently
+    /// reverted optimistic removal succeeded.
     private func announceRowAction(_ message: String) {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
             isSubtitleFocused = true

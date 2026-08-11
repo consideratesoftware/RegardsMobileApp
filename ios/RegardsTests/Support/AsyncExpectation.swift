@@ -17,12 +17,14 @@ import Foundation
 /// prove a plain closure capturing that state is safe to hand across an
 /// isolation boundary.
 ///
-/// Shared, not a copy-per-file convenience: four call sites so far
-/// (`OverdueViewModelActionTests`, `UpcomingViewModelActionTests`), all
-/// waiting on the same shape of problem — a repository broadcast landing on
-/// a subscriber `Task` this test doesn't otherwise await. One implementation
-/// keeps the "never sleep, never guess a timeout" rule enforced in one place
-/// instead of re-derived per call site.
+/// Shared, not a copy-per-file convenience: call sites across several
+/// feature and support test files, all waiting on the same shape of problem
+/// — a repository broadcast landing on a subscriber `Task` this test doesn't
+/// otherwise await, or any other condition that resolves off the calling
+/// `Task`. One implementation keeps the "never sleep, never guess a timeout"
+/// rule enforced in one place instead of re-derived per call site
+/// (`RowActionAccessibilityEffectsTests` used to keep its own copy, named
+/// `eventually`, before consolidating onto this one).
 @MainActor
 @discardableResult
 func waitUntil(maxYields: Int = 10_000, _ condition: () -> Bool) async -> Bool {

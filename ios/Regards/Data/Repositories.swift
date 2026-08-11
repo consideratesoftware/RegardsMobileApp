@@ -57,8 +57,18 @@ public protocol ContactRepository: Sendable {
     /// the action, so a whole-row `upsert` could silently clobber a
     /// concurrent `ContactsReconciler` field write on the same row in
     /// between (including un-archiving a contact that pass just archived).
-    /// Never reads the row it's writing. A no-op if `id` doesn't match one.
-    func updateLastInteractedAt(id: UUID, at date: Date) async throws
+    /// Never reads the row it's writing.
+    ///
+    /// Returns whether `id` matched a stored row — `false`, not a thrown
+    /// error, for the ordinary "no row" case (mirrors `updateReconciledFields`'s
+    /// silent no-op). `InteractionLogging.record` uses this to distinguish
+    /// "the write landed" from "the contact was archived/deleted between the
+    /// earlier fetch and this write" — a caller that ignored the return
+    /// value and always reported success would announce "Marked X caught
+    /// up" for a write that changed nothing (staged review, same class as
+    /// blocker 1's occasion-row false confirmation).
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool
     /// Corruption-aware read (R50, `AllContactsViewModel`): every row that
     /// decodes, plus a diagnostic for each row that doesn't. Never mutates,
     /// deletes, or silently skips the corrupt row — it stays exactly as
@@ -167,10 +177,12 @@ public extension ContactRepository {
     /// Fallback mirroring `updateReconciledFields`' own: fetch, move the one
     /// field, upsert. `GRDBContactRepository` and `MockContactRepository`
     /// override this with a write that never reads the row first.
-    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
-        guard var contact = try await fetch(id: id) else { return }
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
+        guard var contact = try await fetch(id: id) else { return false }
         contact.lastInteractedAt = date
         try await upsert(contact)
+        return true
     }
 }
 
@@ -362,12 +374,17 @@ struct GRDBContactRepository: ContactRepository {
     /// Real field-scoped `UPDATE` — see the protocol doc comment. Never
     /// reads the row first, so it can't clobber a concurrent
     /// `ContactsReconciler` write to any other column on the same row.
-    func updateLastInteractedAt(id: UUID, at date: Date) async throws {
+    /// `db.changesCount` after the `UPDATE` is SQLite's own
+    /// `sqlite3_changes()` — the row count the statement actually matched,
+    /// not an assumption that a well-formed `id` always exists.
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         try await dbQueue.write { db in
             try db.execute(
                 sql: "UPDATE Contact SET lastInteractedAt = ? WHERE id = ?",
                 arguments: [Int(date.timeIntervalSince1970), id.uuidString]
             )
+            return db.changesCount > 0
         }
     }
 
