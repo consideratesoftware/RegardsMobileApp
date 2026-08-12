@@ -52,6 +52,17 @@ struct LogOtherChannelSheet: View {
                 Button("Cancel", role: .cancel, action: onCancel)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
+                    // `.contentShape` (staged review round 11, `.hitRegion`
+                    // audit finding): `.frame(minHeight: 44)` alone measured
+                    // no different via `XCUIElement.frame` — this plain-style
+                    // `Button` wraps only its "Cancel" text with no
+                    // background shape of its own, so without an explicit
+                    // hit-testing shape the accessibility/tap target tracks
+                    // the text's own tight bounds, not the surrounding
+                    // `.frame`. See `EditContactScreen.field(_:)`'s matching
+                    // comment for the same finding, confirmed the same way
+                    // there first.
+                    .contentShape(Rectangle())
                     .accessibilityIdentifier("contact-detail.log-other-cancel")
             }
             .navigationTitle("Log other channel")

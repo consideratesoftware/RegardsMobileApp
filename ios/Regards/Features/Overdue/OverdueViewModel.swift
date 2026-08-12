@@ -3,15 +3,30 @@ import Observation
 
 /// Shape the view renders per contact — precomputed in the view model so the
 /// view body stays formatting-free.
+///
+/// No `isVirtualMerged` field (staged review round 11, removed): the "merged"
+/// chip it drove sat inside the name's `HStack` and took width directly from
+/// the contact name it was competing with — the reason a merged contact's
+/// row was the worst-affected by the row-crowding bug a device screenshot
+/// caught. Sid decided merge provenance belongs on Merge Duplicates alone,
+/// where a user can actually act on it, not surfaced passively on a screen
+/// that never asked them to. `isVirtualMerged` only ever rendered here in
+/// the first place — never on Contacts, Upcoming, or Contact Detail — which
+/// in hindsight reads as the spec's row description being wrong (it listed
+/// this chip), not the other three screens missing a feature.
+///
+/// No `cadenceText`/`lastInteractedText` fields either (same round): the
+/// visible metadata line and the spoken label both dropped cadence and
+/// last-contacted down to just `overdueDays` (Sid's words: "Just have name
+/// and how much overdue"), and neither field had any other reader once
+/// `OverdueRow.metadataString` stopped using them — see that computed
+/// property's own doc comment for the full reasoning.
 public struct OverdueRowState: Sendable, Identifiable, Equatable {
     public var id: UUID { contactId }
     public let contactId: UUID
     public let name: String
     public let priority: PriorityTier
-    public let isVirtualMerged: Bool
     public let overdueDays: Int
-    public let cadenceText: String
-    public let lastInteractedText: String?
     public let channel: Channel
     public let channelLabel: String
     public let channelValue: String
@@ -386,22 +401,15 @@ public final class OverdueViewModel {
 
         let context = Contact.AccessibilityContext(
             now: now,
-            effectiveLastInteractedAt: contact.lastInteractedAt,
             isOverdue: overdueDays > 0,
-            overdueDays: overdueDays,
-            isVirtualMerged: contact.contactGroupId != nil
+            overdueDays: overdueDays
         )
 
         return OverdueRowState(
             contactId: contact.id,
             name: contact.displayName,
             priority: contact.priorityTier,
-            isVirtualMerged: contact.contactGroupId != nil,
             overdueDays: overdueDays,
-            cadenceText: CadenceDescriptor.describe(days: cadenceDays),
-            lastInteractedText: contact.lastInteractedAt.flatMap {
-                Contact.relativeDescription(for: $0, from: now)
-            },
             channel: contact.preferredChannel,
             channelLabel: contact.preferredChannel.displayName,
             channelValue: contact.preferredChannelValue,

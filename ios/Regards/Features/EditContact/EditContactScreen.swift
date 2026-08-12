@@ -183,7 +183,7 @@ public struct EditContactScreen: View {
         let displayedValue = hasValue ? value : placeholder
         let isPreferred = touched && hasValue
         return AccessibilityAdaptiveLayout {
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
+            HStack(alignment: .center, spacing: 16) {
                 fieldLabel(label, fixedWidth: 84)
                 fieldValue(displayedValue, hasValue: hasValue, touched: isPreferred)
                 Spacer()
@@ -197,6 +197,25 @@ public struct EditContactScreen: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .frame(minHeight: 44)
+        // `.contentShape` (staged review round 11, `.hitRegion` audit
+        // finding): plain `.frame(minHeight: 44)` alone measured no
+        // different via `XCUIElement.frame` — verified directly, twice, with
+        // a throwaway diagnostic test, both at the outer container and on
+        // the content itself; the reported accessibility frame stayed ~17pt
+        // tall either way, tracking the text glyphs' own tight bounds rather
+        // than the padded/framed container. `.frame` alone sets the layout
+        // size, not the hit-testing/accessibility shape, and without an
+        // explicit shape SwiftUI can fall back to content bounds for a
+        // custom (non-standard-chrome) view — the same finding recurred on
+        // `LogOtherChannelSheet`'s plain-style Cancel `Button`, so this
+        // isn't specific to `.accessibilityElement(children: .ignore)`.
+        // `.contentShape(Rectangle())` explicitly declares the shape instead
+        // of leaving it implicit, and measurably changed the reported frame
+        // in the same diagnostic. Placed after `.frame(minHeight: 44)` so
+        // the shape it declares is the full 44pt-minimum box, not the
+        // tighter content box.
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             Self.accessibilityFieldLabel(

@@ -53,7 +53,15 @@ struct AppRuntimeTests {
             Contact.relativeDescription(for: contact.lastInteractedAt, from: allContacts.now)
         )
         #expect(allContacts.now == runtime.clock())
-        #expect(overdueRow.lastInteractedText == relative)
+        // No `overdueRow.lastInteractedText` assertion here any more (staged
+        // review round 11): the field it read was removed from
+        // `OverdueRowState` once nothing rendered it — see that struct's own
+        // doc comment. Coverage isn't lost: `allContacts.now == runtime.clock()`
+        // above and `detail.overdueSummary.days == overdueRow.overdueDays`
+        // below already chain allContacts → runtime and detail → overdue
+        // through values each screen still exposes, which is transitively
+        // the same "every screen shares one clock" guarantee this test is
+        // named for.
         #expect(detail.lastTalkedLabel.hasPrefix(relative))
         #expect(detail.overdueSummary.days == overdueRow.overdueDays)
     }

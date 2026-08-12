@@ -32,6 +32,15 @@ public struct UpcomingRowState: Sendable, Identifiable, Equatable {
     /// ("customOccasion") instead of the occasion's label. Cadence rows
     /// speak their cadence text; every other kind speaks its occasion text.
     /// A row with neither omits the phrase rather than speaking empty.
+    ///
+    /// Already satisfies `ios/docs/accessibility.md`'s "labels mirror
+    /// visible content" rule with no departure to record (staged review
+    /// round 11 audit): this picks the same single fact `UpcomingRow.occasion`
+    /// renders (`occasionText` for an occasion row, `cadenceText` for a
+    /// cadence row — never both, `kind` determines which one the model
+    /// populates), so what's spoken always matches what's on screen. See
+    /// `occasion`'s own doc comment for why that visible line wasn't
+    /// trimmed the way Overdue's was.
     public var accessibilityLabel: String {
         let what = kind == .cadence ? cadenceText : occasionText
         guard let what, !what.isEmpty else {

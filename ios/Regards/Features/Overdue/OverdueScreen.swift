@@ -243,6 +243,10 @@ public struct OverdueScreen: View {
 
 struct OverdueRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // Scales the Caught up / Snooze glyphs the same way `ChannelGlyph`
+    // scales its own icon (staged review round 11) — see that type's doc
+    // comment for why `@ScaledMetric` over a fixed point size.
+    @ScaledMetric(relativeTo: .body) private var actionIconSize: CGFloat = 18
 
     let row: OverdueRowState
     let isInnerCircle: Bool
@@ -276,21 +280,15 @@ struct OverdueRow: View {
             HStack(spacing: 10) {
                 Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(row.name)
-                            .font(RegardsFont.rowTitle())
-                            .foregroundStyle(RegardsDS.ink)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                            .minimumScaleFactor(0.85)
-                        if row.isVirtualMerged {
-                            Text("merged")
-                                .font(.caption2)
-                                .foregroundStyle(RegardsDS.muted)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 1)
-                                .background(Capsule().fill(RegardsDS.hairSoft))
-                        }
-                    }
+                    // No merged-chip branch here (round 11) — see
+                    // `OverdueRowState`'s own doc comment for why it was
+                    // removed rather than kept: it competed directly with
+                    // this Text for width.
+                    Text(row.name)
+                        .font(RegardsFont.rowTitle())
+                        .foregroundStyle(RegardsDS.ink)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .minimumScaleFactor(0.85)
                     metadataLine
                 }
                 Spacer(minLength: 8)
@@ -317,58 +315,99 @@ struct OverdueRow: View {
             .truncationMode(.tail)
     }
 
+    /// Just how overdue, not cadence or last-contacted too (staged review
+    /// round 11, Sid's words: "Just have name and how much overdue"). Now
+    /// matches `row.accessibilityLabel` exactly — an earlier pass in this
+    /// same round kept a fuller spoken label ("every N weeks, last
+    /// contacted X ago") while trimming only this visible line, but that
+    /// asymmetry was overruled by a standing principle: a label mirrors
+    /// what the UI shows, and a departure needs a written reason at the
+    /// site (`ios/docs/accessibility.md`). Cadence and last-contacted had
+    /// no such reason, so both are gone from the label too, not just here.
     private var metadataString: String {
-        var parts: [String] = ["\(row.overdueDays)d overdue", row.cadenceText]
-        if let last = row.lastInteractedText {
-            parts.append("last \(last)")
-        }
-        return parts.joined(separator: " · ")
+        "\(row.overdueDays)d overdue"
     }
 
+    /// Icon-only, staged review round 11: the visible "Wh…"/"Sig…" text this
+    /// pill used to carry is exactly what a screenshot on device caught
+    /// truncating the contact name next to it — three fixed-width text
+    /// pills always claimed their own intrinsic width first, leaving
+    /// `contactButton` (the row's only flexible child, `Spacer` and all) to
+    /// absorb the entire shortfall down to a single letter, at every
+    /// Dynamic Type size, not just large ones (confirmed by measuring
+    /// `contactButton`'s actual rendered width: ~77pt at both the smallest
+    /// content size and the default one). Dropping the visible text here
+    /// reclaims that width for the name instead of dividing the shortfall
+    /// differently. The accessibility label is untouched — `channelLabel`
+    /// comes from `Channel.displayName`, never from `ChannelGlyph`'s own
+    /// (now-shared) SF Symbol, so "WhatsApp"/"Signal"/… still speaks in
+    /// full even though several channels now render the same glyph.
+    ///
+    /// Deliberate exception to `ios/docs/accessibility.md`'s "labels mirror
+    /// visible content" rule, not an oversight: the glyph itself no longer
+    /// visually distinguishes between the 8+ channels sharing the bubble
+    /// symbol, so the label has to carry the disambiguating information the
+    /// icon alone can't. Do not simplify this to something generic like
+    /// "Message, unavailable" for consistency with what's on screen — that
+    /// would leave VoiceOver worse-informed than a sighted user, exactly
+    /// what the rule exists to prevent.
     private var channelPill: some View {
-        HStack(spacing: 5) {
-            ChannelGlyph(channel: row.channel, size: 13, color: RegardsDS.muted)
-            Text(row.channelLabel)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(RegardsDS.muted)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 44)
-        .background(Capsule().fill(RegardsDS.hairSoft))
-        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(row.channelLabel), unavailable")
-        .accessibilityIdentifier("overdue.channel-unavailable")
+        ChannelGlyph(channel: row.channel, size: 18, color: RegardsDS.muted)
+            .frame(minWidth: 44, minHeight: 44)
+            .background(Circle().fill(RegardsDS.hairSoft))
+            .overlay(Circle().stroke(RegardsDS.hair, lineWidth: 0.5))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(row.channelLabel), unavailable")
+            .accessibilityIdentifier("overdue.channel-unavailable")
     }
 
+    /// Icon-only (round 11) — see `channelPill`'s doc comment for why.
+    /// `minWidth`/`minHeight`, not just `minHeight` as the text pill had:
+    /// a text pill's own horizontal padding kept it naturally ≥44pt wide,
+    /// but an icon alone has no such built-in width, so the 44×44 minimum
+    /// tap target needs to be stated on both axes explicitly.
+    ///
+    /// The label is also a deliberate exception to "labels mirror visible
+    /// content" (`ios/docs/accessibility.md`), but for a different reason
+    /// than `channelPill`'s: there is no visible text at all here to
+    /// mirror, just a checkmark glyph. "Mark <name> caught up" names the
+    /// action the control performs rather than describing what's on
+    /// screen, which is the correct read of the rule for an unlabelled
+    /// icon button, not a departure from it.
     private var caughtUpButton: some View {
         Button(action: onMarkCaughtUp) {
-            Text("Caught up")
-                .font(.footnote.weight(.semibold))
+            Image(systemName: "checkmark")
+                .font(.system(size: actionIconSize * 0.8, weight: .semibold))
                 .foregroundStyle(RegardsDS.accentInk)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.plain)
-        .background(Capsule().fill(RegardsDS.accentSoft))
-        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .background(Circle().fill(RegardsDS.accentSoft))
+        .overlay(Circle().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Mark \(row.name) caught up")
         .accessibilityHint("Removes this contact from Overdue.")
         .accessibilityIdentifier("overdue.caught-up")
     }
 
+    /// Icon-only (round 11) — see `channelPill`'s doc comment for why. A
+    /// clock face, not a bell or "zzz": distinct at a glance from
+    /// `caughtUpButton`'s checkmark, and reads as "push this out," not
+    /// "mute this," matching what the action actually does (decision #31:
+    /// pushes the cadence reminder 7 days out, logs nothing).
+    ///
+    /// Same label exception as `caughtUpButton`, same reason: nothing
+    /// visible to mirror, so "Snooze <name> 1 week" names the action
+    /// instead.
     private var snoozeButton: some View {
         Button(action: onSnooze) {
-            Text("Snooze 1 wk")
-                .font(.footnote.weight(.semibold))
+            Image(systemName: "clock")
+                .font(.system(size: actionIconSize * 0.8, weight: .semibold))
                 .foregroundStyle(RegardsDS.muted)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.plain)
-        .background(Capsule().fill(RegardsDS.hairSoft))
-        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .background(Circle().fill(RegardsDS.hairSoft))
+        .overlay(Circle().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Snooze \(row.name) 1 week")
         .accessibilityHint("Removes this contact from Overdue for one week.")
         .accessibilityIdentifier("overdue.snooze")

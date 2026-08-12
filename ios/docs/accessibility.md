@@ -59,6 +59,40 @@ audited* table.
    UI. Note the result in the PR description.
 10. **Documentation.** Every new screen gets a row in the table below.
 
+## Labels mirror visible content
+
+Standing principle, staged review round 11: a control's spoken
+`accessibilityLabel` matches what's visually on screen, unless it's
+absolutely necessary that it doesn't. A departure needs a written reason at
+its site — not a silent choice a later reader has to reverse-engineer or
+"fix" back toward strict mirroring.
+
+Current departures, each written up where it lives:
+
+1. **Channel button** (Overdue's `channelPill`,
+   `ios/Regards/Features/Overdue/OverdueScreen.swift`). Round 11 collapsed the
+   channel icon to one of three shared SF Symbols by action
+   (`ChannelGlyph.symbol(for:)`: `phone.fill` / `video.fill` /
+   `bubble.left.and.bubble.right.fill`), so the glyph no longer visually
+   distinguishes between the 8+ channels that now share the bubble symbol.
+   The label keeps naming the specific channel ("WhatsApp, unavailable",
+   "Signal, unavailable", …) exactly as before the icon change. Collapsing
+   the label to something generic like "Message, unavailable" for
+   consistency with the shared glyph would leave a VoiceOver user
+   worse-informed than a sighted user, who can still tell channels apart
+   by context on Contact Detail — the opposite of what this rule protects.
+2. **Caught up / Snooze icon buttons** (Overdue's `caughtUpButton` and
+   `snoozeButton`; Upcoming's `caughtUpButton`; same file and
+   `ios/Regards/Features/Upcoming/UpcomingScreen.swift`). These are
+   icon-only controls — a checkmark or a clock face, no visible text at
+   all — so there's nothing on screen for the label to mirror. The label
+   names the action instead: "Mark <name> caught up", "Snooze <name> 1
+   week".
+
+Read together, the rule in practice is: mirror the information when there's
+visible information to mirror, and name the action when the control is an
+unlabelled icon.
+
 ## Contrast-pair registry
 
 `RegardsPalette` is the single source of truth for rendered design-system
@@ -88,8 +122,8 @@ test in PR2 will catch them *before* they ship.
 ## Screens audited
 
 The gate is `ScreensAccessibilityTests.structuralAuditCategories`
-(`elementDetection + sufficientElementDescription + trait`). Sensory findings
-are documented below under *Sensory-audit carve-outs*.
+(`elementDetection + sufficientElementDescription + trait + hitRegion`).
+Sensory findings are documented below under *Sensory-audit carve-outs*.
 
 `ChannelMetadata.helpText` is not rendered by the current Phase 0 shell.
 When the channel form begins consuming it, that PR must include the text in its
@@ -186,11 +220,13 @@ defect."
 ## Sensory-audit carve-outs
 
 The enabled automated audit set uses the **structural** categories
-(`elementDetection`, `sufficientElementDescription`, `trait`) in the one-run
-post-merge audit and the five-run nightly or pre-release sweep. The **sensory**
-categories — `contrast`, `hitRegion`, `dynamicType`, `textClipped` — are not
-part of that release gate. The residual findings after PR4's sweep fall into
-two buckets, both intentional:
+(`elementDetection`, `sufficientElementDescription`, `trait`, `hitRegion`) in
+the one-run post-merge audit and the five-run nightly or pre-release sweep.
+`hitRegion` joined in staged review round 11 — see *`textClipped` and
+`hitRegion`, trialed round 11* below for why it stayed and `textClipped`
+didn't. The remaining **sensory** categories — `contrast`, `dynamicType`,
+`textClipped` — are not part of that release gate. The residual findings
+after PR4's sweep fall into two buckets, both intentional:
 
 ### Bucket 1 — fixed
 
@@ -235,13 +271,18 @@ two buckets, both intentional:
 Each is a decorative-brand element or a caller-tuned sizing where
 matching the audit's expectation would visibly break the design:
 
-- **Dynamic Type on decorative primitives** — `Avatar` initials,
-  `Wordmark`, and `ChannelGlyph` render at fixed sizes so they fit
-  inside fixed-diameter circles / fixed-height nav bars / fixed-size
-  action pills at every Dynamic Type setting. All three are
-  `.accessibilityHidden(true)`; the readable content is owned by each
-  parent row's spoken label. Scaling broke visual bounds at
-  accessibility tiers without unlocking the audit cleanly.
+- **Dynamic Type on decorative primitives** — `Avatar` initials and
+  `Wordmark` render at fixed sizes so they fit inside fixed-diameter
+  circles / fixed-height nav bars at every Dynamic Type setting. Both
+  are `.accessibilityHidden(true)`; the readable content is owned by
+  each parent row's spoken label. Scaling broke visual bounds at
+  accessibility tiers without unlocking the audit cleanly. `ChannelGlyph`
+  used to be listed here too, but no longer belongs: staged review round
+  11 moved it to `@ScaledMetric(relativeTo: .body)` (see its own doc
+  comment) specifically because its previous fixed size never grew with
+  Dynamic Type at all, unlike the row text it sits beside — it scales
+  now, inside a caller-sized circle/pill that itself scales via
+  `minWidth`/`minHeight: 44`.
 - **Accent color on white cards** — a few low-traffic accent-colored
   stylistic elements (pitch card accent dots in Onboarding, decorative
   ring around inner-circle avatars, the accent checkmark badge in
@@ -256,6 +297,85 @@ A future sensory-audit tightening PR can revisit any of these if the
 design evolves (e.g., a brighter accent-ink, a scaled brand mark, a
 redesigned hero card) — but the gate stays at the structural set
 until there's a design change to chase.
+
+### `textClipped` and `hitRegion`, trialed round 11
+
+Both had sat in the excluded sensory set "by association" with `contrast`
+and `dynamicType`, with no individual justification of their own —
+`textClipped` in particular is Apple's own detector for exactly the kind
+of row-crowding truncation a device screenshot caught on Overdue
+(`a58566e`, the bug this whole round started from). Staged review round 11
+added both to `structuralAuditCategories` and ran the full
+`RegardsAccessibilityTests` screen sweep against them to see what surfaced,
+rather than assuming either belonged in or out.
+
+**`hitRegion` stayed.** It found two real, now-fixed undersized targets:
+
+- `EditContactScreen.field(_:)`'s read-only name/phone/email/address/date
+  rows measured well under 44pt tall — confirmed directly via
+  `XCUIElement.frame` in a throwaway diagnostic test, which read ~17pt
+  regardless of the row's own `.padding` or an added `.frame(minHeight: 44)`.
+- `LogOtherChannelSheet`'s Cancel button showed the identical pattern: an
+  explicit `.frame(minHeight: 44)` that the audit still flagged.
+
+Both traced to the same root cause: `.frame(minHeight:)` sets a view's
+layout size, not its hit-testing/accessibility shape, and a plain-style
+view (a `Button` with only text content, or an `.accessibilityElement
+(children: .ignore)`-collapsed row) can fall back to its content's own
+tight bounds for that shape instead of the frame around it. Neither site
+had an explicit `.contentShape`, and adding `.contentShape(Rectangle())`
+after the `.frame(minHeight: 44)` measurably fixed both — confirmed the
+same way the bugs were found, not assumed.
+
+Two real bugs, no noise anywhere else in the sweep: a clean addition, and
+one worth keeping on unlike `textClipped` below. It now lives in the
+enabled structural set alongside
+`elementDetection`/`sufficientElementDescription`/`trait`.
+
+**`textClipped` was tried and reverted.** It did catch one real bug:
+`OnboardingScreen.allowButton` wrapped its label in a hardcoded
+`.frame(height: 54)` with no `.lineLimit` override, and at `accessibility5`
+"Allow contacts access" needs two lines to fit — the fixed height clipped
+the second one outright, with no ellipsis or other indication anything was
+missing. Fixed by switching to `.frame(minHeight: 54)`, the same pattern
+the row controls elsewhere in this codebase already use for the same
+reason.
+
+Past that one fix, running it broadly across the whole sweep flagged
+roughly half of every other screen tested, including Overdue and Contact
+Detail at the plain **default** content size — no accessibility setting
+involved. Both were checked against an actual XCTest screenshot of the
+exact failing run rather than assumed innocent: Overdue showed "Leia
+Organa," "Padmé Amidala," "Luke Skywalker," and "Lando Calrissian" all
+rendering in full, and Contact Detail showed "Leia Organa," "Open
+WhatsApp," "Caught up" / "Snooze 1 wk" / "Log other," "every 2 weeks,"
+"3 weeks ago · Mar 27," and "9 days overdue" all fully legible — nothing
+visibly clipped on either screen. The issue text on every one of these
+findings was identical and is the tell: *"Text of this
+SwiftUI.AccessibilityNode **may be** clipped at **larger** Dynamic Type
+sizes"* — a predictive claim about a hypothetical larger size, not a report
+about the size actually on screen. On this Xcode/iOS toolchain (Xcode
+current at time of writing, iOS 26.5 simulator runtime), `textClipped`
+behaves as a structural heuristic over the view hierarchy rather than an
+as-rendered defect detector, and it fires on ordinary multi-element layouts
+with no visible problem far more often than it finds a real one.
+
+That signal-to-noise ratio is the reason it was reverted rather than kept
+alongside `hitRegion`: a gate that fails on roughly half of unrelated
+screens trains reviewers to stop reading its failures rather than to
+investigate each one, which produces worse accessibility outcomes over
+time than not gating on it automatically at all — the same lesson the
+`suppressKnownPopoverGlassBleedThrough` precedent earlier in this file
+already drew about scrutinizing a suppression as hard as a pass.
+
+**Recommended use going forward**: as a targeted, temporary diagnostic —
+add `.textClipped` to a specific test's audit call (or a throwaway one)
+when investigating a *specific* reported layout complaint, read the
+findings against a real screenshot at the size that was actually reported,
+fix or dismiss with evidence, then remove it again. That is exactly how it
+was used to confirm the original Overdue row-crowding bug this round
+started from, and it is the shape of usage this category is suited to on
+this toolchain — not a standing, always-on gate.
 
 ## Test patterns
 

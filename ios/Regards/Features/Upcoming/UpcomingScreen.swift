@@ -172,6 +172,10 @@ struct UpcomingRow: View {
     let ownsTransitionSource: Bool
     let onTap: () -> Void
     let onMarkCaughtUp: () -> Void
+    // Scales the Caught up glyph the same way `ChannelGlyph` scales its own
+    // icon (staged review round 11, same fix as `OverdueRow`'s) — see that
+    // type's doc comment for why `@ScaledMetric` over a fixed point size.
+    @ScaledMetric(relativeTo: .body) private var actionIconSize: CGFloat = 18
 
     var body: some View {
         AccessibilityAdaptiveLayout {
@@ -245,17 +249,30 @@ struct UpcomingRow: View {
         .regardsContactTransitionSource(id: row.contactId, isActive: ownsTransitionSource)
     }
 
+    /// Icon-only (staged review round 11) — same fix, and the same
+    /// reasoning, as `OverdueRow.caughtUpButton`: a text pill sitting
+    /// outside `rowButton` claimed a fixed share of the row's width before
+    /// `rowButton`'s own flexible `Spacer` (and the name inside it) ever
+    /// got a look at what was left. `minWidth`/`minHeight`, not just
+    /// `minHeight` as the text pill had: an icon alone has no built-in
+    /// width the way a padded text pill did, so the 44×44 minimum tap
+    /// target needs to be stated on both axes explicitly.
+    ///
+    /// The label is a deliberate exception to `ios/docs/accessibility.md`'s
+    /// "labels mirror visible content" rule — see `OverdueRow.caughtUpButton`'s
+    /// doc comment for the full reasoning, which applies unchanged here:
+    /// there's no visible text on an icon-only button to mirror, so "Mark
+    /// <name> caught up" names the action instead.
     private var caughtUpButton: some View {
         Button(action: onMarkCaughtUp) {
-            Text("Caught up")
-                .font(.footnote.weight(.semibold))
+            Image(systemName: "checkmark")
+                .font(.system(size: actionIconSize * 0.8, weight: .semibold))
                 .foregroundStyle(RegardsDS.accentInk)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.plain)
-        .background(Capsule().fill(RegardsDS.accentSoft))
-        .overlay(Capsule().stroke(RegardsDS.hair, lineWidth: 0.5))
+        .background(Circle().fill(RegardsDS.accentSoft))
+        .overlay(Circle().stroke(RegardsDS.hair, lineWidth: 0.5))
         .accessibilityLabel("Mark \(row.name) caught up")
         .accessibilityHint("Removes this reminder from Upcoming.")
         .accessibilityIdentifier("upcoming.caught-up")
@@ -274,6 +291,21 @@ struct UpcomingRow: View {
         }
     }
 
+    /// Not trimmed the way `OverdueRow.metadataString` was (staged review
+    /// round 11): Overdue's old line carried two redundant facts (cadence
+    /// *and* last-contacted) stacked next to the one fact that mattered
+    /// ("how overdue"), so dropping the first two reclaimed width without
+    /// losing anything a reader needed. This line has never had that
+    /// redundancy — it already shows exactly one fact per row (the
+    /// occasion's name for a birthday/anniversary/custom row, the cadence
+    /// description for a check-in row), which is also the one fact that
+    /// answers "why is this reminder here" the way overdue-days does on
+    /// the other screen. Upcoming's primary datum, when this fires, is
+    /// covered separately by `time`/`dayHeader`; this line covers why, and
+    /// removing it for cadence rows would leave nothing explaining that at
+    /// all. Matches `UpcomingRowState.accessibilityLabel` exactly already,
+    /// so there's no "mirrors visible content" departure to write down
+    /// here either.
     private var occasion: some View {
         Text(row.occasionText ?? row.cadenceText ?? "")
             .font(.footnote)

@@ -6,16 +6,21 @@ extension ScreensAccessibilityTests {
         let app = launchToOverdue()
         let plainRow = app.descendants(matching: .any)["overdue.row"]
         XCTAssertTrue(plainRow.waitForExistence(timeout: 10))
+        // No merged-contact announcement check here (staged review round
+        // 11): the "merged" chip and its spoken phrase were both removed
+        // from Overdue's row — merge provenance lives on Merge Duplicates
+        // alone now, by decision, since it's identity-management
+        // information no other surface asks the user to act on. Proving
+        // the negative directly, not just relying on absence-of-evidence:
+        // no row's label should mention a merge at all any more.
         let rows = app.descendants(matching: .any).matching(identifier: "overdue.row")
-        let mergedLabel = rows.allElementsBoundByIndex.first {
-            $0.label.localizedCaseInsensitiveContains("merged contact")
-        }?.label
-        XCTAssertNotNil(
-            mergedLabel,
-            "The representative virtual-merge state must remain reachable and announced."
+        let stillMentionsMerge = rows.allElementsBoundByIndex.contains {
+            $0.label.localizedCaseInsensitiveContains("merged")
+        }
+        XCTAssertFalse(
+            stillMentionsMerge,
+            "No Overdue row should mention a merge — that state moved to Merge Duplicates only."
         )
-        XCTAssertTrue(mergedLabel?.contains(", merged contact,") == true)
-        XCTAssertFalse(mergedLabel?.contains(".,") == true)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 

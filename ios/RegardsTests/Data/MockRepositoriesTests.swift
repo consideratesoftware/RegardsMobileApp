@@ -22,6 +22,11 @@ struct MockRepositoriesTests {
         #expect(primary.contactGroupId == group.id)
         #expect(members.contains(where: { !$0.isActive }))
 
+        // No `isVirtualMerged`/"merged contact" assertions here (round 11):
+        // that field and spoken phrase were removed from Overdue's row
+        // entirely — see `OverdueRowState`'s doc comment for why. This
+        // still proves `makeOverdueRow` builds cleanly for a grouped
+        // contact's primary, the thing this test's own title is about.
         let overdueRow = try #require(
             OverdueViewModel.makeOverdueRow(
                 for: primary,
@@ -29,8 +34,6 @@ struct MockRepositoriesTests {
                 calendar: Calendar(identifier: .gregorian)
             )
         )
-        #expect(overdueRow.isVirtualMerged)
-        #expect(overdueRow.accessibilityLabel.contains(", merged contact,"))
         #expect(overdueRow.accessibilityLabel.hasSuffix("."))
     }
 
