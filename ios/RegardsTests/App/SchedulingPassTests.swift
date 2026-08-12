@@ -176,6 +176,94 @@ struct SchedulingPassTests {
         #expect(pending.isEmpty)
     }
 
+    /// R54's precondition guard was untested for real, staged review found
+    /// (round 12): the test above ties `tracked: false` to `cadenceDays:
+    /// nil` through `contractContact`'s own fixture, so it can't tell
+    /// whether the `tracked` check or the `cadenceDays` check is the one
+    /// doing the rejecting — either alone, or neither, would still pass it
+    /// if the *other* check happened to still be there. Both view-model
+    /// callers also pre-check on a fresh fetch and return before ever
+    /// reaching `SchedulingPass.snooze`, so deleting the guard entirely
+    /// wouldn't fail anything through them either — the guard had moved
+    /// somewhere safer that nothing actually proved was there. This test
+    /// and the two below decouple all three conditions the guard checks
+    /// (`isActive`, `tracked`, `cadenceDays != nil`) so each one is provably
+    /// load-bearing on its own, calling `scheduler.snooze` directly rather
+    /// than through either view model. Verified by deleting the guard
+    /// locally and confirming all three fail, not assumed.
+    @Test(
+        "R54: snooze rejects an untracked contact even with a cadence set",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeRejectsUntrackedContactWithCadence(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        var contact = contractContact(id: try contractUUID(518), suffix: "snooze-untracked-cadence", tracked: false)
+        contact.cadenceDays = 14 // decoupled from `tracked` on purpose — see doc comment above
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        let wrote = try await scheduler.snooze(contactId: contact.id)
+
+        #expect(wrote == false)
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+    }
+
+    @Test(
+        "R54: snooze rejects a tracked contact with no cadence set",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeRejectsTrackedContactWithNoCadence(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        var contact = contractContact(id: try contractUUID(519), suffix: "snooze-tracked-no-cadence", tracked: true)
+        contact.cadenceDays = nil // decoupled from `tracked` on purpose — see doc comment above
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        let wrote = try await scheduler.snooze(contactId: contact.id)
+
+        #expect(wrote == false)
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+    }
+
+    @Test(
+        "R54: snooze rejects an archived contact even when tracked with a cadence set",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeRejectsArchivedTrackedContactWithCadence(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let contact = contractContact(
+            id: try contractUUID(520),
+            suffix: "snooze-archived",
+            tracked: true,
+            archivedAt: now.addingTimeInterval(-3_600)
+        )
+        try await repositories.contacts.upsert(contact)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        let wrote = try await scheduler.snooze(contactId: contact.id)
+
+        #expect(wrote == false)
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+    }
+
     // MARK: - Wall-clock snooze (DST)
 
     /// A DST-observing calendar pinned to a fixed identifier, not

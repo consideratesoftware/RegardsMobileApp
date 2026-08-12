@@ -215,10 +215,25 @@ public actor SchedulingPass {
     /// narrow, targeted read instead of widening that view model's
     /// dependency surface — the wider wiring TF-07/PR25 brings can still
     /// replace this later without every call site changing shape again.
+    ///
+    /// `.max()` over every pending cadence row's `scheduledFor`, not
+    /// `.first` (staged review round 11 fix): `fetchPending` orders by
+    /// `scheduledFor` ascending, so `.first` picked the *earliest* pending
+    /// cadence row, not the one that actually governs. `SchedulingPass`
+    /// itself only ever keeps one cadence row per contact (the
+    /// deterministic `cadenceReminderID`), but a second, non-canonical row
+    /// can reach the table some other way —
+    /// `SchedulingPassCaughtUpTests.caughtUpNeverTouchesNonCanonicalCadenceRow`
+    /// proves exactly that shape survives `caughtUp` untouched. Matches
+    /// `OverdueViewModel.makeOverdueRow`/`UpcomingViewModel.buildRows`'s own
+    /// `max($0, $1)` tie-break — the same "picking by array order would make
+    /// the winner depend on fetch ordering rather than on which row is
+    /// actually later" reasoning applies here, not just there.
     public func pendingSnoozeDate(contactId: UUID) async throws -> Date? {
         try await reminders.fetchPending(forContact: contactId)
-            .first { $0.kind == .cadence }?
-            .scheduledFor
+            .filter { $0.kind == .cadence }
+            .map(\.scheduledFor)
+            .max()
     }
 
     /// Compensates a `caughtUp(contactId:)` whose caller's own later write
