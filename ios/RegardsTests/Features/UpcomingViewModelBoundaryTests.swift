@@ -239,10 +239,11 @@ struct UpcomingViewModelBoundaryTests {
             ],
             timezoneIdentifier: timezone.identifier
         )
+        let contacts = StubContactRepository([inside, boundary])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([inside, boundary]),
+            contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { nowDate }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { nowDate }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { nowDate }
@@ -297,10 +298,15 @@ struct UpcomingViewModelBoundaryTests {
             timezoneIdentifier: timezone.identifier,
             digestHorizonDays: horizonDays
         )
+        let contactsRepository = StubContactRepository(contacts)
         return UpcomingViewModel(
-            contacts: StubContactRepository(contacts),
+            contacts: contactsRepository,
             reminders: StubReminderRepository(reminders),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(reminders), clock: { now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(reminders),
+                contacts: contactsRepository,
+                clock: { now }
+            ),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { now }

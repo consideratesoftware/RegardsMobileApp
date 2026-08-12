@@ -26,6 +26,13 @@ public final class ContactDetailViewModel {
 
     public private(set) var contact: Contact?
     public private(set) var interactions: [InteractionEntry] = []
+    /// The contact's pending cadence reminder's `scheduledFor`, refreshed on
+    /// every `load()` — R56's fix (ARCHITECTURE.md). `nil` when nothing is
+    /// pending. Read through `scheduler.pendingSnoozeDate(contactId:)`
+    /// rather than a `ReminderRepository` of this view model's own; see that
+    /// method's doc comment for why. `overdueSummary` below is the only
+    /// current reader.
+    public private(set) var pendingSnoozeDate: Date?
 
     private let contacts: any ContactRepository
     private let interactionsRepo: any InteractionRepository
@@ -68,12 +75,27 @@ public final class ContactDetailViewModel {
             entries.reserveCapacity(logs.count)
             for log in logs { entries.append(Self.toEntry(log)) }
             interactions = entries
+            // A failed snooze lookup degrades to "nothing known pending"
+            // instead of failing the whole load (R56) — mirrors
+            // `OverdueViewModel.performLoad`'s identical tolerance for its
+            // own `fetchAllPending()` read: `contact`/`interactions` above
+            // already succeeded, so losing only the snooze lookup is far
+            // less harmful than blanking the screen over it.
+            do {
+                pendingSnoozeDate = try await scheduler.pendingSnoozeDate(contactId: contactId)
+            } catch {
+                Self.log.error(
+                    "failed to load snooze for \(self.contactId, privacy: .private): \(error, privacy: .private)"
+                )
+                pendingSnoozeDate = nil
+            }
         } catch {
             Self.log.error(
                 "failed to load contact \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )
             contact = nil
             interactions = []
+            pendingSnoozeDate = nil
         }
     }
 
@@ -201,11 +223,17 @@ public final class ContactDetailViewModel {
 
     /// "Snooze 1 wk": pushes the contact's cadence reminder out 7 days
     /// through `SchedulingPass` (§14 PR22's DB-only stub). No interaction is
-    /// logged and `lastInteractedAt` is untouched (decision #31) — this
-    /// screen's own labels don't yet read the persisted reminder (TF-07
-    /// wires the "live next reminder" placeholder), so there's nothing to
-    /// reload here; Overdue and Upcoming pick the change up through their
-    /// own reads.
+    /// logged and `lastInteractedAt` is untouched (decision #31).
+    ///
+    /// Reloads on success (R56 fix, staged review): `load()` now also reads
+    /// `pendingSnoozeDate`, which `overdueSummary` consults to suppress
+    /// overdue state while the snooze is still pending — without a reload
+    /// here, the screen kept reading "N days overdue" from the pre-snooze
+    /// snapshot until some *unrelated* trigger (a tab switch, a pop/push)
+    /// happened to reload it. `nextReminderLabel`'s own hardcoded
+    /// placeholder is a separate, still-open gap (R11) this reload does not
+    /// touch. Most other screen labels (`cadenceLabel`, `lastTalkedLabel`)
+    /// are untouched by a snooze and simply re-derive the same values.
     ///
     /// Returns whether the write succeeded — see `markCaughtUp`'s doc
     /// comment for why the screen needs this.
@@ -245,8 +273,19 @@ public final class ContactDetailViewModel {
         }
         guard let freshContact, freshContact.isActive else { return false }
         do {
-            try await scheduler.snooze(contactId: contactId)
-            return true
+            // `SchedulingPass.snooze` now carries its own tracked/cadence
+            // precondition (R54) — the `isActive` guard above stays because
+            // it catches something that precondition doesn't (an
+            // archived-after-`load()` race), not because it's redundant
+            // with it. `wrote` should always be `true` here today: this
+            // screen only ever offers Snooze for a contact whose row is
+            // already computed as overdue, which requires tracked +
+            // cadenceDays by construction. Propagated rather than assumed,
+            // so a future caller that reaches this method some other way
+            // gets an honest `false`, not a lie.
+            let wrote = try await scheduler.snooze(contactId: contactId)
+            if wrote { await load() }
+            return wrote
         } catch {
             Self.log.error(
                 "failed to snooze \(self.contactId, privacy: .private): \(error, privacy: .private)"
@@ -304,21 +343,21 @@ public final class ContactDetailViewModel {
         return CadenceDescriptor.describe(days: days)
     }
 
-    /// Known gap (staged review round 8, register R56): computed purely
-    /// from `Contact`'s own fields — `cadenceDays`, `lastInteractedAt`,
-    /// `createdAt` — with no read of any pending `ScheduledReminder`. Unlike
-    /// `OverdueViewModel.makeOverdueRow`/`UpcomingViewModel.buildRows`, both
-    /// of which fold a pending snooze's `scheduledFor` into their date math
-    /// (and suppress the row entirely while it's still in the future), this
-    /// screen has no `ReminderRepository` of its own to do the same, so
-    /// right after a successful Snooze it keeps reporting "N days overdue"
-    /// against the same stale cadence math — a user-visible false statement
-    /// on the success path, the same category `markCaughtUp`'s VoiceOver
-    /// announcement and `nextReminderLabel`'s placeholder are already
-    /// tracked against. Wiring `reminders` in here is TF-07/PR25's job, not
-    /// a small patch to this property alone — it needs a live read (or
-    /// `ValueObservation`) this §14 PR22 slice was never scoped to carry,
-    /// and touches every call site that constructs this view model. See R56.
+    /// Folds in a pending snooze (R56 fix, promoted from deferred at staged
+    /// review): previously computed purely from `Contact`'s own fields —
+    /// `cadenceDays`, `lastInteractedAt`, `createdAt` — with no read of any
+    /// pending `ScheduledReminder`, so right after a successful Snooze this
+    /// kept reporting "N days overdue" against stale cadence math — a
+    /// user-visible false statement on the success path. VoiceOver already
+    /// stopped announcing it (by not moving focus there), which suppressed
+    /// the symptom for that one audience and left a sighted user reading
+    /// something false; this closes it for both. Mirrors
+    /// `OverdueViewModel.makeOverdueRow`'s identical guard: a pending snooze
+    /// still in the future suppresses overdue state entirely, not just
+    /// trims the day count. `pendingSnoozeDate` is refreshed by `load()`
+    /// through `scheduler.pendingSnoozeDate(contactId:)` — see that
+    /// property's own doc comment for why this didn't need TF-07/PR25's
+    /// full `ReminderRepository` wiring after all.
     public var overdueSummary: (days: Int, isOverdue: Bool) {
         // `c.tracked &&`, not `cadenceDays` alone (nit, staged review round
         // 9): `OverdueViewModel.makeOverdueRow` and this screen's own Snooze
@@ -327,6 +366,13 @@ public final class ContactDetailViewModel {
         // wasn't wrong (an untracked contact can't currently carry a
         // `cadenceDays`), just inconsistent with the other two.
         guard let c = contact, c.tracked, let cadence = c.cadenceDays else {
+            return (0, false)
+        }
+        // Mirrors `OverdueViewModel.makeOverdueRow`'s `if let snoozedUntil,
+        // snoozedUntil > now { return nil }` — a pending-and-future snooze
+        // means the contact is not overdue *right now*, full stop, not
+        // merely "overdue by fewer days than the stale cadence math says."
+        if let pendingSnoozeDate, pendingSnoozeDate > clock() {
             return (0, false)
         }
         // `?? c.createdAt`, not `lastInteractedAt` alone: the never-contacted

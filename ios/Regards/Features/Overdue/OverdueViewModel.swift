@@ -323,15 +323,16 @@ public final class OverdueViewModel {
     /// not this instant, so a contact a concurrent `ContactsReconciler` pass
     /// archived after that load can still be tapped here before its own
     /// `observeTracked()` broadcast reaches this screen.
-    /// `SchedulingPass.snooze` itself has no such check (R54: it writes for
-    /// any contact that merely exists), so without this guard the write
-    /// would still land — a pending cadence row that no `fetchTracked()`
-    /// screen will ever surface, orphaned until PR25 gives the scheduler its
-    /// own precondition. Re-fetches rather than trusting the row's own
-    /// staleness, since `rows` carries no `archivedAt` of its own to check.
-    /// A failed fetch here is treated the same as "inactive" — there's
-    /// nothing else safe to do with an unreadable precondition — but is
-    /// logged distinctly so it doesn't read as a silent no-op in the logs.
+    /// `SchedulingPass.snooze` now carries its own tracked/cadence
+    /// precondition (R54, closed at the write — see that type's own doc
+    /// comment) — this `isActive` guard stays because it catches something
+    /// that precondition doesn't (an archived-after-`load()` race), not
+    /// because it's redundant with it. Re-fetches rather than trusting the
+    /// row's own staleness, since `rows` carries no `archivedAt` of its own
+    /// to check. A failed fetch here is treated the same as "inactive" —
+    /// there's nothing else safe to do with an unreadable precondition —
+    /// but is logged distinctly so it doesn't read as a silent no-op in the
+    /// logs.
     @discardableResult
     public func snooze(contactId: UUID) async -> Bool {
         let contact: Contact?
@@ -345,8 +346,18 @@ public final class OverdueViewModel {
         loadGeneration += 1
         rows.removeAll { $0.contactId == contactId }
         do {
-            try await scheduler.snooze(contactId: contactId)
-            return true
+            // `wrote` should always be `true` here today — this screen only
+            // ever offers Snooze for a row already computed as overdue,
+            // which requires tracked + cadenceDays by construction — but
+            // treated the same as a thrown failure when it isn't: the
+            // optimistic removal above needs undoing either way, not just
+            // on a genuine write error.
+            let wrote = try await scheduler.snooze(contactId: contactId)
+            if !wrote {
+                Self.log.error("snooze rejected for \(contactId, privacy: .private): contact not eligible")
+                await performLoad()
+            }
+            return wrote
         } catch {
             Self.log.error(
                 "failed to snooze \(contactId, privacy: .private): \(error, privacy: .private)"

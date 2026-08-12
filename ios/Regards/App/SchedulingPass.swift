@@ -12,21 +12,39 @@ import Foundation
 /// suppression here, no `NotificationScheduling` call, and neither
 /// `runFull()` nor the general `run(for contactId:)` from §9a's full
 /// contract — TF-07 (PR25) absorbs this type and builds all of that on top
-/// of it. Every write below stays inside `ReminderRepository`; nothing here
-/// touches `ContactRepository` or `InteractionRepository` (`Caught up` and
-/// `Log other` go through `InteractionLogging` instead, which never touches
-/// `ScheduledReminder`).
+/// of it. `Caught up` and `Log other` go through `InteractionLogging`
+/// instead, which never touches `ScheduledReminder`.
+///
+/// Does read `ContactRepository`, despite the "DB-only, `ReminderRepository`
+/// only" framing above (R54, staged review): `snooze(contactId:)` needs to
+/// know a contact is `tracked` with a `cadenceDays` set before it writes,
+/// and that precondition has to live here, not only at the callers that
+/// happen to exist today. `OverdueViewModel.snooze`/`ContactDetailViewModel
+/// .snooze` both offer Snooze only for a row already computed as overdue,
+/// which requires `tracked && cadenceDays != nil` by construction — so this
+/// precondition is unreachable through either shipped caller. But
+/// `ContactDetailViewModel.snooze()` is `public` and ungated beyond an
+/// `isActive` check; a future caller reaching it some other way (a
+/// notification action invoking the view model directly, say) would still
+/// write an orphaned pending reminder no `fetchTracked()`-backed screen
+/// (Overdue, Upcoming) will ever surface. Guarding the two callers this
+/// stub happens to know about is exactly what left the hole open the first
+/// two times (R54's own original note); closing it in the one place every
+/// caller — known or future — must pass through is what actually closes it.
 public actor SchedulingPass {
     private let reminders: any ReminderRepository
+    private let contacts: any ContactRepository
     private let clock: @Sendable () -> Date
     private let calendar: Calendar
 
     public init(
         reminders: any ReminderRepository,
+        contacts: any ContactRepository,
         clock: @escaping @Sendable () -> Date = { Date() },
         calendar: Calendar = .current
     ) {
         self.reminders = reminders
+        self.contacts = contacts
         self.clock = clock
         self.calendar = calendar
     }
@@ -57,19 +75,47 @@ public actor SchedulingPass {
     /// `SchedulingPass` gains its full read/write surface.
     ///
     /// The written row's `id` is deterministic — `cadenceReminderID(contactId:)`,
-    /// not a fresh random UUID — specifically so this method has no read
-    /// before its write. An earlier version read the existing pending cadence
-    /// reminder first to decide whether to update it or insert a new one;
-    /// two overlapping calls for the same contact (e.g. tapping Snooze twice
-    /// fast, or racing Overdue's and Contact Detail's independent calls)
-    /// could both see "nothing pending" before either had written, and both
-    /// would then insert under a fresh random id — two pending cadence rows
-    /// for one contact, silently disagreeing between screens. A pending
-    /// cadence reminder is always exactly this id for this contact, so two
+    /// not a fresh random UUID — specifically so the *write itself* has no
+    /// read before it, only the precondition check below does (added R54,
+    /// see this type's own doc comment for why it lives here). An earlier
+    /// version read the existing pending cadence reminder first to decide
+    /// whether to update it or insert a new one; two overlapping calls for
+    /// the same contact (e.g. tapping Snooze twice fast, or racing
+    /// Overdue's and Contact Detail's independent calls) could both see
+    /// "nothing pending" before either had written, and both would then
+    /// insert under a fresh random id — two pending cadence rows for one
+    /// contact, silently disagreeing between screens. A pending cadence
+    /// reminder is always exactly this id for this contact, so two
     /// concurrent `upsert`s race the *same* primary key: whichever commits
     /// last simply overwrites the other's row instead of coexisting beside
-    /// it. No read, no in-actor lock, no lost update.
-    public func snooze(contactId: UUID) async throws {
+    /// it. No in-actor lock, no lost update — the precondition read above
+    /// doesn't change that, since it never informs *which* id the write
+    /// below uses, only *whether* it happens at all.
+    ///
+    /// Returns whether it actually wrote (R54): `false` for an untracked or
+    /// no-cadence contact — a rejection, not a silent no-op a caller could
+    /// mistake for success, the same shape as
+    /// `ContactRepository.updateLastInteractedAt`'s own `Bool` return for
+    /// its own precondition failure. A failed contact read is treated as
+    /// ineligible, the same conservative default `ContactDetailViewModel
+    /// .snooze()`'s own fresh-fetch guard already uses for the identical
+    /// situation.
+    ///
+    /// `contact.isActive` is checked here too, not only tracked/cadence —
+    /// slightly wider than R54's own wording ("the tracked/cadence
+    /// precondition"), added because the contact is already in hand at
+    /// this point and the cost of checking one more field on it is zero.
+    /// Both shipped callers already re-fetch and check `isActive`
+    /// themselves before ever reaching this write, so this is a genuine
+    /// no-op for them today — it only matters for the same class of future
+    /// caller R54 is about, which this write-site guard exists to not have
+    /// to trust.
+    @discardableResult
+    public func snooze(contactId: UUID) async throws -> Bool {
+        guard let contact = try? await contacts.fetch(id: contactId),
+              contact.isActive, contact.tracked, contact.cadenceDays != nil else {
+            return false
+        }
         let now = clock()
         let scheduledFor = calendar.date(byAdding: .day, value: 7, to: now)
             ?? now.addingTimeInterval(7 * 86_400)
@@ -82,6 +128,7 @@ public actor SchedulingPass {
             state: .pending
         )
         try await reminders.upsert(reminder)
+        return true
     }
 
     /// "Caught up" side effect on `SchedulingPass`'s own state (§9's
@@ -150,6 +197,28 @@ public actor SchedulingPass {
             from: .pending,
             to: .userCaughtUp
         )
+    }
+
+    /// The contact's pending cadence reminder's `scheduledFor`, if one
+    /// exists — Snooze's only persisted trace (see `snooze(contactId:)`'s
+    /// doc comment). `nil` when nothing is pending: never snoozed, a snooze
+    /// already lapsed, or `caughtUp(contactId:)` cleared it.
+    ///
+    /// Read-only counterpart added for R56 (ARCHITECTURE.md): a caller with
+    /// no `ReminderRepository` of its own —
+    /// `ContactDetailViewModel.overdueSummary` — needs to fold a pending
+    /// snooze into its own date math the same way
+    /// `OverdueViewModel.makeOverdueRow`/`UpcomingViewModel.buildRows`
+    /// already do. Routing the read through this actor rather than handing
+    /// out `reminders` directly, or threading a fresh `ReminderRepository`
+    /// through every `ContactDetailViewModel` call site, keeps this a
+    /// narrow, targeted read instead of widening that view model's
+    /// dependency surface — the wider wiring TF-07/PR25 brings can still
+    /// replace this later without every call site changing shape again.
+    public func pendingSnoozeDate(contactId: UUID) async throws -> Date? {
+        try await reminders.fetchPending(forContact: contactId)
+            .first { $0.kind == .cadence }?
+            .scheduledFor
     }
 
     /// Compensates a `caughtUp(contactId:)` whose caller's own later write

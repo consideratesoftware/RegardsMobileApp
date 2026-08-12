@@ -18,7 +18,11 @@ struct SchedulingPassCaughtUpTests {
         let contact = contractContact(id: try contractUUID(506), suffix: "caughtup-transition", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
         try await scheduler.snooze(contactId: contact.id)
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count == 1)
 
@@ -53,7 +57,11 @@ struct SchedulingPassCaughtUpTests {
         let contact = contractContact(id: try contractUUID(517), suffix: "caughtup-noncanonical", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
         try await scheduler.snooze(contactId: contact.id) // the canonical row
 
         // A second, non-canonical cadence row for the same contact — never
@@ -87,6 +95,7 @@ struct SchedulingPassCaughtUpTests {
         try await repositories.contacts.upsert(contact)
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
+            contacts: repositories.contacts,
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
         )
 
@@ -127,7 +136,11 @@ struct SchedulingPassCaughtUpTests {
         let contact = contractContact(id: try contractUUID(512), suffix: "caughtup-concurrent", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
         try await scheduler.snooze(contactId: contact.id)
 
         async let first = scheduler.caughtUp(contactId: contact.id)
@@ -157,7 +170,11 @@ struct SchedulingPassCaughtUpTests {
         let contact = contractContact(id: try contractUUID(510), suffix: "caughtup-restore", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
         try await scheduler.snooze(contactId: contact.id)
         let original = try await repositories.reminders.fetchPending(forContact: contact.id)[0]
         _ = try await scheduler.caughtUp(contactId: contact.id)
@@ -185,6 +202,7 @@ struct SchedulingPassCaughtUpTests {
         try await repositories.contacts.upsert(contact)
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
+            contacts: repositories.contacts,
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
         )
 
@@ -209,13 +227,21 @@ struct SchedulingPassCaughtUpTests {
         try await repositories.contacts.upsert(contact)
         let firstNow = Date(timeIntervalSince1970: 1_800_000_000)
         let secondNow = firstNow.addingTimeInterval(3 * 86_400)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { firstNow })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { firstNow }
+        )
         try await scheduler.snooze(contactId: contact.id)
         _ = try await scheduler.caughtUp(contactId: contact.id)
         // Re-snoozed from a later clock reading before the compensation for
         // the *earlier* caught-up ever runs — simulates the user snoozing
         // again while an earlier failed action's restore is still pending.
-        try await SchedulingPass(reminders: repositories.reminders, clock: { secondNow })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { secondNow }
+        )
             .snooze(contactId: contact.id)
         let freshSnooze = try await repositories.reminders.fetchPending(forContact: contact.id)[0]
 

@@ -15,10 +15,15 @@ struct UpcomingViewModelStateTests {
 
     @Test("A failing contact fetch clears rows and reports failure")
     func failedContactFetchReportsFailure() async throws {
+        let contacts = StubContactRepository.failing()
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository.failing(),
+            contacts: contacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -44,10 +49,15 @@ struct UpcomingViewModelStateTests {
     @Test("A failing pending-reminder fetch degrades to no known snoozes/occasions, not a blanked screen")
     func failedReminderFetchDegradesInsteadOfBlanking() async throws {
         let contact = UpcomingFixtures.contact(systemRef: "reminder-failure", cadenceDays: 7)
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository.failing(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository.failing(), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository.failing(),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -65,10 +75,15 @@ struct UpcomingViewModelStateTests {
     @Test("A failure after a successful load discards the stale rows")
     func failureAfterSuccessDiscardsRows() async throws {
         let contact = UpcomingFixtures.contact(systemRef: "loaded-then-failed", cadenceDays: 1)
+        let loadedContacts = StubContactRepository([contact])
         let loaded = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: loadedContacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: loadedContacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -77,10 +92,15 @@ struct UpcomingViewModelStateTests {
         #expect(loaded.loadState == .loaded)
         #expect(loaded.totalCount > 0)
 
+        let failingContacts = StubContactRepository.failing()
         let failing = UpcomingViewModel(
-            contacts: StubContactRepository.failing(),
+            contacts: failingContacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: failingContacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -103,10 +123,15 @@ struct UpcomingViewModelStateTests {
             scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "spoken-occasion"
         )
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([reminder]), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository([reminder]),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -128,10 +153,15 @@ struct UpcomingViewModelStateTests {
             displayName: "Han Solo",
             cadenceDays: 14
         )
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -179,10 +209,15 @@ struct UpcomingViewModelStateTests {
             scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "zero-capacity-occasion"
         )
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([reminder]), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository([reminder]),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: ReminderWindow(
                 allowedDays: [],
@@ -212,10 +247,15 @@ struct UpcomingViewModelStateTests {
             osNotificationId: "state-\(state.rawValue)"
         )
         reminder.state = state
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([reminder]), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository([reminder]),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -249,10 +289,15 @@ struct UpcomingViewModelStateTests {
             scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "archived-occasion"
         )
+        let contacts = StubContactRepository([archived])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([archived]),
+            contacts: contacts,
             reminders: StubReminderRepository([occasion]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([occasion]), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository([occasion]),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -286,11 +331,13 @@ struct UpcomingViewModelStateTests {
             scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "untracked-occasion"
         )
+        let contacts = StubContactRepository([tracked, untracked])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([tracked, untracked]),
+            contacts: contacts,
             reminders: StubReminderRepository([visible, orphaned]),
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository([visible, orphaned]),
+                contacts: contacts,
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),

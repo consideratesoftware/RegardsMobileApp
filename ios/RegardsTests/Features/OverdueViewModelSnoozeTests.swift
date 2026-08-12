@@ -63,7 +63,7 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
             clock: clock.now
         )
         await viewModel.load()
@@ -94,7 +94,7 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
             clock: clock.now
         )
         await viewModel.load()
@@ -124,7 +124,7 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
             clock: clock.now
         )
         await viewModel.load()
@@ -174,7 +174,7 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
             clock: clock.now
         )
         await viewModel.load()
@@ -253,7 +253,7 @@ struct OverdueViewModelSnoozeTests {
             contacts: gatedContacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: gatedContacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await gate.open()

@@ -123,7 +123,7 @@ struct MockOccasionSeedingTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
-            scheduler: SchedulingPass(reminders: mocks.reminders, clock: { now }),
+            scheduler: SchedulingPass(reminders: mocks.reminders, contacts: mocks.contacts, clock: { now }),
             interactions: mocks.interactions,
             window: window,
             clock: { now }

@@ -45,7 +45,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: interactions,
             window: window,
             clock: { Self.now }
@@ -94,7 +94,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             interactions: interactions,
             window: window,
             clock: { Self.now }
@@ -119,7 +119,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository.failing(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }
@@ -161,7 +161,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }
@@ -216,11 +216,11 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: Self.eightAMWindow(),
             clock: { Self.now }
@@ -248,11 +248,11 @@ struct UpcomingViewModelActionTests {
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
         let clock = MutableClock(Self.now)
-        let scheduler = SchedulingPass(reminders: reminders, clock: clock.now)
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
             interactions: StubInteractionRepository(),
             window: window,
             clock: clock.now
@@ -283,11 +283,11 @@ struct UpcomingViewModelActionTests {
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
         let clock = MutableClock(Self.now)
-        let scheduler = SchedulingPass(reminders: reminders, clock: clock.now)
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: clock.now),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
             interactions: StubInteractionRepository(),
             window: window,
             clock: clock.now
@@ -323,11 +323,11 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }
@@ -380,7 +380,7 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
@@ -410,6 +410,66 @@ struct UpcomingViewModelActionTests {
         #expect(viewModel.groups.flatMap(\.rows).first?.scheduledFor != Self.now.addingTimeInterval(7 * 86_400))
     }
 
+    /// Staged review: `buildRows`' snooze fold passes `includingContainingSlot:
+    /// max(overdueAt, snoozedUntil) <= now` to `nextAllowedSlot`, and no test
+    /// discriminated it from a hardcoded `true` — the same shape as TF-03's
+    /// R25, which passed three times against deliberately broken code before
+    /// an empirical revert caught it. Every snooze test above uses
+    /// `eightAMWindow` specifically to *dodge* the one scenario that tells
+    /// the two apart — see that helper's own doc comment, which already
+    /// names it: a window whose allowed range starts at midnight.
+    ///
+    /// `ReminderWindow.allDayEveryDay` opens at midnight. `scheduler.snooze`
+    /// pushes `scheduledFor` to `now + 7 calendar days`, which keeps `now`'s
+    /// own 08:00 time-of-day (`UpcomingFixtures.now` is exactly 08:00:00
+    /// UTC) — a mid-day target inside that day's midnight-anchored slot.
+    /// Under the correct `false`, day+7's own midnight fails
+    /// `candidate >= date` (00:00 precedes 08:00), so `nextAllowedSlot` finds
+    /// nothing on day+7 and forward-snaps to day+8's midnight. Hardcoded to
+    /// `true`, day+7's midnight satisfies `containsDate` instead and the
+    /// function returns immediately from the *active*-slot branch — snapping
+    /// backward to day+7's midnight, 8 hours *before* the snooze target the
+    /// row is supposed to still be honoring.
+    ///
+    /// Verified by inversion, not assumed: temporarily hardcoding
+    /// `includingContainingSlot: true` at this call site in
+    /// `UpcomingViewModel.buildRows` and rerunning just this test fails it —
+    /// `scheduledFor` lands on day+7's midnight instead of day+8's. Reverted
+    /// after confirming the failure; the assertion below is what a correct
+    /// implementation must satisfy.
+    @Test("A snoozed row forward-snaps past its own day under a midnight-anchored window, not backward into it")
+    func snoozedRowForwardSnapsAcrossMidnightAnchoredWindow() async throws {
+        let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 20)
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: scheduler,
+            interactions: StubInteractionRepository(),
+            window: window,
+            clock: { Self.now }
+        )
+        await viewModel.load()
+
+        try await scheduler.snooze(contactId: contact.id) // scheduledFor == now + 7d, at now's 08:00
+        await viewModel.load()
+
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = UpcomingFixtures.utc
+        let snoozeTarget = Self.now.addingTimeInterval(7 * 86_400)
+        let snoozeDayMidnight = utcCalendar.startOfDay(for: snoozeTarget)
+        let nextDayMidnight = utcCalendar.date(byAdding: .day, value: 1, to: snoozeDayMidnight)
+
+        let row = try #require(viewModel.groups.flatMap(\.rows).first)
+        #expect(row.scheduledFor == nextDayMidnight)
+        // The discriminating negative: a hardcoded `true` lands exactly
+        // here instead.
+        #expect(row.scheduledFor != snoozeDayMidnight)
+    }
+
     @Test("Two concurrent load() calls subscribe to observeTracked() exactly once")
     func concurrentLoadSubscribesOnce() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
@@ -417,7 +477,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }

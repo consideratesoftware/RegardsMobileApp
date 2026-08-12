@@ -48,11 +48,12 @@ struct ContactDetailViewModelTests {
             source: .manual,
             channel: .phoneCall
         )
+        let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository([log]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -65,11 +66,12 @@ struct ContactDetailViewModelTests {
 
     @Test("A failing contact fetch clears contact and interactions")
     func failedLoadClearsState() async throws {
+        let contacts = StubContactRepository.failing()
         let viewModel = ContactDetailViewModel(
             contactId: UUID(),
-            contacts: StubContactRepository.failing(),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -82,11 +84,12 @@ struct ContactDetailViewModelTests {
     @Test("A failing interaction fetch clears contact and interactions even though the contact read succeeded")
     func failedInteractionFetchClearsState() async throws {
         let contact = Self.contact()
+        let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository.failing(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -109,11 +112,12 @@ struct ContactDetailViewModelTests {
     )
     func priorityLabelMapsEveryTier(tier: PriorityTier, expected: String) async throws {
         let contact = Self.contact(priorityTier: tier)
+        let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -125,11 +129,12 @@ struct ContactDetailViewModelTests {
     @Test("cadenceLabel reports 'not tracked' when the contact has no cadence")
     func cadenceLabelReportsNotTracked() async throws {
         let contact = Self.contact(cadenceDays: nil)
+        let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -141,11 +146,12 @@ struct ContactDetailViewModelTests {
     @Test("lastTalkedLabel reports 'never' when the contact has no interaction")
     func lastTalkedLabelReportsNever() async throws {
         let contact = Self.contact(lastInteractedAt: nil)
+        let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -157,11 +163,12 @@ struct ContactDetailViewModelTests {
     @Test("overdueSummary reports overdue days once the cadence has elapsed")
     func overdueSummaryReportsOverdueDays() async throws {
         let contact = Self.contact(cadenceDays: 7, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
+        let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now },
             calendar: {
                 var calendar = Calendar(identifier: .gregorian)
@@ -187,7 +194,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -211,7 +218,7 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()

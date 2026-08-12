@@ -71,7 +71,7 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
-            scheduler: SchedulingPass(reminders: mocks.reminders, clock: { now }),
+            scheduler: SchedulingPass(reminders: mocks.reminders, contacts: mocks.contacts, clock: { now }),
             interactions: mocks.interactions,
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -159,10 +159,11 @@ struct MockRepositoriesTests {
                 osNotificationId: "beyond-horizon"
             ),
         ]
+        let remindersRepository = StubReminderRepository(reminders)
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository(reminders),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(reminders), clock: { now }),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -210,10 +211,11 @@ struct MockRepositoriesTests {
                 osNotificationId: "same-contact-first-birthday"
             ),
         ]
+        let remindersRepository = StubReminderRepository(reminders)
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository(reminders),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(reminders), clock: { now }),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -273,10 +275,11 @@ struct MockRepositoriesTests {
             scheduledFor: scheduledFor,
             osNotificationId: "horizon-boundary"
         )
+        let remindersRepository = StubReminderRepository([reminder])
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([reminder]), clock: { nowDate }),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { nowDate }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
@@ -312,10 +315,11 @@ struct MockRepositoriesTests {
             scheduledFor: horizonEnd,
             osNotificationId: "exact-horizon-end"
         )
+        let remindersRepository = StubReminderRepository([visible, excluded])
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository([visible, excluded]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([visible, excluded]), clock: { now }),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }

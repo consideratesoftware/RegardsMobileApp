@@ -160,7 +160,11 @@ struct RowActionAccessibilityEffectsTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Date(timeIntervalSince1970: 1_800_000_000) }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                clock: { Date(timeIntervalSince1970: 1_800_000_000) }
+            ),
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
         )
         await viewModel.load()
@@ -209,6 +213,7 @@ struct RowActionAccessibilityEffectsTests {
             reminders: nil,
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
+                contacts: contacts,
                 clock: { Date(timeIntervalSince1970: 1_800_000_000) }
             ),
             interactions: StubInteractionRepository(),

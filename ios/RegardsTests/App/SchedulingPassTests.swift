@@ -16,7 +16,11 @@ struct SchedulingPassTests {
         let contact = contractContact(id: try contractUUID(501), suffix: "snooze-fresh", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
 
         try await scheduler.snooze(contactId: contact.id)
 
@@ -38,8 +42,10 @@ struct SchedulingPassTests {
         let first = Date(timeIntervalSince1970: 1_800_000_000)
         let second = first.addingTimeInterval(3 * 86_400)
 
-        try await SchedulingPass(reminders: repositories.reminders, clock: { first }).snooze(contactId: contact.id)
-        try await SchedulingPass(reminders: repositories.reminders, clock: { second }).snooze(contactId: contact.id)
+        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { first })
+            .snooze(contactId: contact.id)
+        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { second })
+            .snooze(contactId: contact.id)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
@@ -64,10 +70,16 @@ struct SchedulingPassTests {
         let contact = contractContact(id: try contractUUID(503), suffix: "snooze-concurrent", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
 
-        async let first: () = scheduler.snooze(contactId: contact.id)
-        async let second: () = scheduler.snooze(contactId: contact.id)
+        // `Bool`, not `()`: `snooze` returns whether it wrote (R54's
+        // precondition), so the async-let bindings type-match that now.
+        async let first: Bool = scheduler.snooze(contactId: contact.id)
+        async let second: Bool = scheduler.snooze(contactId: contact.id)
         _ = try await (first, second)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
@@ -91,7 +103,8 @@ struct SchedulingPassTests {
         let storedBeforeSnooze = try #require(try await repositories.contacts.fetch(id: contact.id)).lastInteractedAt
         let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-        try await SchedulingPass(reminders: repositories.reminders, clock: { now }).snooze(contactId: contact.id)
+        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { now })
+            .snooze(contactId: contact.id)
 
         let interactions = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 100)
         #expect(interactions.count == baselineInteractionCount)
@@ -99,6 +112,16 @@ struct SchedulingPassTests {
         #expect(storedAfterSnooze == storedBeforeSnooze)
     }
 
+    /// Behavior shifted at staged review round 11 (R54's fix): an unknown
+    /// contact used to reach `reminders.upsert` and fail there, on
+    /// whichever backend-specific constraint caught a `ScheduledReminder`
+    /// pointing at a nonexistent contact — hence the original title,
+    /// "fails the write." Now the precondition's own `contacts.fetch`
+    /// simply finds nothing and rejects before ever reaching `upsert`, so
+    /// there's no throw to catch — `expectWriteRejected` would record a
+    /// false failure here today. The outcome this test actually cares
+    /// about (no orphaned reminder for a contact that doesn't exist) is
+    /// unchanged, so the title stays true; only how it's proven changes.
     @Test(
         "Snoozing an unknown contact fails the write instead of orphaning a reminder",
         arguments: RepositoryContractBackend.allCases
@@ -107,39 +130,50 @@ struct SchedulingPassTests {
         let repositories = try backend.makeRepositories()
         let unknownContactID = try contractUUID(505)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
 
-        await expectWriteRejected {
-            try await scheduler.snooze(contactId: unknownContactID)
-        }
+        let wrote = try await scheduler.snooze(contactId: unknownContactID)
+
+        #expect(wrote == false)
+        let pending = try await repositories.reminders.fetchPending(forContact: unknownContactID)
+        #expect(pending.isEmpty)
     }
 
-    /// Pins R54's own claim rather than leaving it asserted without
-    /// evidence (staged review round 9, closing the asymmetry with R56's
-    /// pinning test): `snooze` has no tracked/cadence precondition of its
-    /// own — it writes a pending cadence row for any contact that merely
-    /// exists. Not reachable through either shipped caller today
-    /// (Overdue/Contact Detail's Snooze only ever appear for a row already
-    /// computed as overdue, which requires `tracked && cadenceDays != nil`
-    /// by construction), but nothing in `SchedulingPass` itself enforces
-    /// that. `tracked: false` alone covers both halves of the gap at once —
-    /// `contractContact`'s own fixture ties `cadenceDays` to `tracked`.
+    /// R54, closed at staged review round 11 — this test used to pin the
+    /// gap itself ("snooze writes a pending reminder for an untracked,
+    /// no-cadence contact") as a known, deliberately-left-open limitation.
+    /// It now proves the fix: `snooze` reads the contact first and rejects
+    /// rather than writing. Not reachable through either shipped caller
+    /// today (Overdue/Contact Detail's Snooze only ever appear for a row
+    /// already computed as overdue, which requires `tracked && cadenceDays
+    /// != nil` by construction) — this test exists for the caller that
+    /// isn't either of those yet. `tracked: false` alone covers both
+    /// halves of the precondition at once — `contractContact`'s own
+    /// fixture ties `cadenceDays` to `tracked`.
     @Test(
-        "R54: snooze writes a pending reminder for an untracked, no-cadence contact",
+        "R54: snooze rejects an untracked, no-cadence contact instead of writing an orphaned reminder",
         arguments: RepositoryContractBackend.allCases
     )
-    func snoozeSucceedsForUntrackedNoCadenceContact(backend: RepositoryContractBackend) async throws {
+    func snoozeRejectsUntrackedNoCadenceContact(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
         let contact = contractContact(id: try contractUUID(516), suffix: "snooze-untracked", tracked: false)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now })
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
 
-        try await scheduler.snooze(contactId: contact.id)
+        let wrote = try await scheduler.snooze(contactId: contact.id)
 
+        #expect(wrote == false)
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending.count == 1)
-        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
+        #expect(pending.isEmpty)
     }
 
     // MARK: - Wall-clock snooze (DST)
@@ -174,7 +208,12 @@ struct SchedulingPassTests {
         let now = try #require(calendar.date(from: DateComponents(
             year: 2027, month: 3, day: 8, hour: 8, minute: 0
         )))
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now },
+            calendar: calendar
+        )
 
         try await scheduler.snooze(contactId: contact.id)
 
@@ -202,7 +241,12 @@ struct SchedulingPassTests {
         let now = try #require(calendar.date(from: DateComponents(
             year: 2027, month: 11, day: 1, hour: 8, minute: 0
         )))
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now },
+            calendar: calendar
+        )
 
         try await scheduler.snooze(contactId: contact.id)
 
@@ -231,7 +275,12 @@ struct SchedulingPassTests {
         let now = try #require(calendar.date(from: DateComponents(
             year: 2027, month: 12, day: 28, hour: 8, minute: 0
         )))
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now },
+            calendar: calendar
+        )
 
         try await scheduler.snooze(contactId: contact.id)
 
@@ -259,7 +308,12 @@ struct SchedulingPassTests {
         let now = try #require(calendar.date(from: DateComponents(
             year: 2027, month: 6, day: 1, hour: 8, minute: 15
         )))
-        let scheduler = SchedulingPass(reminders: repositories.reminders, clock: { now }, calendar: calendar)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now },
+            calendar: calendar
+        )
 
         try await scheduler.snooze(contactId: contact.id)
 

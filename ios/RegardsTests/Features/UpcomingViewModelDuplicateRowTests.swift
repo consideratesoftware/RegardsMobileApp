@@ -33,10 +33,15 @@ struct UpcomingViewModelDuplicateRowTests {
             scheduledFor: UpcomingFixtures.now.addingTimeInterval(3_600),
             osNotificationId: "same-day-double-up-occasion"
         )
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository([occasion]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository([occasion]), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository([occasion]),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -84,10 +89,15 @@ struct UpcomingViewModelDuplicateRowTests {
                 osNotificationId: "transition-occasion-\(index)"
             )
         }
+        let contacts = StubContactRepository([first, second])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([first, second]),
+            contacts: contacts,
             reminders: StubReminderRepository(occasions),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(occasions), clock: { UpcomingFixtures.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(occasions),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { UpcomingFixtures.now }
@@ -121,11 +131,13 @@ struct UpcomingViewModelDuplicateRowTests {
             scheduledFor: UpcomingFixtures.now.addingTimeInterval(4 * 86_400),
             osNotificationId: "cross-day-occasion"
         )
+        let contacts = StubContactRepository([contact])
         let viewModel = UpcomingViewModel(
-            contacts: StubContactRepository([contact]),
+            contacts: contacts,
             reminders: StubReminderRepository([laterOccasion]),
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository([laterOccasion]),
+                contacts: contacts,
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),

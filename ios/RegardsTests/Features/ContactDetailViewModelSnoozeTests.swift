@@ -34,7 +34,7 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -50,27 +50,21 @@ struct ContactDetailViewModelSnoozeTests {
         #expect(stored.lastInteractedAt == contact.lastInteractedAt) // untouched (decision #31)
     }
 
-    /// Known-limitation pin, not a passing-behavior proof (ARCHITECTURE.md
-    /// R56, staged review round 8): `overdueSummary` is computed purely from
-    /// `Contact`'s own fields and never reads `ScheduledReminder`, so a
-    /// successful Snooze — which writes only to `ScheduledReminder` — cannot
-    /// change it. Unlike `OverdueViewModel.makeOverdueRow`/`UpcomingViewModel
-    /// .buildRows`, which both suppress an overdue row while a snooze is
-    /// pending, this screen keeps reporting the exact same "N days overdue"
-    /// after a successful Snooze as before it — a real, currently-shipping
-    /// gap, deliberately left open pending TF-07/PR25 wiring a
-    /// `ReminderRepository` into this view model (see `overdueSummary`'s own
-    /// doc comment). This test exists so the gap has a red flag the moment
-    /// someone starts wiring the fix, rather than silently going untested.
-    @Test("Known gap: overdueSummary does not change after a successful Snooze (R56)")
-    func overdueSummaryUnchangedAfterSuccessfulSnooze() async throws {
+    /// The gap this used to pin as a known limitation (ARCHITECTURE.md R56,
+    /// staged review round 8) is now closed: `overdueSummary` folds in
+    /// `pendingSnoozeDate`, refreshed by the reload `snooze()` now performs
+    /// on success. This is the inverted proof the original test's own doc
+    /// comment anticipated ("a red flag the moment someone starts wiring the
+    /// fix") — same setup, opposite assertion.
+    @Test("overdueSummary reports not-overdue immediately after a successful Snooze (R56)")
+    func overdueSummaryClearsAfterSuccessfulSnooze() async throws {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
         let contacts = StubContactRepository([contact])
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -80,11 +74,43 @@ struct ContactDetailViewModelSnoozeTests {
         let succeeded = await viewModel.snooze()
         #expect(succeeded)
 
-        // Unchanged — not because nothing happened (the snooze wrote a real
-        // pending reminder, proven by the sibling test above), but because
-        // this property has no way to know about it yet.
-        #expect(viewModel.overdueSummary.isOverdue == before.isOverdue)
-        #expect(viewModel.overdueSummary.days == before.days)
+        // Suppressed outright, not merely reduced: a pending-and-future
+        // snooze means "not overdue right now," matching
+        // `OverdueViewModel.makeOverdueRow`'s identical guard, not a
+        // smaller-but-still-positive day count.
+        #expect(viewModel.overdueSummary.isOverdue == false)
+        #expect(viewModel.overdueSummary.days == 0)
+        #expect(viewModel.pendingSnoozeDate == Self.now.addingTimeInterval(7 * 86_400))
+    }
+
+    /// The lapse side of the same fix: once the pending snooze's date has
+    /// passed, `overdueSummary` must fall back to the ordinary cadence math
+    /// again — mirroring `OverdueViewModel`/`UpcomingViewModel`'s "a lapsed
+    /// snooze is simply not consulted" behavior, not stay suppressed
+    /// forever because a snooze once existed.
+    @Test("overdueSummary resumes reporting overdue once a Snooze lapses")
+    func overdueSummaryResumesAfterSnoozeLapses() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let contacts = StubContactRepository([contact])
+        let clock = MutableClock(Self.now)
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: contacts,
+            interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: clock.now),
+            clock: clock.now
+        )
+        await viewModel.load()
+
+        let succeeded = await viewModel.snooze()
+        #expect(succeeded)
+        #expect(viewModel.overdueSummary.isOverdue == false)
+
+        clock.advance(by: 8 * 86_400) // past the 7-day snooze target
+        await viewModel.load()
+
+        #expect(viewModel.overdueSummary.isOverdue == true)
+        #expect(viewModel.overdueSummary.days > 0)
     }
 
     /// `snoozePushesCadenceReminderAndLogsNothing`'s failure-path sibling —
@@ -108,7 +134,7 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -141,7 +167,7 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -173,7 +199,7 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -216,7 +242,7 @@ struct ContactDetailViewModelSnoozeTests {
         let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,

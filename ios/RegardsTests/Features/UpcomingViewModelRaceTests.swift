@@ -39,7 +39,7 @@ struct UpcomingViewModelRaceTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
@@ -93,7 +93,7 @@ struct UpcomingViewModelRaceTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
@@ -147,7 +147,7 @@ struct UpcomingViewModelRaceTests {
         let viewModel = UpcomingViewModel(
             contacts: gatedContacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: gatedReminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: gatedReminders, contacts: gatedContacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }

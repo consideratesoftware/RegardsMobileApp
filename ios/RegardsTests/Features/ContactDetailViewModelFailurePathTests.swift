@@ -45,7 +45,7 @@ struct ContactDetailViewModelFailurePathTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -93,7 +93,7 @@ struct ContactDetailViewModelFailurePathTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
@@ -145,7 +145,7 @@ struct ContactDetailViewModelFailurePathTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
         await reminders.armTransitionFailure(from: .userCaughtUp)
         let viewModel = ContactDetailViewModel(
@@ -183,7 +183,7 @@ struct ContactDetailViewModelFailurePathTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, clock: { Self.now })
+        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
         try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
@@ -231,7 +231,7 @@ struct ContactDetailViewModelFailurePathTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -256,7 +256,7 @@ struct ContactDetailViewModelFailurePathTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await viewModel.load()
