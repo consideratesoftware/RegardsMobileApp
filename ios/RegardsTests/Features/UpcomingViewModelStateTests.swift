@@ -146,8 +146,12 @@ struct UpcomingViewModelStateTests {
         #expect(!label.contains("ReminderKind"))
     }
 
-    @Test("A cadence row speaks its cadence text")
-    func cadenceRowSpeaksItsCadenceText() async throws {
+    @Test("A cadence row speaks name and time only, not its cadence text")
+    func cadenceRowOmitsCadenceTextFromItsSpokenLabel() async throws {
+        // Reversed, round 12 (Sid's call — see `UpcomingRowState
+        // .accessibilityLabel`/`UpcomingRow.occasion`'s doc comments): used
+        // to pin the opposite. `cadenceText` is still computed on the row
+        // below (model untouched) — only the label stopped reading it.
         let contact = UpcomingFixtures.contact(
             systemRef: "spoken-cadence",
             displayName: "Han Solo",
@@ -170,8 +174,9 @@ struct UpcomingViewModelStateTests {
         await viewModel.load()
 
         let row = try #require(viewModel.groups.flatMap(\.rows).first)
-        let cadenceText = try #require(row.cadenceText)
-        #expect(row.accessibilityLabel == "Han Solo, \(cadenceText) at \(row.timeOfDayText)")
+        let cadenceText = try #require(row.cadenceText, "still computed, just unread by the label")
+        #expect(row.accessibilityLabel == "Han Solo at \(row.timeOfDayText)")
+        #expect(!row.accessibilityLabel.contains(cadenceText))
         #expect(!row.accessibilityLabel.contains("cadence,"))
     }
 

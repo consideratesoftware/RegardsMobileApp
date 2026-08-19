@@ -24,6 +24,15 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
+    /// `List` only materializes rows near the visible viewport (a lazy,
+    /// virtualized `UICollectionView` — see `LogOtherChannelSheet`'s doc
+    /// comment for the same fact elsewhere in this suite). The birthday row
+    /// is in the fixture's first day section, but the anniversary row is
+    /// several sections down — round 12 (`ARCHITECTURE.md` R52, the `List`
+    /// migration) means neither is guaranteed to exist without scrolling any
+    /// more, unlike under the old eagerly-rendered `ScrollView`. Collects
+    /// every row's label across bounded scrolls rather than assuming a
+    /// single snapshot has everything.
     @MainActor
     func testUpcomingTabPassesAudit() throws {
         let app = launchToOverdue()
@@ -35,8 +44,7 @@ extension ScreensAccessibilityTests {
         )
         let plainRow = app.descendants(matching: .any)["upcoming.row"]
         XCTAssertTrue(plainRow.waitForExistence(timeout: 10))
-        let rows = app.descendants(matching: .any).matching(identifier: "upcoming.row")
-        let labels = rows.allElementsBoundByIndex.map(\.label)
+        let labels = collectAllUpcomingRowLabels(in: app)
         XCTAssertTrue(
             labels.contains(where: { $0.localizedCaseInsensitiveContains("birthday") }),
             "The representative birthday state must remain reachable and announced."
@@ -46,6 +54,34 @@ extension ScreensAccessibilityTests {
             "The representative anniversary state must remain reachable and announced."
         )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    /// Scrolls Upcoming in bounded steps, collecting every distinct
+    /// `upcoming.row` label seen along the way, until two consecutive
+    /// scrolls surface nothing new (the bottom) or the scroll budget runs
+    /// out — see `testUpcomingTabPassesAudit`'s doc comment for why a single
+    /// snapshot isn't enough under `List`'s virtualization.
+    @MainActor
+    private func collectAllUpcomingRowLabels(in app: XCUIApplication, maxScrolls: Int = 8) -> [String] {
+        let upcomingScreen = app.descendants(matching: .any)["screen.upcoming"]
+        var seen: [String] = []
+        var seenSet: Set<String> = []
+        func capture() {
+            let rows = app.descendants(matching: .any)
+                .matching(identifier: "upcoming.row")
+                .allElementsBoundByIndex
+            for row in rows where seenSet.insert(row.label).inserted {
+                seen.append(row.label)
+            }
+        }
+        capture()
+        for _ in 0..<maxScrolls {
+            let before = seenSet.count
+            upcomingScreen.swipeUp()
+            capture()
+            if seenSet.count == before { break }
+        }
+        return seen
     }
 
     /// R50 (TF-03 / PR21): a stored `Contact` row that fails to decode must
@@ -90,18 +126,21 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
-    /// Exercises the stable-ID Contact Detail push from Overdue. The
-    /// Contacts test covers the same destination flow from All Contacts.
+    /// Exercises the representative interaction-history state on Contact
+    /// Detail. Reroutes through Contacts, round 12: this used to reach
+    /// Contact Detail via an Overdue row tap; that tap now opens the
+    /// channel-preview alert instead (`ARCHITECTURE.md` R52; see
+    /// `ScreensAccessibilityTests+RowActions.swift`'s
+    /// `testOverdueChannelPreviewPassesAuditAndDismisses` for that
+    /// coverage). This test's real subject was always Contact Detail's
+    /// interaction list, not how you get there, so it moved to the route
+    /// that still reaches it — Leia Organa specifically, since she's the
+    /// one fixture contact seeded with the "WhatsApp, reminder caught up"
+    /// interaction this test pins (`MockRepositories.swift`).
     @MainActor
-    func testContactDetailFromOverduePassesAudit() throws {
+    func testContactDetailInteractionHistoryPassesAudit() throws {
         let app = launchToOverdue()
-        // Rows are synthetic `.other` elements, so select by identifier.
-        navigateToRow(
-            identifier: "overdue.row",
-            index: 0,
-            sourceIdentifier: "screen.overdue",
-            in: app
-        )
+        openContactDetail(named: "Leia Organa", fromTabIdentifier: "screen.overdue", in: app)
         XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
         let plainInteraction = app.descendants(matching: .any)["contact-detail.interaction-row"]
         XCTAssertTrue(

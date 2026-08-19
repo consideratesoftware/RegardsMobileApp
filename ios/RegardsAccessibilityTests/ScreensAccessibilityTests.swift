@@ -44,7 +44,7 @@ final class ScreensAccessibilityTests: XCTestCase {
         .elementDetection,
         .sufficientElementDescription,
         .trait,
-        .hitRegion,
+        .hitRegion
     ]
 
     override func setUpWithError() throws {
@@ -145,105 +145,29 @@ final class ScreensAccessibilityTests: XCTestCase {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
+    /// Extended, round 12: this used to stop at Contact Detail
+    /// (`assertEditRoundTrip`'s one pop). It now continues one more pop back
+    /// to Contacts, absorbing what `testEditContactBackReturnsTo
+    /// OverdueContactDetail` / `...UpcomingContactDetail` used to uniquely
+    /// prove — a full two-level `NavigationStack` unwind (Edit Contact →
+    /// Contact Detail → tab root) — before those two were deleted. Overdue
+    /// and Upcoming can no longer push Contact Detail at all (round 12, see
+    /// `ARCHITECTURE.md` R52), so the specific stacks those tests exercised
+    /// no longer exist; the *mechanism* they proved (a per-tab
+    /// `NavigationStack` pops correctly through more than one level) is
+    /// per-tab-generic, not specific to which tab owns the stack, so one
+    /// representative route — Contacts, the sole route left to Contact
+    /// Detail from these two screens — covers it. Not duplicating
+    /// `testEditContactPassesAudit`'s own audit call here; that coverage
+    /// already exists on the Contacts route.
     @MainActor
-    func testEditContactBackReturnsToContactDetail() {
+    func testEditContactBackReturnsToContactDetailThenContacts() {
         let app = launchToContactDetailFromContacts()
         assertEditRoundTrip(in: app)
-    }
-
-    @MainActor
-    func testContactDetailFromUpcomingPassesAudit() throws {
-        let app = launchToOverdue()
-        navigateToTab(
-            named: "Upcoming",
-            from: "screen.overdue",
-            to: "screen.upcoming",
-            in: app
-        )
-        navigateToRow(
-            identifier: "upcoming.row",
-            index: 0,
-            sourceIdentifier: "screen.upcoming",
-            in: app
-        )
-        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-    }
-
-    @MainActor
-    func testEditContactBackReturnsToOverdueContactDetail() throws {
-        let app = launchToOverdue()
-        navigateToRow(
-            identifier: "overdue.row",
-            index: 0,
-            sourceIdentifier: "screen.overdue",
-            in: app
-        )
         navigate(
             from: "screen.contact-detail",
-            to: "screen.edit-contact",
-            triggerDescription: "Edit",
-            in: app
-        ) {
-            editButton(in: app)
-        }
-        assertReadOnlyBanner(in: app)
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-        navigate(
-            from: "screen.edit-contact",
-            to: "screen.contact-detail",
-            triggerDescription: "Contact back button",
-            in: app
-        ) {
-            app.navigationBars.buttons["Contact"]
-        }
-        navigate(
-            from: "screen.contact-detail",
-            to: "screen.overdue",
-            triggerDescription: "Overdue back button",
-            in: app
-        ) {
-            app.navigationBars.buttons.element(boundBy: 0)
-        }
-    }
-
-    @MainActor
-    func testEditContactBackReturnsToUpcomingContactDetail() throws {
-        let app = launchToOverdue()
-        navigateToTab(
-            named: "Upcoming",
-            from: "screen.overdue",
-            to: "screen.upcoming",
-            in: app
-        )
-        navigateToRow(
-            identifier: "upcoming.row",
-            index: 0,
-            sourceIdentifier: "screen.upcoming",
-            in: app
-        )
-        navigate(
-            from: "screen.contact-detail",
-            to: "screen.edit-contact",
-            triggerDescription: "Edit",
-            in: app
-        ) {
-            editButton(in: app)
-        }
-        assertReadOnlyBanner(in: app)
-        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
-        navigate(
-            from: "screen.edit-contact",
-            to: "screen.contact-detail",
-            triggerDescription: "Contact back button",
-            in: app
-        ) {
-            app.navigationBars.buttons["Contact"]
-        }
-        navigate(
-            from: "screen.contact-detail",
-            to: "screen.upcoming",
-            triggerDescription: "Upcoming back button",
+            to: "screen.contacts",
+            triggerDescription: "Contacts back button",
             in: app
         ) {
             app.navigationBars.buttons.element(boundBy: 0)
@@ -294,49 +218,54 @@ final class ScreensAccessibilityTests: XCTestCase {
     /// contacts in succession must show the second contact's data, not the
     /// first's. Guards against a future refactor that accidentally reuses
     /// the view's identity across pushes.
+    ///
+    /// Moved from Overdue to Contacts, round 12: Overdue's row no longer
+    /// pushes Contact Detail at all (`ARCHITECTURE.md` R52), so the
+    /// `contactDetail(for:)` factory this test protects is unreachable
+    /// through it. Contacts is the one screen still reaching Contact Detail
+    /// via a stable-ID push per row (`AllContactsScreen`'s
+    /// `NavigationLink(value: contact.id)`), so the regression moved with
+    /// it rather than being dropped.
     @MainActor
-    func testOverdueNavigationShowsDistinctContacts() throws {
+    func testContactsNavigationShowsDistinctContacts() {
         let app = launchToOverdue()
-        let overdue = app.descendants(matching: .any)["screen.overdue"]
-        let rows = app.descendants(matching: .any).matching(identifier: "overdue.row")
+        navigateToTab(named: "Contacts", from: "screen.overdue", to: "screen.contacts", in: app)
+        let contacts = app.descendants(matching: .any)["screen.contacts"]
+        let detail = app.descendants(matching: .any)["screen.contact-detail"]
+        // All Contacts rows resolve as buttons with no shared stable
+        // identifier — see `launchToContactDetailFromContacts`'s matching
+        // comment.
+        let contactsButtons = contacts.descendants(matching: .button)
 
-        // Tap first row → read the hero header → pop back.
-        navigateToRow(
-            identifier: "overdue.row",
-            index: 0,
-            sourceIdentifier: "screen.overdue",
-            in: app
-        )
-        let firstDetail = app.descendants(matching: .any)["screen.contact-detail"]
-        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
-        // The hero header text is the only `staticText` child with an
-        // `.isHeader` trait on this screen.
-        let firstName = firstDetail.staticTexts
-            .matching(NSPredicate(format: "traits & %llu != 0", UIAccessibilityTraits.header.rawValue))
-            .firstMatch.label
+        func openRow(at index: Int) -> String {
+            for attempt in 0..<3 {
+                if detail.exists, !contacts.exists { break }
+                let row = contactsButtons.element(boundBy: index)
+                guard waitUntilLiveAndHittable(row, timeout: 10) else { continue }
+                activate(row, attempt: attempt)
+                if detail.waitForExistence(timeout: 10), contacts.waitForNonExistence(timeout: 10) { break }
+            }
+            XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
+            // The hero header text is the only `staticText` child with an
+            // `.isHeader` trait on this screen.
+            return app.descendants(matching: .any)["screen.contact-detail"]
+                .staticTexts
+                .matching(NSPredicate(format: "traits & %llu != 0", UIAccessibilityTraits.header.rawValue))
+                .firstMatch.label
+        }
+
+        let firstName = openRow(at: 0)
         navigate(
             from: "screen.contact-detail",
-            to: "screen.overdue",
-            triggerDescription: "Back",
+            to: "screen.contacts",
+            triggerDescription: "Contacts back button",
             in: app
         ) {
             app.navigationBars.buttons.element(boundBy: 0)
         }
 
-        // Tap second row → its hero header should differ.
-        XCTAssertTrue(overdue.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(rows.count, 1)
-        navigateToRow(
-            identifier: "overdue.row",
-            index: 1,
-            sourceIdentifier: "screen.overdue",
-            in: app
-        )
-        let secondDetail = app.descendants(matching: .any)["screen.contact-detail"]
-        XCTAssertTrue(editButton(in: app).waitForExistence(timeout: 10))
-        let secondName = secondDetail.staticTexts
-            .matching(NSPredicate(format: "traits & %llu != 0", UIAccessibilityTraits.header.rawValue))
-            .firstMatch.label
+        XCTAssertTrue(contacts.waitForExistence(timeout: 10))
+        let secondName = openRow(at: 1)
 
         XCTAssertNotEqual(
             firstName,
