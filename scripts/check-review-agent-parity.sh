@@ -13,8 +13,10 @@ import tomllib
 
 claude_dir = Path(".claude/agents")
 codex_dir = Path(".codex/agents")
-claude_names = {path.stem for path in claude_dir.glob("*.md")}
-codex_names = {path.stem for path in codex_dir.glob("*.toml")}
+# Only the review contract is mirrored to Codex. Delivery agents (tf-lane,
+# ios-gate, tf-repair) are Claude Code only and are excluded by prefix.
+claude_names = {path.stem for path in claude_dir.glob("pr-*.md")}
+codex_names = {path.stem for path in codex_dir.glob("pr-*.toml")}
 
 if claude_names != codex_names:
     print("Agent adapter sets differ.", file=sys.stderr)
