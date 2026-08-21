@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import Testing
 @testable import Regards
 
@@ -172,5 +173,50 @@ struct ContactObservationContractTests {
         // unchanged by it (only a field on an already-tracked row moved).
         let afterUpdate = try #require(await iterator.next())
         #expect(Set(afterUpdate.map(\.id)).contains(contactID))
+    }
+    /// Staged review round 13, coverage gap: `CancellableBoxTests` covers
+    /// the cancellation box in isolation, but nothing drove a *real* GRDB
+    /// observation failure through `observeTracked()`'s `onError`. This does
+    /// — no fake repository, no injected sentinel error. Dropping the table
+    /// the observation reads leaves `ContactRecord.fetchAll` with nothing to
+    /// fetch, so GRDB itself raises the error and `onError` runs for real.
+    ///
+    /// What it pins is the contract the ViewModels depend on: the stream
+    /// *ends* (`continuation.finish()`) rather than hanging forever or
+    /// throwing into the consumer. `OverdueViewModel`/`UpcomingViewModel`'s
+    /// `for await` loop falls out on exactly this, which is what lets them
+    /// clear the observation token and re-subscribe on the next `load()`.
+    /// A stream that hung here instead would strand that token non-nil and
+    /// silently kill live updates for the rest of the process.
+    /// The fault shape is deliberate, and two more obvious ones do **not**
+    /// work — both were tried here and neither reaches `onError`:
+    /// `DROP TABLE Contact` stops the observation being notified at all (the
+    /// test hangs on `iterator.next()` forever rather than ending), and
+    /// corrupting a value (`UPDATE Contact SET lastInteractedAt =
+    /// 'not-a-number'`) is absorbed — the fetch still succeeds and the
+    /// stream emits normally. Only a *schema* failure that keeps the tracked
+    /// region intact makes the fetch itself throw. Worth knowing before
+    /// "simplifying" this setup into either of those.
+    @Test("A real GRDB observation error ends the stream rather than hanging the consumer")
+    func observeTrackedEndsStreamOnRealGRDBError() async throws {
+        let dbQueue = try DatabaseFactory.makeInMemoryDatabase()
+        let repositories = GRDBRepositories(dbQueue: dbQueue)
+        let seeded = contractContact(id: try contractUUID(525), suffix: "observe-error", tracked: true)
+        try await repositories.contacts.upsert(seeded)
+        let stream = await repositories.contacts.observeTracked()
+        var iterator = stream.makeAsyncIterator()
+
+        // A real, unrecoverable fetch failure that still leaves the
+        // observed region intact, so the observation is notified and its
+        // fetch is the thing that fails. `displayName` is `NOT NULL` and
+        // carries no index, so SQLite permits dropping it; `ContactRecord`
+        // requires it, so `fetchAll` throws while decoding. The `UPDATE` in
+        // the same transaction guarantees the commit notification.
+        try await dbQueue.write { db in
+            try db.execute(sql: "ALTER TABLE Contact DROP COLUMN displayName")
+            try db.execute(sql: "UPDATE Contact SET notes = 'observation-error-probe'")
+        }
+
+        #expect(await iterator.next() == nil)
     }
 }

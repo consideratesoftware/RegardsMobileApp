@@ -202,11 +202,11 @@ extension ContactDetailScreen {
             secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
                 Task {
                     let succeeded = await viewModel.snooze()
-                    // `movesFocus: false` on both branches — see
-                    // `announceRowAction`'s doc comment for why Snooze never
-                    // moves focus, success or failure.
+                    // Success moves focus like every other action here,
+                    // because R56 made Status genuinely change on success.
+                    // Failure passes `false` — nothing changed to read.
                     if succeeded {
-                        announceRowAction("Snoozed \(contact.displayName) 1 week", movesFocus: false)
+                        announceRowAction("Snoozed \(contact.displayName) 1 week")
                     } else {
                         announceRowAction("Couldn't snooze \(contact.displayName).", movesFocus: false)
                     }
@@ -236,21 +236,32 @@ extension ContactDetailScreen {
     /// outside this file to justify it, the one gap in an otherwise
     /// consistent trio that carries contact-name-bearing announcement text.
     ///
-    /// `movesFocus` defaults to `true` for Caught up and Log other, both of
-    /// which genuinely move `Contact.lastInteractedAt` — Status really has
-    /// changed by the time focus lands there. Snooze passes `false`
-    /// explicitly on both its success and failure branches (staged review
-    /// round 9): Snooze never touches `lastInteractedAt` at all (decision
-    /// #31), and this screen has no `ReminderRepository` of its own to
-    /// reflect the pending reminder it just wrote (R56), so `overdueSummary`
-    /// — the value Status reads — is byte-identical before and after either
-    /// outcome. Before this fix, focus landed there anyway and VoiceOver
-    /// read the same stale "N days overdue" straight after the
-    /// announcement, as if it were new — nothing was removed on this
-    /// screen the way a row disappearing from Overdue/Upcoming justifies
-    /// the same move there, so the cursor never needed to drop in the
-    /// first place. Skipping the move keeps the announcement as the only
-    /// spoken confirmation, which is the one true thing here.
+    /// `movesFocus` defaults to `true` — focus moves to Status whenever
+    /// Status has genuinely changed by the time it lands there. That covers
+    /// Caught up and Log other, both of which move
+    /// `Contact.lastInteractedAt`, and now Snooze's *success* branch too.
+    ///
+    /// Snooze's success branch used to pass `false` as well (staged review
+    /// round 9), on the reasoning that Snooze never touches
+    /// `lastInteractedAt` (decision #31) and this screen had no reminder
+    /// read of its own, leaving `overdueSummary` — the value Status reads —
+    /// byte-identical either way; focus would land on an unchanged "N days
+    /// overdue" and VoiceOver would read it straight after the announcement
+    /// as if it were new. **R56 invalidated that in this same PR** (staged
+    /// review round 11): `ContactDetailViewModel.load()` now reads
+    /// `scheduler.pendingSnoozeDate(contactId:)`, `overdueSummary`
+    /// suppresses overdue state while a pending snooze is still in the
+    /// future, and `snooze()` reloads on success — so the success branch is
+    /// now the one branch that *does* change the focus target's text,
+    /// colour and danger state (`overdueSummaryClearsAfterSuccessfulSnooze`
+    /// proves it). Keeping `false` there would have meant the only action
+    /// that changes Status is the only one that refuses to announce it by
+    /// focus. Caught by staged review round 13.
+    ///
+    /// The failure branch still passes `false` explicitly, and for the
+    /// original reason, which failure never invalidated: nothing was
+    /// written, so Status is byte-identical and the announcement is the one
+    /// true thing to say.
     private func announceRowAction(_ message: String, movesFocus: Bool = true) {
         rowActionAnnouncer.fire(message, effects: accessibilityEffects) {
             if movesFocus {

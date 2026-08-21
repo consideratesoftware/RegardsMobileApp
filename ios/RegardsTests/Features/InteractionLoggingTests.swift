@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import Testing
 @testable import Regards
 
@@ -249,5 +250,49 @@ struct InteractionLoggingTests {
         }
 
         #expect(await interactions.appendedLogs().isEmpty)
+    }
+    /// Staged review round 13, coverage gap: `failingContactWriteLeavesLogPersisted`
+    /// above proves the same drift, but only across `StubContactRepository`
+    /// /`StubInteractionRepository` fakes — two in-memory doubles that agree
+    /// with each other by construction. Nothing proved `record(...)`'s two
+    /// operations sequence the same way against the real backend, where the
+    /// append is a genuine `INSERT` into `InteractionLog` and the move is a
+    /// genuine `UPDATE Contact`, in separate writes with no enclosing
+    /// transaction.
+    ///
+    /// The fault is real SQLite, not a thrown sentinel: a `BEFORE UPDATE`
+    /// trigger that aborts. Reads keep working (so the `markCaughtUp` fetch
+    /// still finds the contact and the assertions below can still read
+    /// both tables), and only the update fails — exactly the shape this
+    /// path documents. Confirms the consequence on the real backend: the
+    /// log row is committed and stays, `lastInteractedAt` never moves, and
+    /// nothing rolls the append back.
+    @Test("Against real GRDB, a failing lastInteractedAt update still leaves the interaction log persisted")
+    func grdbFailingContactUpdateLeavesLogPersisted() async throws {
+        let dbQueue = try DatabaseFactory.makeInMemoryDatabase()
+        let repositories = GRDBRepositories(dbQueue: dbQueue)
+        let contact = Self.contact(lastInteractedAt: nil)
+        try await repositories.contacts.upsert(contact)
+
+        try await dbQueue.write { db in
+            try db.execute(sql: """
+                CREATE TRIGGER blockContactUpdate BEFORE UPDATE ON Contact
+                BEGIN SELECT RAISE(ABORT, 'contact update blocked'); END;
+                """)
+        }
+
+        let logging = InteractionLogging(
+            contacts: repositories.contacts,
+            interactions: repositories.interactions
+        )
+        await #expect(throws: (any Error).self) {
+            _ = try await logging.markCaughtUp(contactId: contact.id, at: Self.now)
+        }
+
+        let logs = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+        #expect(logs.count == 1)
+        #expect(logs[0].source == .reminderCaughtUp)
+        let stored = try #require(try await repositories.contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == nil)
     }
 }

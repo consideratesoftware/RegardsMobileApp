@@ -88,9 +88,22 @@ public actor SchedulingPass {
     /// reminder is always exactly this id for this contact, so two
     /// concurrent `upsert`s race the *same* primary key: whichever commits
     /// last simply overwrites the other's row instead of coexisting beside
-    /// it. No in-actor lock, no lost update — the precondition read above
-    /// doesn't change that, since it never informs *which* id the write
-    /// below uses, only *whether* it happens at all.
+    /// it. No in-actor lock, no lost update *between two snoozes* — the
+    /// precondition read above doesn't change that, since it never informs
+    /// *which* id the write below uses, only *whether* it happens at all.
+    ///
+    /// That scoping is deliberate: the claim covers snooze-vs-snooze only,
+    /// and does **not** extend to snooze-vs-`caughtUp` (R59). The
+    /// `contacts.fetch(id:)` below is a genuine suspension point inside this
+    /// actor, so a `caughtUp(contactId:)` for the same contact can commit
+    /// its `.userCaughtUp` transition inside that window and then be
+    /// overwritten by this method's `.pending` upsert at the same canonical
+    /// id — silently undoing the user's caught-up for seven days. Left open
+    /// on purpose (R59): both shipped callers are main-actor row taps on a
+    /// row that is replaced the moment either action lands, so nothing
+    /// reaches it today, and closing it properly needs a conditional
+    /// (compare-and-set) write at the repository layer inside a type that
+    /// TF-07/PR25 replaces outright.
     ///
     /// Returns whether it actually wrote (R54): `false` for an untracked or
     /// no-cadence contact — a rejection, not a silent no-op a caller could

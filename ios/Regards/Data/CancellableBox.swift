@@ -1,10 +1,19 @@
 import Foundation
 import GRDB
 
-/// See `GRDBContactRepository.observeTracked()`'s doc comment for why this
-/// exists instead of a file-wide `@preconcurrency import GRDB`, and for why
-/// `set`/`cancel` can each be called before the other. Split into its own
-/// file to keep `Repositories.swift` under the lint length limit.
+/// See `GRDBContactRepository.observeTracked()`'s doc comment for why
+/// `set`/`cancel` can each be called before the other — it assigns
+/// `onTermination` before `start(...)` precisely so a synchronous `onError`
+/// is safe. Split into its own file to keep `Repositories.swift` under the
+/// lint length limit.
+///
+/// Why this box rather than a file-wide `@preconcurrency import GRDB`
+/// (stated here rather than cross-referenced: that explanation was never
+/// actually written at the other end, staged review round 13): the import
+/// attribute would only silence the `Sendable` diagnostic on GRDB's
+/// `DatabaseCancellable`. The race described below is real regardless of
+/// what the compiler is told, so suppressing the warning would hide it
+/// instead of closing it.
 ///
 /// `NSLock`-guarded, not "safety through cardinality" alone: `set(_:)` runs
 /// synchronously inside the `AsyncStream` builder closure, and `cancel()` can
