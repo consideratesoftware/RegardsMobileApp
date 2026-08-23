@@ -9,8 +9,8 @@ For a pull-request review, invoke `/pr-review` from
 must stay equivalent to their `.codex/agents/` adapters; CI enforces that with
 `scripts/check-review-agent-parity.sh`.
 
-Delivery agents live alongside the reviewers and are Claude Code only:
-`tf-lane` (one per work item, in its own linked worktree), `ios-gate` (the
-mechanical gates), and `tf-repair` (red checks and review blockers). `/lanes`
-runs the `TESTFLIGHT_PLAN.md` restart protocol with up to three lanes in
-parallel. The parity check covers only the `pr-*` reviewers.
+The delivery side is an engineering org of Claude-only agents described in
+`ENGINEERING_ORG.md`: `/org` is the engineering manager; `tech-lead`,
+`senior-ios-engineer`, `ios-engineer`, `qa-engineer`, `verifier`,
+`build-engineer`, `on-call-engineer`, `release-manager`, and `tech-writer`
+are the roles. The parity check covers only the `pr-*` reviewers.

@@ -9,7 +9,7 @@ The model and tool metadata are adapter-specific. The normalized reviewer
 instructions after that metadata must remain equivalent. Run
 `scripts/check-review-agent-parity.sh` after changing either side; CI runs the
 same check. The check covers only the `pr-*` reviewers; the Claude-only
-delivery agents (`tf-lane`, `ios-gate`, `tf-repair`) have no Codex twin.
+org roles listed in `ENGINEERING_ORG.md` have no Codex twin.
 
 The orchestrators are also equivalent:
 
