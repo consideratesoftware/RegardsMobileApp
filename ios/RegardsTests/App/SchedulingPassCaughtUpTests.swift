@@ -338,4 +338,54 @@ struct SchedulingPassCaughtUpTests {
         #expect(pending.count == 1)
         #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
     }
+
+    /// The half of R59 the round-14 fix missed, found by round 15: the
+    /// compare-and-set only guarded the case where a cadence row already
+    /// existed. With **no row at all** — the normal state before a contact's
+    /// first snooze, since `snooze` is the only thing that writes one —
+    /// `snooze` observed `nil`, `caughtUp`'s transition no-opped against a
+    /// row that wasn't there, and the stale `.pending` write landed
+    /// unopposed, suppressing the contact for seven days right after the
+    /// user marked them caught up.
+    ///
+    /// `caughtUpDuringSnoozeInFlightReadSurvives` above cannot catch this: it
+    /// pre-seeds a pending row precisely so `caughtUp` has something to
+    /// transition. This one seeds nothing, which is the whole point.
+    @Test(
+        "A caught-up with no existing reminder row still defeats a racing snooze",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func caughtUpWithNoExistingRowDefeatsRacingSnooze(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(528), suffix: "r59-nil-state", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        // Deliberately no seeded snooze: the contact has never been snoozed,
+        // so no cadence row exists and `snooze` will observe `nil`.
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+
+        let gate = AsyncGate()
+        let gatedScheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            clock: { now }
+        )
+        let openScheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        async let racingSnooze: Bool = gatedScheduler.snooze(contactId: contact.id)
+        await gate.waitUntilArrived()
+        // `false` — nothing pending was cleared — but it still records the
+        // caught-up, which is what the snooze's compare-and-set fails against.
+        #expect(try await openScheduler.caughtUp(contactId: contact.id) == false)
+        await gate.open()
+
+        #expect(try await racingSnooze == false)
+        // The user-visible property: no pending snooze is left suppressing
+        // this contact for the next seven days.
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
 }

@@ -236,11 +236,39 @@ public actor SchedulingPass {
     /// the race this fixes.
     @discardableResult
     public func caughtUp(contactId: UUID) async throws -> Bool {
-        try await reminders.transitionState(
-            id: Self.cadenceReminderID(contactId: contactId),
-            from: .pending,
-            to: .userCaughtUp
+        let reminderID = Self.cadenceReminderID(contactId: contactId)
+        if try await reminders.transitionState(id: reminderID, from: .pending, to: .userCaughtUp) {
+            return true
+        }
+        // Nothing pending to clear — but "no row at all" is the *normal*
+        // pre-first-snooze state, since `snooze` is the only thing that
+        // writes a cadence row, and leaving it empty reopens R59 (staged
+        // review round 15). A concurrent `snooze` observes `nil`, this
+        // transition no-ops against a row that isn't there, and the snooze's
+        // stale `.pending` write then lands unopposed — suppressing the
+        // contact for seven days immediately after the user marked them
+        // caught up. Recording the caught-up as a real `.userCaughtUp` row
+        // gives that compare-and-set something to fail against: it expected
+        // `nil` and now finds `.userCaughtUp`.
+        let marker = ScheduledReminder(
+            id: reminderID,
+            contactId: contactId,
+            kind: .cadence,
+            scheduledFor: clock(),
+            osNotificationId: Self.cadenceNotificationId(contactId: contactId),
+            state: .userCaughtUp
         )
+        // Conditional on absence, so this can never overwrite a row another
+        // caller transitioned in the meantime.
+        try await reminders.upsert(marker, ifCurrentStateIs: nil)
+        // Still `false`: the return means "cleared a pending snooze", and
+        // this path cleared nothing. That distinction is load-bearing —
+        // `ContactDetailViewModel`/`OverdueViewModel` only call
+        // `restorePendingAfterFailedCaughtUp` when this returns `true`, so
+        // reporting `true` here would have a later failure "restore" a
+        // pending snooze the user never had. The row this writes is
+        // invisible to every `fetchPending`-backed reader by construction.
+        return false
     }
 
     /// The contact's pending cadence reminder's `scheduledFor`, if one
