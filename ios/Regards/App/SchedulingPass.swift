@@ -145,9 +145,8 @@ public actor SchedulingPass {
         // the window") silently reintroduces R59: a caught-up landing during
         // the contact read below would then be part of what this observes,
         // the CAS would match, and the write would revert it.
-        let observedState = try await reminders.state(
-            id: Self.cadenceReminderID(contactId: contactId)
-        )
+        let reminderID = Self.cadenceReminderID(contactId: contactId)
+        let observedState = try await reminders.state(id: reminderID)
         guard let contact = try? await contacts.fetch(id: contactId),
               contact.isActive, contact.tracked, contact.cadenceDays != nil else {
             return false
@@ -156,7 +155,7 @@ public actor SchedulingPass {
         let scheduledFor = calendar.date(byAdding: .day, value: 7, to: now)
             ?? now.addingTimeInterval(7 * 86_400)
         let reminder = ScheduledReminder(
-            id: Self.cadenceReminderID(contactId: contactId),
+            id: reminderID,
             contactId: contactId,
             kind: .cadence,
             scheduledFor: scheduledFor,
@@ -172,7 +171,29 @@ public actor SchedulingPass {
         // caught-up still succeeds: it observes `.userCaughtUp` itself and
         // writes against that, so only an interleaving is rejected, never an
         // ordinary sequence.
-        return try await reminders.upsert(reminder, ifCurrentStateIs: observedState)
+        if try await reminders.upsert(reminder, ifCurrentStateIs: observedState) {
+            return true
+        }
+        // The compare-and-set was rejected, which only means *someone else*
+        // wrote at this id while this call was deciding. Whether that is a
+        // failure depends entirely on who (staged review round 16):
+        //
+        // - Another `snooze` — the two Snooze taps Contact Detail's
+        //   un-gated button makes trivially possible — leaves the row
+        //   `.pending`. The user asked for a snooze and a snooze exists, so
+        //   this is success. Reporting failure here made the screen announce
+        //   "Couldn't snooze <name>" for a request that had actually
+        //   succeeded, the same "screen tells the user something false on a
+        //   success path" class this PR's R56 and R59 fixes already targeted.
+        //   It was a regression introduced by the round-14 CAS itself: the
+        //   previous blind upsert let both callers report success, which for
+        //   snooze-vs-snooze was the correct answer.
+        // - A `caughtUp` leaves `.userCaughtUp`, and that must win (R59).
+        //
+        // Reading the state back distinguishes the two. Nothing else writes
+        // `.pending` at this id, so `.pending` here means "a concurrent
+        // snooze won", not an unrelated state.
+        return try await reminders.state(id: reminderID) == .pending
     }
 
     /// "Caught up" side effect on `SchedulingPass`'s own state (§9's

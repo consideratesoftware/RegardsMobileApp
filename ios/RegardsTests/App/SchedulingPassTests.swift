@@ -80,7 +80,17 @@ struct SchedulingPassTests {
         // precondition), so the async-let bindings type-match that now.
         async let first: Bool = scheduler.snooze(contactId: contact.id)
         async let second: Bool = scheduler.snooze(contactId: contact.id)
-        _ = try await (first, second)
+        let (firstResult, secondResult) = try await (first, second)
+
+        // Both report success, not just one. Discarding these was how the
+        // round-14 compare-and-set shipped a regression through this very
+        // test (staged review round 16): the losing call's CAS is rejected
+        // because the winner moved the row, and `snooze` briefly reported
+        // that as failure — so Contact Detail announced "Couldn't snooze" to
+        // VoiceOver for a snooze that had actually happened. The row-count
+        // assertion below was true throughout and said nothing about it.
+        #expect(firstResult)
+        #expect(secondResult)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
