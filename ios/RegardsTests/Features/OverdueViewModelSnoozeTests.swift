@@ -264,14 +264,21 @@ struct OverdueViewModelSnoozeTests {
         let staleLoad = Task { await viewModel.load() }
         await gate.waitUntilArrived()
 
-        await viewModel.snooze(contactId: contact.id)
-        #expect(viewModel.rows.isEmpty)
-
+        // Run as a Task rather than inline: since round 19 a successful
+        // snooze ends with its own `performLoad()`, which parks at the same
+        // gate the stale load is holding, so awaiting it inline deadlocks.
+        // No scheduler-side gate is used here (unlike the `markCaughtUp`
+        // race test) because `snooze` writes through `upsert`, which has no
+        // gated fake — and the property under test does not need one.
+        let action = Task { await viewModel.snooze(contactId: contact.id) }
         await gate.open()
         await staleLoad.value
-        // No reload of this method's own follows a successful snooze — if
-        // the stale load's stale row won here, nothing else would ever
-        // correct it for the rest of this screen's lifetime.
+        _ = await action.value
+        // Two distinct protections now: the generation bump stops the stale
+        // load applying over the optimistic removal, and the trailing reload
+        // corrects the case round 19 found — a load that starts *after* the
+        // bump and resolves before the write commits, which the bump alone
+        // cannot catch.
         #expect(viewModel.rows.isEmpty)
     }
 }

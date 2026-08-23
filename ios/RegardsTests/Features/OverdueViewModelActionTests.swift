@@ -229,11 +229,20 @@ struct OverdueViewModelActionTests {
         let gatedContacts = GatedFetchTrackedContactRepository(wrapped: baseContacts, gate: gate)
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
+        // Second gate, on the scheduler write — the same shape
+        // `UpcomingViewModelRaceTests` already uses. Needed since round 19
+        // gave `markCaughtUp` a trailing `performLoad()` on success: the
+        // action can no longer be awaited inline, because its own reload
+        // parks at the contacts gate below. Holding it here gives the test a
+        // deterministic point where the optimistic removal has applied but
+        // that reload has not yet run.
+        let schedulerGate = AsyncGate()
+        let gatedReminders = GatedTransitionStateReminderRepository(wrapped: reminders, gate: schedulerGate)
         let viewModel = OverdueViewModel(
             contacts: gatedContacts,
             interactions: interactions,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: gatedContacts, clock: { Self.now }),
+            scheduler: SchedulingPass(reminders: gatedReminders, contacts: gatedContacts, clock: { Self.now }),
             clock: { Self.now }
         )
         await gate.open()
@@ -247,16 +256,23 @@ struct OverdueViewModelActionTests {
         let staleLoad = Task { await viewModel.load() }
         await gate.waitUntilArrived()
 
-        await viewModel.markCaughtUp(contactId: contact.id)
-        // The action's own work (fetch/updateLastInteractedAt/append) never
-        // touches the gated fetchTracked(), so it completes immediately,
-        // independent of the stale load still parked at the gate.
+        let action = Task { await viewModel.markCaughtUp(contactId: contact.id) }
+        // Parked inside `scheduler.caughtUp`: the optimistic removal has
+        // applied, its trailing reload has not run yet.
+        await schedulerGate.waitUntilArrived()
         #expect(viewModel.rows.isEmpty)
 
-        // Release the stale load and let it finish. If the generation bump
-        // didn't happen, this is where the contact would reappear.
+        // Release the stale load while the action is still parked, so the
+        // assertion below is genuinely about the generation bump and not
+        // about the action's own reload having tidied up afterwards. If the
+        // bump didn't happen, this is where the contact reappears.
         await gate.open()
         await staleLoad.value
+        #expect(viewModel.rows.isEmpty, "the stale load must not resurrect the row before the action's own reload")
+
+        // Now let the action finish: its write, then its trailing reload.
+        await schedulerGate.open()
+        _ = await action.value
         #expect(viewModel.rows.isEmpty)
     }
 
@@ -308,5 +324,56 @@ struct OverdueViewModelActionTests {
         try await contacts.upsert(updated)
         let sawEmpty = await waitUntil { viewModel.rows.isEmpty }
         #expect(sawEmpty)
+    }
+
+    /// Round 19's blocker, which the generation bump provably cannot cover.
+    /// `markCaughtUpSurvivesConcurrentInFlightLoad` above pins a load
+    /// already in flight *when the action fires* — the bump invalidates
+    /// that one. This pins a load that starts **after** the bump: it
+    /// carries a newer generation, so it applies legitimately, and if its
+    /// own fetch resolved before the action's write committed it re-adds the
+    /// row from pre-action state. Nothing corrected that, so the contact sat
+    /// in Overdue for the rest of the session.
+    ///
+    /// The fix is the trailing `performLoad()` on the success path, which
+    /// `UpcomingViewModel.markCaughtUp` always had and this one did not —
+    /// the bug was that asymmetry, not a missing mechanism.
+    @Test("A load() starting after the generation bump cannot strand the row in Overdue")
+    func markCaughtUpReloadCorrectsLoadStartedAfterGenerationBump() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let baseContacts = StubContactRepository([contact])
+        let gate = AsyncGate()
+        let gatedContacts = GatedFetchTrackedContactRepository(wrapped: baseContacts, gate: gate)
+        let reminders = StubReminderRepository()
+        let schedulerGate = AsyncGate()
+        let gatedReminders = GatedTransitionStateReminderRepository(wrapped: reminders, gate: schedulerGate)
+        let viewModel = OverdueViewModel(
+            contacts: gatedContacts,
+            interactions: StubInteractionRepository(),
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: gatedReminders, contacts: gatedContacts, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await gate.open()
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        // The action bumps the generation, removes the row optimistically,
+        // then parks before its write commits.
+        let action = Task { await viewModel.markCaughtUp(contactId: contact.id) }
+        await schedulerGate.waitUntilArrived()
+        #expect(viewModel.rows.isEmpty)
+
+        // A reload starting *now* — after the bump, before the write. It
+        // reads the contact as still overdue and puts the row back.
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id],
+                "precondition: a post-bump load legitimately re-adds the row")
+
+        // The action's write then commits and its trailing reload runs,
+        // which is the only thing that can correct the row set now.
+        await schedulerGate.open()
+        _ = await action.value
+        #expect(viewModel.rows.isEmpty, "the trailing reload must clear the row the post-bump load restored")
     }
 }

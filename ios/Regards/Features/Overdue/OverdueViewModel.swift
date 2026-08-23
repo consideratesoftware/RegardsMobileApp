@@ -271,6 +271,17 @@ public final class OverdueViewModel {
         do {
             clearedPendingSnooze = try await scheduler.caughtUp(contactId: contactId)
             try await logging.markCaughtUp(contactId: contactId, at: clock())
+            // Reload on success too, matching `UpcomingViewModel
+            // .markCaughtUp` — which already did, and is why this bug was
+            // only ever reachable here (staged review round 19). The
+            // generation bump above only invalidates a load already in
+            // flight *at that moment*; a load starting after it carries a
+            // newer generation and applies legitimately, and if its own
+            // fetch resolved before the write below committed, it re-adds
+            // the row from pre-action state. With no reload on this path
+            // nothing ever corrected that, leaving the contact stuck in
+            // Overdue for the rest of the session.
+            await performLoad()
             return true
         } catch {
             Self.log.error(
@@ -355,8 +366,15 @@ public final class OverdueViewModel {
             let wrote = try await scheduler.snooze(contactId: contactId)
             if !wrote {
                 Self.log.error("snooze rejected for \(contactId, privacy: .private): contact not eligible")
-                await performLoad()
             }
+            // Unconditional, where this used to reload only on rejection:
+            // the success path has the same staleness hole (staged review
+            // round 19, and see `markCaughtUp` above for the mechanism).
+            // The per-contact lock in `SchedulingPass` widened the window by
+            // letting the write queue behind another mutation for this
+            // contact, so a reload has longer to resolve against pre-write
+            // state.
+            await performLoad()
             return wrote
         } catch {
             Self.log.error(
