@@ -202,7 +202,7 @@ struct UpcomingRow: View {
         Button(action: onTap) {
             AccessibilityAdaptiveLayout {
                 HStack(spacing: 12) {
-                    Avatar(name: row.name, size: 40)
+                    Avatar(name: row.name, size: 40, showsInitials: false)
                     VStack(alignment: .leading, spacing: 2) {
                         nameAndTag
                         occasion
@@ -215,7 +215,7 @@ struct UpcomingRow: View {
                 }
             } accessibility: {
                 HStack(alignment: .top, spacing: 12) {
-                    Avatar(name: row.name, size: 40)
+                    Avatar(name: row.name, size: 40, showsInitials: false)
                     VStack(alignment: .leading, spacing: 4) {
                         nameAndTag
                         occasion

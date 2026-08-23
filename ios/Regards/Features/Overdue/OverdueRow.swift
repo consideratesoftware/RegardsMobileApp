@@ -32,7 +32,7 @@ struct OverdueRow: View {
         Button(action: onTapContact) {
             AccessibilityAdaptiveLayout {
                 HStack(spacing: 10) {
-                    Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle)
+                    Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle, showsInitials: false)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.name)
                             .font(RegardsFont.rowTitle())
@@ -50,7 +50,7 @@ struct OverdueRow: View {
                 }
             } accessibility: {
                 HStack(alignment: .top, spacing: 10) {
-                    Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle)
+                    Avatar(name: row.name, size: 40, hasAccentRing: isInnerCircle, showsInitials: false)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.name)
                             .font(RegardsFont.rowTitle())

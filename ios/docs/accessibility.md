@@ -431,6 +431,40 @@ was used to confirm the original Overdue row-crowding bug this round
 started from, and it is the shape of usage this category is suited to on
 this toolchain — not a standing, always-on gate.
 
+## XCUITest cannot drive swipe actions at accessibility5
+
+The swipe redesign's row actions (swipe right = Caught up, swipe left =
+Snooze) are covered end to end at default text size by
+`testOverdueRowActionsAreWiredAndLabeled` and
+`testUpcomingRowActionIsWiredAndLabeled`, which reveal the action *and*
+activate it. The two accessibility5 equivalents are `XCTSkip`ped, and this
+is why.
+
+**The product behaviour is correct.** Verified on device 2026-08-22, build
+`9743193` on "Comm Link 17" (iPhone 17 Pro, iOS 26): at accessibility5,
+after scrolling the Overdue list, a real finger swiping right both reveals
+the Caught up action and completes it.
+
+**What fails is the synthetic gesture.** Once a scroll has happened at that
+text size, XCUITest's swipe never triggers the reveal — reproduced across
+partial drags, full swipes, absolute coordinates, added settle delays,
+press-and-hold, and near-full-width drags, on both list screens, while the
+identical gesture at default size with no scroll succeeds. Unproven but
+consistent hypothesis: the `List`'s scroll recogniser stays armed and
+swallows the horizontal drag.
+
+**Why skipped rather than deleted or left red.** Deleted, the intent
+disappears and nobody re-checks whether a later OS makes it drivable.
+Left red, it joins the set of failures everyone knows about and stops
+reading — which is how a real regression hides. Skipped, it reports as
+skipped, carries its reason, and can be un-skipped in one line.
+
+**What this costs.** Nothing verifies automatically that the row actions
+stay revealable at accessibility5; a regression there would be caught only
+by the manual smoke. That gap is real and is the reason this section names
+the device, build, and date — so the next person can tell how stale the
+evidence is rather than assuming it still holds.
+
 ## Test patterns
 
 How you wait for a UI element matters as much as which element you wait for.
