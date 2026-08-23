@@ -112,5 +112,37 @@ struct GatedTransitionStateReminderRepository: ReminderRepository {
         await gate.wait()
         return try await wrapped.transitionState(id: id, from: from, to: to)
     }
+    func state(id: UUID) async throws -> ReminderState? { try await wrapped.state(id: id) }
+    @discardableResult
+    func upsert(_ reminder: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) async throws -> Bool {
+        try await wrapped.upsert(reminder, ifCurrentStateIs: expectedState)
+    }
     func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
+}
+
+/// Holds `fetch(id:)` open. `GatedFetchTrackedContactRepository` above gates
+/// the *list* read a screen load makes; this gates the *single-contact* read
+/// `SchedulingPass.snooze` makes for its R54 precondition, which is the
+/// suspension R59's caught-up race interleaves at. Lets a test put a
+/// `caughtUp` inside that exact window instead of hoping a real race
+/// reproduces.
+struct GatedFetchByIDContactRepository: ContactRepository {
+    let wrapped: any ContactRepository
+    let gate: AsyncGate
+
+    func fetchAll() async throws -> [Contact] { try await wrapped.fetchAll() }
+    func fetchTracked() async throws -> [Contact] { try await wrapped.fetchTracked() }
+    func fetch(id: UUID) async throws -> Contact? {
+        await gate.wait()
+        return try await wrapped.fetch(id: id)
+    }
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        try await wrapped.fetchMembers(ofGroup: groupId)
+    }
+    func upsert(_ contact: Contact) async throws { try await wrapped.upsert(contact) }
+    func archive(id: UUID, at: Date) async throws { try await wrapped.archive(id: id, at: at) }
+    func observeTracked() async -> AsyncStream<[Contact]> { await wrapped.observeTracked() }
+    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
+        try await wrapped.updateReconciledFields(id: id, fields: fields)
+    }
 }

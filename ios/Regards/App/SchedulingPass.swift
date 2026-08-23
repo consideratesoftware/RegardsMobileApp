@@ -19,10 +19,15 @@ import Foundation
 /// only" framing above (R54, staged review): `snooze(contactId:)` needs to
 /// know a contact is `tracked` with a `cadenceDays` set before it writes,
 /// and that precondition has to live here, not only at the callers that
-/// happen to exist today. `OverdueViewModel.snooze`/`ContactDetailViewModel
-/// .snooze` both offer Snooze only for a row already computed as overdue,
-/// which requires `tracked && cadenceDays != nil` by construction — so this
-/// precondition is unreachable through either shipped caller. But
+/// happen to exist today. `OverdueViewModel.snooze` offers
+/// Snooze only for a row already computed as overdue, which requires
+/// `tracked && cadenceDays != nil` by construction.
+/// `ContactDetailViewModel.snooze` does **not**: that screen gates its
+/// Snooze button on `tracked && cadenceDays != nil` directly and says
+/// nothing about overdue-ness, so the precondition is reachable there and is
+/// not the dead code an earlier version of this comment claimed (staged
+/// review round 14 — the claim was load-bearing for R54's stated rationale,
+/// so it is corrected rather than dropped). Separately,
 /// `ContactDetailViewModel.snooze()` is `public` and ungated beyond an
 /// `isActive` check; a future caller reaching it some other way (a
 /// notification action invoking the view model directly, say) would still
@@ -92,18 +97,25 @@ public actor SchedulingPass {
     /// precondition read above doesn't change that, since it never informs
     /// *which* id the write below uses, only *whether* it happens at all.
     ///
-    /// That scoping is deliberate: the claim covers snooze-vs-snooze only,
-    /// and does **not** extend to snooze-vs-`caughtUp` (R59). The
+    /// That scoping is deliberate: the claim covers snooze-vs-snooze only.
+    /// Snooze-vs-`caughtUp` was a separate problem and is **closed** by the
+    /// compare-and-set write below (R59, staged review round 14). The
     /// `contacts.fetch(id:)` below is a genuine suspension point inside this
-    /// actor, so a `caughtUp(contactId:)` for the same contact can commit
+    /// actor, so a `caughtUp(contactId:)` for the same contact could commit
     /// its `.userCaughtUp` transition inside that window and then be
-    /// overwritten by this method's `.pending` upsert at the same canonical
-    /// id — silently undoing the user's caught-up for seven days. Left open
-    /// on purpose (R59): both shipped callers are main-actor row taps on a
-    /// row that is replaced the moment either action lands, so nothing
-    /// reaches it today, and closing it properly needs a conditional
-    /// (compare-and-set) write at the repository layer inside a type that
-    /// TF-07/PR25 replaces outright.
+    /// overwritten by a blind `.pending` upsert at the same canonical id —
+    /// silently undoing the user's caught-up for seven days.
+    ///
+    /// A previous revision deferred this on the claim that no shipped caller
+    /// could reach it. **That claim was wrong**, and two independent
+    /// reviewers each found a path: Contact Detail's Caught up and Snooze
+    /// buttons are both permanently visible with no busy-gating, so a second
+    /// tap races an in-flight first one; and an Overdue snooze followed by
+    /// an Upcoming/Detail caught-up for the same contact races the identical
+    /// actor and id across screens, since switching tabs cancels nothing.
+    /// The mistake was generalising "a row that disappears when tapped" from
+    /// the two list screens to Contact Detail, which is not a list and whose
+    /// buttons do not disappear.
     ///
     /// Returns whether it actually wrote (R54): `false` for an untracked or
     /// no-cadence contact — a rejection, not a silent no-op a caller could
@@ -125,6 +137,17 @@ public actor SchedulingPass {
     /// to trust.
     @discardableResult
     public func snooze(contactId: UUID) async throws -> Bool {
+        // Observed *first*, before any other suspension in this method. This
+        // is the state the user's Snooze intent was formed against, and the
+        // compare-and-set at the end rejects the write if anything changed
+        // it since — which is exactly a `caughtUp` landing mid-flight.
+        // Reading it later instead (say, just before the write, to "narrow
+        // the window") silently reintroduces R59: a caught-up landing during
+        // the contact read below would then be part of what this observes,
+        // the CAS would match, and the write would revert it.
+        let observedState = try await reminders.state(
+            id: Self.cadenceReminderID(contactId: contactId)
+        )
         guard let contact = try? await contacts.fetch(id: contactId),
               contact.isActive, contact.tracked, contact.cadenceDays != nil else {
             return false
@@ -140,8 +163,16 @@ public actor SchedulingPass {
             osNotificationId: Self.cadenceNotificationId(contactId: contactId),
             state: .pending
         )
-        try await reminders.upsert(reminder)
-        return true
+        // Compare-and-set against the state observed above, not a blind
+        // upsert (R59). If a `caughtUp` for this contact commits
+        // `.userCaughtUp` between that observation and this write, the
+        // states no longer match and the write is refused — the caught-up
+        // stands and Snooze reports failure, rather than the caught-up being
+        // silently reverted for seven days. A snooze taken *after* a
+        // caught-up still succeeds: it observes `.userCaughtUp` itself and
+        // writes against that, so only an interleaving is rejected, never an
+        // ordinary sequence.
+        return try await reminders.upsert(reminder, ifCurrentStateIs: observedState)
     }
 
     /// "Caught up" side effect on `SchedulingPass`'s own state (§9's

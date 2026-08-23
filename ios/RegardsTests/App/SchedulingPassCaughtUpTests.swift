@@ -252,4 +252,90 @@ struct SchedulingPassCaughtUpTests {
         #expect(afterRestore[0].scheduledFor == freshSnooze.scheduledFor)
         #expect(afterRestore[0].scheduledFor == secondNow.addingTimeInterval(7 * 86_400))
     }
+
+    /// R59 regression (staged review round 14). Deterministic, not a hope
+    /// that a real race reproduces: `GatedFetchByIDContactRepository` holds
+    /// `snooze`'s R54 precondition read open, the test lands a full
+    /// `caughtUp` inside that window, then releases it.
+    ///
+    /// Before the compare-and-set fix, `snooze` resumed and blindly upserted
+    /// `.pending` over the `.userCaughtUp` row at the same canonical id,
+    /// silently reverting the user's caught-up for seven days. Now the write
+    /// is conditional on the state `snooze` observed *before* it suspended,
+    /// so the interleaving is rejected: `caughtUp` stands and `snooze`
+    /// reports `false`.
+    ///
+    /// This also pins the ordering inside `snooze` itself, which is subtle
+    /// enough to get wrong twice: the state observation has to happen before
+    /// the gated contact read. Observing it afterwards makes the CAS agree
+    /// with the caught-up it was supposed to detect, and this test fails.
+    @Test(
+        "A caught-up landing inside snooze's in-flight precondition read is not reverted",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func caughtUpDuringSnoozeInFlightReadSurvives(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(526), suffix: "r59-interleave", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let openScheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+        // A real pending snooze first, so `caughtUp` has a row to transition.
+        #expect(try await openScheduler.snooze(contactId: contact.id))
+        // Capture the row's id from the repository rather than reaching for
+        // `SchedulingPass.cadenceReminderID`, which is private and should
+        // stay that way for one assertion's sake.
+        let reminderID = try #require(
+            await repositories.reminders.fetchPending(forContact: contact.id).first
+        ).id
+
+        let gate = AsyncGate()
+        let gatedScheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            clock: { now }
+        )
+        async let racingSnooze: Bool = gatedScheduler.snooze(contactId: contact.id)
+        // Only proceed once `snooze` has genuinely reached the gated read.
+        await gate.waitUntilArrived()
+        #expect(try await openScheduler.caughtUp(contactId: contact.id))
+        await gate.open()
+
+        #expect(try await racingSnooze == false)
+        #expect(try await repositories.reminders.state(id: reminderID) == .userCaughtUp)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
+    /// The other half of the same rule, and the reason the fix is a
+    /// compare-and-set against the observed state rather than a blanket
+    /// "never overwrite `.userCaughtUp`": an *ordinary* snooze taken after a
+    /// caught-up has already settled must still succeed. It observes
+    /// `.userCaughtUp` itself, so nothing changed under it and the write
+    /// goes through. Only interleavings are rejected, never sequences.
+    @Test(
+        "A snooze taken after a settled caught-up still writes",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeAfterSettledCaughtUpStillWrites(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(527), suffix: "r59-sequence", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        #expect(try await scheduler.snooze(contactId: contact.id))
+        #expect(try await scheduler.caughtUp(contactId: contact.id))
+        #expect(try await scheduler.snooze(contactId: contact.id))
+
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.count == 1)
+        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
+    }
 }
