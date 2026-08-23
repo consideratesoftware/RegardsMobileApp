@@ -148,24 +148,13 @@ public actor SchedulingPass {
     /// *which* id the write below uses, only *whether* it happens at all.
     ///
     /// That scoping is deliberate: the claim covers snooze-vs-snooze only.
-    /// Snooze-vs-`caughtUp` was a separate problem and is **closed** by the
-    /// compare-and-set write below (R59, staged review round 14). The
-    /// `contacts.fetch(id:)` below is a genuine suspension point inside this
-    /// actor, so a `caughtUp(contactId:)` for the same contact could commit
-    /// its `.userCaughtUp` transition inside that window and then be
-    /// overwritten by a blind `.pending` upsert at the same canonical id —
-    /// silently undoing the user's caught-up for seven days.
-    ///
-    /// A previous revision deferred this on the claim that no shipped caller
-    /// could reach it. **That claim was wrong**, and two independent
-    /// reviewers each found a path: Contact Detail's Caught up and Snooze
-    /// buttons are both permanently visible with no busy-gating, so a second
-    /// tap races an in-flight first one; and an Overdue snooze followed by
-    /// an Upcoming/Detail caught-up for the same contact races the identical
-    /// actor and id across screens, since switching tabs cancels nothing.
-    /// The mistake was generalising "a row that disappears when tapped" from
-    /// the two list screens to Contact Detail, which is not a list and whose
-    /// buttons do not disappear.
+    /// Snooze-vs-`caughtUp` is a different problem, closed by the
+    /// per-contact lock this method takes — not by anything in the write
+    /// itself. See §19 R59 for how that was arrived at over four review
+    /// rounds; the invariant a reader needs here is just that no other
+    /// mutation for this contact can run between the read below and the
+    /// write, so the write cannot apply a decision someone else has since
+    /// invalidated.
     ///
     /// Returns whether it actually wrote (R54): `false` for an untracked or
     /// no-cadence contact — a rejection, not a silent no-op a caller could
@@ -280,13 +269,11 @@ public actor SchedulingPass {
     public func caughtUp(contactId: UUID) async throws -> Bool {
         await lock(contactId)
         defer { unlock(contactId) }
-        // Back to a bare transition. Round 15 had this also write a
-        // `.userCaughtUp` marker row when none existed, purely so a racing
-        // `snooze`'s compare-and-set had something to fail against. The lock
-        // removes that need, and the marker brought a defect with it: unlike
-        // `snooze`, this method has no tracked/cadence/`isActive`
-        // precondition, so it could write an orphan `.cadence` row for an
-        // untracked or archived contact (staged review round 17).
+        // A bare transition, deliberately: this method has no
+        // tracked/cadence/`isActive` precondition, so anything here that
+        // *inserts* rather than transitions can write an orphan `.cadence`
+        // row for an untracked or archived contact. An earlier revision did
+        // exactly that (§19 R59).
         return try await reminders.transitionState(
             id: Self.cadenceReminderID(contactId: contactId),
             from: .pending,

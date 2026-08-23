@@ -7,10 +7,8 @@ import GRDB
 /// is safe. Split into its own file to keep `Repositories.swift` under the
 /// lint length limit.
 ///
-/// Why this box rather than a file-wide `@preconcurrency import GRDB`
-/// (stated here rather than cross-referenced: that explanation was never
-/// actually written at the other end, staged review round 13): the import
-/// attribute would only silence the `Sendable` diagnostic on GRDB's
+/// Why this box rather than a file-wide `@preconcurrency import GRDB`: the
+/// import attribute would only silence the `Sendable` diagnostic on GRDB's
 /// `DatabaseCancellable`. The race described below is real regardless of
 /// what the compiler is told, so suppressing the warning would hide it
 /// instead of closing it.
