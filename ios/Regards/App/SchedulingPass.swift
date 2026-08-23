@@ -42,6 +42,56 @@ public actor SchedulingPass {
     private let clock: @Sendable () -> Date
     private let calendar: Calendar
 
+    /// Contacts with a mutation in flight, and who is queued behind them.
+    ///
+    /// **Why this exists (R59, staged review rounds 13–17).** Every mutation
+    /// here suspends partway through — a repository read, then a write — and
+    /// an actor permits reentrancy at every suspension. Four consecutive
+    /// review rounds found a different pair of operations interleaving at
+    /// one of those points: a `caughtUp` landing inside `snooze`'s
+    /// precondition read and being overwritten; the same with no row yet
+    /// written; a losing `snooze` reporting failure; and the mirror, a
+    /// `caughtUp` losing to a `snooze` that committed first. Each was closed
+    /// with a narrower compare-and-set, and each fix exposed the next pair.
+    /// Serialising per contact closes the class instead of the instance: no
+    /// two mutations for one contact overlap, so no decision made before a
+    /// suspension can be applied after someone else's write.
+    ///
+    /// **Load-bearing premise: one instance.** These locks are actor state,
+    /// so they only serialise callers sharing this `SchedulingPass`.
+    /// `AppEnvironment` holds exactly one (`public let scheduler`) and every
+    /// screen is handed that same one. Constructing a second in production
+    /// would silently void the guarantee without failing anything.
+    private var busyContacts: Set<UUID> = []
+    private var lockWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
+
+    /// Suspends until no other mutation for `contactId` is in flight.
+    /// Always pair with `unlock` via `defer`.
+    private func lock(_ contactId: UUID) async {
+        if busyContacts.contains(contactId) {
+            await withCheckedContinuation { continuation in
+                lockWaiters[contactId, default: []].append(continuation)
+            }
+            // Resumed by `unlock`, which hands the lock over directly rather
+            // than releasing it — so it is still held on our behalf here,
+            // and no third caller can slip in between.
+            return
+        }
+        busyContacts.insert(contactId)
+    }
+
+    private func unlock(_ contactId: UUID) {
+        guard var queue = lockWaiters[contactId], !queue.isEmpty else {
+            busyContacts.remove(contactId)
+            return
+        }
+        let next = queue.removeFirst()
+        lockWaiters[contactId] = queue.isEmpty ? nil : queue
+        // Hand off without clearing `busyContacts`: the resumed waiter owns
+        // the lock immediately.
+        next.resume()
+    }
+
     public init(
         reminders: any ReminderRepository,
         contacts: any ContactRepository,
@@ -137,16 +187,8 @@ public actor SchedulingPass {
     /// to trust.
     @discardableResult
     public func snooze(contactId: UUID) async throws -> Bool {
-        // Observed *first*, before any other suspension in this method. This
-        // is the state the user's Snooze intent was formed against, and the
-        // compare-and-set at the end rejects the write if anything changed
-        // it since — which is exactly a `caughtUp` landing mid-flight.
-        // Reading it later instead (say, just before the write, to "narrow
-        // the window") silently reintroduces R59: a caught-up landing during
-        // the contact read below would then be part of what this observes,
-        // the CAS would match, and the write would revert it.
-        let reminderID = Self.cadenceReminderID(contactId: contactId)
-        let observedState = try await reminders.state(id: reminderID)
+        await lock(contactId)
+        defer { unlock(contactId) }
         guard let contact = try? await contacts.fetch(id: contactId),
               contact.isActive, contact.tracked, contact.cadenceDays != nil else {
             return false
@@ -155,45 +197,24 @@ public actor SchedulingPass {
         let scheduledFor = calendar.date(byAdding: .day, value: 7, to: now)
             ?? now.addingTimeInterval(7 * 86_400)
         let reminder = ScheduledReminder(
-            id: reminderID,
+            id: Self.cadenceReminderID(contactId: contactId),
             contactId: contactId,
             kind: .cadence,
             scheduledFor: scheduledFor,
             osNotificationId: Self.cadenceNotificationId(contactId: contactId),
             state: .pending
         )
-        // Compare-and-set against the state observed above, not a blind
-        // upsert (R59). If a `caughtUp` for this contact commits
-        // `.userCaughtUp` between that observation and this write, the
-        // states no longer match and the write is refused — the caught-up
-        // stands and Snooze reports failure, rather than the caught-up being
-        // silently reverted for seven days. A snooze taken *after* a
-        // caught-up still succeeds: it observes `.userCaughtUp` itself and
-        // writes against that, so only an interleaving is rejected, never an
-        // ordinary sequence.
-        if try await reminders.upsert(reminder, ifCurrentStateIs: observedState) {
-            return true
-        }
-        // The compare-and-set was rejected, which only means *someone else*
-        // wrote at this id while this call was deciding. Whether that is a
-        // failure depends entirely on who (staged review round 16):
-        //
-        // - Another `snooze` — the two Snooze taps Contact Detail's
-        //   un-gated button makes trivially possible — leaves the row
-        //   `.pending`. The user asked for a snooze and a snooze exists, so
-        //   this is success. Reporting failure here made the screen announce
-        //   "Couldn't snooze <name>" for a request that had actually
-        //   succeeded, the same "screen tells the user something false on a
-        //   success path" class this PR's R56 and R59 fixes already targeted.
-        //   It was a regression introduced by the round-14 CAS itself: the
-        //   previous blind upsert let both callers report success, which for
-        //   snooze-vs-snooze was the correct answer.
-        // - A `caughtUp` leaves `.userCaughtUp`, and that must win (R59).
-        //
-        // Reading the state back distinguishes the two. Nothing else writes
-        // `.pending` at this id, so `.pending` here means "a concurrent
-        // snooze won", not an unrelated state.
-        return try await reminders.state(id: reminderID) == .pending
+        // A plain upsert again, deliberately. Rounds 14–16 made this a
+        // compare-and-set against state observed before the suspension
+        // above; the lock makes that redundant, because nothing else can
+        // touch this contact's row between the read and this write. The CAS
+        // also cost two blockers of its own — a lost race reported as a
+        // failed snooze, and a read-back that could not tell a racing snooze
+        // from `restorePendingAfterFailedCaughtUp`. Simpler is now also
+        // safer; do not reintroduce the conditional write without first
+        // removing the lock.
+        try await reminders.upsert(reminder)
+        return true
     }
 
     /// "Caught up" side effect on `SchedulingPass`'s own state (§9's
@@ -257,39 +278,20 @@ public actor SchedulingPass {
     /// the race this fixes.
     @discardableResult
     public func caughtUp(contactId: UUID) async throws -> Bool {
-        let reminderID = Self.cadenceReminderID(contactId: contactId)
-        if try await reminders.transitionState(id: reminderID, from: .pending, to: .userCaughtUp) {
-            return true
-        }
-        // Nothing pending to clear — but "no row at all" is the *normal*
-        // pre-first-snooze state, since `snooze` is the only thing that
-        // writes a cadence row, and leaving it empty reopens R59 (staged
-        // review round 15). A concurrent `snooze` observes `nil`, this
-        // transition no-ops against a row that isn't there, and the snooze's
-        // stale `.pending` write then lands unopposed — suppressing the
-        // contact for seven days immediately after the user marked them
-        // caught up. Recording the caught-up as a real `.userCaughtUp` row
-        // gives that compare-and-set something to fail against: it expected
-        // `nil` and now finds `.userCaughtUp`.
-        let marker = ScheduledReminder(
-            id: reminderID,
-            contactId: contactId,
-            kind: .cadence,
-            scheduledFor: clock(),
-            osNotificationId: Self.cadenceNotificationId(contactId: contactId),
-            state: .userCaughtUp
+        await lock(contactId)
+        defer { unlock(contactId) }
+        // Back to a bare transition. Round 15 had this also write a
+        // `.userCaughtUp` marker row when none existed, purely so a racing
+        // `snooze`'s compare-and-set had something to fail against. The lock
+        // removes that need, and the marker brought a defect with it: unlike
+        // `snooze`, this method has no tracked/cadence/`isActive`
+        // precondition, so it could write an orphan `.cadence` row for an
+        // untracked or archived contact (staged review round 17).
+        return try await reminders.transitionState(
+            id: Self.cadenceReminderID(contactId: contactId),
+            from: .pending,
+            to: .userCaughtUp
         )
-        // Conditional on absence, so this can never overwrite a row another
-        // caller transitioned in the meantime.
-        try await reminders.upsert(marker, ifCurrentStateIs: nil)
-        // Still `false`: the return means "cleared a pending snooze", and
-        // this path cleared nothing. That distinction is load-bearing —
-        // `ContactDetailViewModel`/`OverdueViewModel` only call
-        // `restorePendingAfterFailedCaughtUp` when this returns `true`, so
-        // reporting `true` here would have a later failure "restore" a
-        // pending snooze the user never had. The row this writes is
-        // invisible to every `fetchPending`-backed reader by construction.
-        return false
     }
 
     /// The contact's pending cadence reminder's `scheduledFor`, if one
@@ -354,6 +356,10 @@ public actor SchedulingPass {
     /// compare-and-set above prevents that attempt from doing damage, but
     /// the caller-side check stays the first line of defense.
     public func restorePendingAfterFailedCaughtUp(contactId: UUID) async throws {
+        // Serialised for the same reason: this writes `.pending` at the very
+        // id `snooze` and `caughtUp` contend over.
+        await lock(contactId)
+        defer { unlock(contactId) }
         try await reminders.transitionState(
             id: Self.cadenceReminderID(contactId: contactId),
             from: .userCaughtUp,

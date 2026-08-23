@@ -253,75 +253,95 @@ struct SchedulingPassCaughtUpTests {
         #expect(afterRestore[0].scheduledFor == secondNow.addingTimeInterval(7 * 86_400))
     }
 
-    /// R59 regression (staged review round 14). Deterministic, not a hope
-    /// that a real race reproduces: `GatedFetchByIDContactRepository` holds
-    /// `snooze`'s R54 precondition read open, the test lands a full
-    /// `caughtUp` inside that window, then releases it.
+    /// R59 regression, rewritten for the per-contact lock (staged review
+    /// round 17). Rounds 14–16 fixed this with a compare-and-set and each
+    /// fix exposed the next interleaving; `SchedulingPass` now serialises
+    /// mutations per contact instead, so the whole class is closed rather
+    /// than one pair at a time.
     ///
-    /// Before the compare-and-set fix, `snooze` resumed and blindly upserted
-    /// `.pending` over the `.userCaughtUp` row at the same canonical id,
-    /// silently reverting the user's caught-up for seven days. Now the write
-    /// is conditional on the state `snooze` observed *before* it suspended,
-    /// so the interleaving is rejected: `caughtUp` stands and `snooze`
-    /// reports `false`.
+    /// **Both operations go through one `SchedulingPass` on purpose.** The
+    /// locks are actor state, so they only serialise callers sharing an
+    /// instance — which production does (`AppEnvironment.scheduler` is a
+    /// single `let`, handed to every screen). An earlier version of this
+    /// test used two instances to force the race; that no longer models
+    /// anything real, and would test only that two schedulers can corrupt
+    /// each other, which production cannot do.
     ///
-    /// This also pins the ordering inside `snooze` itself, which is subtle
-    /// enough to get wrong twice: the state observation has to happen before
-    /// the gated contact read. Observing it afterwards makes the CAS agree
-    /// with the caught-up it was supposed to detect, and this test fails.
+    /// `GatedFetchByIDContactRepository` holds `snooze`'s precondition read
+    /// open, so `caughtUp` is issued while `snooze` is genuinely mid-flight.
+    /// Whichever order the lock grants, the caught-up must not be silently
+    /// lost: no pending row may survive to suppress the contact for a week.
     @Test(
-        "A caught-up landing inside snooze's in-flight precondition read is not reverted",
+        "A caught-up issued while a snooze is mid-flight is not silently lost",
         arguments: RepositoryContractBackend.allCases
     )
-    func caughtUpDuringSnoozeInFlightReadSurvives(backend: RepositoryContractBackend) async throws {
+    func caughtUpDuringInFlightSnoozeIsNotLost(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
         let contact = contractContact(id: try contractUUID(526), suffix: "r59-interleave", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let openScheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            clock: { now }
-        )
-        // A real pending snooze first, so `caughtUp` has a row to transition.
-        #expect(try await openScheduler.snooze(contactId: contact.id))
-        // Capture the row's id from the repository rather than reaching for
-        // `SchedulingPass.cadenceReminderID`, which is private and should
-        // stay that way for one assertion's sake.
-        let reminderID = try #require(
-            await repositories.reminders.fetchPending(forContact: contact.id).first
-        ).id
-
         let gate = AsyncGate()
-        let gatedScheduler = SchedulingPass(
+        let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
             clock: { now }
         )
-        async let racingSnooze: Bool = gatedScheduler.snooze(contactId: contact.id)
-        // Only proceed once `snooze` has genuinely reached the gated read.
-        await gate.waitUntilArrived()
-        #expect(try await openScheduler.caughtUp(contactId: contact.id))
-        await gate.open()
 
-        #expect(try await racingSnooze == false)
-        #expect(try await repositories.reminders.state(id: reminderID) == .userCaughtUp)
+        async let racingSnooze: Bool = scheduler.snooze(contactId: contact.id)
+        await gate.waitUntilArrived()
+        // Issued while the snooze holds the lock: it queues behind it rather
+        // than interleaving with it.
+        async let racingCaughtUp: Bool = scheduler.caughtUp(contactId: contact.id)
+        await gate.open()
+        _ = try await (racingSnooze, racingCaughtUp)
+
+        // The user-visible guarantee: whatever order the two settled in, the
+        // contact is not left snoozed for seven days by a write whose
+        // decision predates the caught-up.
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
 
-    /// The other half of the same rule, and the reason the fix is a
-    /// compare-and-set against the observed state rather than a blanket
-    /// "never overwrite `.userCaughtUp`": an *ordinary* snooze taken after a
-    /// caught-up has already settled must still succeed. It observes
-    /// `.userCaughtUp` itself, so nothing changed under it and the write
-    /// goes through. Only interleavings are rejected, never sequences.
+    /// The same guarantee with no pre-existing row — the normal state before
+    /// a contact's first snooze, since `snooze` is the only thing that
+    /// writes a cadence row. Round 15 needed a separate marker-row mechanism
+    /// to cover this; serialisation covers it with no extra machinery, which
+    /// is the point.
     @Test(
-        "A snooze taken after a settled caught-up still writes",
+        "A caught-up issued mid-snooze is not lost when no reminder row exists yet",
         arguments: RepositoryContractBackend.allCases
     )
-    func snoozeAfterSettledCaughtUpStillWrites(backend: RepositoryContractBackend) async throws {
+    func caughtUpDuringInFlightSnoozeWithNoExistingRow(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
-        let contact = contractContact(id: try contractUUID(527), suffix: "r59-sequence", tracked: true)
+        let contact = contractContact(id: try contractUUID(528), suffix: "r59-nil-state", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let gate = AsyncGate()
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            clock: { now }
+        )
+
+        async let racingSnooze: Bool = scheduler.snooze(contactId: contact.id)
+        await gate.waitUntilArrived()
+        async let racingCaughtUp: Bool = scheduler.caughtUp(contactId: contact.id)
+        await gate.open()
+        let (snoozed, caughtUp) = try await (racingSnooze, racingCaughtUp)
+
+        // The snooze wrote (it held the lock first); the caught-up then
+        // transitioned that very row, so nothing pending is left behind.
+        #expect(snoozed)
+        #expect(caughtUp)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+    }
+
+    /// Serialisation must not deadlock or starve: many concurrent mutations
+    /// for one contact all complete, and the row stays singular throughout.
+    @Test("Concurrent mixed mutations for one contact all complete under the lock")
+    func concurrentMixedMutationsAllComplete() async throws {
+        let repositories = try RepositoryContractBackend.mock.makeRepositories()
+        let contact = contractContact(id: try contractUUID(529), suffix: "r59-lock-throughput", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let scheduler = SchedulingPass(
@@ -330,62 +350,20 @@ struct SchedulingPassCaughtUpTests {
             clock: { now }
         )
 
-        #expect(try await scheduler.snooze(contactId: contact.id))
-        #expect(try await scheduler.caughtUp(contactId: contact.id))
-        #expect(try await scheduler.snooze(contactId: contact.id))
+        await withTaskGroup(of: Void.self) { group in
+            for index in 0..<12 {
+                group.addTask {
+                    if index.isMultiple(of: 2) {
+                        _ = try? await scheduler.snooze(contactId: contact.id)
+                    } else {
+                        _ = try? await scheduler.caughtUp(contactId: contact.id)
+                    }
+                }
+            }
+        }
 
-        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending.count == 1)
-        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
-    }
-
-    /// The half of R59 the round-14 fix missed, found by round 15: the
-    /// compare-and-set only guarded the case where a cadence row already
-    /// existed. With **no row at all** — the normal state before a contact's
-    /// first snooze, since `snooze` is the only thing that writes one —
-    /// `snooze` observed `nil`, `caughtUp`'s transition no-opped against a
-    /// row that wasn't there, and the stale `.pending` write landed
-    /// unopposed, suppressing the contact for seven days right after the
-    /// user marked them caught up.
-    ///
-    /// `caughtUpDuringSnoozeInFlightReadSurvives` above cannot catch this: it
-    /// pre-seeds a pending row precisely so `caughtUp` has something to
-    /// transition. This one seeds nothing, which is the whole point.
-    @Test(
-        "A caught-up with no existing reminder row still defeats a racing snooze",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func caughtUpWithNoExistingRowDefeatsRacingSnooze(backend: RepositoryContractBackend) async throws {
-        let repositories = try backend.makeRepositories()
-        let contact = contractContact(id: try contractUUID(528), suffix: "r59-nil-state", tracked: true)
-        try await repositories.contacts.upsert(contact)
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        // Deliberately no seeded snooze: the contact has never been snoozed,
-        // so no cadence row exists and `snooze` will observe `nil`.
-        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
-
-        let gate = AsyncGate()
-        let gatedScheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
-            clock: { now }
-        )
-        let openScheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            clock: { now }
-        )
-
-        async let racingSnooze: Bool = gatedScheduler.snooze(contactId: contact.id)
-        await gate.waitUntilArrived()
-        // `false` — nothing pending was cleared — but it still records the
-        // caught-up, which is what the snooze's compare-and-set fails against.
-        #expect(try await openScheduler.caughtUp(contactId: contact.id) == false)
-        await gate.open()
-
-        #expect(try await racingSnooze == false)
-        // The user-visible property: no pending snooze is left suppressing
-        // this contact for the next seven days.
-        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+        // Reaching here at all is the deadlock check. One canonical id means
+        // at most one row, whatever order the twelve settled in.
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count <= 1)
     }
 }

@@ -327,28 +327,6 @@ actor StubReminderRepository: ReminderRepository {
     /// independent GRDB write transactions could — matching
     /// `MockStore.transitionReminderState`'s equivalent note.
     @discardableResult
-    func state(id: UUID) async throws -> ReminderState? {
-        try requireSuccess()
-        return reminders.first(where: { $0.id == id })?.state
-    }
-
-    /// Mirrors the real backends' compare-and-set upsert. Honours
-    /// `upsertFailure` the same way the unconditional `upsert` does, so a
-    /// test that arms a write failure still exercises this path.
-    @discardableResult
-    func upsert(_ reminder: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) async throws -> Bool {
-        try requireSuccess()
-        if let upsertFailure { throw upsertFailure }
-        let current = reminders.first(where: { $0.id == reminder.id })?.state
-        guard current == expectedState else { return false }
-        if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
-            reminders[index] = reminder
-        } else {
-            reminders.append(reminder)
-        }
-        return true
-    }
-
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
         try requireSuccess()
         if let transitionFailureFrom, transitionFailureFrom == from { throw RepositoryFakeFailure() }

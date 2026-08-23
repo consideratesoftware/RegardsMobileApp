@@ -84,35 +84,6 @@ struct GRDBReminderRepository: ReminderRepository {
         }
     }
 
-    func state(id: UUID) async throws -> ReminderState? {
-        try await dbQueue.read { db in
-            try String.fetchOne(
-                db,
-                sql: "SELECT state FROM ScheduledReminder WHERE id = ?",
-                arguments: [id.uuidString]
-            ).flatMap(ReminderState.init(rawValue:))
-        }
-    }
-
-    /// Read and write inside one `dbQueue.write`, so the state check and the
-    /// save commit as a single transaction — the same shape as
-    /// `transitionState` above, and the reason this can't be assembled from
-    /// `state(id:)` plus `upsert(_:)` at the call site.
-    @discardableResult
-    func upsert(_ reminder: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) async throws -> Bool {
-        let record = ScheduledReminderRecord(from: reminder)
-        return try await dbQueue.write { db in
-            let current = try String.fetchOne(
-                db,
-                sql: "SELECT state FROM ScheduledReminder WHERE id = ?",
-                arguments: [reminder.id.uuidString]
-            ).flatMap(ReminderState.init(rawValue:))
-            guard current == expectedState else { return false }
-            try record.save(db)
-            return true
-        }
-    }
-
     func delete(id: UUID) async throws {
         try await dbQueue.write { db in
             _ = try ScheduledReminderRecord.deleteOne(db, key: id.uuidString)

@@ -112,11 +112,6 @@ struct GatedTransitionStateReminderRepository: ReminderRepository {
         await gate.wait()
         return try await wrapped.transitionState(id: id, from: from, to: to)
     }
-    func state(id: UUID) async throws -> ReminderState? { try await wrapped.state(id: id) }
-    @discardableResult
-    func upsert(_ reminder: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) async throws -> Bool {
-        try await wrapped.upsert(reminder, ifCurrentStateIs: expectedState)
-    }
     func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
 }
 

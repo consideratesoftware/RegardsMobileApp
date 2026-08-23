@@ -224,26 +224,6 @@ public protocol ReminderRepository: Sendable {
     /// window by making the check part of the same write.
     @discardableResult
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool
-    /// The row's current state, or `nil` when no row exists at `id`.
-    /// Needed because every other read here filters to `.pending`, and
-    /// `SchedulingPass.snooze`'s compare-and-set has to observe a
-    /// `.userCaughtUp` row too — the one state its write must not clobber.
-    func state(id: UUID) async throws -> ReminderState?
-    /// Compare-and-set upsert: writes `reminder` only if the row at
-    /// `reminder.id` is still in `expectedState` (`nil` meaning "no row"),
-    /// atomically with that check. Returns whether the write happened.
-    ///
-    /// The unconditional `upsert` above is fine for a caller that owns the
-    /// row outright. `SchedulingPass.snooze` does not: it decides to write
-    /// based on a contact read that suspends, and a `caughtUp` for the same
-    /// contact can commit `.userCaughtUp` at the same canonical id inside
-    /// that window (R59). Passing the state observed before the decision
-    /// makes such an interleaving fail the write instead of silently
-    /// reverting the user's caught-up for seven days. Same reasoning as
-    /// `transitionState` above, applied to a write that inserts rather than
-    /// only transitions.
-    @discardableResult
-    func upsert(_ reminder: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) async throws -> Bool
     func delete(id: UUID) async throws
 }
 

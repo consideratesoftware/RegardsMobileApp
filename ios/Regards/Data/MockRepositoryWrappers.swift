@@ -59,11 +59,6 @@ struct MockReminderRepository: ReminderRepository {
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
         await store.transitionReminderState(id: id, from: from, to: to)
     }
-    func state(id: UUID) async throws -> ReminderState? { await store.reminderState(id: id) }
-    @discardableResult
-    func upsert(_ reminder: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) async throws -> Bool {
-        try await store.upsertReminder(reminder, ifCurrentStateIs: expectedState)
-    }
     func delete(id: UUID) async throws { await store.deleteReminder(id: id) }
 }
 

@@ -393,19 +393,6 @@ extension MockStore {
         reminders[id] = r
         return true
     }
-    func reminderState(id: UUID) -> ReminderState? { reminders[id]?.state }
-
-    /// Compare-and-set counterpart to `upsertReminder` — see
-    /// `ReminderRepository.upsert(_:ifCurrentStateIs:)`. Atomic for the same
-    /// reason `transitionReminderState` is: this actor serializes every call,
-    /// so the check and the write below cannot straddle a suspension.
-    @discardableResult
-    func upsertReminder(_ r: ScheduledReminder, ifCurrentStateIs expectedState: ReminderState?) throws -> Bool {
-        guard reminders[r.id]?.state == expectedState else { return false }
-        try upsertReminder(r)
-        return true
-    }
-
     func deleteReminder(id: UUID) { reminders.removeValue(forKey: id) }
 
     func recentInteractions(forContact id: UUID, limit: Int) -> [InteractionLog] {
