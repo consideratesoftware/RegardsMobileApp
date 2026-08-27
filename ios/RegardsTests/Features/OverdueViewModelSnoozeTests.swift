@@ -281,4 +281,55 @@ struct OverdueViewModelSnoozeTests {
         // cannot catch.
         #expect(viewModel.rows.isEmpty)
     }
+
+    /// R61(a), round 20 blocker — the snooze mirror of
+    /// `markCaughtUpReloadCorrectsLoadStartedAfterGenerationBump`. The
+    /// register entry this PR added said to close this rather than defer it,
+    /// and it was left open; this closes it.
+    ///
+    /// `snoozeSurvivesConcurrentInFlightLoad` above covers a load already in
+    /// flight when the action fires — the generation bump handles that. This
+    /// covers a load that starts *after* the bump: it carries a newer
+    /// generation, applies legitimately, and if it resolves before the
+    /// snooze write commits it re-adds the row from pre-action state. Only
+    /// snooze's own trailing reload can correct that.
+    ///
+    /// Needs `GatedUpsertReminderRepository` — snooze writes through
+    /// `upsert`, and until now no fake could hold that write open, which is
+    /// exactly why R61 recorded this gap instead of a test.
+    @Test("A load() starting after the generation bump cannot strand a snoozed row in Overdue")
+    func snoozeReloadCorrectsLoadStartedAfterGenerationBump() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let baseContacts = StubContactRepository([contact])
+        let reminders = StubReminderRepository()
+        let writeGate = AsyncGate()
+        let gatedReminders = GatedUpsertReminderRepository(wrapped: reminders, gate: writeGate)
+        let viewModel = OverdueViewModel(
+            contacts: baseContacts,
+            interactions: StubInteractionRepository(),
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: gatedReminders, contacts: baseContacts, clock: { Self.now }),
+            clock: { Self.now }
+        )
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+
+        // Snooze bumps the generation, removes the row optimistically, then
+        // parks at its own write.
+        let action = Task { await viewModel.snooze(contactId: contact.id) }
+        await writeGate.waitUntilArrived()
+        #expect(viewModel.rows.isEmpty)
+
+        // A reload starting now — after the bump, before the write lands. It
+        // legitimately sees the contact as still overdue and restores the row.
+        await viewModel.load()
+        #expect(viewModel.rows.map(\.contactId) == [contact.id],
+                "precondition: a post-bump load legitimately re-adds the row")
+
+        // The write commits and snooze's trailing reload runs — the only
+        // thing that can clear the row the post-bump load restored.
+        await writeGate.open()
+        _ = await action.value
+        #expect(viewModel.rows.isEmpty, "snooze's trailing reload must clear the restored row")
+    }
 }

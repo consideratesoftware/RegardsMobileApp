@@ -62,10 +62,32 @@ public final class ContactDetailViewModel {
         contactId
     }
 
+    /// Bumped on every `load()`; a load whose generation is stale by the
+    /// time it resumes discards its results rather than overwriting a
+    /// newer one's. Mirrors the two list view models.
+    private var loadGeneration = 0
+
     public func load() async {
+        // Same generation guard `OverdueViewModel.performLoad` and
+        // `UpcomingViewModel.performLoad` carry, and for the same reason —
+        // this screen was the one sibling that never got it (staged review
+        // round 20). Every PR22 action here (`markCaughtUp`, `logOther`,
+        // `snooze`) fires its own untracked `Task` ending in a second
+        // `load()`, and nothing disables the buttons in between, so two
+        // loads overlap readily. Without this, a stale load that started
+        // first but finished last overwrites the newer one's state — worst
+        // through the `catch` below, which nils `contact` outright and would
+        // flash "N days overdue" back onto a screen whose action had just
+        // succeeded. Exactly the false-success class R56 fixed for
+        // `overdueSummary`.
+        loadGeneration += 1
+        let generation = loadGeneration
         do {
-            contact = try await contacts.fetch(id: contactId)
+            let fetched = try await contacts.fetch(id: contactId)
+            guard generation == loadGeneration else { return }
+            contact = fetched
             let logs = try await interactionsRepo.fetchRecent(forContact: contactId, limit: 8)
+            guard generation == loadGeneration else { return }
             // `logs.map(Self.toEntry)` would pass a `@MainActor`-isolated
             // function reference into `Array.map`'s nonisolated parameter
             // type — Swift 6 strict concurrency rejects it. The `for` loop
@@ -82,14 +104,18 @@ public final class ContactDetailViewModel {
             // already succeeded, so losing only the snooze lookup is far
             // less harmful than blanking the screen over it.
             do {
-                pendingSnoozeDate = try await scheduler.pendingSnoozeDate(contactId: contactId)
+                let pending = try await scheduler.pendingSnoozeDate(contactId: contactId)
+                guard generation == loadGeneration else { return }
+                pendingSnoozeDate = pending
             } catch {
+                guard generation == loadGeneration else { return }
                 Self.log.error(
                     "failed to load snooze for \(self.contactId, privacy: .private): \(error, privacy: .private)"
                 )
                 pendingSnoozeDate = nil
             }
         } catch {
+            guard generation == loadGeneration else { return }
             Self.log.error(
                 "failed to load contact \(self.contactId, privacy: .private): \(error, privacy: .private)"
             )

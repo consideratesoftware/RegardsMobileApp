@@ -268,4 +268,52 @@ struct ContactDetailViewModelFailurePathTests {
         #expect(stored.lastInteractedAt == nil)
         #expect(viewModel.contact?.lastInteractedAt == nil)
     }
+
+    /// Round 20 blocker: `load()` had no generation guard, unlike the two
+    /// list view models that gained one in this same PR. Every action here
+    /// ends in its own `load()` and nothing disables the buttons between
+    /// taps, so two loads overlap readily — and the stale one's `catch`
+    /// nils `contact` outright, which is the worst version: a screen whose
+    /// action just succeeded flashes back to empty.
+    ///
+    /// `GatedFirstFetchContactRepository` makes it deterministic: only the
+    /// first `fetch(id:)` is held, so the stale load parks while a newer one
+    /// runs to completion, then resumes carrying an out-of-date generation.
+    /// A plain `AsyncGate` cannot express that — opening it releases every
+    /// waiter at once.
+    @Test("A stale load resuming after a newer one does not overwrite its state")
+    func staleLoadDoesNotOverwriteNewerLoad() async throws {
+        let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let base = StubContactRepository([contact])
+        let gate = AsyncGate()
+        let gatedContacts = GatedFirstFetchContactRepository(
+            wrapped: base, gate: gate, counter: CallCounter(), firstFetchFails: true
+        )
+        let reminders = StubReminderRepository()
+        let viewModel = ContactDetailViewModel(
+            contactId: contact.id,
+            contacts: gatedContacts,
+            interactionsRepo: StubInteractionRepository(),
+            scheduler: SchedulingPass(reminders: reminders, contacts: base, clock: { Self.now }),
+            clock: { Self.now }
+        )
+
+        // Stale load: parks at the first fetch, holding generation 1.
+        let staleLoad = Task { await viewModel.load() }
+        await gate.waitUntilArrived()
+
+        // Newer load runs to completion — its fetch is the second call, so
+        // it passes straight through and it owns the current generation.
+        await viewModel.load()
+        #expect(viewModel.contact?.id == contact.id)
+
+        // Release the stale load, whose read then fails. Without the guard
+        // its `catch` sets `contact = nil` on top of the newer load's state.
+        // The read is made to fail deliberately: a stale load that simply
+        // re-reads the same contact writes an identical value, so the test
+        // would pass with or without the guard and prove nothing.
+        await gate.open()
+        await staleLoad.value
+        #expect(viewModel.contact?.id == contact.id, "a stale load must not overwrite newer state")
+    }
 }

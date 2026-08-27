@@ -115,6 +115,82 @@ struct GatedTransitionStateReminderRepository: ReminderRepository {
     func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
 }
 
+/// Counts calls so a fake can treat the first one differently.
+actor CallCounter {
+    private var count = 0
+    func next() -> Int {
+        count += 1
+        return count
+    }
+}
+
+/// Gates only the **first** `fetch(id:)`; every later call passes straight
+/// through.
+///
+/// A plain `AsyncGate` is binary — opening it releases every waiter — so it
+/// cannot express "hold the stale load parked while a newer load runs to
+/// completion", which is the only arrangement that actually exercises a
+/// generation guard. This can: load #1 parks forever until released, load #2
+/// completes normally, then load #1 resumes holding a stale generation.
+struct GatedFirstFetchContactRepository: ContactRepository {
+    let wrapped: any ContactRepository
+    let gate: AsyncGate
+    let counter: CallCounter
+    /// Make the gated first fetch *throw* after it is released. Without
+    /// this a stale load re-reads the same contact and writes an identical
+    /// value, so the test cannot tell a guarded load from an unguarded one —
+    /// it passes either way. Failing that read drives the `catch` path the
+    /// guard actually has to protect, which nils `contact` outright.
+    var firstFetchFails = false
+
+    func fetchAll() async throws -> [Contact] { try await wrapped.fetchAll() }
+    func fetchTracked() async throws -> [Contact] { try await wrapped.fetchTracked() }
+    func fetch(id: UUID) async throws -> Contact? {
+        if await counter.next() == 1 {
+            await gate.wait()
+            if firstFetchFails { throw RepositoryFakeFailure() }
+        }
+        return try await wrapped.fetch(id: id)
+    }
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        try await wrapped.fetchMembers(ofGroup: groupId)
+    }
+    func upsert(_ contact: Contact) async throws { try await wrapped.upsert(contact) }
+    func archive(id: UUID, at: Date) async throws { try await wrapped.archive(id: id, at: at) }
+    func observeTracked() async -> AsyncStream<[Contact]> { await wrapped.observeTracked() }
+    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
+        try await wrapped.updateReconciledFields(id: id, fields: fields)
+    }
+}
+
+/// Holds `upsert(_:)` open — the write `SchedulingPass.snooze` makes.
+/// `GatedTransitionStateReminderRepository` gates the *transition* that
+/// `caughtUp` makes; this gates the *insert* that `snooze` makes, which is
+/// what R61(a) needed and did not have: without it there was no way to hold
+/// a snooze open at its write and land a competing reload inside that
+/// window.
+struct GatedUpsertReminderRepository: ReminderRepository {
+    let wrapped: any ReminderRepository
+    let gate: AsyncGate
+
+    func fetchAllPending() async throws -> [ScheduledReminder] { try await wrapped.fetchAllPending() }
+    func fetchPending(forContact contactId: UUID) async throws -> [ScheduledReminder] {
+        try await wrapped.fetchPending(forContact: contactId)
+    }
+    func upsert(_ reminder: ScheduledReminder) async throws {
+        await gate.wait()
+        try await wrapped.upsert(reminder)
+    }
+    func updateState(id: UUID, state: ReminderState) async throws {
+        try await wrapped.updateState(id: id, state: state)
+    }
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        try await wrapped.transitionState(id: id, from: from, to: to)
+    }
+    func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
+}
+
 /// Holds `fetch(id:)` open. `GatedFetchTrackedContactRepository` above gates
 /// the *list* read a screen load makes; this gates the *single-contact* read
 /// `SchedulingPass.snooze` makes for its R54 precondition, which is the

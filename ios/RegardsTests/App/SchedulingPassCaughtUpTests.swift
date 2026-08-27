@@ -366,4 +366,60 @@ struct SchedulingPassCaughtUpTests {
         // at most one row, whatever order the twelve settled in.
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count <= 1)
     }
+
+    /// R61(e), round 20 blocker. The per-contact lock suspends waiters in a
+    /// `withCheckedContinuation`, which is not cancellation-aware: a
+    /// cancelled waiter cannot remove itself from the queue. What must hold
+    /// regardless is liveness — if a waiting task is cancelled, the lock
+    /// must still reach the next caller for that contact rather than
+    /// stranding it forever.
+    ///
+    /// Structure: a gated first caller holds the lock; a second caller
+    /// queues behind it and is then cancelled; a third caller queues too.
+    /// Releasing the gate must let the chain drain and the third caller
+    /// complete. If it cannot, this test hangs rather than fails — which is
+    /// itself the signal, since a stranded lock has no failing assertion to
+    /// report.
+    @Test("A cancelled waiter does not strand the per-contact lock")
+    func cancelledWaiterDoesNotStrandTheLock() async throws {
+        let repositories = try RepositoryContractBackend.mock.makeRepositories()
+        let contact = contractContact(id: try contractUUID(530), suffix: "r61e-cancel", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let gate = AsyncGate()
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            clock: { now }
+        )
+
+        // Holder: parks inside its gated precondition read, holding the lock.
+        let holder = Task { try await scheduler.snooze(contactId: contact.id) }
+        await gate.waitUntilArrived()
+
+        // Waiter that gets cancelled while queued behind the holder.
+        let cancelled = Task { try await scheduler.caughtUp(contactId: contact.id) }
+        await Task.yield()
+        cancelled.cancel()
+
+        // A third caller, queued behind both.
+        let follower = Task { try await scheduler.caughtUp(contactId: contact.id) }
+        await Task.yield()
+
+        await gate.open()
+        _ = try? await holder.value
+        _ = try? await cancelled.value
+        // The assertion that matters: this returns at all.
+        _ = try? await follower.value
+
+        // And the lock is genuinely free afterwards — a fresh caller on an
+        // ungated scheduler completes rather than queueing forever.
+        let free = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+        _ = try await free.snooze(contactId: contact.id)
+        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count <= 1)
+    }
 }
