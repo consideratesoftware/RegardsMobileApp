@@ -51,10 +51,12 @@ func contractUUID(_ suffix: Int) throws -> UUID {
         suffix
     )))
 }
-private func contractStoredDate(_ date: Date) -> Date {
+// Not `private` (staged review round 10): `ReminderRepositoryContractTests`,
+// split into its own file at the 500-line limit, needs both of these too.
+func contractStoredDate(_ date: Date) -> Date {
     Date(timeIntervalSince1970: TimeInterval(Int(date.timeIntervalSince1970)))
 }
-private func contractStored(_ reminder: ScheduledReminder) -> ScheduledReminder {
+func contractStored(_ reminder: ScheduledReminder) -> ScheduledReminder {
     var stored = reminder
     stored.scheduledFor = contractStoredDate(reminder.scheduledFor)
     return stored
@@ -255,132 +257,6 @@ struct ContactGroupRepositoryContractTests {
             contactId: missingContactID,
             occurredAt: Date(timeIntervalSince1970: 1_800_000_000), source: .manual)
         await expectWriteRejected { try await repositories.interactions.append(orphanInteraction) }
-    }
-}
-struct ReminderRepositoryContractTests {
-
-    @Test(
-        "Pending reads normalize timestamps, round-trip, filter, scope, and sort ties by id",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func pendingOrdering(backend: RepositoryContractBackend) async throws {
-        let repositories = try backend.makeRepositories()
-        let contact = contractContact(
-            id: try contractUUID(301), suffix: "reminder-contact", tracked: true)
-        let other = contractContact(
-            id: try contractUUID(302), suffix: "reminder-other", tracked: true)
-        try await repositories.contacts.upsert(contact)
-        try await repositories.contacts.upsert(other)
-
-        let earlier = ScheduledReminder(
-            id: try contractUUID(311),
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100.875),
-            osNotificationId: "contract-earlier"
-        )
-        let tiedFirst = ScheduledReminder(
-            id: try contractUUID(312),
-            contactId: contact.id,
-            kind: .birthday,
-            occasionDate: "08-07",
-            occasionLabel: "Birthday",
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_200.875),
-            osNotificationId: "contract-tied-first"
-        )
-        let tiedSecond = ScheduledReminder(
-            id: try contractUUID(313),
-            contactId: contact.id,
-            kind: .anniversary,
-            occasionDate: "08-07",
-            occasionLabel: "Anniversary",
-            scheduledFor: tiedFirst.scheduledFor,
-            osNotificationId: "contract-tied-second"
-        )
-        let fired = ScheduledReminder(
-            id: try contractUUID(314),
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_000.875),
-            osNotificationId: "contract-fired",
-            state: .fired
-        )
-        let otherPending = ScheduledReminder(
-            id: try contractUUID(315),
-            contactId: other.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_150.875),
-            osNotificationId: "contract-other"
-        )
-        let cancelled = ScheduledReminder(
-            id: try contractUUID(316),
-            contactId: contact.id,
-            kind: .customOccasion,
-            occasionDate: "08-08",
-            occasionLabel: "Cancelled occasion",
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_050.875),
-            osNotificationId: "contract-cancelled",
-            state: .cancelled
-        )
-        let caughtUp = ScheduledReminder(
-            id: try contractUUID(317),
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_075.875),
-            osNotificationId: "contract-caught-up",
-            state: .userCaughtUp
-        )
-        let inserted = [
-            tiedSecond, fired, otherPending, earlier, tiedFirst, cancelled, caughtUp,
-        ]
-        for reminder in inserted {
-            try await repositories.reminders.upsert(reminder)
-        }
-
-        let contactResult = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(contactResult == [contractStored(earlier), contractStored(tiedFirst), contractStored(tiedSecond)])
-        let insertedIDs = Set(inserted.map(\.id))
-        let globalResult = try await repositories.reminders.fetchAllPending()
-            .filter { insertedIDs.contains($0.id) }
-        #expect(globalResult == [
-            contractStored(earlier), contractStored(otherPending),
-            contractStored(tiedFirst), contractStored(tiedSecond),
-        ])
-    }
-
-    @Test("Reminder state updates and delete remove pending rows", arguments: RepositoryContractBackend.allCases)
-    func updateStateAndDelete(backend: RepositoryContractBackend) async throws {
-        let repositories = try backend.makeRepositories()
-        let contact = contractContact(
-            id: try contractUUID(321), suffix: "reminder-mutation", tracked: true)
-        let reminder = ScheduledReminder(
-            id: try contractUUID(322),
-            contactId: contact.id,
-            kind: .birthday,
-            occasionDate: "08-07",
-            occasionLabel: "Birthday",
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_000.875),
-            osNotificationId: "contract-mutation",
-            state: .fired
-        )
-        try await repositories.contacts.upsert(contact)
-        try await repositories.reminders.upsert(reminder)
-        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
-
-        try await repositories.reminders.updateState(id: reminder.id, state: .pending)
-        var expected = contractStored(reminder)
-        expected.state = .pending
-        #expect(try await repositories.reminders.fetchPending(forContact: contact.id) == [expected])
-
-        var replacement = expected
-        replacement.kind = .anniversary
-        replacement.occasionLabel = "Updated anniversary"
-        replacement.scheduledFor = Date(timeIntervalSince1970: 1_800_000_100.875)
-        replacement.osNotificationId = "contract-replacement"
-        try await repositories.reminders.upsert(replacement)
-        #expect(try await repositories.reminders.fetchPending(forContact: contact.id) == [contractStored(replacement)])
-        try await repositories.reminders.delete(id: reminder.id)
-        #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
 }
 struct InteractionRepositoryContractTests {

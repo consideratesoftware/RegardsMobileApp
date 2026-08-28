@@ -71,10 +71,9 @@ extension ScreensAccessibilityTests {
         let contacts = app.descendants(matching: .any)["screen.contacts"]
         let detail = app.descendants(matching: .any)["screen.contact-detail"]
 
-        // Contacts rows currently resolve as buttons rather than the
-        // synthetic `.other` elements used by Overdue and Upcoming.
-        // Re-resolve for two bounded retries because rapid test relaunches can
-        // drop synthesized row taps before SwiftUI handles them.
+        // Contacts rows resolve as buttons, not the synthetic `.other`
+        // elements Overdue/Upcoming use. Two bounded retries: rapid test
+        // relaunches can drop a synthesized row tap before SwiftUI handles it.
         for attempt in 0..<3 {
             if detail.exists, !contacts.exists {
                 break
@@ -113,12 +112,32 @@ extension ScreensAccessibilityTests {
             "\(sourceIdentifier) should exist before selecting the \(name) tab."
         )
 
+        // A prior scroll on `source` can leave the floating tab bar
+        // minimized (`RegardsTabBarBehavior`'s `tabBarMinimizeBehavior
+        // (.onScrollDown)`, iOS 26+) — standard system behavior, not a bug:
+        // a real user scrolls back up before tapping a different tab, and
+        // the minimized bar's other buttons are genuinely absent from the
+        // tree meanwhile (dumped directly: 4 buttons before a scroll, 2
+        // after — removed, not relabeled). `source` is the screen's own
+        // `List`; scrolling it up reproduces that precondition instead of
+        // working around a synthetic-only problem. Bounded loop, not one
+        // `swipeDown()`: a single swipe wasn't reliably enough distance to
+        // cross the re-expand threshold, and expanding is itself a brief
+        // animation this also waits out. Skipped when nothing minimized it.
+        if !app.tabBars.buttons[name].exists {
+            for _ in 0..<4 {
+                source.swipeDown()
+                if waitUntilLiveAndHittable(app.tabBars.buttons[name], timeout: 2) {
+                    break
+                }
+            }
+        }
+
         // Rapid simulator relaunches can leave a stale tab-bar element in the
-        // automation hierarchy. Resolve the current button for each attempt
-        // and allow two bounded retries when synthesized taps are dropped.
-        // The screen waits remain plain queries. The bounded hittability poll
-        // below returns false without recording an XCTest failure while a
-        // transient element has no activation frame.
+        // tree. Resolve the current button per attempt with two bounded
+        // retries when synthesized taps are dropped; the hittability poll
+        // below returns false, without failing, while a transient element
+        // has no activation frame yet.
         for attempt in 0..<3 {
             if destination.exists, !source.exists {
                 return
@@ -175,64 +194,42 @@ extension ScreensAccessibilityTests {
         XCTFail("\(triggerIdentifier) should replace Settings with \(screenIdentifier).")
     }
 
+    /// Opens Contact Detail for a specific contact by name via Contacts —
+    /// the only surviving route from Overdue or Upcoming as of round 12
+    /// (`ARCHITECTURE.md` R52), for any test that needs a *specific* named
+    /// contact rather than just "whichever is first". Contacts rows have no
+    /// shared stable identifier (see `launchToContactDetailFromContacts`'s
+    /// matching comment); this matches on the row's combined label, which
+    /// begins with `displayName`.
     @MainActor
-    func navigateToRow(
-        identifier: String,
-        index: Int,
-        sourceIdentifier: String,
+    func openContactDetail(
+        named name: String,
+        fromTabIdentifier sourceIdentifier: String,
         in app: XCUIApplication
     ) {
-        let source = app.descendants(matching: .any)[sourceIdentifier]
+        navigateToTab(named: "Contacts", from: sourceIdentifier, to: "screen.contacts", in: app)
+        let contactsScreen = app.descendants(matching: .any)["screen.contacts"]
         let detail = app.descendants(matching: .any)["screen.contact-detail"]
-        let plainRow = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(
-            source.waitForExistence(timeout: 10),
-            "\(sourceIdentifier) should exist before opening Contact Detail."
-        )
+        let contactsRow = app.buttons
+            .element(matching: NSPredicate(format: "label BEGINSWITH[c] %@", name))
 
-        // Row taps can be dropped by the same rapid-relaunch automation race
-        // as tab taps. Wait on the plain identifier query, then re-resolve
-        // the indexed row and its live coordinate before each attempt.
         for attempt in 0..<3 {
-            if detail.exists, !source.exists {
-                return
-            }
-
-            guard plainRow.waitForExistence(timeout: 10) else {
-                continue
-            }
-            let rows = app.descendants(matching: .any)
-                .matching(identifier: identifier)
-                .allElementsBoundByIndex
-            guard rows.indices.contains(index) else {
-                continue
-            }
-            let row = rows[index]
-            // `isHittable` is a one-shot read. Immediately after a relaunch or
-            // a tab switch it can be false for a row that is already on screen
-            // and about to settle, and scrolling on that reading pushes a
-            // perfectly good target out of the viewport — the flake this
-            // helper kept reintroducing across its seven call sites. Poll
-            // first; only scroll once the row is genuinely off-screen.
-            if !waitUntilLiveAndHittable(row) {
-                // Representative states add enough rows to place the target
-                // below the viewport at accessibility Dynamic Type sizes.
-                source.swipeUp()
-                if !waitUntilLiveAndHittable(row) {
-                    // Bounded scroll-back: an earlier attempt, or a row above
-                    // the viewport to begin with, leaves the target behind us.
-                    source.swipeDown()
-                    guard waitUntilLiveAndHittable(row) else { continue }
+            if detail.exists { return }
+            // Bounded-scroll fallback: at accessibility Dynamic Type sizes,
+            // or simply further down an alphabetical list, the named row
+            // can be genuinely off-screen rather than merely not settled.
+            if !waitUntilLiveAndHittable(contactsRow) {
+                contactsScreen.swipeUp()
+                if !waitUntilLiveAndHittable(contactsRow) {
+                    contactsScreen.swipeDown()
+                    guard waitUntilLiveAndHittable(contactsRow) else { continue }
                 }
             }
-            activate(row, attempt: attempt)
-            if detail.waitForExistence(timeout: 10),
-               source.waitForNonExistence(timeout: 10) {
-                return
-            }
+            activate(contactsRow, attempt: attempt)
+            if detail.waitForExistence(timeout: 10) { return }
         }
 
-        XCTFail("\(identifier) row \(index) should open Contact Detail.")
+        XCTFail("The Contacts row for \(name) should open Contact Detail.")
     }
 
     @MainActor
@@ -333,10 +330,9 @@ extension ScreensAccessibilityTests {
     @MainActor
     func activate(_ element: XCUIElement, attempt: Int) {
         // Simulator automation can drop a synthesized tap on a live element.
-        // Bounded retries vary the target point, while the
-        // caller verifies the source/destination state after every attempt.
-        // These are navigation synchronization only; the audit still owns
-        // hit-region verification when sensory categories are enabled.
+        // Bounded retries vary the target point; the caller verifies
+        // source/destination state after every attempt. Navigation sync
+        // only — the audit still owns hit-region verification.
         let offsets = [0.5, 0.35, 0.65]
         let offset = offsets[min(attempt, offsets.count - 1)]
         element.coordinate(
@@ -363,56 +359,6 @@ extension ScreensAccessibilityTests {
         defer { timer.invalidate() }
 
         return XCTWaiter.wait(for: [live], timeout: timeout) == .completed
-    }
-
-    @MainActor
-    func assertStacked(
-        _ lower: XCUIElement,
-        below upper: XCUIElement,
-        _ message: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertGreaterThan(
-            upper.frame.width,
-            0,
-            "Upper element: \(message)",
-            file: file,
-            line: line
-        )
-        XCTAssertGreaterThan(
-            upper.frame.height,
-            0,
-            "Upper element: \(message)",
-            file: file,
-            line: line
-        )
-        XCTAssertGreaterThan(
-            lower.frame.width,
-            0,
-            "Lower element: \(message)",
-            file: file,
-            line: line
-        )
-        XCTAssertGreaterThan(
-            lower.frame.height,
-            0,
-            "Lower element: \(message)",
-            file: file,
-            line: line
-        )
-        XCTAssertGreaterThanOrEqual(
-            lower.frame.minY,
-            upper.frame.maxY,
-            message,
-            file: file,
-            line: line
-        )
-    }
-
-    @MainActor
-    func editButton(in app: XCUIApplication) -> XCUIElement {
-        app.navigationBars.buttons["contact-detail.edit"]
     }
 
 }

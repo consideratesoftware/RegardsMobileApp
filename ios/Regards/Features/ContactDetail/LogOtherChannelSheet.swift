@@ -1,0 +1,72 @@
+import SwiftUI
+
+/// Contact Detail's "Log other channel" picker. A `.sheet` we build and
+/// control ourselves, not a system `confirmationDialog` — see
+/// `ContactDetailScreen`'s `.sheet` call site for why: `confirmationDialog`
+/// rendered as an anchored, translucent popover on the OS this shipped
+/// against, with no Cancel row at all, and `.presentationCompactAdaptation
+/// (.sheet)` — added to force the standard action-sheet presentation — did
+/// not change that. Confirmed live: an accessibility-tree dump still showed
+/// a `Popover` container, no "Cancel" button anywhere, dismissal reachable
+/// only by tapping a `PopoverDismissRegion` VoiceOver users can't discover
+/// (device report: "I can't get the voiceover to dismiss the picker").
+///
+/// Cancel lives outside the `List`, in the enclosing `VStack`, not as a
+/// trailing row inside it. Two earlier shapes both failed on the dedicated
+/// test simulator, and a live accessibility-tree dump (with the sheet open,
+/// scrolled to the top) pinned the second one directly: a `.toolbar` Cancel
+/// never resolved hittable and once triggered "Multiple matching elements
+/// found" for its own identifier; a Cancel placed as a second `Section`
+/// after all 13 channel rows didn't exist in the tree *at all* — the dump's
+/// last realized row was "Custom" (channel 13 of 13), followed by a large
+/// unrendered placeholder region, because `List` is backed by a lazy,
+/// virtualized `UICollectionView` that only materializes rows near the
+/// visible viewport. A row placed after the full channel list is never
+/// scrolled into view by anything in this flow, so it's simply never
+/// instantiated. Cancel outside the `List` — in the `VStack` that also
+/// holds it — is unconditionally instantiated and on screen regardless of
+/// how many channels there are or where the list happens to be scrolled.
+struct LogOtherChannelSheet: View {
+    let onSelect: (Channel) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                List(Channel.allCases, id: \.self) { channel in
+                    Button(channel.displayName) {
+                        onSelect(channel)
+                    }
+                    // Added round 9 (a review framing it as "inconsistent
+                    // with Cancel, which has a hint" didn't hold — Cancel
+                    // carries no hint either — but a hint here is worth
+                    // adding on its own: the channel name alone doesn't say
+                    // what tapping it does). Shortened round 10: the
+                    // original repeated "and closes this picker" 13 times
+                    // over, verbose for a VoiceOver user tabbing through
+                    // the whole list; closing is the unsurprising, shared
+                    // behavior of picking any row in a picker sheet and
+                    // doesn't need repeating per row.
+                    .accessibilityHint("Logs an interaction through \(channel.displayName).")
+                }
+                Button("Cancel", role: .cancel, action: onCancel)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+                    // `.contentShape` (staged review round 11, `.hitRegion`
+                    // audit finding): `.frame(minHeight: 44)` alone measured
+                    // no different via `XCUIElement.frame` — this plain-style
+                    // `Button` wraps only its "Cancel" text with no
+                    // background shape of its own, so without an explicit
+                    // hit-testing shape the accessibility/tap target tracks
+                    // the text's own tight bounds, not the surrounding
+                    // `.frame`. See `EditContactScreen.field(_:)`'s matching
+                    // comment for the same finding, confirmed the same way
+                    // there first.
+                    .contentShape(Rectangle())
+                    .accessibilityIdentifier("contact-detail.log-other-cancel")
+            }
+            .navigationTitle("Log other channel")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}

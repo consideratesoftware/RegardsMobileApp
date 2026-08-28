@@ -12,11 +12,37 @@ public struct Avatar: View {
     public let name: String
     public let size: CGFloat
     public let hasAccentRing: Bool
+    /// Whether to draw the two-letter monogram inside the circle.
+    ///
+    /// `false` for the list rows whose accessibility subtree is substituted
+    /// wholesale by `.accessibilityRepresentation` (Overdue, Upcoming). The
+    /// monogram is decorative — it is derived from the name the row already
+    /// announces — but it is still *text on screen*, and once the row's real
+    /// subtree is replaced there is no accessibility element behind those
+    /// pixels for Apple's audit to find. That is a genuine
+    /// "Potentially inaccessible text" finding, not a false positive, and
+    /// bisecting confirmed the monogram is the sole cause: removing it takes
+    /// the Overdue audit from one issue to zero. Avatar-level fixes do not
+    /// work, because the substitution happens above them — both making the
+    /// avatar a represented element and rasterising it with `.drawingGroup()`
+    /// leave the finding in place (both tried).
+    ///
+    /// Larger avatars keep their monogram: Contact Detail, Edit Contact,
+    /// Onboarding, Merge and All Contacts do not substitute their
+    /// accessibility subtrees, so their monograms sit inside a real element
+    /// and the audit is satisfied.
+    public let showsInitials: Bool
 
-    public init(name: String, size: CGFloat = 44, hasAccentRing: Bool = false) {
+    public init(
+        name: String,
+        size: CGFloat = 44,
+        hasAccentRing: Bool = false,
+        showsInitials: Bool = true
+    ) {
         self.name = name
         self.size = size
         self.hasAccentRing = hasAccentRing
+        self.showsInitials = showsInitials
     }
 
     public var body: some View {
@@ -31,10 +57,12 @@ public struct Avatar: View {
             // `.accessibilityHidden(true)`; parent rows own the VoiceOver
             // label, and the visible letters are purely decorative. Noted
             // as a known trade-off in `ios/docs/accessibility.md`.
-            Text(initials)
-                .font(.system(size: size * 0.38, weight: .medium))
-                .foregroundStyle(tone.foreground)
-                .kerning(0.2)
+            if showsInitials {
+                Text(initials)
+                    .font(.system(size: size * 0.38, weight: .medium))
+                    .foregroundStyle(tone.foreground)
+                    .kerning(0.2)
+            }
         }
         // `.overlay` doesn't participate in parent layout — the ring draws
         // outside the avatar's bounding frame without changing the hit box

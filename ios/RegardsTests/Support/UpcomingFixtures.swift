@@ -35,13 +35,21 @@ enum UpcomingFixtures {
 extension ReminderWindow {
     /// A window that always has capacity, so cadence rows are never dropped
     /// for window reasons in tests that are about something else.
-    static func allDayEveryDay(timezone: TimeZone) -> ReminderWindow {
+    /// `digestHorizonDays` defaults to the production default; pass a
+    /// shorter one to push a *future* cadence row (e.g. the fresh reminder
+    /// `markCaughtUp` computes for a contact's next cadence date) outside
+    /// the horizon on purpose.
+    static func allDayEveryDay(
+        timezone: TimeZone,
+        digestHorizonDays: Int = ReminderWindow.defaultDigestHorizonDays
+    ) -> ReminderWindow {
         ReminderWindow(
             allowedDays: .allDays,
             allowedTimeRanges: [
                 TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59)),
             ],
-            timezoneIdentifier: timezone.identifier
+            timezoneIdentifier: timezone.identifier,
+            digestHorizonDays: digestHorizonDays
         )
     }
 }

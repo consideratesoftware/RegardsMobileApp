@@ -257,6 +257,9 @@ struct RegardsTabRoot: View {
     static func makeOverdueViewModel(runtime: AppRuntime) -> OverdueViewModel {
         OverdueViewModel(
             contacts: runtime.environment.contacts,
+            interactions: runtime.environment.interactions,
+            reminders: runtime.environment.reminders,
+            scheduler: runtime.scheduler,
             clock: runtime.clock,
             calendar: runtime.userCalendar
         )
@@ -267,6 +270,8 @@ struct RegardsTabRoot: View {
         UpcomingViewModel(
             contacts: runtime.environment.contacts,
             reminders: runtime.environment.reminders,
+            scheduler: runtime.scheduler,
+            interactions: runtime.environment.interactions,
             window: runtime.window,
             clock: runtime.clock
         )
@@ -289,6 +294,7 @@ struct RegardsTabRoot: View {
             contactId: contactId,
             contacts: runtime.environment.contacts,
             interactionsRepo: runtime.environment.interactions,
+            scheduler: runtime.scheduler,
             clock: runtime.clock,
             calendar: runtime.userCalendar
         )
@@ -373,11 +379,21 @@ struct RegardsTabRoot: View {
 
     private var overdueRoot: some View {
         NavigationStack(path: $navigation.overduePath) {
+            // No `onTapContact` any more (round 12): row tap previews the
+            // channel action instead of pushing Contact Detail — see
+            // `OverdueRow`'s doc comment. `navigationDestination` below is
+            // kept, not removed: nothing pushes onto `overduePath` from
+            // this screen today, but the destination itself costs nothing
+            // to leave wired, and ripping it (plus the transition
+            // namespace below) out is a separate call this round didn't
+            // ask for — flagged in the round-12 report rather than done
+            // unilaterally.
             OverdueScreen(
                 viewModel: overdueVM,
+                accessibilityEffects: .live,
                 upcomingCount: upcomingVM.totalCount,
-                onTapContact: { contactId in navigation.overduePath.append(contactId) },
-                onSwitchToUpcoming: { navigation.selected = .upcoming }
+                onSwitchToUpcoming: { navigation.selected = .upcoming },
+                rowActionAnnouncer: RowActionAnnouncer()
             )
             .navigationDestination(for: UUID.self) { contactId in
                 contactDetail(for: contactId)
@@ -388,11 +404,13 @@ struct RegardsTabRoot: View {
 
     private var upcomingRoot: some View {
         NavigationStack(path: $navigation.upcomingPath) {
+            // See `overdueRoot`'s matching comment above — same reasoning.
             UpcomingScreen(
                 viewModel: upcomingVM,
+                accessibilityEffects: .live,
                 overdueCount: overdueVM.overdueCount,
-                onTapContact: { contactId in navigation.upcomingPath.append(contactId) },
-                onSwitchToOverdue: { navigation.selected = .overdue }
+                onSwitchToOverdue: { navigation.selected = .overdue },
+                rowActionAnnouncer: RowActionAnnouncer()
             )
             .navigationDestination(for: UUID.self) { contactId in
                 contactDetail(for: contactId)
@@ -459,7 +477,9 @@ struct RegardsTabRoot: View {
             viewModel: Self.makeContactDetailViewModel(
                 contactId: contactId,
                 runtime: runtime
-            )
+            ),
+            accessibilityEffects: .live,
+            rowActionAnnouncer: RowActionAnnouncer()
         )
     }
 }

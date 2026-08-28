@@ -61,6 +61,25 @@ public struct AppRuntime: Sendable {
     public let window: ReminderWindow
     public let userCalendar: Calendar
     public let clock: @Sendable () -> Date
+    /// The single `SchedulingPass` writer for this runtime (decision #36).
+    /// This §14 PR22 stub needs `reminders` + `clock` + `calendar` — the
+    /// last of these is correctness-critical, not optional: `snooze`'s
+    /// wall-clock 7-day push (correctness fix, staged review) resolves
+    /// through whichever `Calendar` is passed in. Built from `window.timeZone`
+    /// (the persisted reminder window's own timezone), not `userCalendar` —
+    /// fixed staged-review bug, round 6: `userCalendar` is the *device's*
+    /// timezone, snapshotted once at launch, and using it here meant a
+    /// device/window timezone mismatch (or traveling mid-session) could push
+    /// `scheduledFor` an hour off across a DST boundary relative to the
+    /// window's own timezone, the one every other scheduling computation in
+    /// this codebase treats as authoritative (`ReminderEngine`,
+    /// `UpcomingViewModel.buildRows`). `userCalendar` stays reserved for
+    /// user-facing elapsed-day labels (`OverdueViewModel`,
+    /// `ContactDetailViewModel`), which intentionally track the device's
+    /// calendar instead — see this struct's own doc comment. Composed here,
+    /// alongside `environment`, so every screen shares the same `scheduler`
+    /// instance.
+    public let scheduler: SchedulingPass
 
     public init(
         environment: AppEnvironment,
@@ -72,6 +91,12 @@ public struct AppRuntime: Sendable {
         self.window = window
         self.userCalendar = userCalendar
         self.clock = clock
+        self.scheduler = SchedulingPass(
+            reminders: environment.reminders,
+            contacts: environment.contacts,
+            clock: clock,
+            calendar: Self.calendar(for: window.timeZone)
+        )
     }
 
     /// The frozen mock fixture is reserved for previews and explicit DEBUG

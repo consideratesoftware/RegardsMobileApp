@@ -1,9 +1,7 @@
 import Foundation
 
-/// In-memory repository fakes preloaded with a Star Wars sample cast (Leia,
-/// Padmé, Luke, Lando, Chewbacca, Anakin, Din, Shmi, Obi-Wan, Ahsoka). PR3's
-/// SwiftUI shell renders against these so we can iterate on the screens — and
-/// take demo screenshots — without integrating the Contacts framework.
+/// In-memory repository fakes preloaded with a Star Wars sample cast (Leia, Padmé, Luke, Lando, Chewbacca, Anakin,
+/// Din, Shmi, Obi-Wan, Ahsoka), so the SwiftUI shell can render without integrating the Contacts framework.
 public struct MockRepositories: Sendable {
 
     public let contacts: any ContactRepository
@@ -61,8 +59,7 @@ private enum MockRepositoryWriteError: Error {
     case duplicateSystemContactRef, missingGroup, missingContact, duplicateInteraction
 }
 
-/// GRDB stores timestamps as integer epoch seconds. Mock writes use the same
-/// precision so round trips, filtering, and tie ordering agree.
+/// GRDB stores timestamps as integer epoch seconds; mock writes match so round trips, filtering, and ordering agree.
 private func mockStoredDate(_ date: Date) -> Date {
     Date(timeIntervalSince1970: TimeInterval(Int(date.timeIntervalSince1970)))
 }
@@ -91,15 +88,12 @@ actor MockStore {
     var interactions: [UUID: InteractionLog] = [:]
     var window: ReminderWindow
     var profile: UserProfile
-    /// R50 fixture (`REGARDS_UI_TEST_SEED_CORRUPT_ROW`): the mock store never
-    /// holds an actually-undecodable row (every write round-trips through
-    /// `ContactRecord` first), so this is a fabricated diagnostic rather
-    /// than a real decode failure — it exists purely to make the All
-    /// Contacts corruption banner reachable for the XCUITest audit, which
-    /// needs a real assistive-technology-active process to render SwiftUI's
-    /// accessibility tree at all (unlike a plain unit test hosting the
-    /// screen in-process).
+    /// R50 fixture: fabricated (mocks round-trip `ContactRecord`) — reaches the corruption banner in XCUI.
     var corruptionDiagnostics: [ContactCorruptionDiagnostic] = []
+
+    /// Subscribers of `observeTracked()`, keyed per subscription so termination removes exactly one. Mirrors
+    /// `GRDBContactRepository.observeTracked()`: nothing on subscribe, only the tracked set after a later write.
+    private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
     init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool, seedCorruptRow: Bool = false) {
         self.window = window
@@ -135,11 +129,8 @@ actor MockStore {
         }
     }
 
-    /// Phase 0 deliberately renders representative persisted states so the
-    /// corresponding UI does not exist only as unreachable implementation:
-    /// a virtual merge marker, recent interactions, and both occasion tags.
-    /// Production scheduling still belongs to TF-07; these rows are local
-    /// in-memory fixtures only.
+    /// Phase 0 deliberately renders representative persisted states (virtual merge marker, recent interactions,
+    /// both occasion tags) so the corresponding UI isn't unreachable implementation. Local fixtures only.
     private nonisolated static func seedRepresentativeStates(
         now: Date,
         window: ReminderWindow,
@@ -239,21 +230,10 @@ actor MockStore {
         return (contacts, groups, reminders, interactions)
     }
 
-    /// The seeded occasion instant `offset` days after `startOfToday`, at the
-    /// given local `hour`.
-    ///
-    /// `date(bySettingHour:)` is `Optional`, and the seeding used to sit
-    /// inside an `if let` chain that silently dropped the birthday and
-    /// anniversary whenever it returned nil. That would make the
-    /// representative occasion states R34 exists to guarantee unreachable and
-    /// unauditable, with no failure anywhere to say so.
-    ///
-    /// Measured on a real DST gap (US Pacific, 2026-03-08, hour 2): the API
-    /// does not return nil — it forgives the missing hour and snaps forward to
-    /// 03:00. So this is a defensive guard against API surface rather than a
-    /// reproduced drop. It stays because the seeds must never depend on that
-    /// leniency: fall forward to the first instant that does exist, and fall
-    /// back to the day start if even that fails.
+    /// The seeded occasion instant `offset` days after `startOfToday`, at the given local `hour`.
+    /// `date(bySettingHour:)` is `Optional`; seeding used to sit in an `if let` that silently dropped occasions on
+    /// nil, making R34's representative states unreachable with nothing to say so. A real DST gap (US Pacific,
+    /// 2026-03-08, hour 2) never returns nil, but this guard stays defensive: fall forward, then to the day start.
     nonisolated static func occasionInstant(
         daysAfter startOfToday: Date,
         offset: Int,
@@ -279,109 +259,6 @@ actor MockStore {
         return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
     }
 
-    static func seedCast(
-        now: Date,
-        includeDuplicateFixture: Bool
-    ) -> [Contact] {
-        let day: TimeInterval = 86_400
-        var contacts = [
-            Contact(
-                systemContactRef: "sys-leia",
-                displayName: "Leia Organa",
-                tracked: true, cadenceDays: 14,
-                priorityTier: .innerCircle,
-                preferredChannel: .whatsapp,
-                preferredChannelValue: "+1 415 555 0140",
-                lastInteractedAt: now.addingTimeInterval(-day * 23),
-                notes: "Son is Ben. Ask about the diplomatic posting on Chandrila."),
-            Contact(
-                systemContactRef: "sys-padme",
-                displayName: "Padmé Amidala",
-                tracked: true, cadenceDays: 7,
-                priorityTier: .innerCircle,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0134",
-                lastInteractedAt: now.addingTimeInterval(-day * 11)),
-            Contact(
-                systemContactRef: "sys-luke",
-                displayName: "Luke Skywalker",
-                tracked: true, cadenceDays: 30,
-                priorityTier: .close,
-                preferredChannel: .signal,
-                preferredChannelValue: "+1 415 555 0198",
-                lastInteractedAt: now.addingTimeInterval(-day * 36)),
-            Contact(
-                systemContactRef: "sys-lando",
-                displayName: "Lando Calrissian",
-                tracked: true, cadenceDays: 21,
-                priorityTier: .close,
-                preferredChannel: .sms,
-                preferredChannelValue: "+1 212 555 0176",
-                lastInteractedAt: now.addingTimeInterval(-day * 23)),
-            Contact(
-                systemContactRef: "sys-chewbacca",
-                displayName: "Chewbacca",
-                tracked: true, cadenceDays: 30,
-                priorityTier: .regular,
-                preferredChannel: .whatsapp,
-                preferredChannelValue: "+1 415 555 0141",
-                lastInteractedAt: now.addingTimeInterval(-day * 28)),
-            Contact(
-                systemContactRef: "sys-anakin",
-                displayName: "Anakin Skywalker",
-                tracked: true, cadenceDays: 14,
-                priorityTier: .innerCircle,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0177",
-                lastInteractedAt: now.addingTimeInterval(-day * 8)),
-            Contact(
-                systemContactRef: "sys-din",
-                displayName: "Din Djarin",
-                tracked: true, cadenceDays: 42,
-                priorityTier: .regular,
-                preferredChannel: .signal,
-                preferredChannelValue: "+1 415 555 0142",
-                lastInteractedAt: now.addingTimeInterval(-day * 42)),
-            Contact(
-                systemContactRef: "sys-shmi",
-                displayName: "Shmi Skywalker",
-                tracked: true, cadenceDays: 10,
-                priorityTier: .innerCircle,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0111",
-                lastInteractedAt: now.addingTimeInterval(-day * 2)),
-            Contact(
-                systemContactRef: "sys-obiwan",
-                displayName: "Obi-Wan Kenobi",
-                tracked: true, cadenceDays: 90,
-                priorityTier: .regular,
-                preferredChannel: .email,
-                preferredChannelValue: "obiwan@jeditemple.example",
-                lastInteractedAt: now.addingTimeInterval(-day * 84)),
-            Contact(
-                systemContactRef: "sys-ahsoka",
-                displayName: "Ahsoka Tano",
-                tracked: true, cadenceDays: 90,
-                priorityTier: .close,
-                preferredChannel: .phoneCall,
-                preferredChannelValue: "+1 415 555 0143",
-                lastInteractedAt: now.addingTimeInterval(-day * 87)),
-        ]
-        if includeDuplicateFixture {
-            contacts.append(Contact(
-                systemContactRef: "ui-test-luke-duplicate",
-                displayName: "Luke Skywalker",
-                tracked: true,
-                cadenceDays: 30,
-                priorityTier: .close,
-                preferredChannel: .signal,
-                preferredChannelValue: "+1 415 555 0198",
-                lastInteractedAt: now.addingTimeInterval(-day * 36)
-            ))
-        }
-        return contacts
-    }
-
 }
 
 extension MockStore {
@@ -403,18 +280,47 @@ extension MockStore {
             throw MockRepositoryWriteError.missingGroup
         }
         contacts[c.id] = try mockStoredContact(c)
+        broadcastTrackedChange()
     }
     func archiveContact(id: UUID, at: Date) {
         guard var c = contacts[id] else { return }
         c.archivedAt = mockStoredDate(at)
         contacts[id] = c
+        broadcastTrackedChange()
     }
 
-    /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the
-    /// *current* dictionary entry (actor-isolated, so there's no separate
-    /// snapshot to go stale) and overwrites only these five fields, same as
-    /// the real field-scoped `UPDATE` — parity for `ContactsReconciler`'s
-    /// refresh writes between the production and mock/preview backends.
+    // MARK: - Live observation
+
+    /// Never replays the current value on subscribe — only a later write reaches the stream (see
+    /// `ContactRepository.observeTracked()`'s doc: an eager replay would race a caller's own optimistic update).
+    /// Registers synchronously via `AsyncStream.makeStream`, not the closure initializer, which can't touch
+    /// actor-isolated `trackedObservers` directly and could miss an early write from a deferred spawned `Task`.
+    /// `.bufferingNewest(1)`, not `.unbounded` — see `GRDBContactRepository.observeTracked()`'s matching comment.
+    func observeTracked() -> AsyncStream<[Contact]> {
+        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self, bufferingPolicy: .bufferingNewest(1))
+        let token = UUID()
+        trackedObservers[token] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeTrackedObserver(token) }
+        }
+        return stream
+    }
+
+    private func removeTrackedObserver(_ token: UUID) {
+        trackedObservers.removeValue(forKey: token)
+    }
+
+    private func broadcastTrackedChange() {
+        let current = tracked()
+        for continuation in trackedObservers.values {
+            continuation.yield(current)
+        }
+    }
+
+    /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the *current* entry (actor-isolated, so no
+    /// stale snapshot) and overwrites only these five fields — parity for `ContactsReconciler` across backends.
+    /// `broadcastTrackedChange()` at the end is the same R23 parity `deleteGroup` below needs it for — see its
+    /// comment for why a GRDB-matching mock has to broadcast here too.
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) {
         guard var c = contacts[id] else { return }
         c.displayName = fields.displayName
@@ -423,6 +329,20 @@ extension MockStore {
         c.preferredChannelValue = fields.preferredChannelValue
         c.archivedAt = fields.archivedAt.map(mockStoredDate)
         contacts[id] = c
+        broadcastTrackedChange()
+    }
+
+    /// Mirrors `GRDBContactRepository.updateLastInteractedAt`: writes exactly this one field,
+    /// same R23 broadcast parity as `updateReconciledFields` above, and reports whether `id`
+    /// matched — see the protocol doc comment for why the caller needs that, including why an
+    /// archived contact (round 8) counts as "no match" the same as a missing one.
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) -> Bool {
+        guard var c = contacts[id], c.isActive else { return false }
+        c.lastInteractedAt = mockStoredDate(date)
+        contacts[id] = c
+        broadcastTrackedChange()
+        return true
     }
 
     func allGroups() -> [ContactGroup] { Array(groups.values) }
@@ -435,6 +355,12 @@ extension MockStore {
             if updated.contactGroupId == id { updated.contactGroupId = nil }
             return updated
         }
+        // GRDB's real FK `ON DELETE SET NULL` writes every member row, and `observeTracked()`'s region-based
+        // observation fires on any write to the Contact table regardless of whether the *filtered* result changed —
+        // so a subscriber sees a fresh (if content-identical) emission after a group delete there. Without this call
+        // the mock silently drifted from that: a group delete never broadcast here, so a subscriber-driven parity
+        // test comparing the two backends would see GRDB emit and the mock stay silent.
+        broadcastTrackedChange()
     }
 
     func pendingReminders() -> [ScheduledReminder] {
@@ -453,6 +379,19 @@ extension MockStore {
         guard var r = reminders[id] else { return }
         r.state = state
         reminders[id] = r
+    }
+    /// Compare-and-set counterpart to `updateReminderState` — see
+    /// `ReminderRepository.transitionState`'s doc comment. Safe from the mock
+    /// backend's own concurrency the same way `updateLastInteractedAt`'s
+    /// field-scoped write is: this actor serializes every call already, so
+    /// the "current state" check and the write below can't straddle a
+    /// suspension point the way two independent calls into GRDB could.
+    @discardableResult
+    func transitionReminderState(id: UUID, from: ReminderState, to: ReminderState) -> Bool {
+        guard var r = reminders[id], r.state == from else { return false }
+        r.state = to
+        reminders[id] = r
+        return true
     }
     func deleteReminder(id: UUID) { reminders.removeValue(forKey: id) }
 

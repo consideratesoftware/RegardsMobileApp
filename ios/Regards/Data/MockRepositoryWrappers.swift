@@ -12,11 +12,19 @@ struct MockContactRepository: ContactRepository {
     }
     func upsert(_ contact: Contact) async throws { try await store.upsertContact(contact) }
     func archive(id: UUID, at: Date) async throws { await store.archiveContact(id: id, at: at) }
+    func observeTracked() async -> AsyncStream<[Contact]> { await store.observeTracked() }
 
     /// Overrides the protocol's default (fetch + apply + upsert) with the
     /// real field-scoped mock write, for parity with `GRDBContactRepository`.
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
         await store.updateReconciledFields(id: id, fields: fields)
+    }
+
+    /// Overrides the protocol's default the same way, for the same reason —
+    /// see `updateReconciledFields` immediately above.
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
+        await store.updateLastInteractedAt(id: id, at: date)
     }
 
     /// Overrides the protocol's default (which reports zero corruption for
@@ -46,6 +54,10 @@ struct MockReminderRepository: ReminderRepository {
     }
     func updateState(id: UUID, state: ReminderState) async throws {
         await store.updateReminderState(id: id, state: state)
+    }
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        await store.transitionReminderState(id: id, from: from, to: to)
     }
     func delete(id: UUID) async throws { await store.deleteReminder(id: id) }
 }
