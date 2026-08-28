@@ -26,23 +26,28 @@ public struct UpcomingRowState: Sendable, Identifiable, Equatable {
     public let dayHeader: String
 
     /// The spoken VoiceOver label for this row, e.g.
-    /// "Leia Organa, Jedi Order anniversary at 6:00 pm". Lives on the state,
+    /// "Leia Organa, Jedi Order anniversary at 6:00 pm" for an occasion row,
+    /// or plain "Han Solo at 6:00 pm" for a cadence row. Lives on the state,
     /// not the view, so it's unit-testable: the row previously interpolated
     /// `kind` directly and VoiceOver read the raw enum case name
-    /// ("customOccasion") instead of the occasion's label. Cadence rows
-    /// speak their cadence text; every other kind speaks its occasion text.
-    /// A row with neither omits the phrase rather than speaking empty.
+    /// ("customOccasion") instead of the occasion's label.
     ///
-    /// Already satisfies `ios/docs/accessibility.md`'s "labels mirror
-    /// visible content" rule with no departure to record (staged review
-    /// round 11 audit): this picks the same single fact `UpcomingRow.occasion`
-    /// renders (`occasionText` for an occasion row, `cadenceText` for a
-    /// cadence row — never both, `kind` determines which one the model
-    /// populates), so what's spoken always matches what's on screen. See
-    /// `occasion`'s own doc comment for why that visible line wasn't
-    /// trimmed the way Overdue's was.
+    /// Cadence rows dropped their cadence text from the spoken label in
+    /// round 12, matching `UpcomingRow.occasion`'s identical visual trim —
+    /// see that property's doc comment for why (Sid's call: cadence restates
+    /// `timeOfDayText`'s "when," making name + cadence + time one fact too
+    /// many, the same shape Overdue's row trimmed in round 11). Occasion
+    /// rows are unaffected — `occasionText` is still the one fact `time`
+    /// can't supply on its own, so it still speaks. A row with no text for
+    /// its kind omits the phrase rather than speaking empty.
+    ///
+    /// Still satisfies `ios/docs/accessibility.md`'s "labels mirror visible
+    /// content" rule with no departure to record: this reads the same single
+    /// fact `UpcomingRow.occasion` renders now (`occasionText` only, and
+    /// only for a non-cadence row), so what's spoken always matches what's
+    /// on screen.
     public var accessibilityLabel: String {
-        let what = kind == .cadence ? cadenceText : occasionText
+        let what = kind == .cadence ? nil : occasionText
         guard let what, !what.isEmpty else {
             return "\(name) at \(timeOfDayText)"
         }

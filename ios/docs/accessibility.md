@@ -69,25 +69,39 @@ its site — not a silent choice a later reader has to reverse-engineer or
 
 Current departures, each written up where it lives:
 
-1. **Channel button** (Overdue's `channelPill`,
-   `ios/Regards/Features/Overdue/OverdueScreen.swift`). Round 11 collapsed the
-   channel icon to one of three shared SF Symbols by action
-   (`ChannelGlyph.symbol(for:)`: `phone.fill` / `video.fill` /
-   `bubble.left.and.bubble.right.fill`), so the glyph no longer visually
-   distinguishes between the 8+ channels that now share the bubble symbol.
-   The label keeps naming the specific channel ("WhatsApp, unavailable",
-   "Signal, unavailable", …) exactly as before the icon change. Collapsing
-   the label to something generic like "Message, unavailable" for
-   consistency with the shared glyph would leave a VoiceOver user
-   worse-informed than a sighted user, who can still tell channels apart
-   by context on Contact Detail — the opposite of what this rule protects.
-2. **Caught up / Snooze icon buttons** (Overdue's `caughtUpButton` and
-   `snoozeButton`; Upcoming's `caughtUpButton`; same file and
-   `ios/Regards/Features/Upcoming/UpcomingScreen.swift`). These are
-   icon-only controls — a checkmark or a clock face, no visible text at
-   all — so there's nothing on screen for the label to mirror. The label
-   names the action instead: "Mark <name> caught up", "Snooze <name> 1
-   week".
+1. **Channel glyph, resolved rather than departing (round 12).** Overdue and
+   Upcoming's trailing `ChannelGlyph` used to be its own accessible element —
+   a channel pill labeled "WhatsApp, unavailable", "Signal, unavailable", …
+   even though round 11 had already collapsed its *visual* symbol to one of
+   three shared SF Symbols by action type, a real departure recorded here
+   for several rounds: a VoiceOver user could tell channels apart that a
+   sighted user, looking at the same shared bubble/phone/camera glyph,
+   couldn't. Round 12 (`ARCHITECTURE.md` R52) removed the departure rather
+   than writing it up again: `ChannelGlyph` is purely decorative now, folded
+   into the row's single `.accessibilityElement(children: .ignore)` label
+   (`OverdueRow`/`UpcomingRow`, same two files), which — like the glyph
+   itself — doesn't name the channel either. Both modalities are equally
+   uninformed about *which* channel until the row is activated, at which
+   point the channel-preview alert (`Channel.tapPreviewMessage(for:)`) names
+   it for everyone, sighted and VoiceOver alike, in the same alert. Visible
+   and spoken content match exactly again, with no exception to write down.
+2. **Caught up / Snooze icon buttons, now swipe actions (round 12).**
+   Overdue's Caught up / Snooze and Upcoming's Caught up moved off the row
+   entirely, from custom icon-only `Button`s to native `List`/
+   `.swipeActions` (`ARCHITECTURE.md` R52) — same two files. The departure
+   itself is unchanged in shape, just in mechanism: revealed, a swipe action
+   shows a short visible label ("Caught up", "Snooze") that the spoken label
+   ("Mark <name> caught up", "Snooze <name> 1 week") still says more than,
+   since the contact's name distinguishes rows the way the standing rule
+   above requires. Confirmed by test (`ScreensAccessibilityTests
+   +RowActions.swift`'s `testOverdueRowActionsAreWiredAndLabeled` /
+   `testUpcomingRowActionIsWiredAndLabeled`), with a caveat worth stating
+   plainly: XCUITest has no public API to enumerate the VoiceOver rotor's
+   "Actions" the way a person would — those tests reveal the swipe actions
+   by gesture (the same `UISwipeActionsConfiguration` buttons the rotor also
+   exposes) and assert on the result, which proves the buttons exist,
+   are correctly labeled, and are activatable, but doesn't simulate the
+   rotor picker itself.
 
 Read together, the rule in practice is: mirror the information when there's
 visible information to mirror, and name the action when the control is an
@@ -137,11 +151,12 @@ screen-level VoiceOver smoke and automated audit coverage.
 | Upcoming | PR3 / TF-01 | Native large title and modern empty state. |
 | All Contacts | PR3 / TF-01; corruption banner TF-03 / PR21 | Search-role destination on iOS 18+; embedded search fallback on iOS 17. R50: when `fetchAllWithDiagnostics()` reports one or more undecodable rows, a conditional banner (`contacts.corruption-banner`, `.accessibilityElement(children: .combine)`, icon `.accessibilityHidden(true)`) renders above the list with a combined label equal to the visible "N contact(s) couldn't be read and need attention." message. Label composition (including pluralization) is covered by the plain-unit `AllContactsCorruptionAnnouncementTests`/`AllContactsViewModelTests.corruptionMessagePluralizesForMultipleRows`; the banner's real on-screen accessibility tree — reachable via the `REGARDS_UI_TEST_SEED_CORRUPT_ROW` launch-environment fixture — is proven by the XCUITest `ScreensAccessibilityTests.testContactsCorruptionBannerPassesAudit`, which runs where assistive technology is genuinely active — an in-process unit-level UIKit tree walk can't reproduce that on headless CI, so this PR dropped the earlier in-process version of this test rather than keep a check that only passed locally. Manual VoiceOver smoke for this state is outstanding — see `accessibility-smoke.md`. |
 | Settings | PR3 | |
-| Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. |
-| Contact Detail (via Overdue → row) | PR5 (`ios/phase-0-a11y-tighten`) | Factory-built VM per push. |
-| Contact Detail (via Upcoming → row) | PR5 | Factory-built VM per push. |
+| Contact Detail (via Contacts → row) | PR3 / TF-01 | Stable-ID destination with a fresh ViewModel per push. As of round 12 (`ARCHITECTURE.md` R52), this is the *only* route to Contact Detail — Overdue and Upcoming's rows no longer push there. |
+| ~~Contact Detail (via Overdue → row)~~ — **removed, round 12** | PR5 (`ios/phase-0-a11y-tighten`) → removed TF-04/R52 | Overdue's row tap opens a channel-preview alert instead (see the new row below); it no longer pushes Contact Detail. The per-push-VM-factory regression this route used to guard moved to the Contacts route above (`ScreensAccessibilityTests.testContactsNavigationShowsDistinctContacts`, formerly `testOverdueNavigationShowsDistinctContacts`). Kept as a row, not deleted outright, so the removal itself stays a documented decision rather than a silent gap — see R52's own entry for the full reasoning. |
+| ~~Contact Detail (via Upcoming → row)~~ — **removed, round 12** | PR5 → removed TF-04/R52 | Same removal, same replacement, Upcoming's row. |
+| Overdue / Upcoming channel-preview alert (via row tap) | TF-04 / R52 (round 12) | Replaces both screens' former row-tap-to-Contact-Detail push. Native `.alert`, not a custom sheet — same reasoning as Log other below: reachable, labelled dismissal on every OS version, no popover/translucency failure mode to reproduce. Own audit + dismissal test per screen (`testOverdueChannelPreviewPassesAuditAndDismisses`, `testUpcomingChannelPreviewPassesAuditAndDismisses`, `ScreensAccessibilityTests+RowActions.swift`), mirroring `testLogOtherChannelPickerPassesAudit`'s shape. |
 | Contact Preview (via Contacts → Contact Detail → Edit) | TF-01 / GitHub PRs #23, #37 | Structural audit coverage, speakable preferred-field state, and standard Back escape route; the real form remains TF-09. |
-| Log other channel picker (`LogOtherChannelSheet`, via Contact Detail → Log other) | TF-04 / PR22 | Own `NavigationStack`, own title, own audit test (`testLogOtherChannelPickerPassesAudit`) — same rule (§10) and precedent (Contact Preview above, R16) as any other screen reached by a push/present, despite living in one file with its trigger. Replaced an earlier `confirmationDialog` that rendered as a translucent popover with no reachable Cancel control on the OS this shipped against; Cancel here is an ordinary full-width button in the sheet's own content, not a `.toolbar` item — a live accessibility-tree dump on the dedicated test simulator showed a toolbar Cancel never resolving hittable, and a second dump showed a Cancel placed as a trailing `List` row not existing in the tree at all (`List` only materializes rows near the visible viewport; a row after all 13 channels is never scrolled into view by anything in this flow). |
+| Log other channel picker (`LogOtherChannelSheet`, via Contact Detail → Log other) | TF-04 / PR22 | Own `NavigationStack`, own title, own audit test (`testLogOtherChannelPickerPassesAudit`) — same rule (§10) and precedent (Contact Preview above, R16) as any other screen reached by a push/present, despite living in one file with its trigger. Replaced an earlier `confirmationDialog` that rendered as a translucent popover with no reachable Cancel control on the OS this shipped against; Cancel here is an ordinary full-width button in the sheet's own content, not a `.toolbar` item — a live accessibility-tree dump on the dedicated test simulator showed a toolbar Cancel never resolving hittable, and a second dump showed a Cancel placed as a trailing `List` row not existing in the tree at all (`List` only materializes rows near the visible viewport; a row after all 13 channels is never scrolled into view by anything in this flow). Reached via Contacts as of round 12 — its trigger (Contact Detail) no longer has an Overdue/Upcoming entry point either. |
 | Reminder Windows | PR3 | Reached via Settings → Reminder windows. |
 | Merge Duplicates | PR3 / TF-01 | Reached via Settings → Find duplicate contacts; candidate choices survive a tab-root round trip. |
 | Transparency | PR3 | Reached via Settings → Transparency. |
@@ -217,6 +232,33 @@ suppressed audit finding needs the same scrutiny as a passing one — "this
 looks like system chrome" is not the same claim as "this is not a real
 defect."
 
+**Third instance, round 12, unresolved — flagged rather than dismissed
+either way.** Overdue and Upcoming's new channel-preview `.alert`
+(`ARCHITECTURE.md` R52) reproducibly triggers 3 `.elementDetection`
+"Potentially inaccessible text" findings while open — confirmed
+deterministic with a throwaway diagnostic run using
+`performAccessibilityAudit`'s `issueHandler` closure: 0 issues with the
+screen alone, 3 every time with the alert open, on both screens. Unlike
+either instance above, `XCUIAccessibilityAuditIssue.element` is `nil` for
+this exact message — confirmed directly against this issue, not assumed
+from precedent — so neither the "traced into OS UI" proof the first
+instance used nor the "traced into app UI" proof the second instance used
+is available in either direction. Switching the alert from
+`.alert(item:content:)` returning the older `Alert` struct to the modern
+`isPresented:presenting:actions:message:` builder (a legitimate change on
+its own merits) changed nothing, which weighs against the app's own alert
+content being the cause without proving it — three text nodes (title,
+message, dismiss button) is suggestive of the alert's own chrome, not
+conclusive. `ScreensAccessibilityTests+RowActions.swift`'s
+`testOverdueChannelPreviewPassesAuditAndDismisses` /
+`testUpcomingChannelPreviewPassesAuditAndDismisses` exclude
+`.elementDetection` only (the other three structural categories still
+gate) with this paragraph cited at the call site. Resolve by a real-device
+VoiceOver pass confirming the alert's title, message, and Done button are
+each announced correctly — already required before merge
+(`accessibility-smoke.md`) — and update this entry with the result either
+way rather than leaving it open indefinitely.
+
 ## Sensory-audit carve-outs
 
 The enabled automated audit set uses the **structural** categories
@@ -240,14 +282,26 @@ after PR4's sweep fall into two buckets, both intentional:
   actions are wired (TF-04, R11): real, hittable controls, not muted text —
   Snooze via `SchedulingPass`'s §14 PR22 DB-only stub (decision #36).
   Overdue and Upcoming carry the same Caught up (and, for Overdue, Snooze)
-  as real per-row controls. Contact Detail's primary channel and Overdue's
-  channel pills remain muted, noninteractive content until TF-08 supplies
-  deep-link routing. Their labels include “unavailable” without exposing a
-  false button trait.
-- **Navigation**: Overdue / Upcoming row taps now push Contact Detail via
-  per-tab `NavigationPath`; the tab-root factory creates a fresh VM per
-  push so tapping two different contacts in succession shows the right
-  data. iOS 18 matched zoom is disabled under Reduce Motion.
+  as real controls, as native `.swipeActions` since round 12 rather than
+  per-row buttons (`ARCHITECTURE.md` R52). Contact Detail's primary channel
+  remains muted, noninteractive content until TF-08 supplies deep-link
+  routing, with a label that includes "unavailable" without exposing a
+  false button trait. Overdue and Upcoming's own channel glyph is no longer
+  a separate "unavailable" control at all (round 12) — it's decorative,
+  folded into the row's label — and the row's tap opens a channel-preview
+  alert instead, honest about not being wired yet without using
+  "unavailable" framing (see *Labels mirror visible content* above and the
+  *Screens audited* table's channel-preview row).
+- **Navigation**: Contacts row taps push Contact Detail via per-tab
+  `NavigationPath`; the tab-root factory creates a fresh VM per push so
+  tapping two different contacts in succession shows the right data. iOS 18
+  matched zoom is disabled under Reduce Motion. Overdue and Upcoming row
+  taps *used to* push Contact Detail the same way; round 12
+  (`ARCHITECTURE.md` R52) replaced that with a channel-preview `.alert` on
+  both screens instead — see the *Screens audited* table's now-removed
+  "via Overdue/Upcoming → row" rows and the new channel-preview row that
+  replaced them. Contacts is the only screen left where a row push, and the
+  per-push VM factory it exercises, still applies.
 - **Dynamic Type on screen content**: repeated two-branch container layouts in
   the Overdue / Upcoming selector, digest, list rows, Contact Detail
   actions/interactions/cards, and Contact Preview fields use the shared
@@ -377,6 +431,40 @@ was used to confirm the original Overdue row-crowding bug this round
 started from, and it is the shape of usage this category is suited to on
 this toolchain — not a standing, always-on gate.
 
+## XCUITest cannot drive swipe actions at accessibility5
+
+The swipe redesign's row actions (swipe right = Caught up, swipe left =
+Snooze) are covered end to end at default text size by
+`testOverdueRowActionsAreWiredAndLabeled` and
+`testUpcomingRowActionIsWiredAndLabeled`, which reveal the action *and*
+activate it. The two accessibility5 equivalents are `XCTSkip`ped, and this
+is why.
+
+**The product behaviour is correct.** Verified on device 2026-08-22, build
+`9743193` on "Comm Link 17" (iPhone 17 Pro, iOS 26): at accessibility5,
+after scrolling the Overdue list, a real finger swiping right both reveals
+the Caught up action and completes it.
+
+**What fails is the synthetic gesture.** Once a scroll has happened at that
+text size, XCUITest's swipe never triggers the reveal — reproduced across
+partial drags, full swipes, absolute coordinates, added settle delays,
+press-and-hold, and near-full-width drags, on both list screens, while the
+identical gesture at default size with no scroll succeeds. Unproven but
+consistent hypothesis: the `List`'s scroll recogniser stays armed and
+swallows the horizontal drag.
+
+**Why skipped rather than deleted or left red.** Deleted, the intent
+disappears and nobody re-checks whether a later OS makes it drivable.
+Left red, it joins the set of failures everyone knows about and stops
+reading — which is how a real regression hides. Skipped, it reports as
+skipped, carries its reason, and can be un-skipped in one line.
+
+**What this costs.** Nothing verifies automatically that the row actions
+stay revealable at accessibility5; a regression there would be caught only
+by the manual smoke. That gap is real and is the reason this section names
+the device, build, and date — so the next person can tell how stale the
+evidence is rather than assuming it still holds.
+
 ## Test patterns
 
 How you wait for a UI element matters as much as which element you wait for.
@@ -413,8 +501,11 @@ Apply the same pattern to pushed navigation: resolve the current trigger
 element for every attempt, use the same bounded poll and varied activations,
 and require the plain destination identifier to appear while the source screen
 identifier disappears. `launchToContactDetailFromContacts`,
-`navigateFromSettings`, `navigateToRow`, and the consolidated `navigate` helper
-are the canonical implementations.
+`navigateFromSettings`, `openContactDetail`, and the consolidated `navigate`
+helper are the canonical implementations. (`navigateToRow` — the original
+canonical implementation for this pattern — was removed in round 12: Overdue
+and Upcoming's rows are its only former callers, and neither pushes anywhere
+any more, see `ARCHITECTURE.md` R52.)
 
 The varied activation paths are synchronization workarounds for dropped
 Simulator events. They do not replace hit-region coverage: the sensory audit
@@ -457,3 +548,43 @@ sweep runs nightly and through `workflow_dispatch` in
 `.github/workflows/audit-stress.yml`. Those runs own broad flake detection. A
 failure blocks the next release and becomes the next repair item; it does not
 justify rerunning the full suite during every PR.
+
+### 4. A `Button`-rooted `List` row does not collapse to one accessibility element by default
+
+Round 12 (`ARCHITECTURE.md` R52) found this the hard way: `OverdueRow` and
+`UpcomingRow` each read as a single tappable unit — `Button(action:) { ... }
+.accessibilityElement(children: .ignore).accessibilityLabel(...)` — the exact
+shape that collapsed correctly under the old `ScrollView`. Under `List`, it
+didn't. `ScreensAccessibilityTests+RowActions.swift`'s
+`assertRowIsOneOpaqueElement` (`row.children(matching: .any).count == 0`)
+caught it live: Overdue's row still leaked one child — a duplicate of the row
+itself, same label, `Button`-typed; Upcoming's leaked four — avatar initials,
+name, time, and the channel glyph, the last of which carries
+`.accessibilityHidden(true)` at its own declaration (`ChannelGlyph.body`) and
+still leaked. `List` composes a `Button`-rooted row's cell in a way neither
+`.accessibilityElement(children: .ignore)` nor `.combine` fully suppresses —
+confirmed structural, not a missing modifier: swapping `.ignore` for
+`.combine`, reordering modifiers relative to `.swipeActions`, and wrapping the
+`Button` in a plain `Group` all left the leak unchanged.
+
+**Fix:** `.accessibilityRepresentation { Button(action: sameAction) { Text
+(sameLabel) } }` in place of `.accessibilityElement(children:)` +
+`.accessibilityLabel(...)`. This substitutes the row's entire accessibility
+subtree rather than trying to hide or merge the real one, which is what
+actually closes the leak (`children(matching: .any).count == 0`, confirmed by
+test). The representation must itself be a `Button`, not a plain `Text` — an
+earlier attempt using just `Text` did zero out the leak but also silently
+dropped the row's `.isButton` trait (`elementType` read back as `staticText`,
+not `button`) — a VoiceOver user would hear the row's content but get no
+indication it does anything. Wrapping the representation's `Text` in its own
+`Button`, sharing the same tap action, restored the trait: confirmed via
+`elementType.rawValue == 9` (button) and a positive `app.buttons.matching
+(identifier:)` count, not assumed from the fix compiling.
+
+**This is a standing rule for every future `List` row that needs to collapse
+to one spoken element, not an Overdue/Upcoming-specific fix.** Any new
+`List`-backed screen with row content built from more than a bare `Text`
+needs this same `.accessibilityRepresentation` treatment and the same
+`children(matching: .any).count == 0` proof in its test — reading the
+modifier chain and assuming `.ignore` worked is exactly the mistake this round
+corrected.
