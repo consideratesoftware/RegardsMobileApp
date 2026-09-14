@@ -56,18 +56,24 @@ public enum Channel: String, CaseIterable, Codable, Sendable, Hashable {
     /// the way the others are — `ChannelCatalog.metadata` already documents
     /// it as having no deep link at all, ever, so its preview says that
     /// honestly instead of promising an app that will never open.
+    ///
+    /// The switch is exhaustive on purpose, like every other `Channel`
+    /// switch (`ChannelGlyph.symbol`, `ChannelCatalog.metadata`): a new §8
+    /// channel must choose its preview here rather than silently inherit
+    /// "open <app> with <name>" and imply a deep link that may not exist.
+    /// `ChannelTapPreviewMessageTests` pins one exact string per case.
     public func tapPreviewMessage(for name: String) -> String {
-        guard self != .inPerson else {
-            return "\(name)'s preferred channel is in person, so there's no app to open here — "
-                + "this reminder is a nudge to reach out yourself."
-        }
         let verbPhrase: String
         switch self {
         case .phoneCall:  verbPhrase = "call \(name)"
         case .facetime:   verbPhrase = "FaceTime \(name)"
         case .sms:        verbPhrase = "text \(name)"
         case .email:      verbPhrase = "email \(name)"
-        default:          verbPhrase = "open \(displayName) with \(name)"
+        case .whatsapp, .telegram, .signal, .messenger, .instagramDM, .linkedinMsg, .discord, .custom:
+            verbPhrase = "open \(displayName) with \(name)"
+        case .inPerson:
+            return "\(name)'s preferred channel is in person, so there's no app to open here — "
+                + "this reminder is a nudge to reach out yourself."
         }
         return "Would \(verbPhrase). Channel actions aren't wired up yet — this previews what tapping will do."
     }
