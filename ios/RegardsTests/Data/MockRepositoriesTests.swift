@@ -22,6 +22,11 @@ struct MockRepositoriesTests {
         #expect(primary.contactGroupId == group.id)
         #expect(members.contains(where: { !$0.isActive }))
 
+        // No `isVirtualMerged`/"merged contact" assertions here (round 11):
+        // that field and spoken phrase were removed from Overdue's row
+        // entirely — see `OverdueRowState`'s doc comment for why. This
+        // still proves `makeOverdueRow` builds cleanly for a grouped
+        // contact's primary, the thing this test's own title is about.
         let overdueRow = try #require(
             OverdueViewModel.makeOverdueRow(
                 for: primary,
@@ -29,8 +34,6 @@ struct MockRepositoriesTests {
                 calendar: Calendar(identifier: .gregorian)
             )
         )
-        #expect(overdueRow.isVirtualMerged)
-        #expect(overdueRow.accessibilityLabel.contains(", merged contact,"))
         #expect(overdueRow.accessibilityLabel.hasSuffix("."))
     }
 
@@ -68,6 +71,8 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
+            scheduler: SchedulingPass(reminders: mocks.reminders, contacts: mocks.contacts, clock: { now }),
+            interactions: mocks.interactions,
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -154,9 +159,12 @@ struct MockRepositoriesTests {
                 osNotificationId: "beyond-horizon"
             ),
         ]
+        let remindersRepository = StubReminderRepository(reminders)
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository(reminders),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -203,9 +211,12 @@ struct MockRepositoriesTests {
                 osNotificationId: "same-contact-first-birthday"
             ),
         ]
+        let remindersRepository = StubReminderRepository(reminders)
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository(reminders),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )
@@ -264,9 +275,12 @@ struct MockRepositoriesTests {
             scheduledFor: scheduledFor,
             osNotificationId: "horizon-boundary"
         )
+        let remindersRepository = StubReminderRepository([reminder])
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository([reminder]),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { nowDate }),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
         )
@@ -301,9 +315,12 @@ struct MockRepositoriesTests {
             scheduledFor: horizonEnd,
             osNotificationId: "exact-horizon-end"
         )
+        let remindersRepository = StubReminderRepository([visible, excluded])
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
-            reminders: StubReminderRepository([visible, excluded]),
+            reminders: remindersRepository,
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
+            interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
         )

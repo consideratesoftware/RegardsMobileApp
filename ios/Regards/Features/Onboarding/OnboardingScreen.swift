@@ -213,8 +213,17 @@ public struct OnboardingScreen: View {
             Text(isBusy ? "Importing contacts…" : "Allow contacts access")
                 .font(.headline)
                 .foregroundStyle(RegardsDS.background)
+                .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                // `minHeight`, not a fixed `height` (staged review round 11,
+                // `.textClipped` audit finding): `.headline` scales with
+                // Dynamic Type same as any other system font, and at
+                // `accessibility5` "Allow contacts access" needs two lines —
+                // a fixed 54pt height clipped the second one instead of
+                // growing to fit it. `minHeight: 54` keeps the same tap
+                // target at every other size while letting this one grow.
+                .frame(minHeight: 54)
+                .padding(.vertical, 8)
                 // Background-on-`accentInk` passes AA in both color schemes.
                 .background(RegardsDS.accentInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }

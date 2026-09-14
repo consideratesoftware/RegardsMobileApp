@@ -122,12 +122,8 @@ final class LaunchAccessibilityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(why.frame.height, 44)
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
-        browse.tap()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        XCTAssertTrue(
-            overdue.waitForExistence(timeout: 10),
-            "Browse-only onboarding should reveal production-backed tabs."
-        )
+        tap(browse, until: overdue, message: "Browse-only onboarding should reveal production-backed tabs.")
     }
 
     @MainActor
@@ -169,12 +165,8 @@ final class LaunchAccessibilityTests: XCTestCase {
         )
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
-        allow.tap()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        XCTAssertTrue(
-            overdue.waitForExistence(timeout: 10),
-            "Retry should resume the import and reveal production-backed tabs."
-        )
+        tap(allow, until: overdue, message: "Retry should resume the import and reveal production-backed tabs.")
     }
 
     @MainActor
@@ -203,12 +195,8 @@ final class LaunchAccessibilityTests: XCTestCase {
         )
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
-        browse.tap()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        XCTAssertTrue(
-            overdue.waitForExistence(timeout: 10),
-            "Browse-only recovery should reveal production-backed tabs."
-        )
+        tap(browse, until: overdue, message: "Browse-only recovery should reveal production-backed tabs.")
     }
 
     @MainActor

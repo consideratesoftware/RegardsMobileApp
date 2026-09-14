@@ -26,34 +26,32 @@ struct ContactAccessibilityTests {
                 preferredChannelValue: "+919876543210")
     }
 
+    /// No `effectiveLastInteractedAt` construction argument and no "every N
+    /// days"/"last contacted…" assertions here any more (staged review
+    /// round 11): both were dropped from `AccessibilityContext` and the
+    /// label itself — see `accessibilityLabel(context:)`'s own doc comment
+    /// for the standing "labels mirror visible content" principle behind
+    /// the removal.
     @Test("Overdue label reads as a natural sentence")
     func overdueLabel() {
         let now = Self.date("2026-04-19 14:00")
-        let last = Self.date("2026-03-29 09:00")
-        let ctx = Contact.AccessibilityContext(
-            now: now, effectiveLastInteractedAt: last,
-            isOverdue: true, overdueDays: 9)
+        let ctx = Contact.AccessibilityContext(now: now, isOverdue: true, overdueDays: 9)
         let c = Self.makeContact()
         let label = c.accessibilityLabel(context: ctx)
         #expect(label.contains("Priya Raghavan"))
         #expect(label.contains("9 days overdue"))
-        #expect(label.contains("every 14 days"))
-        #expect(label.contains("last contacted 3 weeks ago"))
         #expect(label.hasSuffix("Inner circle."))
     }
 
     @Test("Pluralization at boundaries (0, 1, 2)")
     func pluralization() {
         let now = Date()
-        let ctx1 = Contact.AccessibilityContext(
-            now: now, effectiveLastInteractedAt: nil, isOverdue: true, overdueDays: 1)
+        let ctx1 = Contact.AccessibilityContext(now: now, isOverdue: true, overdueDays: 1)
         let c1 = Self.makeContact(cadence: 1)
         let label1 = c1.accessibilityLabel(context: ctx1)
         #expect(label1.contains("1 day overdue"))
-        #expect(label1.contains("every 1 day"))
 
-        let ctx0 = Contact.AccessibilityContext(
-            now: now, effectiveLastInteractedAt: nil, isOverdue: true, overdueDays: 0)
+        let ctx0 = Contact.AccessibilityContext(now: now, isOverdue: true, overdueDays: 0)
         let c0 = Self.makeContact()
         let label0 = c0.accessibilityLabel(context: ctx0)
         #expect(label0.contains("0 days overdue"))
@@ -72,24 +70,24 @@ struct ContactAccessibilityTests {
         #expect(Contact.relativeDescription(for: now.addingTimeInterval(-86400 * 400), from: now) == "1 year ago")
     }
 
-    @Test("Untracked contact's label flags state instead of cadence")
+    @Test("Untracked contact's label flags state instead of overdue status")
     func untrackedLabel() {
         let now = Date()
-        let ctx = Contact.AccessibilityContext(
-            now: now, effectiveLastInteractedAt: nil, isOverdue: false, overdueDays: 0)
+        let ctx = Contact.AccessibilityContext(now: now, isOverdue: false, overdueDays: 0)
         let c = Self.makeContact(tracked: false)
         let label = c.accessibilityLabel(context: ctx)
         #expect(label.contains("not tracked"))
-        #expect(!label.contains("every"))
+        // No "every" assertion here any more (staged review round 11): cadence
+        // phrasing was removed from every label, tracked or not, so a check
+        // that untracked specifically omits it no longer discriminates
+        // anything — see `accessibilityLabel(context:)`'s doc comment.
     }
 
     @Test("Status chip mirrors the overdue state")
     func statusChip() {
         let now = Date()
-        let overdue = Contact.AccessibilityContext(
-            now: now, effectiveLastInteractedAt: nil, isOverdue: true, overdueDays: 9)
-        let onTime = Contact.AccessibilityContext(
-            now: now, effectiveLastInteractedAt: nil, isOverdue: false, overdueDays: 0)
+        let overdue = Contact.AccessibilityContext(now: now, isOverdue: true, overdueDays: 9)
+        let onTime = Contact.AccessibilityContext(now: now, isOverdue: false, overdueDays: 0)
         #expect(Self.makeContact().statusChip(context: overdue) == "9d overdue")
         #expect(Self.makeContact().statusChip(context: onTime) == nil)
     }
