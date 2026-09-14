@@ -16,7 +16,6 @@ workflow = YAML.safe_load(
 )
 jobs = workflow.fetch("jobs")
 open_check = jobs.fetch("open_check")
-preflight = jobs.fetch("preflight")
 analyze = jobs.fetch("analyze")
 publish = jobs.fetch("publish")
 # bootstrap_review was a one-time compatibility job named `review` whose body
@@ -28,12 +27,11 @@ publish = jobs.fetch("publish")
 raise "the echo-only bootstrap review job must stay deleted" if jobs.key?("bootstrap_review")
 raise "workflow must not run on the PR-controlled pull_request event" if workflow.fetch(true).key?("pull_request")
 
-raise "preflight must wait for the pending head check" unless preflight.fetch("needs") == "open_check"
-raise "analysis must wait for trusted preflight" unless analyze.fetch("needs") == "preflight"
+raise "analysis must wait for the pending head check" unless analyze.fetch("needs") == "open_check"
 raise "head check must use the protected environment" unless open_check.fetch("environment") == "hosted-review"
 raise "publisher must use the protected environment" unless publish.fetch("environment") == "hosted-review"
 raise "publisher token permissions expanded" unless publish.fetch("permissions") == {"contents" => "read"}
-[open_check, preflight, analyze, publish].each do |job|
+[open_check, analyze, publish].each do |job|
   raise "trusted job can run on a PR-controlled workflow" unless job.fetch("if").include?("github.event_name == 'pull_request_target'")
 end
 
@@ -41,7 +39,7 @@ open_steps = open_check.fetch("steps")
 open_token_step = open_steps.find { |step| step["id"] == "review_app_token" }
 raise "head check App token step missing" unless open_token_step
 raise "head check App token action must stay pinned" unless open_token_step.fetch("uses") == "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1"
-raise "head check must be opened before preflight" unless open_steps.any? { |step| step["id"] == "head_check" }
+raise "head check must be opened before analysis" unless open_steps.any? { |step| step["id"] == "head_check" }
 raise "head check ID must cross the job boundary" unless open_check.fetch("outputs").fetch("check_id") == "${{ steps.head_check.outputs.id }}"
 open_check_text = open_check.to_s
 raise "dedicated check name missing" unless open_check_text.include?("Regards staged review")
