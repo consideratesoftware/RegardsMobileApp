@@ -242,9 +242,7 @@ struct ContactGroupRepositoryContractTests {
             createdAt: Date(timeIntervalSince1970: 1_700_000_000.875)
         )
         try await repositories.groups.upsert(orphanPrimaryGroup)
-        #expect(
-            try await repositories.groups.fetch(id: orphanPrimaryGroup.id) == (try contractStored(orphanPrimaryGroup))
-        )
+        #expect(try await repositories.groups.fetch(id: orphanPrimaryGroup.id) == contractStored(orphanPrimaryGroup))
 
         let missingGroupID = try contractUUID(213)
         let orphanContact = contractContact(
