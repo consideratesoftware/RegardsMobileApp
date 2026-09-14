@@ -137,23 +137,19 @@ echo 'PASS: renders request changes and signals it with exit 2'
 
 output_file="$(mktemp)"
 printf '%s\n' "$approval" > "$output_file"
-"$output_guard" success success "$output_file" >/dev/null
-echo 'PASS: accepts successful analysis and preflight with artifact'
+"$output_guard" success "$output_file" >/dev/null
+echo 'PASS: accepts successful analysis with artifact'
 
 whitespace_file="$(mktemp)"
 printf '\n' > "$whitespace_file"
 set +e
-"$output_guard" failure success "$output_file" >/dev/null 2>&1
+"$output_guard" failure "$output_file" >/dev/null 2>&1
 failed_analysis_status=$?
-"$output_guard" success failure "$output_file" >/dev/null 2>&1
-failed_preflight_status=$?
-"$output_guard" success success "$whitespace_file" >/dev/null 2>&1
+"$output_guard" success "$whitespace_file" >/dev/null 2>&1
 empty_artifact_status=$?
 set -e
 test "$failed_analysis_status" -ne 0
-test "$failed_preflight_status" -ne 0
 test "$empty_artifact_status" -ne 0
 rm -f "$output_file" "$whitespace_file"
 echo 'PASS: rejects failed analysis'
-echo 'PASS: rejects failed trusted preflight'
 echo 'PASS: rejects whitespace-only artifact'

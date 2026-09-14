@@ -2,22 +2,16 @@
 
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-  echo "usage: $0 <analysis-result> <preflight-result> <artifact-json>" >&2
+if [[ $# -ne 2 ]]; then
+  echo "usage: $0 <analysis-result> <artifact-json>" >&2
   exit 64
 fi
 
 analysis_result="$1"
-preflight_result="$2"
-artifact_file="$3"
+artifact_file="$2"
 
 if [[ "$analysis_result" != success ]]; then
   echo "::error::Hosted review analysis finished with $analysis_result." >&2
-  exit 1
-fi
-
-if [[ "$preflight_result" != success ]]; then
-  echo "::error::Trusted review preflight finished with $preflight_result." >&2
   exit 1
 fi
 
@@ -27,4 +21,4 @@ if [[ ! -f "$artifact_file" ]] \
   exit 1
 fi
 
-echo "Hosted review analysis and trusted preflight succeeded."
+echo "Hosted review analysis succeeded."

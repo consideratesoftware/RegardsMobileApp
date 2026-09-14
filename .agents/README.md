@@ -34,10 +34,9 @@ paths, and moves the raw checkout outside the workspace before the model
 starts.
 
 The analysis job receives a read-only GitHub token, cannot call Bash or mutate
-GitHub, and returns a typed JSON artifact. A separate trusted job runs XcodeGen
-determinism, SwiftLint, and the privacy/Domain guards directly from
-default-branch workflow code. Analysis depends on that preflight. The publisher
-requires both jobs, validates the artifact against the event's head, base, PR,
+GitHub, and returns a typed JSON artifact. The workflow has no mechanical
+preflight: XcodeGen determinism, SwiftLint, and the privacy/Domain guards are
+their own required checks. The publisher requires analysis, validates the artifact against the event's head, base, PR,
 and run identity, and publishes it through the dedicated App bot. The check
 asserts that a valid review ran for the current head, not that the reviewer
 agreed: a missing, malformed or stale-head artifact fails it, while a
