@@ -255,13 +255,21 @@ public struct OverdueScreen: View {
                     row: row,
                     isInnerCircle: innerCircle,
                     onTapContact: { channelPreviewRow = row },
+                    // Failure copy names only the action, never the
+                    // contact's state (hosted review, post-#49 re-run): a
+                    // failed Caught up can leave the contact snoozed (the
+                    // catch path restores a snooze it had cleared) and a
+                    // failed Snooze can mean the contact was archived
+                    // mid-tap, so "Still overdue" was false on both. The
+                    // reloaded list shows the true state; Upcoming and
+                    // Contact Detail already phrase theirs this way.
                     onMarkCaughtUp: {
                         Task {
                             let succeeded = await viewModel.markCaughtUp(contactId: row.contactId)
                             if succeeded {
                                 announceRowAction("Marked \(row.name) caught up")
                             } else {
-                                announceRowAction("Couldn't mark \(row.name) caught up. Still overdue.")
+                                announceRowAction("Couldn't mark \(row.name) caught up.")
                             }
                         }
                     },
@@ -271,7 +279,7 @@ public struct OverdueScreen: View {
                             if succeeded {
                                 announceRowAction("Snoozed \(row.name) 1 week")
                             } else {
-                                announceRowAction("Couldn't snooze \(row.name). Still overdue.")
+                                announceRowAction("Couldn't snooze \(row.name).")
                             }
                         }
                     }
