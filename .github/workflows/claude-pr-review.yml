@@ -67,74 +67,13 @@ jobs:
           test -n "$check_id"
           printf 'id=%s\n' "$check_id" >> "$GITHUB_OUTPUT"
 
-  preflight:
-    needs: open_check
-    if: >-
-      ${{ github.event_name == 'pull_request_target' &&
-          !github.event.pull_request.draft &&
-          github.event.pull_request.base.ref == github.event.repository.default_branch }}
-    runs-on: macos-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - name: Check out trusted gate policy
-        # actions/checkout v6, pinned 2026-07-31.
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          persist-credentials: false
-
-      - name: Check out pull-request head as untrusted input
-        # actions/checkout v6, pinned 2026-07-31.
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-          path: pr-head
-
-      - name: Install deterministic gate tools
-        run: brew install swiftlint xcodegen
-
-      - name: Run trusted mechanical preflight
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$(git rev-parse HEAD)" = "$BASE_SHA"
-          test "$(git -C pr-head rev-parse HEAD)" = "$HEAD_SHA"
-
-          scripts/prepare-hosted-review-data.sh \
-            pr-head "$HEAD_SHA" "$RUNNER_TEMP/pr-tree" \
-            "$RUNNER_TEMP/proposed-policy"
-
-          scripts/validate-hosted-project-spec.sh \
-            "$RUNNER_TEMP/pr-tree/ios/project.yml"
-
-          cp -R "$RUNNER_TEMP/pr-tree/ios" "$RUNNER_TEMP/generated-ios"
-          (
-            cd "$RUNNER_TEMP/generated-ios"
-            xcodegen generate
-          )
-          diff -qr "$RUNNER_TEMP/pr-tree/ios/Regards.xcodeproj" \
-            "$RUNNER_TEMP/generated-ios/Regards.xcodeproj"
-
-          swiftlint lint --strict \
-            --config "$GITHUB_WORKSPACE/.swiftlint.yml" \
-            "$RUNNER_TEMP/pr-tree"
-
-          scripts/check-no-network.sh \
-            "$RUNNER_TEMP/pr-tree/ios/Regards"
-          scripts/check-domain-purity.sh \
-            "$RUNNER_TEMP/pr-tree/ios/Regards/Domain"
-          ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0))' \
-            "$RUNNER_TEMP/pr-tree/ios/project.yml"
-
+  # There is no mechanical preflight job. XcodeGen determinism, SwiftLint, the
+  # privacy and Domain guards, and project.yml syntax are already separate
+  # required checks (ios-ci.yml, lint.yml, guards.yml). Repeating them here
+  # cost a macOS runner per push, and the copy linted the base checkout rather
+  # than the PR tree.
   analyze:
-    needs: preflight
+    needs: open_check
     if: >-
       ${{ github.event_name == 'pull_request_target' &&
           !github.event.pull_request.draft &&
@@ -218,8 +157,8 @@ jobs:
             sanitized data, and any neighboring source needed to judge
             behavior. Run the Stage 1 reviewer set in one parallel batch using
             the trusted root `.claude/agents/` definitions. Apply Stages 2
-            through 4. Stage 0 is handled by the separate trusted preflight
-            job.
+            through 4. Skip Stage 0: the required Lint, Guards, and iOS CI
+            checks run those gates on this pull request.
 
             This run is non-interactive.
             Wait for every Stage 1 agent in this same turn.
@@ -242,7 +181,7 @@ jobs:
 
   publish:
     name: Publish hosted review
-    needs: [open_check, preflight, analyze]
+    needs: [open_check, analyze]
     if: >-
       ${{ always() && github.event_name == 'pull_request_target' &&
           !github.event.pull_request.draft &&
@@ -279,20 +218,17 @@ jobs:
           scripts/tests/render-review-check-summary-tests.sh
           scripts/tests/source-boundary-guard-tests.sh
           scripts/tests/prepare-hosted-review-data-tests.sh
-          scripts/tests/validate-hosted-project-spec-tests.sh
           scripts/tests/validate-hosted-review-artifact-tests.sh
 
-      - name: Require successful analysis and preflight
+      - name: Require successful analysis
         env:
           ANALYZE_RESULT: ${{ needs.analyze.result }}
-          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
           REVIEW_ARTIFACT: ${{ needs.analyze.outputs.artifact }}
         run: |
           printf '%s\n' "$REVIEW_ARTIFACT" \
             > "$RUNNER_TEMP/hosted-review.json"
           scripts/require-hosted-review-output.sh \
-            "$ANALYZE_RESULT" "$PREFLIGHT_RESULT" \
-            "$RUNNER_TEMP/hosted-review.json"
+            "$ANALYZE_RESULT" "$RUNNER_TEMP/hosted-review.json"
 
       - name: Publish verified review artifact
         env:

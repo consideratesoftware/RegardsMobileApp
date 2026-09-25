@@ -64,28 +64,16 @@ if "$domain_guard" "$fixture_root/ios/Regards/Domain" >/dev/null 2>&1; then
   exit 1
 fi
 
-ruby - "$repo_root/.github/workflows/guards.yml" \
-  "$repo_root/.github/workflows/claude-pr-review.yml" <<'RUBY'
+ruby - "$repo_root/.github/workflows/guards.yml" <<'RUBY'
 require "yaml"
 
 guards = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: false).fetch("jobs")
-review = YAML.safe_load(File.read(ARGV.fetch(1)), aliases: false).fetch("jobs")
 
 privacy_runs = guards.fetch("privacy-grep").fetch("steps").map { |step| step["run"] }.compact
 domain_runs = guards.fetch("domain-purity-grep").fetch("steps").map { |step| step["run"] }.compact
-preflight_runs = review.fetch("preflight").fetch("steps").map { |step| step["run"] }.compact
 
 raise "canonical privacy job does not call the shared guard" unless privacy_runs == ["scripts/check-no-network.sh"]
 raise "canonical Domain job does not call the shared guard" unless domain_runs == ["scripts/check-domain-purity.sh"]
-
-preflight = preflight_runs.join("\n")
-privacy_call_is_bound = preflight.scan("scripts/check-no-network.sh").length == 1 &&
-  preflight.include?('"$RUNNER_TEMP/pr-tree/ios/Regards"')
-domain_call_is_bound = preflight.scan("scripts/check-domain-purity.sh").length == 1 &&
-  preflight.include?('"$RUNNER_TEMP/pr-tree/ios/Regards/Domain"')
-
-raise "trusted preflight does not call the shared privacy guard" unless privacy_call_is_bound
-raise "trusted preflight does not call the shared Domain guard" unless domain_call_is_bound
 RUBY
 
-echo "PASS: source-boundary guards reject regressions and share one implementation"
+echo "PASS: source-boundary guards reject regressions and the canonical jobs call them"
