@@ -13,17 +13,53 @@ import Foundation
 struct RepositoryFakeFailure: Error, Equatable {}
 
 actor StubContactRepository: ContactRepository {
-    private let contacts: [Contact]
+    private var contacts: [Contact]
     private let failure: RepositoryFakeFailure?
+    /// Independent of `failure`: lets a test make `fetch` succeed and only
+    /// `upsert` fail, to exercise a write that fails *after* an earlier read
+    /// (or an earlier write to a different repository) already succeeded —
+    /// `failure` alone can't isolate that, since it applies uniformly to
+    /// every method.
+    private let upsertFailure: RepositoryFakeFailure?
+    /// Independent of both `failure` and `upsertFailure`: lets a test make
+    /// `fetch` find the contact and `updateLastInteractedAt` report "no row
+    /// matched" (`false`, not a thrown error) for that same id — the
+    /// archived-or-deleted-between-fetch-and-write race
+    /// `InteractionLogging.record()`'s `guard matched else { throw
+    /// DataError.notFound }` exists to catch (staged review round 6). Real
+    /// callers can't drive `fetch` and `updateLastInteractedAt` to disagree
+    /// through this fake's single `contacts` array — the id is either
+    /// present for both or neither — so this flag stands in for "a
+    /// concurrent write removed the row in the gap between them."
+    private let missesUpdateLastInteractedAt: Bool
+    private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
 
-    init(_ contacts: [Contact] = [], failure: RepositoryFakeFailure? = nil) {
+    init(
+        _ contacts: [Contact] = [],
+        failure: RepositoryFakeFailure? = nil,
+        upsertFailure: RepositoryFakeFailure? = nil,
+        missesUpdateLastInteractedAt: Bool = false
+    ) {
         self.contacts = contacts
         self.failure = failure
+        self.upsertFailure = upsertFailure
+        self.missesUpdateLastInteractedAt = missesUpdateLastInteractedAt
     }
 
     /// A repository whose every read throws.
     static func failing(_ contacts: [Contact] = []) -> StubContactRepository {
         StubContactRepository(contacts, failure: RepositoryFakeFailure())
+    }
+
+    /// Reads succeed normally; only `upsert` fails.
+    static func failingUpsert(_ contacts: [Contact] = []) -> StubContactRepository {
+        StubContactRepository(contacts, upsertFailure: RepositoryFakeFailure())
+    }
+
+    /// Reads succeed normally; `updateLastInteractedAt` always reports "no
+    /// row matched" instead of throwing or writing.
+    static func missingUpdateLastInteractedAt(_ contacts: [Contact] = []) -> StubContactRepository {
+        StubContactRepository(contacts, missesUpdateLastInteractedAt: true)
     }
 
     private func requireSuccess() throws {
@@ -56,15 +92,96 @@ actor StubContactRepository: ContactRepository {
         return contacts.filter { $0.contactGroupId == groupId }
     }
 
+    /// Applies the write in-memory (mirrors both production implementations,
+    /// which are real upserts) so an action test can `fetch` the contact back
+    /// afterward and see `lastInteractedAt` moved.
     func upsert(_ contact: Contact) async throws {
         try requireSuccess()
+        if let upsertFailure { throw upsertFailure }
+        if let index = contacts.firstIndex(where: { $0.id == contact.id }) {
+            contacts[index] = contact
+        } else {
+            contacts.append(contact)
+        }
+        broadcastTrackedChange()
     }
 
     func archive(id: UUID, at: Date) async throws {
         try requireSuccess()
+        guard let index = contacts.firstIndex(where: { $0.id == id }) else { return }
+        contacts[index].archivedAt = at
+        broadcastTrackedChange()
+    }
+
+    /// Overrides the protocol's default (fetch + apply + upsert) with a real
+    /// field-scoped write — matching both production backends, not the
+    /// generic fallback (staged review: every `markCaughtUp`/`logOther`
+    /// action test in this suite was exercising the fallback instead of the
+    /// write GRDB actually ships, leaving the field-scoped fix unproven by
+    /// this repository's own test double). Gated by `upsertFailure`, same as
+    /// `upsert` above: this is the write that persists `lastInteractedAt`
+    /// now, so a test reaching for `.failingUpsert()` to simulate that write
+    /// failing should still work unchanged. Also excludes an archived
+    /// contact (round 8), matching both production backends.
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
+        try requireSuccess()
+        if let upsertFailure { throw upsertFailure }
+        guard !missesUpdateLastInteractedAt else { return false }
+        guard let index = contacts.firstIndex(where: { $0.id == id && $0.isActive }) else { return false }
+        contacts[index].lastInteractedAt = date
+        broadcastTrackedChange()
+        return true
     }
 
     func storedCount() -> Int { contacts.count }
+
+    private var subscribeCount = 0
+
+    /// Test-only instrumentation: how many times `observeTracked()` has been
+    /// called, i.e. how many independent subscriptions exist. A view model
+    /// that subscribes once per `load()` instead of once ever would show up
+    /// here as `> 1` after two concurrent `load()` calls.
+    func subscriptionCount() -> Int { subscribeCount }
+
+    /// A real live stream (mirrors `GRDBContactRepository`/`MockStore`), for
+    /// tests that assert an Overdue/Upcoming view model reflects a write made
+    /// through a *different* repository reference to the same fake.
+    /// Never replays the current value on subscribe — only a write *after*
+    /// subscribing reaches the stream, matching the mock/GRDB contract (see
+    /// `ContactRepository.observeTracked()`'s doc comment). Registers the
+    /// continuation synchronously via `AsyncStream.makeStream` rather than
+    /// inside the closure-based initializer, so there's no window where a
+    /// write landing right after subscribe is missed (mirrors
+    /// `MockStore.observeTracked()`).
+    ///
+    /// `.bufferingNewest(1)`, not the `.unbounded` default (nit, staged
+    /// review round 8, correcting a fake that drifted from all three
+    /// production implementations' matching fix): an unbounded buffer here
+    /// would let an N-write test burst queue N full reloads for a slow
+    /// consumer instead of collapsing to the latest, same reasoning as
+    /// `GRDBContactRepository.observeTracked()`'s own comment.
+    func observeTracked() async -> AsyncStream<[Contact]> {
+        subscribeCount += 1
+        let (stream, continuation) = AsyncStream.makeStream(of: [Contact].self, bufferingPolicy: .bufferingNewest(1))
+        let token = UUID()
+        trackedObservers[token] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeTrackedObserver(token) }
+        }
+        return stream
+    }
+
+    private func removeTrackedObserver(_ token: UUID) {
+        trackedObservers.removeValue(forKey: token)
+    }
+
+    private func broadcastTrackedChange() {
+        let current = contacts.filter { $0.tracked && $0.archivedAt == nil }
+        for continuation in trackedObservers.values {
+            continuation.yield(current)
+        }
+    }
 }
 
 /// A `ContactRepository` whose backing `ContactFetchReport` (healthy
@@ -117,17 +234,53 @@ actor SettableContactRepository: ContactRepository {
 }
 
 actor StubReminderRepository: ReminderRepository {
-    private let reminders: [ScheduledReminder]
+    private var reminders: [ScheduledReminder]
     private let failure: RepositoryFakeFailure?
+    /// Independent of `failure`: lets a test make reads succeed and only
+    /// `upsert` fail — e.g. `OverdueViewModel.snooze`'s failure path re-reads
+    /// through the same `reminders` reference `SchedulingPass.snooze` writes
+    /// through, so making the whole repository fail would fail the *restore*
+    /// read too, not just the write under test.
+    private let upsertFailure: RepositoryFakeFailure?
+    /// Independent of both above, and mutable rather than init-time (unlike
+    /// `upsertFailure`): a test needs a *real* `scheduler.snooze()` /
+    /// `caughtUp()` transition to succeed first, to set up the genuinely
+    /// pending row a later restore attempts to touch, and only THEN wants
+    /// the *restore's* own transition to fail — `armTransitionFailure`
+    /// lets a test flip this on partway through, after that setup, rather
+    /// than needing it armed from construction. Proves the double-failure
+    /// case none of the three ViewModels' restore call sites had before
+    /// (staged review round 8): `caughtUp` clears a real snooze, the
+    /// caller's own next write then fails, and the compensating restore
+    /// *also* fails — the method must still return cleanly, not throw
+    /// past its own catch block.
+    private var transitionFailureFrom: ReminderState?
 
-    init(_ reminders: [ScheduledReminder] = [], failure: RepositoryFakeFailure? = nil) {
+    init(
+        _ reminders: [ScheduledReminder] = [],
+        failure: RepositoryFakeFailure? = nil,
+        upsertFailure: RepositoryFakeFailure? = nil
+    ) {
         self.reminders = reminders
         self.failure = failure
+        self.upsertFailure = upsertFailure
     }
 
     /// A repository whose every read throws.
     static func failing() -> StubReminderRepository {
         StubReminderRepository([], failure: RepositoryFakeFailure())
+    }
+
+    /// Reads succeed normally; only `upsert` fails.
+    static func failingUpsert() -> StubReminderRepository {
+        StubReminderRepository([], upsertFailure: RepositoryFakeFailure())
+    }
+
+    /// From this point on, any `transitionState` moving *out of* `from`
+    /// fails — see the property doc comment for why this arms after
+    /// construction instead of at it.
+    func armTransitionFailure(from: ReminderState) {
+        transitionFailureFrom = from
     }
 
     private func requireSuccess() throws {
@@ -149,17 +302,85 @@ actor StubReminderRepository: ReminderRepository {
         return reminders.filter { $0.contactId == contactId && $0.state == .pending }
     }
 
+    /// Applies the write in-memory (mirrors both production
+    /// implementations), so a `SchedulingPass.snooze` write-then-read
+    /// round trip is actually observable — see `StubContactRepository`'s
+    /// sibling note.
     func upsert(_ reminder: ScheduledReminder) async throws {
         try requireSuccess()
+        if let upsertFailure { throw upsertFailure }
+        if let index = reminders.firstIndex(where: { $0.id == reminder.id }) {
+            reminders[index] = reminder
+        } else {
+            reminders.append(reminder)
+        }
     }
 
     func updateState(id: UUID, state: ReminderState) async throws {
         try requireSuccess()
+        guard let index = reminders.firstIndex(where: { $0.id == id }) else { return }
+        reminders[index].state = state
+    }
+
+    /// This actor already serializes every call into it, so the check and
+    /// the write below can't straddle a suspension point the way two
+    /// independent GRDB write transactions could — matching
+    /// `MockStore.transitionReminderState`'s equivalent note.
+    @discardableResult
+    func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
+        try requireSuccess()
+        if let transitionFailureFrom, transitionFailureFrom == from { throw RepositoryFakeFailure() }
+        guard let index = reminders.firstIndex(where: { $0.id == id && $0.state == from }) else { return false }
+        reminders[index].state = to
+        return true
     }
 
     func delete(id: UUID) async throws {
         try requireSuccess()
+        reminders.removeAll { $0.id == id }
     }
+}
+
+actor StubInteractionRepository: InteractionRepository {
+    private var logs: [InteractionLog]
+    private let failure: RepositoryFakeFailure?
+
+    init(_ logs: [InteractionLog] = [], failure: RepositoryFakeFailure? = nil) {
+        self.logs = logs
+        self.failure = failure
+    }
+
+    /// A repository whose every call throws.
+    static func failing() -> StubInteractionRepository {
+        StubInteractionRepository(failure: RepositoryFakeFailure())
+    }
+
+    private func requireSuccess() throws {
+        if let failure { throw failure }
+    }
+
+    /// Mirrors both production implementations: ordered by `occurredAt`
+    /// descending then `id` ascending, and `limit <= 0` returns empty.
+    func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
+        try requireSuccess()
+        guard limit > 0 else { return [] }
+        return logs
+            .filter { $0.contactId == contactId }
+            .sorted {
+                if $0.occurredAt != $1.occurredAt { return $0.occurredAt > $1.occurredAt }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    func append(_ log: InteractionLog) async throws {
+        try requireSuccess()
+        logs.append(log)
+    }
+
+    /// Test-only inspection of every logged interaction, in append order.
+    func appendedLogs() -> [InteractionLog] { logs }
 }
 
 struct StubReminderWindowRepository: ReminderWindowRepository {

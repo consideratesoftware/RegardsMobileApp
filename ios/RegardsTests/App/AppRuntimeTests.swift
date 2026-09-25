@@ -53,7 +53,15 @@ struct AppRuntimeTests {
             Contact.relativeDescription(for: contact.lastInteractedAt, from: allContacts.now)
         )
         #expect(allContacts.now == runtime.clock())
-        #expect(overdueRow.lastInteractedText == relative)
+        // No `overdueRow.lastInteractedText` assertion here any more (staged
+        // review round 11): the field it read was removed from
+        // `OverdueRowState` once nothing rendered it — see that struct's own
+        // doc comment. Coverage isn't lost: `allContacts.now == runtime.clock()`
+        // above and `detail.overdueSummary.days == overdueRow.overdueDays`
+        // below already chain allContacts → runtime and detail → overdue
+        // through values each screen still exposes, which is transitively
+        // the same "every screen shares one clock" guarantee this test is
+        // named for.
         #expect(detail.lastTalkedLabel.hasPrefix(relative))
         #expect(detail.overdueSummary.days == overdueRow.overdueDays)
     }
@@ -76,6 +84,67 @@ struct AppRuntimeTests {
         #expect(runtime.userCalendar.timeZone.identifier == TimeZone.current.identifier)
         #expect(runtime.clock() != MockRepositories.defaultNow)
         #expect(try await runtime.environment.window.fetchGlobal() == runtime.window)
+    }
+
+    /// The bug this pins (staged review round 6): `AppRuntime.init` used to
+    /// wire `userCalendar` — the *device's* timezone, snapshotted once at
+    /// launch — into `scheduler` instead of `window.timeZone`, the persisted
+    /// reminder window's own timezone. `userCalendar` here is pinned to
+    /// `Etc/GMT+8`, a fixed UTC-8 offset that never observes DST — sharing
+    /// `America/Los_Angeles`'s pre-transition offset exactly, so the two
+    /// zones agree at `now` and only diverge once LA's own spring-forward
+    /// lands. If `scheduler` still resolved through `userCalendar`, the
+    /// 7-day snooze push would land an hour off `window.timeZone`'s own
+    /// "same local wall-clock time" answer; mirrors
+    /// `SchedulingPassTests.snoozeAcrossSpringForwardStaysOnWallClock`, one
+    /// level up the composition (`AppRuntime`, not `SchedulingPass` directly).
+    @Test("Runtime scheduler resolves the persisted window's timezone, not the device calendar's, across DST")
+    func schedulerResolvesWindowTimezoneAcrossDSTBoundary() async throws {
+        let losAngeles = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        var laCalendar = Calendar(identifier: .gregorian)
+        laCalendar.timeZone = losAngeles
+        var deviceCalendar = Calendar(identifier: .gregorian)
+        deviceCalendar.timeZone = try #require(TimeZone(identifier: "Etc/GMT+8"))
+
+        // 2027-03-08 08:00 local — a week before LA's 2027-03-14
+        // spring-forward. Both zones agree here: confirms any divergence in
+        // the result below is attributable to the transition itself, not a
+        // baseline offset difference between the two calendars.
+        let now = try #require(laCalendar.date(from: DateComponents(
+            year: 2027, month: 3, day: 8, hour: 8, minute: 0
+        )))
+        #expect(deviceCalendar.date(from: DateComponents(
+            year: 2027, month: 3, day: 8, hour: 8, minute: 0
+        )) == now)
+
+        let seedEnvironment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let contact = contractContact(id: try contractUUID(510), suffix: "runtime-tz-dst", tracked: true)
+        try await seedEnvironment.contacts.upsert(contact)
+        let window = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 10))],
+            timezoneIdentifier: losAngeles.identifier
+        )
+
+        let runtime = AppRuntime(
+            environment: seedEnvironment,
+            window: window,
+            userCalendar: deviceCalendar,
+            clock: { now }
+        )
+        try await runtime.scheduler.snooze(contactId: contact.id)
+
+        let expectedFromWindowTimezone = try #require(laCalendar.date(from: DateComponents(
+            year: 2027, month: 3, day: 15, hour: 8, minute: 0
+        )))
+        let wrongIfUsingDeviceCalendar = try #require(deviceCalendar.date(from: DateComponents(
+            year: 2027, month: 3, day: 15, hour: 8, minute: 0
+        )))
+        let pending = try await seedEnvironment.reminders.fetchPending(forContact: contact.id)
+        #expect(pending[0].scheduledFor == expectedFromWindowTimezone)
+        // The bug's own value, named explicitly: proves this is a real
+        // discriminator, not incidentally true either way.
+        #expect(pending[0].scheduledFor != wrongIfUsingDeviceCalendar)
     }
 
     @Test("Production composition uses the persisted digest horizon", arguments: [7, 30])
