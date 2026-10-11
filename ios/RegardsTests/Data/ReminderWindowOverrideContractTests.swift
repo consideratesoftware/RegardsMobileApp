@@ -79,14 +79,17 @@ struct ReminderWindowOverrideContractTests {
         #expect(kind == "null")
     }
 
-    /// The race the method exists for: Contact Detail holds a snapshot, a
-    /// "Caught up" write lands, then the editor saves. A whole-row upsert
-    /// from the snapshot would put the old `lastInteractedAt` back.
+    /// Ordering check only: a `lastInteractedAt` written after the caller's
+    /// snapshot is still there after the override write. This catches an
+    /// implementation that writes back a row it read before the call; it
+    /// cannot catch a read-then-upsert done inside the method, because that
+    /// reads the row after `updateLastInteractedAt` has landed.
+    /// `grdbWriteTouchesOnlyTheOverrideColumn` below is the field-scope proof.
     @Test(
         "updateReminderWindowOverride keeps a lastInteractedAt written after the caller's snapshot",
         arguments: RepositoryContractBackend.allCases
     )
-    func doesNotRevertConcurrentLastInteractedAtWrite(backend: RepositoryContractBackend) async throws {
+    func laterOverrideWriteKeepsEarlierLastInteractedAt(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
         let original = contractContact(id: try contractUUID(174), suffix: "override-race", tracked: true)
         try await repositories.contacts.upsert(original)
@@ -104,6 +107,70 @@ struct ReminderWindowOverrideContractTests {
         let reloaded = try #require(try await repositories.contacts.fetch(id: original.id))
         #expect(reloaded.lastInteractedAt == newer)
         #expect(reloaded.reminderWindowOverride == Self.saturdayMorning)
+    }
+
+    /// The field-scope proof. A temp trigger aborts any `UPDATE` whose SET
+    /// list names a Contact column other than `reminderWindowOverride`, so a
+    /// fetch-then-`upsert` (which sets every column) fails here while the
+    /// single-column `UPDATE` succeeds. The column list comes from the live
+    /// table, so a column added later is covered without touching this test.
+    @Test("GRDB override write sets only the reminderWindowOverride column")
+    func grdbWriteTouchesOnlyTheOverrideColumn() async throws {
+        let dbQueue = try DatabaseFactory.makeInMemoryDatabase()
+        let contacts = GRDBRepositories(dbQueue: dbQueue).contacts
+        let original = contractContact(id: try contractUUID(179), suffix: "override-column-scope", tracked: true)
+        try await contacts.upsert(original)
+        try await dbQueue.write { db in
+            let others = try Row.fetchAll(db, sql: "PRAGMA table_info(Contact)")
+                .map { $0["name"] as String }
+                .filter { $0 != "reminderWindowOverride" }
+            #expect(others.count > 10)
+            let columns = others.map { "\"\($0)\"" }.joined(separator: ", ")
+            try db.execute(sql: """
+                CREATE TEMP TRIGGER overrideFieldScope BEFORE UPDATE OF \(columns) ON Contact
+                BEGIN SELECT RAISE(ABORT, 'field-scope violated'); END
+                """)
+        }
+        // The probe must bite: a whole-row write is refused.
+        await expectWriteRejected { try await contacts.upsert(original) }
+
+        let matched = try await contacts.updateReminderWindowOverride(id: original.id, window: Self.saturdayMorning)
+
+        #expect(matched)
+        #expect(try await contacts.fetch(id: original.id)?.reminderWindowOverride == Self.saturdayMorning)
+    }
+
+    /// Validation runs before the row lookup, so an invalid window throws
+    /// even when the id would have reported `false`.
+    @Test(
+        "updateReminderWindowOverride throws for an invalid window even when the id is missing or archived",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func invalidWindowThrowsEvenForMissingOrArchivedId(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let archived = contractContact(
+            id: try contractUUID(180),
+            suffix: "override-invalid-archived",
+            tracked: true,
+            archivedAt: Date(timeIntervalSince1970: 1_799_999_000)
+        )
+        try await repositories.contacts.upsert(archived)
+        let wrapping = TimeRange(start: TimeOfDay(hour: 22), end: TimeOfDay(hour: 1))
+        let invalid = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [wrapping],
+            timezoneIdentifier: "Etc/UTC"
+        )
+
+        await #expect(throws: ReminderWindow.ValidationError.wrappingAllowedRange(wrapping)) {
+            try await repositories.contacts.updateReminderWindowOverride(
+                id: try contractUUID(181),
+                window: invalid
+            )
+        }
+        await #expect(throws: ReminderWindow.ValidationError.wrappingAllowedRange(wrapping)) {
+            try await repositories.contacts.updateReminderWindowOverride(id: archived.id, window: invalid)
+        }
     }
 
     @Test(

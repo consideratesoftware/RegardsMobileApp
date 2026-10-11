@@ -81,6 +81,10 @@ struct GatedFetchTrackedContactRepository: ContactRepository {
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         try await wrapped.updateLastInteractedAt(id: id, at: date)
     }
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try await wrapped.updateReminderWindowOverride(id: id, window: window)
+    }
     func fetchAllWithDiagnostics() async throws -> ContactFetchReport {
         try await wrapped.fetchAllWithDiagnostics()
     }
@@ -161,6 +165,10 @@ struct GatedFirstFetchContactRepository: ContactRepository {
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
         try await wrapped.updateReconciledFields(id: id, fields: fields)
     }
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try await wrapped.updateReminderWindowOverride(id: id, window: window)
+    }
 }
 
 /// Holds `upsert(_:)` open — the write `SchedulingPass.snooze` makes.
@@ -215,5 +223,9 @@ struct GatedFetchByIDContactRepository: ContactRepository {
     func observeTracked() async -> AsyncStream<[Contact]> { await wrapped.observeTracked() }
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
         try await wrapped.updateReconciledFields(id: id, fields: fields)
+    }
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try await wrapped.updateReminderWindowOverride(id: id, window: window)
     }
 }

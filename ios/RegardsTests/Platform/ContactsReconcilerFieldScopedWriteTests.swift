@@ -80,4 +80,9 @@ private struct InterceptingUpdateFieldsRepository: ContactRepository {
         await onUpdateReconciledFields()
         try await wrapping.updateReconciledFields(id: id, fields: fields)
     }
+
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try await wrapping.updateReminderWindowOverride(id: id, window: window)
+    }
 }
