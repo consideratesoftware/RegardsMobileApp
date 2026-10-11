@@ -20,9 +20,11 @@ never pick up Android work.
   hard gate: it must not ship notification scheduling until R57 is resolved
   (owner ruling 2026-08-22; see its queue row). `TF-07` needs `TF-05` and
   `TF-06`, and `TF-11` needs `TF-06`, so both stay `BLOCKED` until those merge.
-- Open TF pull requests: none. The only open pull request is GitHub PR #57
-  (`claude/audit-stress-timeout`). It has no `TF-##` marker and raises the
-  stress-job limits described below.
+- Open TF pull requests: none. Other open pull requests, none with a
+  `TF-##` marker: GitHub PR #57 (`claude/audit-stress-timeout`, raises the
+  stress-job limits described below), PR #58 (`claude/tf-03-close`, this
+  checkpoint), and PR #59 (`claude/org-codex-review`, adds the Codex
+  cross-model review to `ENGINEERING_ORG.md`).
 - Stress job: the nightly `Audit stress` run has been red or cancelled since
   about 2026-09-21, with 1 pass in the last 20 runs. Each 5x iteration now
   takes about 13 minutes (39 tests), so a full run needs about 73 minutes
