@@ -31,21 +31,31 @@ conditions).
    plus recent mtimes). If one exists, treat that lane as staffed and do not
    dispatch into it; mention it in the report.
 
+7. Remove any `../RegardsReview-*` worktree left by a crashed Stage 1 run.
+
+Owner questions never wait in a PR. Whenever a role returns a question only
+Sid can answer (OPEN FOR OWNER, "Questions for Sid", an owner gate, a rule
+you'd need to bend), interview Sid in the session as `ENGINEERING_ORG.md`
+describes, then record each answer as a PR comment.
+
 For `status`: print the Stage 5 report from this state and stop.
 
 ## Stage 1: resume open work (parallel; does not consume lanes)
 
 For each open TF PR:
 
-1. Read the PR body's `PR REVIEW:` and `CODEX REVIEW:` lines. For each one
-   that is missing, names a sha other than the PR's current head, or (for
-   Codex) records RETRY or UNAVAILABLE, rerun that review: check the head
-   out with `git worktree add --detach <tmp> <head sha>`, run
-   `/pr-review origin/main...HEAD` and/or `codex-reviewer` there with that
-   target, then `git worktree remove <tmp>`. RETRY and UNAVAILABLE follow
-   Stage 3's limits.
+1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
+   comments. For each one that is missing, names a sha other than the PR's
+   current head, or (for Codex) records RETRY or UNAVAILABLE, rerun that
+   review: check the head out with `git worktree add --detach
+   ../RegardsReview-<pr> <head sha>`, run `/pr-review origin/main...HEAD`
+   and/or `codex-reviewer` there with that target, then remove that
+   worktree. Stage 0 removes any leftover `../RegardsReview-*` worktree
+   from a crashed run. RETRY and UNAVAILABLE follow Stage 3's limits; count
+   consecutive RETRY comments on the PR, so the limit holds across
+   sessions.
 2. In every case, launch `release-manager` with both current verdicts to
-   re-evaluate the PR. It will route red checks to `on-call-engineer`,
+   re-evaluate the PR. If it reports CODEX STALE, handle it as in Stage 4. It will route red checks to `on-call-engineer`,
    park on owner gates, or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
@@ -108,16 +118,17 @@ can't launch agents.
 
 Second opinion: at most once per lane, before parking it on a second
 REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
-Codex plugin) in the foreground (`--wait`) with the lane worktree, the
+Codex plugin) in the foreground (`--wait`), read-only (never `--write`), with the lane worktree, the
 slice, the refutation or blockers verbatim, and the instruction "read-only
 diagnosis: do not edit files; name the root cause and the smallest fix,
 with file:line". If it returns a background job instead of a diagnosis,
 fetch the result with `/codex:result` before going on. Send its diagnosis to
 `tech-lead` for a ruling. If the tech lead accepts it, the slice owner gets
 one last repair round, the only exception to the two-round limit, and the
-verifier or both reviews run once more. If Codex or the plugin is
-unavailable, the tech lead rejects the diagnosis, or that round fails, park
-the lane with the refutation, blockers, and any Codex diagnosis in the
+verifier or both reviews run once more. If the second opinion is already
+spent, Codex or the plugin is unavailable, the tech lead rejects the
+diagnosis, or that round fails, interview Sid: one more round, or park the
+lane with the refutation, blockers, and any Codex diagnosis in the
 report.
 
 ## Stage 4: ship
@@ -127,8 +138,8 @@ watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
 
-If it reports CODEX STALE (the PR body's `CODEX REVIEW:` sha is not the
-head), run both reviews on the new head as in Stage 3 and relaunch
+If it reports CODEX STALE (either review's newest verdict comment names a
+sha other than the head), run both reviews on the new head as in Stage 3 and relaunch
 `release-manager` with the new verdicts. Blockers go to the slice owner as
 in Stage 3. After 3 stale rounds on one PR, park it and say why.
 
@@ -142,7 +153,8 @@ LANES (n/3 occupied):
 RESUMED:
 - PR #n: release-manager STATE | Codex: verdict @ sha
 WAITED: READY items not started, with lock or budget reason
-OWNER NEEDED: merged checklist across lanes, exact steps
+OWNER NEEDED: what the interview covered and Sid's answers, plus anything
+still waiting because Sid wasn't in the session
 DISPUTED: findings dropped against ARCHITECTURE.md, with §
 NEXT RUN: what /org will find next time
 ```

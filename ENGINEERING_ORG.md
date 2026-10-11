@@ -63,7 +63,8 @@ TF-## READY
   → tech-writer: doc siblings, register, a11y rows
   → /pr-review (review board) + codex-reviewer, in parallel
   → release-manager: PR, CI, hosted review, on-call repairs, checkpoint
-  → merge when every condition below holds, else parked with an owner checklist
+  → merge when every condition below holds, else the engineering manager
+    interviews Sid in the session and records the answers on the PR
 ```
 
 Handoffs are the structured report blocks at the end of each agent file.
@@ -106,8 +107,17 @@ to skip one of these is wrong by definition.
 
 ## Owner gates
 
-Only Sid can do these. The org writes an exact checklist and parks the PR;
-it never pretends the step happened.
+Only Sid can do these, and the org never pretends one happened. When a
+gate, an OPEN FOR OWNER ruling, or a reviewer's "Questions for Sid" item
+comes up, the engineering manager interviews Sid in the session with
+`AskUserQuestion`: related questions batched, recommendation first, with
+the context to answer in one pass. Each answer goes on the PR as a comment
+(or into the PR description if the PR isn't open yet). Physical tasks,
+such as a device run or a VoiceOver smoke, are presented the same way as
+exact steps, and Sid's result is recorded the same way. Only work that
+needs the answer waits; if Sid isn't in the session, the rest continues and
+the interview happens when Sid is back. No role parks a question in a PR body
+for Sid to find later.
 
 - Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) for any diff
   touching `Features/`, `DesignSystem/`, or `App/` view code.

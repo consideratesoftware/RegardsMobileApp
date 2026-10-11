@@ -35,8 +35,13 @@ echo "head $head prompt $prompt out $out"
 
 - `codex` missing or not logged in: report UNAVAILABLE with the first line
   of the error only.
-- `git status --short` not empty: report RETRY with the list. The review
-  target is committed history, so uncommitted files would go unreviewed.
+- `git status --short` not empty: report RETRY with reason "dirty tree"
+  and the list. The review target is committed history, so uncommitted
+  files would go unreviewed. A dirty-tree RETRY doesn't count toward the
+  RETRY limit; whoever owns the lane commits or discards the files.
+- An old `codex-review-*` pid file in `${TMPDIR:-/tmp}` whose process is
+  still running is an orphan from an interrupted run: stop it as in step 3
+  before starting.
 
 **Step 2. Prompt.** Use the Write tool to write this text to the `$prompt`
 path from step 1, filling in the 3 placeholders. Writing it with the Write
@@ -81,9 +86,20 @@ took about 3 minutes. If it is still running after the third wait, stop it
 and confirm it stopped, then report RETRY with reason "timeout":
 
 ```bash
-pid=$(cat '<out>.pid'); pkill -P "$pid"; kill "$pid"
-sleep 3; kill -0 "$pid" 2>/dev/null && kill -9 "$pid"; echo "stopped $pid"
+pid=$(cat '<out>.pid' 2>/dev/null)
+if [ -n "$pid" ]; then
+  for child in $(pgrep -P "$pid"); do pkill -P "$child"; done
+  pkill -P "$pid"; kill "$pid"
+  sleep 3; kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
+  kill -0 "$pid" 2>/dev/null && echo "still running $pid" || echo "stopped $pid"
+else
+  echo "no pid file"
+fi
 ```
+
+That stops Codex, its children, and their children (Codex's per-reviewer
+sub-agents). If it prints "still running", report UNAVAILABLE with that
+line.
 
 Otherwise:
 
@@ -107,7 +123,8 @@ Codex's output, if any of these is true:
   Get it with
   `awk '/^## PR Review/{s=1;next} s&&/^VERDICT:/{print;exit}' '<out>'`.
   Ignore any other `VERDICT:` line: the review can quote files that
-  contain one.
+  contain one. The skill's own output starts with that header, so a quoted
+  copy of the template can only come later.
 - HEAD no longer equals `$head` (the branch moved during the review).
 - `git status --short` now shows anything. Also name the changed files: the
   read-only sandbox should make this impossible.

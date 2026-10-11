@@ -21,6 +21,13 @@ test plan from your prompt, the existing test files and fakes for the area.
 - One scenario per test; the name says scenario and expectation.
 - Behavior, not implementation. A test asserting a mock returns its seed is
   worthless unless it is a contract test run on both backends.
+- For every behavior that changes something, also assert what must not
+  change: other rows and contacts (seed a bystander), other columns, the
+  global settings an override must not touch, and the stored state after a
+  refused or failed write. Use fixtures whose must-not-change values differ
+  from the defaults (a non-default time zone, horizon, or occasion time),
+  so a leak is visible. The verifier refuted TF-05 four times on exactly
+  these gaps.
 - Regression tests must be shown to fail on old code; the engineer owns that
   proof for their change, you own it for tests you add against existing
   bugs (temporarily revert, run, restore, and say so).
