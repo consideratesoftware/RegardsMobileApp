@@ -163,13 +163,11 @@ struct NotificationActionHandlingTests {
         #expect(harness.launch.phase == .onboarding)
 
         harness.fake.send(.caughtUp(contact.id))
-        // The coordinator exposes no "action handled" signal, so this yields
-        // to let the consumer run (dropping is synchronous). If it had not run
-        // yet, the action would be applied after onboarding finishes below and
-        // the final assertions would fail: late is a red test, never a false
-        // green. A handled-action counter on the coordinator would replace
-        // these yields with a deterministic wait.
-        for _ in 0..<50 { await Task.yield() }
+        // Wait until the consumer has handled (here, dropped) the action, so
+        // onboarding can't finish before it is judged against the phase.
+        let handled = await Self.waitFor { harness.launch.handledNotificationActionCount == 1 }
+        #expect(handled, "the action was never handled")
+        #expect(harness.launch.phase == .onboarding)
         await harness.launch.continueWithoutContacts()
         #expect(harness.launch.phase == .ready)
 
