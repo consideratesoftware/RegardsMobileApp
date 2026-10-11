@@ -85,18 +85,21 @@ and confirm it stopped, then report RETRY with reason "timeout":
 
 ```bash
 pg=$(cat '<out>.pgid' 2>/dev/null)
-if [ -n "$pg" ]; then
+if [ "$pg" -gt 1 ] 2>/dev/null && [ "$(ps -o pgid= -p "$pg" 2>/dev/null | tr -d ' ')" = "$pg" ]; then
   kill -TERM -- -"$pg"; sleep 3
   pgrep -g "$pg" >/dev/null && { kill -KILL -- -"$pg"; sleep 1; }
   pgrep -g "$pg" >/dev/null && echo "still running group $pg" || echo "stopped group $pg"
 else
-  echo "no pgid file"
+  echo "no valid pgid"
 fi
 ```
 
 That stops the whole group, including Codex's per-reviewer sub-agents, and
-checks none survived. If it prints "still running", report UNAVAILABLE with
-that line.
+checks none survived. It only signals a group whose leader is still alive
+and leads that group, so a bad or stale pgid can't reach other processes.
+If it prints "still running" or "no valid pgid" while `<out>.exit` is
+still missing, report UNAVAILABLE with that line: a Codex run that can't
+be confirmed stopped must not be retried.
 
 Otherwise:
 

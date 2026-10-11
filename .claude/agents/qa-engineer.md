@@ -26,12 +26,13 @@ test plan from your prompt, the existing test files and fakes for the area.
   global settings an override must not touch, and the stored state after a
   refused or failed write. Use fixtures whose must-not-change values differ
   from the defaults (a non-default time zone, horizon, or occasion time),
-  so a leak is visible. The verifier refuted TF-05 four times on exactly
-  these gaps.
+  so a leak is visible.
 - Every control a screen exposes, and every announcement it makes, is
   exercised by at least one test that fails if the control does nothing
-  or the announcement is missing. TF-05's editor passed 471 tests with 5
-  of its controls made inert.
+  or the announcement is missing. A control `ARCHITECTURE.md` §19 records
+  as intentionally inert (for example R58's channel controls until PR26)
+  gets a test that pins its disabled state and how it's announced
+  instead.
 - Regression tests must be shown to fail on old code; the engineer owns that
   proof for their change, you own it for tests you add against existing
   bugs (temporarily revert, run, restore, and say so).

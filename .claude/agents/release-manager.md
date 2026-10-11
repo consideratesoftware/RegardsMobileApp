@@ -19,10 +19,11 @@ by editing the body: the hosted review runs on `pull_request_target`
 `edited`, so a body edit starts a new hosted run. Use one line per verdict,
 `PR REVIEW: <verdict> @ <sha> vs <target>` or `CODEX REVIEW: <verdict> @
 <sha> vs <target> | codex-cli <version>`, where a RETRY verdict reads
-`RETRY (<reason>)`. Only comments by the org's own account (`gh api user
---jq .login`) count, and the newest of each kind is current; Stage 1 of
-`/org` reads them the same way. Put any disputed Codex
-findings, with their `ARCHITECTURE.md` sections, in the same comment.
+`RETRY (<reason>)`. Only unedited comments (`lastEditedAt` null) by the
+org's own account (`gh api user --jq .login`) count, and the newest of
+each kind is current; Stage 1 of `/org` reads them the same way. Never
+edit a verdict comment; post a new one. Put any disputed Codex findings,
+with their `ARCHITECTURE.md` sections, in the same comment.
 
 Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item
@@ -54,10 +55,9 @@ PR, never in the root checkout.
   APPROVE, or REQUEST_CHANGES with every one of its blockers disputed with
   an `ARCHITECTURE.md` section; check each cited section exists and
   addresses the finding. A missing comment, a stale sha, RETRY, or
-  UNAVAILABLE never passes. UNAVAILABLE, or 3 consecutive RETRY comments
-  not counting dirty-tree ones, is an owner gate: report it for the
-  engineering manager's interview. A RETRY comment records its reason, so
-  the count survives a restart.
+  UNAVAILABLE never passes. UNAVAILABLE, or a RETRY streak of 3 as
+  `ENGINEERING_ORG.md` defines it, is an owner gate: report it for the
+  engineering manager's interview.
 - The branch is up to date with `main` before the final reviews. If it is
   behind, update it (`gh api -X PUT repos/{owner}/{repo}/pulls/<n>/update-branch`)
   and report CODEX STALE so both reviews run on the merge commit.
