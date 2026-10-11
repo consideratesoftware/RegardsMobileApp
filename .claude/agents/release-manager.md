@@ -52,8 +52,10 @@ PR, never in the root checkout.
   APPROVE, or REQUEST_CHANGES with every one of its blockers disputed with
   an `ARCHITECTURE.md` section; check each cited section exists and
   addresses the finding. A missing comment, a stale sha, RETRY, or
-  UNAVAILABLE never passes. UNAVAILABLE, or 3 consecutive RETRY comments,
-  is an owner gate: report it for the engineering manager's interview.
+  UNAVAILABLE never passes. UNAVAILABLE, or 3 consecutive RETRY comments
+  not counting dirty-tree ones, is an owner gate: report it for the
+  engineering manager's interview. A RETRY comment records its reason, so
+  the count survives a restart.
 - The branch is up to date with `main` before the final reviews. If it is
   behind, update it (`gh api -X PUT repos/{owner}/{repo}/pulls/<n>/update-branch`)
   and report CODEX STALE so both reviews run on the merge commit.

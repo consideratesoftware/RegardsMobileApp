@@ -95,7 +95,7 @@ All of these, on the current head, with no averaging:
 2. Hosted `Regards staged review`: zero unresolved blockers.
 3. `/pr-review` verdict APPROVE.
 4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
-   with every Codex blocker disputed in the PR body by the engineering
+   with every Codex blocker disputed in that verdict's PR comment by the engineering
    manager, citing the `ARCHITECTURE.md` section that settles it; the
    release manager checks each cited section exists and addresses the
    finding. RETRY and UNAVAILABLE never satisfy this condition.

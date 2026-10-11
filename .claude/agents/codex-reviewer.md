@@ -39,9 +39,6 @@ echo "head $head prompt $prompt out $out"
   and the list. The review target is committed history, so uncommitted
   files would go unreviewed. A dirty-tree RETRY doesn't count toward the
   RETRY limit; whoever owns the lane commits or discards the files.
-- An old `codex-review-*` pid file in `${TMPDIR:-/tmp}` whose process is
-  still running is an orphan from an interrupted run: stop it as in step 3
-  before starting.
 
 **Step 2. Prompt.** Use the Write tool to write this text to the `$prompt`
 path from step 1, filling in the 3 placeholders. Writing it with the Write

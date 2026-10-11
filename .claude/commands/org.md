@@ -31,7 +31,8 @@ conditions).
    plus recent mtimes). If one exists, treat that lane as staffed and do not
    dispatch into it; mention it in the report.
 
-7. Remove any `../RegardsReview-*` worktree left by a crashed Stage 1 run.
+7. Unless this is a `status` run, remove any `../RegardsReview-*` worktree
+   left by a crashed Stage 1 run.
 
 Owner questions never wait in a PR. Whenever a role returns a question only
 Sid can answer (OPEN FOR OWNER, "Questions for Sid", an owner gate, a rule
@@ -63,8 +64,9 @@ For each open TF PR:
 For each READY item in queue order, up to the budget:
 
 1. Launch `tech-lead` with the queue row and §14 criteria verbatim. Wait
-   for the plan. If OPEN FOR OWNER is non-empty, park the item under OWNER
-   NEEDED and move on.
+   for the plan. If OPEN FOR OWNER is non-empty, interview Sid before
+   staffing the item. If Sid isn't in the session, park the item under
+   OWNER NEEDED and move on.
 2. Check the plan's locks against other lanes' locks. Two lanes may not
    both own `AppEnvironment`, `RegardsApp`, migrations, `project.yml`,
    SchedulingPass, shared a11y helpers, or the execution docs. On a
@@ -103,7 +105,7 @@ compares against the merge base, so commits that landed on `main` after the
 lane branched don't show up as reversions. Treat blockers from both the same way:
 they go to the slice owner (design questions to `tech-lead` first), one
 round, then both review again. Drop a Codex finding only when it
-contradicts `ARCHITECTURE.md`; you write the dispute in the PR body with
+contradicts `ARCHITECTURE.md`; you write the dispute in that verdict's PR comment with
 the section, as `/pr-review` does for its own findings.
 
 A `codex-reviewer` RETRY proves nothing: run it again, at most twice more.
