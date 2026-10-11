@@ -37,14 +37,15 @@ For `status`: print the Stage 5 report from this state and stop.
 
 For each open TF PR:
 
-1. Read the PR body's `CODEX REVIEW:` line. If it is missing, names a sha
-   other than the PR's current head, or records RETRY or UNAVAILABLE, run a
-   fresh Codex review (RETRY and UNAVAILABLE follow Stage 3's limits): check the
-   head out with `git worktree add --detach <tmp> <head sha>`, launch
-   `codex-reviewer` there with target `origin/main...HEAD`, then
-   `git worktree remove <tmp>`.
-2. In every case, launch `release-manager` with the current Codex verdict
-   to re-evaluate the PR. It will route red checks to `on-call-engineer`,
+1. Read the PR body's `PR REVIEW:` and `CODEX REVIEW:` lines. For each one
+   that is missing, names a sha other than the PR's current head, or (for
+   Codex) records RETRY or UNAVAILABLE, rerun that review: check the head
+   out with `git worktree add --detach <tmp> <head sha>`, run
+   `/pr-review origin/main...HEAD` and/or `codex-reviewer` there with that
+   target, then `git worktree remove <tmp>`. RETRY and UNAVAILABLE follow
+   Stage 3's limits.
+2. In every case, launch `release-manager` with both current verdicts to
+   re-evaluate the PR. It will route red checks to `on-call-engineer`,
    park on owner gates, or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
@@ -107,9 +108,11 @@ can't launch agents.
 
 Second opinion: at most once per lane, before parking it on a second
 REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
-Codex plugin) with the lane worktree, the slice, the refutation or blockers
-verbatim, and the instruction "read-only diagnosis: do not edit files; name
-the root cause and the smallest fix, with file:line". Send its diagnosis to
+Codex plugin) in the foreground (`--wait`) with the lane worktree, the
+slice, the refutation or blockers verbatim, and the instruction "read-only
+diagnosis: do not edit files; name the root cause and the smallest fix,
+with file:line". If it returns a background job instead of a diagnosis,
+fetch the result with `/codex:result` before going on. Send its diagnosis to
 `tech-lead` for a ruling. If the tech lead accepts it, the slice owner gets
 one last repair round, the only exception to the two-round limit, and the
 verifier or both reviews run once more. If Codex or the plugin is

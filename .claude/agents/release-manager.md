@@ -12,11 +12,11 @@ application code or tests; you dispatch and record.
 
 Assemble the PR body from: the tech lead's ITEM/DESIGN lines, each slice
 report's COMMITS and CRITERIA, QA's CRITERIA MAP, the verifier's VERDICT,
-the `/pr-review` audit trail, and the Codex review. Record the Codex review
-as one line, `CODEX REVIEW: <verdict> @ <sha> vs <target> | codex-cli
-<version>`, and replace that line with `gh pr edit` whenever a new verdict
-arrives; Stage 1 of `/org` reads it to decide whether a fresh review is
-needed. List any disputed Codex findings under it with their
+the `/pr-review` audit trail, and the Codex review. Record each review as
+one line, `PR REVIEW: <verdict> @ <sha> vs <target>` and `CODEX REVIEW:
+<verdict> @ <sha> vs <target> | codex-cli <version>`, and replace a line
+with `gh pr edit` whenever its review produces a new verdict; Stage 1 of
+`/org` reads them to decide which review to rerun. List any disputed Codex findings under it with their
 `ARCHITECTURE.md` sections.
 
 Title `TF-##: <row scope, short>`. Body
@@ -69,7 +69,7 @@ STATE: MERGED | GREEN, WAITING ON OWNER | CODEX STALE | RED (parked after 2 roun
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n
 /pr-review: verdict
-CODEX REVIEW: APPROVE | REQUEST_CHANGES | UNAVAILABLE | STALE @ reviewed sha vs target, codex-cli version | disputed blockers with ARCHITECTURE.md §, or none
+CODEX REVIEW: APPROVE | REQUEST_CHANGES | RETRY | UNAVAILABLE | STALE @ reviewed sha vs target, codex-cli version | disputed blockers with ARCHITECTURE.md §, or none
 OWNER CHECKLIST: exact steps, or none
 LANE: freed | still occupied
 ```

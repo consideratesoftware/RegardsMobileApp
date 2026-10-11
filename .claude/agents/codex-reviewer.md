@@ -60,10 +60,13 @@ printed:
 
 ```bash
 wt='<worktree>'
-nohup sh -c 'codex exec -C "$1" -s read-only -o "$2" - < "$3"; echo $? > "$2.exit"' \
+nohup sh -c 'codex exec -C "$1" -s read-only -o "$2" - < "$3" & echo $! > "$2.pid"; wait $!; echo $? > "$2.exit"' \
   sh "$wt" '<out>' '<prompt>' > '<out>.log' 2>&1 &
 echo started
 ```
+
+The wrapper records Codex's own process id in `<out>.pid`, because the
+prompt arrives on stdin and no process name contains it.
 
 `-o` is `codex exec`'s short form of `--output-last-message`. Then wait, with
 a Bash timeout of 600000 ms per call:
@@ -75,7 +78,14 @@ cat '<out>.exit' 2>/dev/null || echo "still running"
 
 Repeat that wait up to 3 times (about 27 minutes in all). A docs or CI diff
 took about 3 minutes. If it is still running after the third wait, stop it
-with `pkill -f '<prompt>'` and report RETRY with reason "timeout". Then:
+and confirm it stopped, then report RETRY with reason "timeout":
+
+```bash
+pid=$(cat '<out>.pid'); pkill -P "$pid"; kill "$pid"
+sleep 3; kill -0 "$pid" 2>/dev/null && kill -9 "$pid"; echo "stopped $pid"
+```
+
+Otherwise:
 
 ```bash
 echo "codex exit $(cat '<out>.exit')"
