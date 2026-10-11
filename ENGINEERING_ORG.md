@@ -1,7 +1,7 @@
 # Engineering org
 
 Regards is built by a small engineering organization made of Claude Code
-agents, with Sid as owner. This file is the org contract: who does what,
+agents plus 2 Codex roles, with Sid as owner. This file is the org contract: who does what,
 which model each role runs on, how work moves between roles, and what the
 owner alone decides. `AGENTS.md`, `ARCHITECTURE.md`, and
 `TESTFLIGHT_PLAN.md` stay the sources of truth for the product and the
@@ -26,10 +26,17 @@ from skipping steps inside an item.
 | Release manager | `release-manager` | sonnet | no | PR lifecycle, CI, checkpoint, merge execution |
 | Tech writer | `tech-writer` | haiku | docs only | Sibling doc edits from facts other roles supply |
 | Review board | `pr-correctness` (opus), `pr-security-privacy` (sonnet), `pr-tests` (sonnet), `pr-accessibility` (sonnet), `pr-code-quality` (haiku), `pr-fit-finish` (haiku) via `/pr-review` | as listed | no | Unchanged; mirrored to `.codex/agents/` and checked by CI |
+| Cross-model reviewer | `codex-reviewer`, which runs Codex's `$regards-pr-review` read-only | haiku wrapper; Codex's default model reviews | no | Same review contract run by a different model family, so a blind spot shared by every Claude reviewer can still get caught |
+| Second opinion | `codex:codex-rescue` (Codex plugin), read-only diagnosis | Codex default | no | Fresh eyes on a lane that is about to park, before Sid is asked |
 
 Only the `pr-*` reviewers are mirrored for Codex. Every other role is Claude
 Code only; `scripts/check-review-agent-parity.sh` ignores them by prefix, so
 a new non-reviewer role must not be named `pr-*`.
+
+The 2 Codex roles need the Codex CLI installed and logged in on this Mac
+(`/codex:setup` checks both). They run on Sid's ChatGPT plan, not the
+Anthropic API. Codex never edits a lane: both roles run read-only, and a
+Claude engineer applies any fix they lead to.
 
 ## How one work item moves
 
@@ -41,7 +48,7 @@ TF-## READY
       → build-engineer gates each before commit
       → verifier tries to refute the slice
   → tech-writer: doc siblings, register, a11y rows
-  → /pr-review (review board)
+  → /pr-review (review board) + codex-reviewer, in parallel
   → release-manager: PR, CI, hosted review, on-call repairs, checkpoint
   → merge when every condition below holds, else parked with an owner checklist
 ```
@@ -73,8 +80,10 @@ All of these, on the current head, with no averaging:
 1. Every required check green.
 2. Hosted `Regards staged review`: zero unresolved blockers.
 3. `/pr-review` verdict APPROVE.
-4. Verifier verdict HOLDS for every slice.
-5. No owner-only gate outstanding (below).
+4. `codex-reviewer` verdict APPROVE, or every Codex blocker disputed in the
+   PR body with the `ARCHITECTURE.md` section that settles it.
+5. Verifier verdict HOLDS for every slice.
+6. No owner-only gate outstanding (below).
 
 The release manager executes the merge. Any role that finds itself wanting
 to skip one of these is wrong by definition.
@@ -89,6 +98,9 @@ it never pretends the step happened.
 - Physical-device runs (A15 budget, device matrix, TF-18).
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
+- Codex setup when `codex-reviewer` reports UNAVAILABLE: run `/codex:setup`
+  and `codex login` if it asks. The PR waits; the org does not merge
+  without the Codex verdict.
 - Scope changes to the queue or dependency graph.
 
 Simulator gates run on this Mac through `build-engineer`; GitHub-hosted

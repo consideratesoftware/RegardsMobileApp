@@ -70,14 +70,29 @@ For each slice in the tech lead's plan:
 3. Launch `verifier` with the claim "slice <name> on <branch> meets <its
    criteria> and its regression tests fail with the change reverted". On
    REFUTED: send the refutation to the slice owner, one repair round, then
-   verify once more. A second REFUTED parks the lane with the refutation in
-   the report.
+   verify once more. A second REFUTED goes to the second opinion below
+   before the lane parks.
 
 After the last slice: launch `tech-writer` with the DOC SIBLINGS list and
-the facts from the slice reports. Then run `/pr-review worktree` from inside
-the lane's worktree. On REQUEST_CHANGES: blockers go to the slice owner
-(design questions to `tech-lead` first), one round, review again. Two
-rounds maximum, then park.
+the facts from the slice reports. Commit, then in one batch run
+`/pr-review` from inside the lane's worktree and launch `codex-reviewer`
+with the worktree, base `origin/main`, the item's §14 row, and its claimed
+R-numbers. Treat blockers from both the same way: they go to the slice
+owner (design questions to `tech-lead` first), one round, then both review
+again. Drop a Codex finding only when it contradicts `ARCHITECTURE.md`, and
+record the section, as `/pr-review` does. If `codex-reviewer` reports
+UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate in
+`ENGINEERING_ORG.md`. Two rounds maximum, then the second opinion.
+
+Second opinion: before parking a lane on a second REFUTED or a second
+REQUEST_CHANGES, launch `codex:codex-rescue` (from the Codex plugin) once with the lane worktree,
+the slice, the refutation or blockers verbatim, and the instruction
+"read-only diagnosis: do not edit files; name the root cause and the
+smallest fix, with file:line". Send its diagnosis to `tech-lead` for a
+ruling. If the tech lead accepts it, the slice owner gets one last repair
+round and the verifier or both reviews run once more. Otherwise, or if
+that round fails, park the lane with the refutation, blockers, and Codex
+diagnosis in the report.
 
 ## Stage 4: ship
 
