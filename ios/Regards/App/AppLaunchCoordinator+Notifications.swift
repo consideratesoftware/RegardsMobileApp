@@ -10,11 +10,12 @@ import Foundation
 /// `NotificationAction` before anything crosses an isolation boundary, so
 /// nothing non-`Sendable` reaches this file.
 extension AppLaunchCoordinator {
-    /// Starts the single consumer of `notifications.actions`. Called once
-    /// `runtime` is set and `phase` is decided, so an action that launched the
-    /// app (buffered in the stream until now) is judged against the real
-    /// phase. Idempotent: `retry()` reaches this again and must not start a
-    /// second iterator, which would trap.
+    /// Starts the single consumer of `notifications.actions`. `start()` calls
+    /// this on every exit, once `phase` is decided (`.ready`, `.onboarding`,
+    /// or `.failed`), so an action that launched the app (buffered in the
+    /// stream until now) is judged against the real phase and never held
+    /// across a failed launch. Idempotent: `retry()` reaches this again and
+    /// must not start a second iterator, which would trap.
     func beginConsumingNotificationActions() {
         guard notificationActionTask == nil, let notifications else { return }
         let actions = notifications.actions

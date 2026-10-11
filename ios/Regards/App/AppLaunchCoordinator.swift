@@ -221,12 +221,20 @@ final class AppLaunchCoordinator {
 
     func start() async {
         guard !didStart, let dependencies else {
-            // The DEBUG mock launch sets `runtime` in its initializer and
-            // never runs the body below, so its consumer starts here.
-            if runtime != nil { beginConsumingNotificationActions() }
+            // No launch body runs here: the DEBUG mock launch, or a
+            // coordinator whose phase was set without one. Its phase is
+            // already decided unless another `start()` is still loading,
+            // which starts the consumer itself when it finishes.
+            if phase != .loading { beginConsumingNotificationActions() }
             return
         }
         didStart = true
+        // Every exit below, the failure paths included, has decided `phase`
+        // by now, so the consumer judges a buffered action against it. An
+        // action that arrives on the launch-failure screen is dropped there,
+        // not applied after a later `retry()`. The `.ready` and `.onboarding`
+        // branches also start it early, before their long awaits.
+        defer { beginConsumingNotificationActions() }
         phase = .loading
         statusMessage = nil
         // Round 11: load before the first reconcile pass below, so it has
