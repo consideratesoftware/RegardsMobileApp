@@ -13,6 +13,6 @@ The delivery side is an engineering org of Claude Code agents, plus 2
 read-only Codex roles, described in `ENGINEERING_ORG.md`: `/org` is the
 engineering manager; `tech-lead`, `senior-ios-engineer`, `ios-engineer`,
 `qa-engineer`, `verifier`, `build-engineer`, `on-call-engineer`,
-`release-manager`, and `tech-writer` are the roles. `codex-reviewer` and the Codex plugin's `codex:codex-rescue`
-add a read-only Codex review and second opinion. The parity check covers
+`release-manager`, and `tech-writer` are the roles. `codex-reviewer` adds a read-only Codex review, and the Codex
+plugin's `codex:codex-rescue` adds a read-only second opinion. The parity check covers
 only the `pr-*` reviewers.

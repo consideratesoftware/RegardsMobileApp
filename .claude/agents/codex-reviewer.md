@@ -23,7 +23,8 @@ first line of the error only.
 placeholders. The prompt goes into a file through a quoted heredoc, so
 quotes or `$` in the §14 row can't reach the shell, and the closing
 `PROMPT` line must stay at column 0. The worktree path is assigned in single
-quotes. The review runs read-only, so Codex cannot change the branch.
+quotes. Org worktree paths never contain a quote; if the path you were given
+contains `'`, stop and report UNAVAILABLE instead of running anything. The review runs read-only, so Codex cannot change the branch.
 
 ```bash
 wt='<worktree>'

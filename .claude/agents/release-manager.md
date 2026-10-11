@@ -13,7 +13,9 @@ application code or tests; you dispatch and record.
 Assemble the PR body from: the tech lead's ITEM/DESIGN lines, each slice
 report's COMMITS and CRITERIA, QA's CRITERIA MAP, the verifier's VERDICT,
 the `/pr-review` audit trail, and the `codex-reviewer` verdict with any
-disputed Codex findings and their `ARCHITECTURE.md` sections. Title `TF-##: <row scope, short>`. Body
+disputed Codex findings and their `ARCHITECTURE.md` sections.
+
+Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item
 depends on an unmerged parent. Push with explicit branch name; never force.
 
