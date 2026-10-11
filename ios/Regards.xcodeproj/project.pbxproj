@@ -54,6 +54,7 @@
 		4B668D6DFA64D62381BB7324 /* SchedulingPassSnoozeCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A40C514B390F4D2E4D15531 /* SchedulingPassSnoozeCalendarTests.swift */; };
 		4DC3FCCE2BE3579953F30E74 /* ContactValueAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0F1602FA69250B09439710 /* ContactValueAccessibility.swift */; };
 		4ED0532952C440CA7B1F87A0 /* AppLaunchCoordinator+Reconciliation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADC5733A26E2C5DEF5A8AA3 /* AppLaunchCoordinator+Reconciliation.swift */; };
+		4F6AB774AC8B518B769931BD /* AppLaunchCoordinator+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E1D776AE132C7E4AF10439 /* AppLaunchCoordinator+Notifications.swift */; };
 		4FA92BCDA8B77555BBC3747B /* RepositoriesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9337143263D1CE0320C55554 /* RepositoriesTests.swift */; };
 		50AE036BE6ADA7D882B22017 /* TransparencyScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 212E7604734F51D4345DEAFB /* TransparencyScreen.swift */; };
 		5250803E1BE3B74C539BACD5 /* RegardsLoadStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41F30FBE59A2C13DD47309A /* RegardsLoadStateTests.swift */; };
@@ -189,6 +190,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00E1D776AE132C7E4AF10439 /* AppLaunchCoordinator+Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppLaunchCoordinator+Notifications.swift"; sourceTree = "<group>"; };
 		00F525DC9E8A95452CB6159F /* DeepLinkBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkBuilderTests.swift; sourceTree = "<group>"; };
 		0127536628D374A08FE62114 /* RegardsColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsColor.swift; sourceTree = "<group>"; };
 		027BE6D52A02459903897060 /* Tag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tag.swift; sourceTree = "<group>"; };
@@ -777,6 +779,7 @@
 				93F66D1A796C1ADC15E58FD9 /* AppEnvironment.swift */,
 				AF37C281EC11771129182D9C /* AppLaunchCoordinator.swift */,
 				A3B9E81A3643CB7480549D8D /* AppLaunchCoordinator+DebugLaunch.swift */,
+				00E1D776AE132C7E4AF10439 /* AppLaunchCoordinator+Notifications.swift */,
 				1ADC5733A26E2C5DEF5A8AA3 /* AppLaunchCoordinator+Reconciliation.swift */,
 				F1ADC20C0E7E4CE0DA30722D /* RegardsApp.swift */,
 				C1D7968D3C4F277905163294 /* RegardsApp+ViewModifiers.swift */,
@@ -1028,6 +1031,7 @@
 				06C5A4374506C5D5126024B3 /* AllContactsViewModel.swift in Sources */,
 				CB8B6E51DE9C90BFAA7E6F70 /* AppEnvironment.swift in Sources */,
 				12AD26AD426340E81B579975 /* AppLaunchCoordinator+DebugLaunch.swift in Sources */,
+				4F6AB774AC8B518B769931BD /* AppLaunchCoordinator+Notifications.swift in Sources */,
 				4ED0532952C440CA7B1F87A0 /* AppLaunchCoordinator+Reconciliation.swift in Sources */,
 				607728A371DB3C42AE7707DC /* AppLaunchCoordinator.swift in Sources */,
 				F029A2CCAA85DECF7BF8A6B7 /* Avatar.swift in Sources */,

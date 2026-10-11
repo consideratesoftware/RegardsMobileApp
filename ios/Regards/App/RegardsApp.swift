@@ -5,6 +5,12 @@ import SwiftUI
 struct RegardsApp: App {
     @State private var launch = AppLaunchCoordinator.configuredForCurrentProcess()
 
+    init() {
+        // Before launch finishes: an action that launched the app is
+        // delivered to the adapter's delegate, so the delegate must be set.
+        UserNotificationsAdapter.shared.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView(launch: launch)
