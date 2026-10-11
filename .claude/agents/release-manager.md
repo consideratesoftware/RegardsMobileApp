@@ -45,9 +45,11 @@ PR, never in the root checkout.
 - Every required check green on the current head.
 - Hosted review: zero unresolved blockers.
 - `/pr-review` APPROVE on the current head.
-- `codex-reviewer` APPROVE on the current head, or every Codex blocker
-  disputed in the PR body with an `ARCHITECTURE.md` section; check each
-  cited section exists and addresses the finding. UNAVAILABLE is an owner
+- A `CODEX REVIEW:` verdict exists for the current head and is APPROVE,
+  or REQUEST_CHANGES with every one of its blockers disputed with an
+  `ARCHITECTURE.md` section; check each cited section exists and
+  addresses the finding. A missing line, RETRY, STALE, or UNAVAILABLE
+  never passes. UNAVAILABLE, or RETRY three times in a row, is an owner
   gate: park with "run `/codex:setup`".
 - If either review's verdict names a sha other than the current head,
   report STATE CODEX STALE and stop; the engineering manager reruns both
