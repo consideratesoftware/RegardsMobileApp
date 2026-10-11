@@ -13,30 +13,43 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-10-11
-- Baseline: `main` at `1bf6352` (merge of GitHub PR #55).
-- Active work: none.
-- Next ready work: `TF-05` and `TF-06` are independent lanes. Both are
-  `READY` because their only dependency, `TF-04`, is `DONE`. `TF-06` has a
-  hard gate: it must not ship notification scheduling until R57 is resolved
-  (owner ruling 2026-08-22; see its queue row). `TF-07` needs `TF-05` and
-  `TF-06`, and `TF-11` needs `TF-06`, so both stay `BLOCKED` until those merge.
-- Open TF pull requests: none. Other open pull requests, none with a
-  `TF-##` marker: GitHub PR #57 (`claude/audit-stress-timeout`, raises the
-  stress-job limits described below), PR #58 (`claude/tf-03-close`, this
-  checkpoint), and PR #59 (`claude/org-codex-review`, adds the Codex
-  cross-model review to `ENGINEERING_ORG.md`).
-- Stress job: the nightly `Audit stress` run has been red or cancelled since
-  about 2026-09-21, with 1 pass in the last 20 runs. Each 5x iteration now
-  takes about 13 minutes (39 tests), so a full run needs about 73 minutes
-  against a 75-minute job limit. Two runs also hit the 10-minute simulator
-  boot limit because the boot itself took 8.7 minutes.
-- iOS CI, Lint, and Guards are green on `1bf6352`.
-- Owner action needed: none.
+- Baseline: `main` at `78dad7d` (merge of GitHub PR #57, which raised the
+  stress-job limits: job timeout 75 to 120 minutes, boot step 10 to 20
+  minutes). A confirming `Audit stress` run on `78dad7d` is in progress: run
+  `38121994128`.
+- Active work:
+  - `TF-05` on `claude/tf-05-reminder-window-editor` (worktree
+    `../RegardsMobileApp-TF05`), started 2026-10-11, no PR yet.
+  - `TF-06` on `claude/tf-06-notification-adapter` (worktree
+    `../RegardsMobileApp-TF06`), started 2026-10-11, no PR yet.
+  - `TF-03` acceptance, owned by the owner (see `Owner gates`). The code is
+    merged in PR #48.
+- Next ready work: `TF-05` and `TF-06` stay `READY`, since their only
+  dependency, `TF-04`, is `DONE`. `TF-06` has a hard gate: it must not ship
+  notification scheduling until R57 is resolved (owner ruling 2026-08-22, see
+  its queue row).
+- Blocked: `TF-07` needs `TF-05` and `TF-06`, and `TF-11` needs `TF-06`. Both
+  also need `TF-03`, which stays `OWNER` until its acceptance run passes, so
+  both stay `BLOCKED`.
+- Open pull requests:
+  - PR #58 (`claude/tf-03-close`): this checkpoint. It is TF-03 work.
+  - PR #59 (`claude/org-codex-review`): infra. It adds a Codex cross-model
+    review to the org. It is not TF work.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
   Standing mitigation for any agent in this worktree: never `git add -A`.
   Stage explicit paths, and check `find . -name "* 2.*"` before committing.
+- Stress job: the nightly `Audit stress` run has been red or cancelled since
+  about 2026-09-21, with 1 pass in the last 20 runs. Each 5x iteration takes
+  about 13 minutes (39 tests). Five iterations take about 65 minutes, and
+  setup, boot, and build add about 8 more, so a full run needs about 73 minutes
+  against the old 75-minute limit. Two runs failed at the 10-minute boot step
+  limit. On 2026-10-09, `bootstatus` took 8.7 minutes, and the status-bar setup
+  after it pushed the step past 10 minutes.
+- Green CI: iOS CI (`36099491997`), Lint (`36099491904`), and Guards
+  (`36099491878`) passed on `1bf6352`, the sha before PR #57.
+- Owner action needed: TF-03 acceptance. See `Owner gates`.
 
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
@@ -45,11 +58,22 @@ never pick up Android work.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
 
+- Owner rulings, 2026-10-11:
+  - `TF-05` and `TF-06` run in parallel despite sharing the `RegardsApp`,
+    generated-project, and execution-docs locks. The second to merge rebases
+    and regates.
+  - `R55` moves to `TF-07`.
+  - `TF-06`'s on-device exit check moves to `TF-07`'s airplane-mode device
+    test.
 - History: the PR that carries each closed item's evidence.
-  - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`, the
-    close checkpoint).
-  - TF-03: PR #48 (merged as `6886be3` on 2026-08-11). The corruption-banner
-    VoiceOver smoke is recorded in its description.
+  - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
+    physical-device acceptance, including the
+    `NSFileProtectionCompleteUntilFirstUserAuthentication` check on
+    2026-08-09, is in PR #45's checkpoint text (`git show
+    ee601a5:TESTFLIGHT_PLAN.md`).
+  - TF-03: code merged in PR #48 (merged as `6886be3` on 2026-08-11). The
+    corruption-banner VoiceOver smoke is recorded in PR #48's description. The
+    acceptance run is pending (see `Owner gates`).
   - TF-04: PR #49 (merged as `02873e8` on 2026-09-14).
   - Earlier checkpoint text, including the round-by-round TF-02 and TF-03
     review history, is in the git history of this file.
@@ -160,7 +184,7 @@ numbers.
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
 | TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R22, R27–R34, R40, R42–R43 |
 | TF-02 | DONE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
-| TF-03 | DONE | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
+| TF-03 | OWNER | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
 | TF-04 | DONE | TF-02 | Caught up, Snooze, and Log other persist from every surface they appear on (Contact Detail: all three, as buttons; Overdue: Caught up and Snooze as native `List`/`.swipeActions`, swipe right and left; Upcoming: Caught up only, cadence rows only, swipe right; neither list screen has a Log-other row action, and Upcoming ships no Snooze action; tapping a list row previews the channel action pending TF-08; both screens migrated from `ScrollView`/`RegardsCard` per-row buttons to `List` in round 12, which R52 records); Snooze via a narrow `SchedulingPass` DB-only stub (single cadence `ScheduledReminder` write, no window/engine/reconciliation — PR25 absorbs it); live lists update via `ContactRepository.observeTracked()`; interaction, action, and mock/GRDB parity tests pass | PR22; R11, R24, R34, R36, R46, R52 |
 | TF-05 | READY | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
 | TF-06 | READY | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
@@ -195,7 +219,7 @@ needed; then the TF-13 → TF-15 → TF-17 → TF-16 → TF-18 joins. Joins bran
 from the combined current `main`, never from only one parent. Independent
 siblings use separate linked worktrees. Stacks are reserved for real
 dependency edges and are rebased and retargeted to `main` after their parent
-merges.
+merges. As of 2026-10-11, `TF-05` and `TF-06` are the active pair.
 
 Treat shared schema/location transitions and high-collision composition as
 locks, not artificial global dependencies. Only one lane may own a schema or
@@ -491,9 +515,31 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
 
 Current gates:
 
-- No owner gate is active. `TF-02` is agent-owned repository work. R30 stays
-  intentionally open; no unique work may be removed merely to close a hygiene
-  row.
+- TF-03 acceptance (`OWNER`). The owner runs this pass on a physical iPhone,
+  using a production build from `main` at `78dad7d` or later. Do not use
+  `--regards-mock-runtime` or any `REGARDS_UI_TEST_*` flag. Full Contacts
+  access is required (`.authorized`). Limited Access never archives, so the
+  delete steps prove nothing under Limited Access. The 5k off-pool half of R25
+  is already proven by the synthetic regression test in PR #48, so this pass
+  covers only the PR21 exit check.
+
+  1. Complete onboarding with full Contacts access. Use two test contacts in
+     the system Contacts app: Contact A to rename and Contact B to delete.
+  2. In Regards, log one interaction on Contact B. Record the interaction count.
+  3. Rename Contact A in the Contacts app. Foreground Regards. Confirm the new
+     name shows.
+  4. Delete Contact B in the Contacts app. Foreground Regards. Confirm Contact B
+     is still present. The first miss is recorded but not archived yet.
+  5. Relaunch Regards. Confirm Contact B is still present.
+  6. Wait at least 5 minutes after the step 4 foreground. Foreground Regards.
+     Confirm Contact B is archived and the interaction count is unchanged.
+  7. Re-add Contact B, or undo its delete, in the Contacts app. Foreground
+     Regards. Confirm Contact B is back in view. Record which path you used.
+     A re-added contact can get a new system identifier and import as new.
+
+  Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___).
+  Findings: ___.
+- R30 stays intentionally open; no unique work may be removed merely to close a hygiene row.
 
 ### PR #24 modernization accessibility evidence
 
