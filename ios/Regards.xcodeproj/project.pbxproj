@@ -134,6 +134,7 @@
 		CB3CA010C4EBE1D62D594D9E /* ContactsReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0796D2167027FBCEF07289C /* ContactsReconciler.swift */; };
 		CB6DFAAA9FE0A26F371A6E87 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B5E6620099016E635E9FB5 /* Contact.swift */; };
 		CB8B6E51DE9C90BFAA7E6F70 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F66D1A796C1ADC15E58FD9 /* AppEnvironment.swift */; };
+		CBA4143AD2A46BABB3FEBABD /* NotificationScheduling.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBF28C6B21851DD36A0CAE3 /* NotificationScheduling.swift */; };
 		CD76FBEDEEF35BB28E43303D /* ChannelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A814573BE991E0A35C84653E /* ChannelCatalog.swift */; };
 		D02616FCEEA8888EF9DEF40A /* ContactsImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A240F758BF789AC64D5A3E /* ContactsImporterTests.swift */; };
 		D2519370DA6A639FBD030621 /* UpcomingFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47DD4E9A1F63D784EBA57296 /* UpcomingFixtures.swift */; };
@@ -347,6 +348,7 @@
 		FC1EDE1581885F647407E537 /* ObservationSubscriptionToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationSubscriptionToken.swift; sourceTree = "<group>"; };
 		FD23D49A80EFB8405D107012 /* CadenceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceDescriptor.swift; sourceTree = "<group>"; };
 		FEA83CFB2493F560AB4FF030 /* OverdueScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdueScreen.swift; sourceTree = "<group>"; };
+		FEBF28C6B21851DD36A0CAE3 /* NotificationScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduling.swift; sourceTree = "<group>"; };
 		FFEAB693894E205010B8179E /* OverdueViewModelActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdueViewModelActionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -580,6 +582,14 @@
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
+		702520EEA6055277219D446A /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				FEBF28C6B21851DD36A0CAE3 /* NotificationScheduling.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
 		77E5586298AAAC9F341B2B64 /* Contacts */ = {
 			isa = PBXGroup;
 			children = (
@@ -701,6 +711,7 @@
 			children = (
 				A34313EF9006CC0B080B990F /* AppIntents */,
 				77E5586298AAAC9F341B2B64 /* Contacts */,
+				702520EEA6055277219D446A /* Notifications */,
 			);
 			path = Platform;
 			sourceTree = "<group>";
@@ -1042,6 +1053,7 @@
 				7C9C3BFC545AEC946B91F45B /* MockRepositories+SeedCast.swift in Sources */,
 				C17E9AC4724CF5518EDC0353 /* MockRepositories.swift in Sources */,
 				4259341EC1D0E9B83B0585BE /* MockRepositoryWrappers.swift in Sources */,
+				CBA4143AD2A46BABB3FEBABD /* NotificationScheduling.swift in Sources */,
 				21C13F2242D52556CDF87D28 /* ObservationSubscriptionToken.swift in Sources */,
 				D928A420E34C0B47420C0BD5 /* OnboardingScreen.swift in Sources */,
 				8688A4974A05E6E784F3DEAC /* OverdueRow.swift in Sources */,
