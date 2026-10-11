@@ -62,7 +62,11 @@ retry_sleep_seconds="${PREPARE_AUDIT_SIMULATOR_RETRY_SLEEP:-15}"
 #      "searching" wifi icon, an actual low-battery state -- can't itself
 #      become a separate audit finding.
 #   3. Bound a hang with the calling workflow step's `timeout-minutes`
-#      (10 min). A single `bootstatus` call that never returns is not
+#      (20 min). A healthy cold boot is slow: `bootstatus` spends most of
+#      it on "Waiting on Data Migration", and took 4.5 minutes on
+#      2026-10-08 and 8.7 minutes on 2026-10-09. The second boot finished,
+#      and the status-bar setup after it then crossed the old 10-minute
+#      bound, so a slow boot failed as if it had hung. A single `bootstatus` call that never returns is not
 #      something the retry loop below can detect or interrupt -- it only
 #      reacts to an attempt that returns a failure -- so only GitHub Actions
 #      killing the whole step after its timeout actually bounds that case,
