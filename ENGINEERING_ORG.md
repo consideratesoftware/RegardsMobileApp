@@ -125,7 +125,7 @@ for Sid to find later.
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
 - Codex setup when `codex-reviewer` reports UNAVAILABLE, or RETRY 3 times
-  in a row: run `/codex:setup` and `codex login` if it asks. The PR waits;
+  in a row (dirty-tree RETRYs don't count): run `/codex:setup` and `codex login` if it asks. The PR waits;
   the org does not merge without the Codex verdict.
 - Scope changes to the queue or dependency graph.
 

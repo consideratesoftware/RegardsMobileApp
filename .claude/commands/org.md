@@ -53,8 +53,8 @@ For each open TF PR:
    and/or `codex-reviewer` there with that target, then remove that
    worktree. Stage 0 removes any leftover `../RegardsReview-*` worktree
    from a crashed run. RETRY and UNAVAILABLE follow Stage 3's limits; count
-   consecutive RETRY comments on the PR, so the limit holds across
-   sessions.
+   consecutive RETRY comments on the PR, skipping dirty-tree ones, so the
+   limit holds across sessions.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. If it reports CODEX STALE, handle it as in Stage 4. It will route red checks to `on-call-engineer`,
    park on owner gates, or merge when all conditions hold.
@@ -109,6 +109,8 @@ contradicts `ARCHITECTURE.md`; you write the dispute in that verdict's PR commen
 the section, as `/pr-review` does for its own findings.
 
 A `codex-reviewer` RETRY proves nothing: run it again, at most twice more.
+A dirty-tree RETRY doesn't count; have the lane's owner commit or discard
+the files, then rerun.
 After that, or on UNAVAILABLE, carry on to Stage 4; the PR waits on the
 owner gate in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up
 a review round. Two rounds maximum, then the second opinion.
