@@ -35,9 +35,11 @@ For `status`: print the Stage 5 report from this state and stop.
 
 ## Stage 1: resume open work (parallel; does not consume lanes)
 
-For each open TF PR: launch `release-manager` to re-evaluate it. It will
-route red checks to `on-call-engineer`, park on owner gates, or merge when
-all conditions hold.
+For each open TF PR: launch `codex-reviewer` on the PR's head (in a clean
+checkout of that branch, target `origin/main...HEAD`) unless a Codex verdict
+for that exact head is already in the PR body, then launch `release-manager`
+with that verdict to re-evaluate it. It will route red checks to
+`on-call-engineer`, park on owner gates, or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
@@ -74,7 +76,9 @@ For each slice in the tech lead's plan:
    before the lane parks.
 
 After the last slice: launch `tech-writer` with the DOC SIBLINGS list and
-the facts from the slice reports. Commit, fetch, then in one batch run
+the facts from the slice reports. The tech writer commits its files; the
+review batch starts only when `git status --short` in the lane is empty.
+Fetch, then in one batch run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch
 `codex-reviewer` with the worktree, the same target `origin/main...HEAD`,
 the item's §14 row, and its claimed R-numbers. The three-dot target
@@ -82,10 +86,10 @@ compares against the merge base, so commits that landed on `main` after the
 lane branched don't show up as reversions. Treat blockers from both the same way: they go to the slice
 owner (design questions to `tech-lead` first), one round, then both review
 again. Drop a Codex finding only when it contradicts `ARCHITECTURE.md`, and
-record the section, as `/pr-review` does. If `codex-reviewer` reports
-UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate in
-`ENGINEERING_ORG.md`, and an UNAVAILABLE run does not use up a review
-round. Two rounds maximum, then the second opinion. Whenever the head
+record the section, as `/pr-review` does. A `codex-reviewer` RETRY
+proves nothing: run it again, at most twice, then treat it as UNAVAILABLE.
+If it reports UNAVAILABLE, carry on to Stage 4; the PR waits on the owner
+gate in `ENGINEERING_ORG.md`. Neither uses up a review round. Two rounds maximum, then the second opinion. Whenever the head
 moves after a Codex verdict (a repair, a rebase, an on-call fix), launch
 `codex-reviewer` again on the new head before Stage 4 re-checks merge
 conditions; the release manager can't launch agents.
@@ -106,6 +110,11 @@ Launch `release-manager` with every report from the lane. It opens the PR,
 watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
+
+If it reports CODEX STALE (the head moved after the last Codex verdict),
+launch `codex-reviewer` on the new head and relaunch `release-manager` with
+the new verdict. Blockers go to the slice owner as in Stage 3. After 3
+stale rounds on one PR, park it and say why.
 
 ## Stage 5: report
 

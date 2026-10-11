@@ -44,8 +44,9 @@ PR, never in the root checkout.
 - `codex-reviewer` APPROVE on the current head, or every Codex blocker
   disputed in the PR body with the `ARCHITECTURE.md` section that settles
   it. UNAVAILABLE is an owner gate: park with "run `/codex:setup`". If the
-  head moved after the last Codex verdict, report CODEX STALE and stop; the
-  engineering manager reruns `codex-reviewer`.
+  head moved after the last Codex verdict, or the verdict is RETRY, report
+  CODEX STALE and stop; the engineering manager reruns `codex-reviewer` and
+  relaunches you.
 - Verifier HOLDS for every slice.
 - No owner-only gate outstanding: manual VoiceOver smoke for any diff
   touching `Features/`, `DesignSystem/`, or `App/` view code; physical-device
@@ -63,7 +64,7 @@ STATE: MERGED | GREEN, WAITING ON OWNER | RED (parked after 2 rounds) | DRAFT (s
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n
 /pr-review: verdict
-CODEX REVIEW: APPROVE | REQUEST_CHANGES | UNAVAILABLE | STALE @ reviewed sha vs target | disputed blockers with ARCHITECTURE.md §, or none
+CODEX REVIEW: APPROVE | REQUEST_CHANGES | UNAVAILABLE | STALE @ reviewed sha vs target, codex-cli version | disputed blockers with ARCHITECTURE.md §, or none
 OWNER CHECKLIST: exact steps, or none
 LANE: freed | still occupied
 ```
