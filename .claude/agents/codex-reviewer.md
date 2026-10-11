@@ -37,8 +37,8 @@ echo "head $head prompt $prompt out $out"
   of the error only.
 - `git status --short` not empty: report RETRY with reason "dirty tree"
   and the list. The review target is committed history, so uncommitted
-  files would go unreviewed. A dirty-tree RETRY doesn't count toward the
-  RETRY limit; whoever owns the lane commits or discards the files.
+  files would go unreviewed; whoever owns the lane commits or discards
+  them before the rerun.
 
 **Step 2. Prompt.** Use the Write tool to write this text to the `$prompt`
 path from step 1, filling in the 3 placeholders. Writing it with the Write
@@ -62,14 +62,10 @@ printed:
 
 ```bash
 wt='<worktree>'
-nohup perl -e 'setpgrp(0,0); exec @ARGV' sh -c 'echo $$ > "$2.pgid"; codex exec -C "$1" -s read-only -o "$2" - < "$3"; echo $? > "$2.exit"' \
+nohup sh -c 'codex exec -C "$1" -s read-only -o "$2" - < "$3"; echo $? > "$2.exit"' \
   sh "$wt" '<out>' '<prompt>' > '<out>.log' 2>&1 &
 echo started
 ```
-
-`perl ... setpgrp` puts the wrapper, Codex, and every process Codex starts
-in a new process group, and the wrapper records that group's id in
-`<out>.pgid`. The prompt arrives on stdin, so no process name contains it.
 
 `-o` is `codex exec`'s short form of `--output-last-message`. Then wait, with
 a Bash timeout of 600000 ms per call:
@@ -80,28 +76,10 @@ cat '<out>.exit' 2>/dev/null || echo "still running"
 ```
 
 Repeat that wait up to 3 times (about 27 minutes in all). A docs or CI diff
-took about 3 minutes. If it is still running after the third wait, stop it
-and confirm it stopped, then report RETRY with reason "timeout":
-
-```bash
-pg=$(cat '<out>.pgid' 2>/dev/null)
-if [ "$pg" -gt 1 ] 2>/dev/null && [ "$(ps -o pgid= -p "$pg" 2>/dev/null | tr -d ' ')" = "$pg" ]; then
-  kill -TERM -- -"$pg"; sleep 3
-  pgrep -g "$pg" >/dev/null && { kill -KILL -- -"$pg"; sleep 1; }
-  pgrep -g "$pg" >/dev/null && echo "still running group $pg" || echo "stopped group $pg"
-else
-  echo "no valid pgid"
-fi
-```
-
-That stops the whole group, including Codex's per-reviewer sub-agents, and
-checks none survived. It only signals a group whose leader is still alive
-and leads that group, so a bad or stale pgid can't reach other processes.
-If it prints "still running" or "no valid pgid" while `<out>.exit` is
-still missing, report UNAVAILABLE with that line: a Codex run that can't
-be confirmed stopped must not be retried.
-
-Otherwise:
+took about 3 minutes. If it is still running after the third wait, report
+UNAVAILABLE with reason "timeout" and leave it alone. Don't try to stop it:
+it runs read-only and writes only to its own `<out>` file, which nothing
+reads again. Otherwise:
 
 ```bash
 echo "codex exit $(cat '<out>.exit')"
@@ -115,7 +93,6 @@ and those need the saved parent session.
 **Step 4. Verdict.** Report RETRY, with the reason and the last 20 lines of
 Codex's output, if any of these is true:
 
-- Codex was still running after the third wait.
 - `codex exit` is not 0.
 - `<out>` is empty, or the verdict can't be read. The verdict is the first
   line starting `VERDICT:` after the first line starting `## PR Review`,
@@ -152,6 +129,6 @@ REVIEW:
 output for RETRY>
 ```
 
-UNAVAILABLE means Codex itself needs setup, which only Sid can do. RETRY
-means this run proved nothing and the engineering manager should run it
-again.
+UNAVAILABLE means only Sid can unblock Codex: it needs setup, or a review
+timed out. RETRY means this run proved nothing; the engineering manager
+reruns it once, and a second RETRY on the same head counts as UNAVAILABLE.

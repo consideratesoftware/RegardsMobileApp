@@ -130,12 +130,10 @@ for Sid to find later.
 - Physical-device runs (A15 budget, device matrix, TF-18).
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
-- Codex setup when `codex-reviewer` reports UNAVAILABLE, or its RETRY
-  streak reaches 3. The streak is the number of `CODEX REVIEW: RETRY`
-  comments on the PR since its last APPROVE, REQUEST_CHANGES, or
-  UNAVAILABLE comment, skipping dirty-tree RETRYs; this is the one
-  definition every other file uses. Then: run `/codex:setup` and `codex login` if it asks. The PR waits;
-  the org does not merge without the Codex verdict.
+- Codex when `codex-reviewer` reports UNAVAILABLE (Codex needs setup, a
+  review timed out, or a second RETRY on the same head): Sid runs
+  `/codex:setup`, and `codex login` if it asks, or says what else to do.
+  The PR waits; the org does not merge without the Codex verdict.
 - Scope changes to the queue or dependency graph.
 
 Simulator gates run on this Mac through `build-engineer`; GitHub-hosted
