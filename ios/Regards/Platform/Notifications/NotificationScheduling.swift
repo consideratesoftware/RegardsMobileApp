@@ -2,14 +2,18 @@ import Foundation
 import UserNotifications
 
 // R57 gate (ARCHITECTURE.md §19, owner ruling 2026-08-22): TF-06 must not
-// ship notification scheduling. `SchedulingPass.snooze` writes a raw
-// `now + 7d` with no window resolution, so a notification scheduled from
-// that row would fire outside the user's declared window, the one promise
-// §9 says can't break. This adapter therefore has no way to hand a request
-// to the notification center: `NotificationScheduling` carries permission
-// and actions only, and TF-07 adds `schedule`, `cancel`, and
+// ship notification scheduling. `SchedulingPass.snooze` writes `now + 7 days`
+// without resolving the user's reminder window, so a notification scheduled
+// from that row could fire outside the window, which §9 forbids. This file
+// therefore carries permission and actions only: it builds no notification
+// request and has no path that hands one to the system notification center.
+// TF-07 restores request building plus `schedule`, `cancel`, and
 // `pendingIdentifiers` in the PR that resolves R57.
-// `NotificationSchedulingGateTests` enforces the gate until then.
+//
+// `NotificationSchedulingGateTests` enforces this on raw source text:
+// G1, no other app file names the center type; G2, this file never
+// contains the center's enqueue verb; G3, this file names the center type
+// exactly 4 times (3 `.current()` calls and the delegate parameter).
 
 /// Permission state mirrored from `UNAuthorizationStatus`, so callers outside
 /// the Platform layer never import UserNotifications.
@@ -32,38 +36,7 @@ public enum NotificationAction: Sendable, Equatable {
     case snooze(UUID)
 }
 
-/// One OS notification to schedule. `fireDate` is the absolute instant
-/// SchedulingPass resolved through the engine (§9); the adapter never
-/// re-derives it from wall-clock fields in another zone.
-public struct ReminderNotificationRequest: Sendable, Equatable {
-    /// `contact-{uuid}-{kind}` or `digest-{slotStartEpoch}` (§9 contract 5).
-    public let identifier: String
-    public let title: String
-    public let body: String
-    public let fireDate: Date
-    /// Set for a single-contact notification, so its actions know whom they
-    /// act on. Nil for a digest.
-    public let contactId: UUID?
-    public let category: NotificationCategory
-
-    public init(
-        identifier: String,
-        title: String,
-        body: String,
-        fireDate: Date,
-        contactId: UUID?,
-        category: NotificationCategory
-    ) {
-        self.identifier = identifier
-        self.title = title
-        self.body = body
-        self.fireDate = fireDate
-        self.contactId = contactId
-        self.category = category
-    }
-}
-
-/// Seam over `UNUserNotificationCenter` (§9a). Production wires
+/// Seam over the system notification center (§9a). Production wires
 /// `UserNotificationsAdapter.shared`; tests and the DEBUG mock launch inject
 /// a fake so they never raise the system permission alert. TF-06 ships 3 of
 /// §9a's members; `schedule`, `cancel`, and `pendingIdentifiers` arrive with
@@ -77,7 +50,7 @@ public protocol NotificationScheduling: Sendable {
     var actions: AsyncStream<NotificationAction> { get }
 }
 
-/// Default `NotificationScheduling` backed by `UNUserNotificationCenter`.
+/// Default `NotificationScheduling` backed by the system notification center.
 ///
 /// Checked `Sendable` with no `@unchecked`: the class is final, inherits only
 /// from `NSObject`, and stores two `let`s whose types are `Sendable`
@@ -147,50 +120,6 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     }
 
     // MARK: - Pure mapping (tested without the notification center)
-
-    /// Builds the OS request. A future `fireDate` becomes a non-repeating
-    /// `UNCalendarNotificationTrigger` (§9 platform nuance) whose components
-    /// are pinned to UTC: UTC has no skipped or repeated hour, so the trigger
-    /// names one absolute instant whatever the device zone or DST does. A
-    /// `fireDate` at or before `now` gets a nil trigger, which delivers
-    /// immediately (§9 contract 5: a past slot start is an immediate
-    /// delivery); a calendar trigger for a past instant would never fire.
-    ///
-    /// - Parameter now: read immediately before this request is added to the
-    ///   center, once per request.
-    static func makeRequest(
-        _ request: ReminderNotificationRequest,
-        now: Date,
-        calendar: Calendar = Calendar(identifier: .gregorian)
-    ) -> UNNotificationRequest {
-        let content = UNMutableNotificationContent()
-        content.title = request.title
-        content.body = request.body
-        content.sound = .default
-        content.categoryIdentifier = request.category.rawValue
-        if let contactId = request.contactId {
-            content.userInfo = [contactIdKey: contactId.uuidString]
-        }
-
-        // `calendar` carries the device zone; it is overwritten to GMT here.
-        // Tests pass a DST-zone calendar to prove this line matters on any host.
-        var utc = calendar; utc.timeZone = .gmt
-        let components = utc.dateComponents(
-            [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second],
-            from: request.fireDate
-        )
-        // Components drop sub-second precision, so compare the instant the
-        // trigger would actually name. If that has already passed, a calendar
-        // trigger would never fire; deliver now instead.
-        let trigger: UNCalendarNotificationTrigger?
-        if let triggerInstant = utc.date(from: components), triggerInstant > now {
-            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        } else {
-            trigger = nil
-        }
-
-        return UNNotificationRequest(identifier: request.identifier, content: content, trigger: trigger)
-    }
 
     /// Cadence notifications carry Caught up and Snooze 1 week; both open the
     /// app (owner ruling 2026-10-11). There's no custom Open action: the OS
