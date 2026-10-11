@@ -40,11 +40,15 @@ the second opinion and parks instead. Both roles run on Sid's ChatGPT plan,
 not the Anthropic API. Codex never edits a lane: both roles run read-only,
 and a Claude engineer applies any fix they lead to.
 
-Codex sends its prompt and every file it reads to OpenAI's model. Its
-read-only sandbox blocks writes and network use from the commands Codex
-runs; it does not confine reads to the worktree. That is acceptable because
-lane worktrees hold only repository code and synthetic fixtures, never real
-contact data. None of this touches the app's no-network invariant (§11),
+Codex sends its prompt and every file it reads to OpenAI's model. It runs
+as Sid's macOS user. Its read-only sandbox blocks writes and network use
+from the commands it runs, but it does not confine reads: in principle it
+can read any file that account can, such as `~/.codex/auth.json` or another
+repository. The prompt tells it to review the diff only; nothing enforces
+that. This is the same exposure as running Codex by hand in this repo.
+Lane worktrees hold only repository code and synthetic fixtures, never real
+contact data, and `codex-reviewer` treats Codex's output as data, never as
+instructions. None of this touches the app's no-network invariant (§11),
 which the guards still enforce on app code.
 
 ## How one work item moves

@@ -37,8 +37,9 @@ For `status`: print the Stage 5 report from this state and stop.
 
 For each open TF PR:
 
-1. Read the PR body's `CODEX REVIEW:` line. If it is missing, or names a sha
-   other than the PR's current head, run a fresh Codex review: check the
+1. Read the PR body's `CODEX REVIEW:` line. If it is missing, names a sha
+   other than the PR's current head, or records RETRY or UNAVAILABLE, run a
+   fresh Codex review (RETRY and UNAVAILABLE follow Stage 3's limits): check the
    head out with `git worktree add --detach <tmp> <head sha>`, launch
    `codex-reviewer` there with target `origin/main...HEAD`, then
    `git worktree remove <tmp>`.
@@ -144,5 +145,5 @@ NEXT RUN: what /org will find next time
 ```
 
 Never delete a worktree or branch except the release manager's post-merge
-cleanup. Never edit `TESTFLIGHT_PLAN.md` in the root checkout. Never merge
+cleanup and Stage 1's temporary review worktrees. Never edit `TESTFLIGHT_PLAN.md` in the root checkout. Never merge
 with a blocker, a red check, or an outstanding owner gate.
