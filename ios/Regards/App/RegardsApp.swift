@@ -66,7 +66,8 @@ struct RootView: View {
                 if let runtime = launch.runtime {
                     RegardsTabRoot(
                         runtime: runtime,
-                        reconciliationGeneration: launch.reconciliationCount
+                        reconciliationGeneration: launch.reconciliationCount,
+                        notifications: launch.notifications
                     )
                     .transition(.opacity)
                 } else {
@@ -182,36 +183,6 @@ struct LaunchFailureAccessibilityEffects {
     )
 }
 
-/// Splash shown while the production database, runtime, and profile load.
-struct SplashView: View {
-    @ScaledMetric(relativeTo: .largeTitle) private var wordmarkWidth: CGFloat = 240
-
-    var body: some View {
-        ZStack {
-            RegardsDS.background.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                Spacer()
-                Image("LaunchWordmark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: wordmarkWidth)
-                    .accessibilityHidden(true)
-                Spacer()
-                Text("© 2026 Considerate Software LLC")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(RegardsDS.muted)
-                    .padding(.bottom, 24)
-                    .accessibilityHidden(true)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Regards. Loading.")
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityIdentifier("launch.root")
-    }
-}
-
 /// The tab-bar root. Every feature screen reaches users through one of the
 /// four tabs. Each tab wraps its content in a `NavigationStack` so pushes
 /// (Contact Detail, Edit, Transparency, …) stay local to the tab.
@@ -225,12 +196,19 @@ struct RegardsTabRoot: View {
     @State private var overdueVM: OverdueViewModel
     @State private var upcomingVM: UpcomingViewModel
     @State private var mergeDuplicatesVM: MergeDuplicatesViewModel
+    /// Nil when the launch has no notification seam, which hides the Settings
+    /// notifications section.
+    @State private var notificationPermissionVM: NotificationPermissionViewModel?
     @State private var intentRouter = RegardsIntentRouter.shared
     @Namespace private var overdueContactTransition
     @Namespace private var upcomingContactTransition
     @Namespace private var contactsContactTransition
 
-    init(runtime: AppRuntime, reconciliationGeneration: Int = 0) {
+    init(
+        runtime: AppRuntime,
+        reconciliationGeneration: Int = 0,
+        notifications: (any NotificationScheduling)? = nil
+    ) {
         self.runtime = runtime
         self.reconciliationGeneration = reconciliationGeneration
         self._overdueVM = State(
@@ -241,6 +219,9 @@ struct RegardsTabRoot: View {
         )
         self._mergeDuplicatesVM = State(
             initialValue: MergeDuplicatesViewModel(contacts: runtime.environment.contacts)
+        )
+        self._notificationPermissionVM = State(
+            initialValue: notifications.map { NotificationPermissionViewModel(notifications: $0) }
         )
     }
 
@@ -441,7 +422,7 @@ struct RegardsTabRoot: View {
 
     private var settingsRoot: some View {
         NavigationStack(path: $navigation.settingsPath) {
-            SettingsScreen()
+            SettingsScreen(notifications: notificationPermissionVM)
                 .navigationDestination(for: RegardsSettingsRoute.self) { route in
                     settingsDestination(for: route)
                 }
