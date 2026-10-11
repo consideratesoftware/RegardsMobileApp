@@ -542,8 +542,10 @@ Current gates:
      recorded but not archived yet.
   4. Within 2 minutes of step 3, force-quit and relaunch Regards. Confirm
      Contact B is still in All Contacts.
-  5. At least 5 minutes after step 3, foreground Regards. Confirm Contact B
-     is gone from All Contacts. This shows the debounce state survived the
+  5. Between 5 and 6 minutes after step 3, foreground Regards. Confirm
+     Contact B is gone from All Contacts. The upper bound matters: if the
+     relaunch had lost the debounce state, the miss would be re-recorded at
+     step 4 and Contact B would still be present in this window. This shows the debounce state survived the
      relaunch; `AppLaunchArchivePersistenceTests.archiveDebounceStateSurvivesRelaunch`
      proves the same in unit form.
   6. Re-add Contact B in the Contacts app. Foreground Regards. Confirm a
@@ -552,6 +554,12 @@ Current gates:
      Un-archiving a row whose identifier reappears (the PR21 "un-archive"
      clause) can't be produced from the Contacts app on demand and is
      proven by `ContactsReconcilerTests.reconcileUnarchivesReappearingContact`.
+
+  The PR21 clause "history survives archive" isn't visible in the UI: the
+  archived row is hidden, and a re-added contact is a new row. It is proven
+  by `ContactsReconcilerResilienceTests`
+  (`archiveSurvivesWithScheduledReminderAndInteractionLogHistory` and
+  `deleteThenReAddLandsAsNewRowKeepingArchivedHistory`, both from PR #48).
   7. Corruption banner VoiceOver smoke. A corrupt row can't be produced on
      demand in a production build; the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
      fixture works only under the Debug mock runtime. So for this step
