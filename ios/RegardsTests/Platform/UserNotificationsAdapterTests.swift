@@ -82,6 +82,20 @@ struct UserNotificationsAdapterTests {
         #expect(mapped.trigger == nil)
     }
 
+    /// Trigger components drop sub-second precision, so a fire date 0.4 s
+    /// ahead of a whole-second `now` names the second that is already `now`.
+    /// A calendar trigger for that second never fires, so it must deliver
+    /// immediately instead.
+    @Test("A fire date less than a second after now maps to no trigger, which delivers immediately")
+    func fireDateWithinOneSecondOfNowDeliversImmediately() {
+        let now = Self.wholeSeconds(Date())
+        let fireDate = now.addingTimeInterval(0.4)
+
+        let mapped = UserNotificationsAdapter.makeRequest(Self.cadenceRequest(fireDate: fireDate), now: now)
+
+        #expect(mapped.trigger == nil)
+    }
+
     // MARK: DST (§13)
 
     @Test("Fall-back: 30 minutes after the repeated hour begins fires at the second occurrence, not an hour early")
