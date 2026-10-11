@@ -126,29 +126,46 @@ struct NotificationActionHandlingTests {
 
     // MARK: Ineligible and early actions
 
-    @Test(
-        "Actions for an archived or an untracked contact write nothing",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func actionForArchivedOrUntrackedWritesNothing(backend: RepositoryContractBackend) async throws {
-        let harness = try await Self.readyHarness(backend: backend)
-        let archived = try await Self.seed(harness, id: 607, suffix: "archived", archivedAt: Self.now)
-        let untracked = try await Self.seed(harness, id: 608, suffix: "untracked", tracked: false)
-        let barrier = try await Self.seed(harness, id: 609, suffix: "ineligible-barrier")
+    /// Each case breaks exactly one eligibility rule, so deleting any one
+    /// check in the handler turns one case red: archived (`isActive`),
+    /// untracked with a cadence (`tracked`), tracked with no cadence
+    /// (`cadenceDays`).
+    enum IneligibleContact: String, CaseIterable, Sendable {
+        case archived
+        case untrackedWithCadence
+        case trackedWithoutCadence
+    }
 
-        for contact in [archived, untracked] {
-            harness.fake.send(.caughtUp(contact.id))
-            harness.fake.send(.snooze(contact.id))
+    @Test(
+        "Actions for a contact that is archived, untracked, or without a cadence write nothing",
+        arguments: RepositoryContractBackend.allCases, IneligibleContact.allCases
+    )
+    func actionForIneligibleContactWritesNothing(
+        backend: RepositoryContractBackend, kind: IneligibleContact
+    ) async throws {
+        let harness = try await Self.readyHarness(backend: backend)
+        let ineligible = switch kind {
+        case .archived:
+            try await Self.seed(harness, id: 607, suffix: "archived", archivedAt: Self.now)
+        case .untrackedWithCadence:
+            try await Self.seed(harness, id: 608, suffix: "untracked", tracked: false, cadenceDays: 14)
+        case .trackedWithoutCadence:
+            try await Self.seed(harness, id: 609, suffix: "no-cadence", cadenceDays: nil)
         }
+        let bystander = try await Self.seed(harness, id: 616, suffix: "bystander")
+        let barrier = try await Self.seed(harness, id: 617, suffix: "ineligible-barrier")
+
+        harness.fake.send(.caughtUp(ineligible.id))
+        harness.fake.send(.snooze(ineligible.id))
         harness.fake.send(.snooze(barrier.id))
         await Self.expectBarrierSettled(harness, barrier.id)
 
-        for contact in [archived, untracked] {
-            #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
-            #expect(try await harness.repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
-            let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
-            #expect(after.lastInteractedAt == contact.lastInteractedAt)
-        }
+        let logs = try await harness.repositories.interactions.fetchRecent(forContact: ineligible.id, limit: 10)
+        #expect(logs.isEmpty)
+        #expect(try await harness.repositories.reminders.fetchPending(forContact: ineligible.id).isEmpty)
+        let after = try #require(try await harness.repositories.contacts.fetch(id: ineligible.id))
+        #expect(after.lastInteractedAt == ineligible.lastInteractedAt)
+        try await Self.expectUntouched(harness, bystander)
     }
 
     @Test(
@@ -177,6 +194,43 @@ struct NotificationActionHandlingTests {
         #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
         let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
         #expect(after.lastInteractedAt == contact.lastInteractedAt)
+    }
+
+    /// The launch-failure screen has no runtime, so an action tapped there
+    /// can't be applied. It must not wait in the stream and fire after a
+    /// retry succeeds, when the user is looking at something else.
+    @Test(
+        "An action tapped while the launch-failure screen is showing is dropped, not applied after a retry",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func actionOnLaunchFailureScreenIsDroppedAfterRetry(backend: RepositoryContractBackend) async throws {
+        let harness = try await Self.harness(backend: backend, onboarded: true, makeRuntimeFailureCount: 1)
+        let contact = try await Self.seed(harness, id: 618, suffix: "failure-screen")
+        let bystander = try await Self.seed(harness, id: 619, suffix: "failure-screen-bystander")
+        let barrier = try await Self.seed(harness, id: 620, suffix: "failure-screen-barrier")
+        try await harness.scheduler.snooze(contactId: contact.id)
+        let snoozedUntil = try #require(try await harness.scheduler.pendingSnoozeDate(contactId: contact.id))
+
+        await harness.launch.start()
+        #expect(harness.launch.phase == .failed)
+        #expect(harness.launch.runtime == nil)
+        harness.fake.send(.caughtUp(contact.id))
+        // Wait until the consumer has judged the action against the failure
+        // screen. A retry that raced ahead of it would let the action run
+        // against a ready runtime.
+        let dropped = await Self.waitFor { harness.launch.handledNotificationActionCount == 1 }
+        #expect(dropped, "the action was never handled")
+        await harness.launch.retry()
+        #expect(harness.launch.phase == .ready)
+
+        harness.fake.send(.snooze(barrier.id))
+        await Self.expectBarrierSettled(harness, barrier.id)
+
+        #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
+        let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
+        #expect(after.lastInteractedAt == contact.lastInteractedAt)
+        #expect(try await harness.scheduler.pendingSnoozeDate(contactId: contact.id) == snoozedUntil)
+        try await Self.expectUntouched(harness, bystander)
     }
 
     // MARK: Single consumer and wiring
@@ -239,7 +293,9 @@ struct NotificationActionHandlingTests {
 
         #expect((dependencies.notifications as AnyObject?) === UserNotificationsAdapter.shared)
     }
+}
 
+extension NotificationActionHandlingTests {
     // MARK: Helpers
 
     private actor LaunchAttempts {
@@ -327,13 +383,24 @@ struct NotificationActionHandlingTests {
         id: Int,
         suffix: String,
         tracked: Bool = true,
+        cadenceDays: Int? = 14,
         archivedAt: Date? = nil
     ) async throws -> Contact {
-        let contact = contractContact(
+        var contact = contractContact(
             id: try contractUUID(id), suffix: suffix, tracked: tracked, archivedAt: archivedAt
         )
+        contact.cadenceDays = cadenceDays
         try await harness.repositories.contacts.upsert(contact)
         return try #require(try await harness.repositories.contacts.fetch(id: contact.id))
+    }
+
+    /// A contact no action targeted still has no log, no pending row, and its
+    /// original `lastInteractedAt`.
+    private static func expectUntouched(_ harness: Harness, _ contact: Contact) async throws {
+        #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
+        #expect(try await harness.repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+        let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
+        #expect(after.lastInteractedAt == contact.lastInteractedAt)
     }
 
     /// Polls `condition` with `Task.yield()` between attempts, up to a fixed
