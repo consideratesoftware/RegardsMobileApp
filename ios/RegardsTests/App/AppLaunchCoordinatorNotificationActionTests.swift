@@ -126,10 +126,11 @@ struct NotificationActionHandlingTests {
 
     // MARK: Ineligible and early actions
 
-    /// Each case breaks exactly one eligibility rule, so deleting any one
-    /// check in the handler turns one case red: archived (`isActive`),
-    /// untracked with a cadence (`tracked`), tracked with no cadence
-    /// (`cadenceDays`).
+    /// Each case breaks one eligibility rule. Deleting only the `tracked`
+    /// check or only the `cadenceDays` check in the handler turns its case
+    /// red. The archived case is weaker: `SchedulingPass.snooze` and
+    /// `InteractionLogging` also check `isActive`, so it pins the whole chain
+    /// and would stay green if the handler's own `isActive` check went.
     enum IneligibleContact: String, CaseIterable, Sendable {
         case archived
         case untrackedWithCadence
