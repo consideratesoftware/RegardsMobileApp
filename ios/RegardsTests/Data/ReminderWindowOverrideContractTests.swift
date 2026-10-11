@@ -109,35 +109,88 @@ struct ReminderWindowOverrideContractTests {
         #expect(reloaded.reminderWindowOverride == Self.saturdayMorning)
     }
 
-    /// The field-scope proof. A temp trigger aborts any `UPDATE` whose SET
-    /// list names a Contact column other than `reminderWindowOverride`, so a
-    /// fetch-then-`upsert` (which sets every column) fails here while the
-    /// single-column `UPDATE` succeeds. The column list comes from the live
-    /// table, so a column added later is covered without touching this test.
+    /// The field-scope proof. Triggers on `main.Contact` abort every way of
+    /// rewriting the row except a plain `UPDATE` of `reminderWindowOverride`:
+    /// an `UPDATE` naming any other column (the column list comes from the
+    /// live table, so a column added later is covered), an `UPDATE` of the
+    /// rowid, any `INSERT` (including `INSERT OR REPLACE`, which deletes the
+    /// old row and cascades into the contact's history), and any `DELETE`.
+    /// A fetch-then-`upsert`, a delete-then-insert and a replace-insert all
+    /// fail here; the single-column `UPDATE` succeeds and the contact's
+    /// InteractionLog and ScheduledReminder rows survive.
     @Test("GRDB override write sets only the reminderWindowOverride column")
     func grdbWriteTouchesOnlyTheOverrideColumn() async throws {
         let dbQueue = try DatabaseFactory.makeInMemoryDatabase()
-        let contacts = GRDBRepositories(dbQueue: dbQueue).contacts
+        let repositories = GRDBRepositories(dbQueue: dbQueue)
+        let contacts = repositories.contacts
         let original = contractContact(id: try contractUUID(179), suffix: "override-column-scope", tracked: true)
         try await contacts.upsert(original)
+        let log = InteractionLog(
+            id: try contractUUID(182),
+            contactId: original.id,
+            occurredAt: Date(timeIntervalSince1970: 1_800_000_000),
+            source: .manual
+        )
+        let reminder = ScheduledReminder(
+            id: try contractUUID(183),
+            contactId: original.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
+            osNotificationId: "override-column-scope"
+        )
+        try await repositories.interactions.append(log)
+        try await repositories.reminders.upsert(reminder)
+
         try await dbQueue.write { db in
             let others = try Row.fetchAll(db, sql: "PRAGMA table_info(Contact)")
                 .map { $0["name"] as String }
                 .filter { $0 != "reminderWindowOverride" }
             #expect(others.count > 10)
-            let columns = others.map { "\"\($0)\"" }.joined(separator: ", ")
+            let columns = (others + ["rowid", "_rowid_", "oid"]).map { "\"\($0)\"" }.joined(separator: ", ")
             try db.execute(sql: """
-                CREATE TEMP TRIGGER overrideFieldScope BEFORE UPDATE OF \(columns) ON Contact
-                BEGIN SELECT RAISE(ABORT, 'field-scope violated'); END
+                CREATE TRIGGER main.overrideScopeUpdate BEFORE UPDATE OF \(columns) ON Contact
+                BEGIN SELECT RAISE(ABORT, 'override-scope:update'); END
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER main.overrideScopeInsert BEFORE INSERT ON Contact
+                BEGIN SELECT RAISE(ABORT, 'override-scope:insert'); END
+                """)
+            try db.execute(sql: """
+                CREATE TRIGGER main.overrideScopeDelete BEFORE DELETE ON Contact
+                BEGIN SELECT RAISE(ABORT, 'override-scope:delete'); END
                 """)
         }
-        // The probe must bite: a whole-row write is refused.
-        await expectWriteRejected { try await contacts.upsert(original) }
+
+        // Each probe must be refused by its own trigger, so a trigger that
+        // does not bite fails here instead of silently weakening the proof.
+        let probes: [(sql: String, message: String)] = [
+            ("UPDATE Contact SET displayName = displayName", "override-scope:update"),
+            ("UPDATE Contact SET rowid = rowid", "override-scope:update"),
+            ("INSERT OR REPLACE INTO Contact SELECT * FROM Contact WHERE id = ?", "override-scope:insert"),
+            ("DELETE FROM Contact WHERE id = ?", "override-scope:delete"),
+        ]
+        for probe in probes {
+            do {
+                try await dbQueue.write { db in
+                    try db.execute(
+                        sql: probe.sql,
+                        arguments: probe.sql.contains("?") ? [original.id.uuidString] : []
+                    )
+                }
+                Issue.record("Expected '\(probe.sql)' to be refused")
+            } catch let error as DatabaseError {
+                #expect(error.message == probe.message, "\(probe.sql)")
+            }
+        }
 
         let matched = try await contacts.updateReminderWindowOverride(id: original.id, window: Self.saturdayMorning)
 
         #expect(matched)
         #expect(try await contacts.fetch(id: original.id)?.reminderWindowOverride == Self.saturdayMorning)
+        let logs = try await repositories.interactions.fetchRecent(forContact: original.id, limit: 10)
+        let reminders = try await repositories.reminders.fetchPending(forContact: original.id)
+        #expect(logs.map(\.id) == [log.id])
+        #expect(reminders.map(\.id) == [reminder.id])
     }
 
     /// Validation runs before the row lookup, so an invalid window throws
