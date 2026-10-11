@@ -10,13 +10,15 @@ import Testing
 /// This test scans raw source text, comments included. It catches accidental wiring. It can't prove that arbitrary
 /// source changes are safe: a selector string, reflection, or a deliberate rewrite of one of the 3 pinned call sites
 /// can get past it. Deliberate evasion is for code review to catch, and a reviewer should treat any edit to this
-/// file's patterns or counts as wiring notification scheduling. TF-07 deletes this file in the PR that resolves R57.
+/// file's patterns or counts as wiring notification scheduling. TF-07 deletes this file in the PR that resolves R57,
+/// and removes the request-building rule (G4) along with the rest of it.
 struct NotificationSchedulingGateTests {
     private static let adapterRelativePath = "Platform/Notifications/NotificationScheduling.swift"
 
     private static let centerPattern = #"\bUNUserNotificationCenter\b"#
     private static let currentCenterPattern = #"\bUNUserNotificationCenter\.current\(\)"#
     private static let addPattern = #"\badd\b"#
+    private static let requestBuildingPattern = #"\bUNNotificationRequest\b|\bUN\w*NotificationTrigger\b"#
 
     /// The adapter names the center 4 times: `.current()` in `install`,
     /// `requestAuthorization` and `authorizationStatus`, plus the delegate
@@ -91,12 +93,27 @@ struct NotificationSchedulingGateTests {
         #expect(try Self.matchCount(Self.currentCenterPattern, in: adapter) == Self.pinnedCurrentCalls)
     }
 
+    @Test("G4: no file, adapter included, names UNNotificationRequest or a notification trigger")
+    func noFileBuildsNotificationRequests() throws {
+        let scanned = try Self.scan()
+        let files = scanned.others + [(path: Self.adapterRelativePath, text: scanned.adapter)]
+        let offenders = try files
+            .filter { try Self.matchCount(Self.requestBuildingPattern, in: $0.text) > 0 }
+            .map(\.path)
+
+        #expect(offenders.isEmpty, "R57 gate G4: nothing may build notification requests until TF-07. \(offenders)")
+    }
+
     @Test("The gate patterns match on raw text, odd spacing and backticks included")
     func gatePatternsMatchOnRawText() throws {
         let imageFixture = "let t = \"image/*\"\n_ = UNUserNotificationCenter.current()"
         let g1Matches = ["`UNUserNotificationCenter`", imageFixture]
         let g2Matches = ["center.add (r)", "center.`add`(r)", "let f = center.add", "// add"]
-        let neverMatches = ["address", "addingTimeInterval", "UNUserNotificationCenterDelegate"]
+        let g4Matches = ["UNNotificationRequest(", "UNCalendarNotificationTrigger("]
+        let neverMatches = [
+            "address", "addingTimeInterval", "UNUserNotificationCenterDelegate",
+            "UNNotificationResponse", "UNNotificationCategory",
+        ]
 
         for text in g1Matches {
             #expect(try Self.matchCount(Self.centerPattern, in: text) > 0, "G1 should match: \(text)")
@@ -104,7 +121,11 @@ struct NotificationSchedulingGateTests {
         for text in g2Matches {
             #expect(try Self.matchCount(Self.addPattern, in: text) > 0, "G2 should match: \(text)")
         }
+        for text in g4Matches {
+            #expect(try Self.matchCount(Self.requestBuildingPattern, in: text) > 0, "G4 should match: \(text)")
+        }
         for text in neverMatches {
+            #expect(try Self.matchCount(Self.requestBuildingPattern, in: text) == 0, "G4 should not match: \(text)")
             #expect(try Self.matchCount(Self.centerPattern, in: text) == 0, "G1 should not match: \(text)")
             #expect(try Self.matchCount(Self.addPattern, in: text) == 0, "G2 should not match: \(text)")
         }
