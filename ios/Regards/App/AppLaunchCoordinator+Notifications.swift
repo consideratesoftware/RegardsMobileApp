@@ -34,6 +34,9 @@ extension AppLaunchCoordinator {
     /// observe `ScheduledReminder`, so a Snooze from a notification shows on
     /// their next `load()` rather than immediately.
     func handleNotificationAction(_ action: NotificationAction) async {
+        // Counts every exit, dropped and ineligible included, after the
+        // action's writes have finished.
+        defer { recordHandledNotificationAction() }
         guard phase == .ready, let runtime else {
             Self.notificationLog.info("dropped a notification action: the app isn't ready")
             return

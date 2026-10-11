@@ -91,6 +91,22 @@ final class AppLaunchCoordinator {
         reconciliationCounters.coalesces += 1
     }
 
+    /// Backing storage for `handledNotificationActionCount`, private for the
+    /// same reason as `ReconciliationCounters`: the Notifications split can
+    /// only advance it through `recordHandledNotificationAction()`.
+    private var handledNotificationActions = 0
+
+    /// Notification actions `handleNotificationAction` has finished with,
+    /// whether applied, ignored as ineligible, or dropped. Test-only signal:
+    /// tests await a specific count instead of yielding a guessed number of
+    /// times.
+    var handledNotificationActionCount: Int { handledNotificationActions }
+
+    /// Called only from `AppLaunchCoordinator+Notifications.swift`.
+    func recordHandledNotificationAction() {
+        handledNotificationActions += 1
+    }
+
     /// Set by `beginObservingContactStoreChanges` when a `CNContactStoreDidChange`
     /// notification arrives while `runtime` is `nil` (e.g. mid-`retry()`) — see
     /// that method's guard. `continue`-ing past it there would drop the
