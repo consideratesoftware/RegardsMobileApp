@@ -13,17 +13,19 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-10-11
-- Baseline: `main` at `78dad7d` (merge of GitHub PR #57, which raised the
+- Baseline: `main` at `6c0d633` (merge of PR #60, after PR #57 raised the
   stress-job limits: job timeout 75 to 120 minutes, boot step 10 to 20
   minutes). A confirming `Audit stress` run on `78dad7d` is in progress: run
   `38121994128`.
-- Active work:
-  - `TF-05` on `claude/tf-05-reminder-window-editor` (worktree
-    `../RegardsMobileApp-TF05`), started 2026-10-11, no PR yet.
-  - `TF-06` on `claude/tf-06-notification-adapter` (worktree
-    `../RegardsMobileApp-TF06`), started 2026-10-11, no PR yet.
-  - `TF-03` acceptance, owned by the owner (see `Owner gates`). The code is
-    merged in PR #48.
+- Active work: no merged TF work is in progress. `TF-03` acceptance is
+  owner work (see `Owner gates`); its code is merged in PR #48. Lanes for
+  `TF-05` (`claude/tf-05-reminder-window-editor`, worktree
+  `../RegardsMobileApp-TF05`) and `TF-06`
+  (`claude/tf-06-notification-adapter`, worktree `../RegardsMobileApp-TF06`)
+  started 2026-10-11. Their rows stay `READY` here because the closing
+  rule below reserves `ACTIVE` and `DONE` for the pull request that carries
+  the implementation; each lane sets its own row. A restart finds the lanes
+  through restart protocol step 2 (worktrees and branches), not this table.
 - Next ready work: `TF-05` and `TF-06` stay `READY`, since their only
   dependency, `TF-04`, is `DONE`. `TF-06` has a hard gate: it must not ship
   notification scheduling until R57 is resolved (owner ruling 2026-08-22, see
@@ -47,8 +49,12 @@ never pick up Android work.
   against the old 75-minute limit. Two runs failed at the 10-minute boot step
   limit. On 2026-10-09, `bootstatus` took 8.7 minutes, and the status-bar setup
   after it pushed the step past 10 minutes.
-- Green CI: iOS CI (`36099491997`), Lint (`36099491904`), and Guards
-  (`36099491878`) passed on `1bf6352`, the sha before PR #57.
+- Green CI on `6c0d633`: Lint (`38123416925`) and Guards (`38123416912`)
+  passed; iOS CI (`38123416916`) is in progress. On `78dad7d`, iOS CI
+  (`38121978206`) passed determinism, build, and unit tests; its
+  post-merge accessibility audit was cancelled when PR #60 merged. Before
+  that, iOS CI (`36099491997`), Lint (`36099491904`), and Guards
+  (`36099491878`) passed on `1bf6352`.
 - Owner action needed: TF-03 acceptance. See `Owner gates`.
 
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
@@ -63,7 +69,8 @@ never pick up Android work.
     generated-project, and execution-docs locks. The second to merge rebases
     and regates.
   - `R55` moves to `TF-07`.
-  - `TF-06`'s on-device exit check moves to `TF-07`'s airplane-mode device
+  - `TF-06`'s on-device exit checks (a notification fires at a window
+    boundary; its actions round-trip) move to `TF-07`'s airplane-mode device
     test.
 - History: the PR that carries each closed item's evidence.
   - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
@@ -71,9 +78,11 @@ never pick up Android work.
     `NSFileProtectionCompleteUntilFirstUserAuthentication` check on
     2026-08-09, is in PR #45's checkpoint text (`git show
     ee601a5:TESTFLIGHT_PLAN.md`).
-  - TF-03: code merged in PR #48 (merged as `6886be3` on 2026-08-11). The
-    corruption-banner VoiceOver smoke is recorded in PR #48's description. The
-    acceptance run is pending (see `Owner gates`).
+  - TF-03: code merged in PR #48 (merged as `6886be3` on 2026-08-11). PR
+    #48's description records a corruption-banner VoiceOver check run
+    against `--regards-mock-runtime`, with no iOS version or findings line,
+    so it does not meet `accessibility-smoke.md`'s contract; the production
+    VoiceOver smoke is step 7 of the acceptance run (see `Owner gates`).
   - TF-04: PR #49 (merged as `02873e8` on 2026-09-14).
   - Earlier checkpoint text, including the round-by-round TF-02 and TF-03
     review history, is in the git history of this file.
@@ -186,9 +195,9 @@ numbers.
 | TF-02 | DONE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
 | TF-03 | OWNER | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
 | TF-04 | DONE | TF-02 | Caught up, Snooze, and Log other persist from every surface they appear on (Contact Detail: all three, as buttons; Overdue: Caught up and Snooze as native `List`/`.swipeActions`, swipe right and left; Upcoming: Caught up only, cadence rows only, swipe right; neither list screen has a Log-other row action, and Upcoming ships no Snooze action; tapping a list row previews the channel action pending TF-08; both screens migrated from `ScrollView`/`RegardsCard` per-row buttons to `List` in round 12, which R52 records); Snooze via a narrow `SchedulingPass` DB-only stub (single cadence `ScheduledReminder` write, no window/engine/reconciliation — PR25 absorbs it); live lists update via `ContactRepository.observeTracked()`; interaction, action, and mock/GRDB parity tests pass | PR22; R11, R24, R34, R36, R46, R52 |
-| TF-05 | READY | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
+| TF-05 | READY | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly; the editor never writes a timezone (`saveNeverChangesTimezone`, the R55 ruling of 2026-10-11) | PR23; R4, R9 |
 | TF-06 | READY | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
-| TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved. Also owns (owner rulings 2026-10-11): R55, and TF-06's on-device exit check that a local notification fires at a window boundary, run in the airplane-mode device test | PR25; R4–R6, R10–R11, R24, R55, R57 |
+| TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved. Also owns (owner rulings 2026-10-11): R55, and TF-06's on-device exit checks (a local notification fires at a window boundary; its Caught up and Snooze actions round-trip), run in the airplane-mode device test | PR25; R4–R6, R10–R11, R24, R55, R57 |
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
 | TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
 | TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
@@ -516,30 +525,41 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
 Current gates:
 
 - TF-03 acceptance (`OWNER`). The owner runs this pass on a physical iPhone,
-  using a production build from `main` at `78dad7d` or later. Do not use
-  `--regards-mock-runtime` or any `REGARDS_UI_TEST_*` flag. Full Contacts
-  access is required (`.authorized`). Limited Access never archives, so the
-  delete steps prove nothing under Limited Access. The 5k off-pool half of R25
-  is already proven by the synthetic regression test in PR #48, so this pass
-  covers only the PR21 exit check.
+  using a production build from `main` at `6c0d633` or later. Steps 1-6 use
+  no `--regards-mock-runtime` and no `REGARDS_UI_TEST_*` flag; step 7 needs
+  both. Full Contacts access is required (`.authorized`). Limited Access
+  never archives, so the delete steps prove nothing under Limited Access.
+  The 5k off-pool half of R25 is already proven by the synthetic regression
+  test in PR #48, so this pass covers the PR21 exit check plus the
+  corruption-banner VoiceOver smoke.
 
   1. Complete onboarding with full Contacts access. Use two test contacts in
      the system Contacts app: Contact A to rename and Contact B to delete.
   2. Rename Contact A in the Contacts app. Foreground Regards. Confirm All
      Contacts shows the new name.
-  3. Delete Contact B in the Contacts app. Foreground Regards. Confirm Contact B
-     is still in All Contacts. The first miss is recorded but not archived yet.
-  4. Relaunch Regards. Confirm Contact B is still in All Contacts.
-  5. Wait at least 5 minutes after the step 3 foreground. Foreground Regards.
-     Confirm Contact B is gone from All Contacts.
+  3. Delete Contact B in the Contacts app. Foreground Regards and note the
+     time. Confirm Contact B is still in All Contacts. The first miss is
+     recorded but not archived yet.
+  4. Within 2 minutes of step 3, force-quit and relaunch Regards. Confirm
+     Contact B is still in All Contacts.
+  5. At least 5 minutes after step 3, foreground Regards. Confirm Contact B
+     is gone from All Contacts. This shows the debounce state survived the
+     relaunch; `AppLaunchArchivePersistenceTests.archiveDebounceStateSurvivesRelaunch`
+     proves the same in unit form.
   6. Re-add Contact B in the Contacts app. Foreground Regards. Confirm a
      Contact B row is back in All Contacts. A re-added contact gets a new
      system identifier, so it imports as a new row; that is expected.
-
-  History surviving the archive is not visible in the UI and is proven by
-  `ContactsReconcilerResilienceTests`
-  (`archiveSurvivesWithScheduledReminderAndInteractionLogHistory` and
-  `deleteThenReAddLandsAsNewRowKeepingArchivedHistory`, both from PR #48).
+     Un-archiving a row whose identifier reappears (the PR21 "un-archive"
+     clause) can't be produced from the Contacts app on demand and is
+     proven by `ContactsReconcilerTests.reconcileUnarchivesReappearingContact`.
+  7. Corruption banner VoiceOver smoke. A corrupt row can't be produced on
+     demand in a production build; the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
+     fixture works only under the Debug mock runtime. So for this step
+     only, launch a Debug build of the same sha with `--regards-mock-runtime`
+     and `REGARDS_UI_TEST_SEED_CORRUPT_ROW=1`, run the corruption-banner item
+     in `ios/docs/accessibility-smoke.md` with VoiceOver on, and record it in
+     that file's Reporting format, including the iOS version and a Findings
+     line.
 
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___).
   Findings: ___.
