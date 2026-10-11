@@ -525,17 +525,21 @@ Current gates:
 
   1. Complete onboarding with full Contacts access. Use two test contacts in
      the system Contacts app: Contact A to rename and Contact B to delete.
-  2. In Regards, log one interaction on Contact B. Record the interaction count.
-  3. Rename Contact A in the Contacts app. Foreground Regards. Confirm the new
-     name shows.
-  4. Delete Contact B in the Contacts app. Foreground Regards. Confirm Contact B
-     is still present. The first miss is recorded but not archived yet.
-  5. Relaunch Regards. Confirm Contact B is still present.
-  6. Wait at least 5 minutes after the step 4 foreground. Foreground Regards.
-     Confirm Contact B is archived and the interaction count is unchanged.
-  7. Re-add Contact B, or undo its delete, in the Contacts app. Foreground
-     Regards. Confirm Contact B is back in view. Record which path you used.
-     A re-added contact can get a new system identifier and import as new.
+  2. Rename Contact A in the Contacts app. Foreground Regards. Confirm All
+     Contacts shows the new name.
+  3. Delete Contact B in the Contacts app. Foreground Regards. Confirm Contact B
+     is still in All Contacts. The first miss is recorded but not archived yet.
+  4. Relaunch Regards. Confirm Contact B is still in All Contacts.
+  5. Wait at least 5 minutes after the step 3 foreground. Foreground Regards.
+     Confirm Contact B is gone from All Contacts.
+  6. Re-add Contact B in the Contacts app. Foreground Regards. Confirm a
+     Contact B row is back in All Contacts. A re-added contact gets a new
+     system identifier, so it imports as a new row; that is expected.
+
+  History surviving the archive is not visible in the UI and is proven by
+  `ContactsReconcilerResilienceTests`
+  (`archiveSurvivesWithScheduledReminderAndInteractionLogHistory` and
+  `deleteThenReAddLandsAsNewRowKeepingArchivedHistory`, both from PR #48).
 
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___).
   Findings: ___.
