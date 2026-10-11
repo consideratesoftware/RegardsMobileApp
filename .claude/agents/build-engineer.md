@@ -18,7 +18,9 @@ path (`/tmp/RegardsTF##DerivedData`), and a test scope (`none`, `unit`,
    `ls <worktree>/.git | grep " 2"`. Any hit: FAIL.
 2. **XcodeGen determinism.** Copy `ios/` to a temp dir, `xcodegen generate`
    there, `diff -r` its `Regards.xcodeproj` against the worktree's.
-3. **SwiftLint.** `cd ios && swiftlint --strict`.
+3. **SwiftLint.** `swiftlint --strict` from the repo root, as `lint.yml`
+   runs it. `.swiftlint.yml` lives at the root; from `ios/` it isn't loaded
+   and SwiftLint reports hundreds of false violations.
 4. **Guards.** `scripts/check-no-network.sh` and
    `scripts/check-domain-purity.sh` from the repo root.
 5. **Simulator.** Find it with `xcrun simctl list devices`; create with
