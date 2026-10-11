@@ -81,8 +81,9 @@ never pick up Android work.
   - TF-03: code merged in PR #48 (merged as `6886be3` on 2026-08-11). PR
     #48's description records a corruption-banner VoiceOver check run
     against `--regards-mock-runtime`, with no iOS version or findings line,
-    so it does not meet `accessibility-smoke.md`'s contract; the production
-    VoiceOver smoke is step 7 of the acceptance run (see `Owner gates`).
+    so it does not meet `accessibility-smoke.md`'s contract; a recorded
+    corruption-banner VoiceOver smoke is step 7 of the acceptance run (see
+    `Owner gates`).
   - TF-04: PR #49 (merged as `02873e8` on 2026-09-14).
   - Earlier checkpoint text, including the round-by-round TF-02 and TF-03
     review history, is in the git history of this file.
@@ -540,13 +541,14 @@ Current gates:
   3. Delete Contact B in the Contacts app. Foreground Regards and note the
      time. Confirm Contact B is still in All Contacts. The first miss is
      recorded but not archived yet.
-  4. Within 2 minutes of step 3, force-quit and relaunch Regards. Confirm
-     Contact B is still in All Contacts.
-  5. Between 5 and 6 minutes after step 3, foreground Regards. Confirm
-     Contact B is gone from All Contacts. The upper bound matters: if the
-     relaunch had lost the debounce state, the miss would be re-recorded at
-     step 4 and Contact B would still be present in this window. This shows the debounce state survived the
-     relaunch; `AppLaunchArchivePersistenceTests.archiveDebounceStateSurvivesRelaunch`
+  4. Between 2 and 3 minutes after step 3, force-quit and relaunch
+     Regards, and note the time. Confirm Contact B is still in All Contacts.
+  5. Between 5 and 6 minutes after step 3, and so less than 5 minutes after
+     step 4, foreground Regards. Confirm Contact B is gone from All Contacts.
+     Both bounds matter. If the relaunch had lost the debounce state, the
+     launch pass at step 4 would record the miss again, and Contact B could
+     not archive until 5 minutes after step 4, which is after this window.
+     `AppLaunchArchivePersistenceTests.archiveDebounceStateSurvivesRelaunch`
      proves the same in unit form.
   6. Re-add Contact B in the Contacts app. Foreground Regards. Confirm a
      Contact B row is back in All Contacts. A re-added contact gets a new
@@ -560,6 +562,7 @@ Current gates:
   by `ContactsReconcilerResilienceTests`
   (`archiveSurvivesWithScheduledReminderAndInteractionLogHistory` and
   `deleteThenReAddLandsAsNewRowKeepingArchivedHistory`, both from PR #48).
+
   7. Corruption banner VoiceOver smoke. A corrupt row can't be produced on
      demand in a production build; the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
      fixture works only under the Debug mock runtime. So for this step
