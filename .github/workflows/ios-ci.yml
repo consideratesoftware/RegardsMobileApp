@@ -215,8 +215,9 @@ jobs:
         # exact device instead of re-resolving name=...,OS=latest. See
         # scripts/prepare-audit-simulator.sh's header for what this does and
         # does not address — it does not suppress the Apple Intelligence
-        # banner itself; no such toggle exists.
-        timeout-minutes: 10
+        # banner itself; no such toggle exists. The script's header explains
+        # the 20-minute hang bound.
+        timeout-minutes: 20
         run: scripts/prepare-audit-simulator.sh "$SIMULATOR_NAME"
       - name: Run RegardsAccessibilityTests
         working-directory: ios
