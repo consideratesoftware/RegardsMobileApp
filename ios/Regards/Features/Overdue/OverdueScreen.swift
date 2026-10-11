@@ -178,7 +178,7 @@ public struct OverdueScreen: View {
                 rowSection(for: viewModel.otherRows, header: "Others · overdue")
             }
 
-            Text("Quiet until 6:00 pm. Reminders stay inside your chosen windows.")
+            Text("Reminders stay inside your chosen windows.")
                 .font(.footnote)
                 .foregroundStyle(RegardsDS.muted)
                 .multilineTextAlignment(.center)
