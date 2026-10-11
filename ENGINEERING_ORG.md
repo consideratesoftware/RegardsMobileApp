@@ -29,16 +29,23 @@ from skipping steps inside an item.
 | Cross-model reviewer | `codex-reviewer`, which runs Codex's `$regards-pr-review` read-only | haiku wrapper; Codex's default model reviews | no | Same review contract run by a different model family, so a blind spot shared by every Claude reviewer can still get caught |
 | Second opinion | `codex:codex-rescue` (Codex plugin), read-only diagnosis | Codex default | no | Fresh eyes on a lane that is about to park, before Sid is asked |
 
-Only the `pr-*` reviewers are mirrored for Codex. Every other role is Claude
-Code only; `scripts/check-review-agent-parity.sh` ignores them by prefix, so
-a new non-reviewer role must not be named `pr-*`.
+Only the `pr-*` reviewers are mirrored for Codex; no other Claude Code role
+has a Codex adapter. `scripts/check-review-agent-parity.sh` ignores the
+other roles by prefix, so a new non-reviewer role must not be named `pr-*`.
 
-The 2 Codex roles need the Codex CLI installed and logged in on this Mac
-(`/codex:setup` checks both). They run on Sid's ChatGPT plan, not the
-Anthropic API. Codex never edits a lane: both roles run read-only, and a
-Claude engineer applies any fix they lead to. Codex's network use is
-development tooling on this Mac; it has nothing to do with the app's
-no-network invariant (§11), which the guards still enforce on app code.
+`codex-reviewer` needs only the Codex CLI, installed and logged in on this
+Mac. The second opinion and `/codex:setup` come from the Codex plugin
+(`openai-codex`, installed with `/plugin`); without the plugin the org skips
+the second opinion and parks instead. Both roles run on Sid's ChatGPT plan,
+not the Anthropic API. Codex never edits a lane: both roles run read-only,
+and a Claude engineer applies any fix they lead to.
+
+Codex sends its prompt and every file it reads to OpenAI's model. Its
+read-only sandbox blocks writes and network use from the commands Codex
+runs; it does not confine reads to the worktree. That is acceptable because
+lane worktrees hold only repository code and synthetic fixtures, never real
+contact data. None of this touches the app's no-network invariant (§11),
+which the guards still enforce on app code.
 
 ## How one work item moves
 
@@ -83,9 +90,10 @@ All of these, on the current head, with no averaging:
 2. Hosted `Regards staged review`: zero unresolved blockers.
 3. `/pr-review` verdict APPROVE.
 4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
-   with every Codex blocker disputed in the PR body with the
-   `ARCHITECTURE.md` section that settles it. UNAVAILABLE never satisfies
-   this condition.
+   with every Codex blocker disputed in the PR body by the engineering
+   manager, citing the `ARCHITECTURE.md` section that settles it; the
+   release manager checks each cited section exists and addresses the
+   finding. RETRY and UNAVAILABLE never satisfy this condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
 

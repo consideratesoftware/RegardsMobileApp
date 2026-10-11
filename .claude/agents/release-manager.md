@@ -12,8 +12,12 @@ application code or tests; you dispatch and record.
 
 Assemble the PR body from: the tech lead's ITEM/DESIGN lines, each slice
 report's COMMITS and CRITERIA, QA's CRITERIA MAP, the verifier's VERDICT,
-the `/pr-review` audit trail, and the `codex-reviewer` verdict with any
-disputed Codex findings and their `ARCHITECTURE.md` sections.
+the `/pr-review` audit trail, and the Codex review. Record the Codex review
+as one line, `CODEX REVIEW: <verdict> @ <sha> vs <target> | codex-cli
+<version>`, and replace that line with `gh pr edit` whenever a new verdict
+arrives; Stage 1 of `/org` reads it to decide whether a fresh review is
+needed. List any disputed Codex findings under it with their
+`ARCHITECTURE.md` sections.
 
 Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item
@@ -42,11 +46,12 @@ PR, never in the root checkout.
 - Hosted review: zero unresolved blockers.
 - `/pr-review` APPROVE on the current head.
 - `codex-reviewer` APPROVE on the current head, or every Codex blocker
-  disputed in the PR body with the `ARCHITECTURE.md` section that settles
-  it. UNAVAILABLE is an owner gate: park with "run `/codex:setup`". If the
-  head moved after the last Codex verdict, or the verdict is RETRY, report
-  CODEX STALE and stop; the engineering manager reruns `codex-reviewer` and
-  relaunches you.
+  disputed in the PR body with an `ARCHITECTURE.md` section; check each
+  cited section exists and addresses the finding. UNAVAILABLE is an owner
+  gate: park with "run `/codex:setup`".
+- If either review's verdict names a sha other than the current head,
+  report STATE CODEX STALE and stop; the engineering manager reruns both
+  reviews and relaunches you.
 - Verifier HOLDS for every slice.
 - No owner-only gate outstanding: manual VoiceOver smoke for any diff
   touching `Features/`, `DesignSystem/`, or `App/` view code; physical-device
@@ -60,7 +65,7 @@ the PR and write the exact owner checklist.
 
 ```
 PR: #n url @ head sha
-STATE: MERGED | GREEN, WAITING ON OWNER | RED (parked after 2 rounds) | DRAFT (stacked on #m)
+STATE: MERGED | GREEN, WAITING ON OWNER | CODEX STALE | RED (parked after 2 rounds) | DRAFT (stacked on #m)
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n
 /pr-review: verdict

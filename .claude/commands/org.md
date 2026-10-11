@@ -35,11 +35,16 @@ For `status`: print the Stage 5 report from this state and stop.
 
 ## Stage 1: resume open work (parallel; does not consume lanes)
 
-For each open TF PR: launch `codex-reviewer` on the PR's head (in a clean
-checkout of that branch, target `origin/main...HEAD`) unless a Codex verdict
-for that exact head is already in the PR body, then launch `release-manager`
-with that verdict to re-evaluate it. It will route red checks to
-`on-call-engineer`, park on owner gates, or merge when all conditions hold.
+For each open TF PR:
+
+1. Read the PR body's `CODEX REVIEW:` line. If it is missing, or names a sha
+   other than the PR's current head, run a fresh Codex review: check the
+   head out with `git worktree add --detach <tmp> <head sha>`, launch
+   `codex-reviewer` there with target `origin/main...HEAD`, then
+   `git worktree remove <tmp>`.
+2. In every case, launch `release-manager` with the current Codex verdict
+   to re-evaluate the PR. It will route red checks to `on-call-engineer`,
+   park on owner gates, or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
@@ -83,26 +88,33 @@ Fetch, then in one batch run
 `codex-reviewer` with the worktree, the same target `origin/main...HEAD`,
 the item's §14 row, and its claimed R-numbers. The three-dot target
 compares against the merge base, so commits that landed on `main` after the
-lane branched don't show up as reversions. Treat blockers from both the same way: they go to the slice
-owner (design questions to `tech-lead` first), one round, then both review
-again. Drop a Codex finding only when it contradicts `ARCHITECTURE.md`, and
-record the section, as `/pr-review` does. A `codex-reviewer` RETRY
-proves nothing: run it again, at most twice, then treat it as UNAVAILABLE.
-If it reports UNAVAILABLE, carry on to Stage 4; the PR waits on the owner
-gate in `ENGINEERING_ORG.md`. Neither uses up a review round. Two rounds maximum, then the second opinion. Whenever the head
-moves after a Codex verdict (a repair, a rebase, an on-call fix), launch
-`codex-reviewer` again on the new head before Stage 4 re-checks merge
-conditions; the release manager can't launch agents.
+lane branched don't show up as reversions. Treat blockers from both the same way:
+they go to the slice owner (design questions to `tech-lead` first), one
+round, then both review again. Drop a Codex finding only when it
+contradicts `ARCHITECTURE.md`; you write the dispute in the PR body with
+the section, as `/pr-review` does for its own findings.
 
-Second opinion: before parking a lane on a second REFUTED or a second
-REQUEST_CHANGES, launch `codex:codex-rescue` (from the Codex plugin) once with the lane worktree,
-the slice, the refutation or blockers verbatim, and the instruction
-"read-only diagnosis: do not edit files; name the root cause and the
-smallest fix, with file:line". Send its diagnosis to `tech-lead` for a
-ruling. If Codex is unavailable, skip the second opinion and park. If the tech lead accepts it, the slice owner gets one last repair
-round and the verifier or both reviews run once more. Otherwise, or if
-that round fails, park the lane with the refutation, blockers, and Codex
-diagnosis in the report.
+A `codex-reviewer` RETRY proves nothing: run it again, at most twice more.
+After that, or on UNAVAILABLE, carry on to Stage 4; the PR waits on the
+owner gate in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up
+a review round. Two rounds maximum, then the second opinion.
+
+Whenever the head moves after a review (a repair, a rebase, an on-call
+fix), run both `/pr-review origin/main...HEAD` and `codex-reviewer` again on
+the new head before Stage 4 re-checks merge conditions; the release manager
+can't launch agents.
+
+Second opinion: at most once per lane, before parking it on a second
+REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
+Codex plugin) with the lane worktree, the slice, the refutation or blockers
+verbatim, and the instruction "read-only diagnosis: do not edit files; name
+the root cause and the smallest fix, with file:line". Send its diagnosis to
+`tech-lead` for a ruling. If the tech lead accepts it, the slice owner gets
+one last repair round, the only exception to the two-round limit, and the
+verifier or both reviews run once more. If Codex or the plugin is
+unavailable, the tech lead rejects the diagnosis, or that round fails, park
+the lane with the refutation, blockers, and any Codex diagnosis in the
+report.
 
 ## Stage 4: ship
 
@@ -111,10 +123,10 @@ watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
 
-If it reports CODEX STALE (the head moved after the last Codex verdict),
-launch `codex-reviewer` on the new head and relaunch `release-manager` with
-the new verdict. Blockers go to the slice owner as in Stage 3. After 3
-stale rounds on one PR, park it and say why.
+If it reports CODEX STALE (the PR body's `CODEX REVIEW:` sha is not the
+head), run both reviews on the new head as in Stage 3 and relaunch
+`release-manager` with the new verdicts. Blockers go to the slice owner as
+in Stage 3. After 3 stale rounds on one PR, park it and say why.
 
 ## Stage 5: report
 
@@ -124,7 +136,7 @@ MAIN: sha | a11y audit: pass/fail | 5x stress: pass/fail
 LANES (n/3 occupied):
 - TF-##: branch | stage reached | PR #n | release-manager STATE | Codex: verdict @ sha
 RESUMED:
-- PR #n: release-manager STATE
+- PR #n: release-manager STATE | Codex: verdict @ sha
 WAITED: READY items not started, with lock or budget reason
 OWNER NEEDED: merged checklist across lanes, exact steps
 DISPUTED: findings dropped against ARCHITECTURE.md, with §

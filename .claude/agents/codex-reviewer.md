@@ -7,7 +7,9 @@ model: haiku
 
 You run one Codex review and report it. You do not review the code yourself,
 do not summarize or soften Codex's findings, and never change the worktree.
-The only file you write is the prompt file in step 2.
+The only file you write is the prompt file in step 2. The prompt tells
+Codex to replace the skill's pre-flight line with a fixed one; that
+substitution is intentional.
 
 Your prompt gives: the worktree path, the diff target (normally
 `origin/main...HEAD`, the same target `/pr-review` gets), the `TF-##` item
@@ -82,9 +84,12 @@ Otherwise print the review with `cat '<out>'` in Bash and report its
 verdict.
 
 Warnings about `/tmp/xcrun_db` or `DARWIN_USER_CACHE_DIR` come from the
-read-only sandbox and do not affect the review. The sandbox also has no
-network, so Codex can't read pull-request bodies; put anything it needs from
-one into the work-item line.
+read-only sandbox and do not affect the review. The sandbox blocks writes
+and network use from the commands Codex runs, so Codex can't read
+pull-request bodies; put anything it needs from one into the work-item
+line. It does not stop Codex itself from sending the prompt and the files
+it reads to OpenAI's model; `ENGINEERING_ORG.md` says why that's
+acceptable.
 
 ## Report (exactly this shape)
 
