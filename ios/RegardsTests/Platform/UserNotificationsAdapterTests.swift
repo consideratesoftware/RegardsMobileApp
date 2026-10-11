@@ -11,11 +11,12 @@ private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 ///
 /// The DST tests never change `NSTimeZone.default`: Swift Testing runs suites
 /// in parallel, and several other suites read the default zone implicitly.
-/// Instead they find a real DST transition in a named zone and assert two
-/// things about the trigger: it fires at the exact instant, and the zone it
-/// names has the same offset on both sides of that transition (so no hour is
-/// skipped or repeated). A trigger built from a DST zone's wall-clock
-/// components fails both in fall-back.
+/// They pass `makeRequest` a gregorian calendar set to a zone with a real DST
+/// transition (the calendar carries the device zone), find that transition at
+/// run time, and assert two things about the trigger: it fires at the exact
+/// instant, and the zone it names has the same offset on both sides of the
+/// transition. Deleting the adapter's pin to GMT fails the offset check on
+/// every host, including a UTC CI runner.
 ///
 /// `nextTriggerDate()` is relative to the real current time and the
 /// calendar trigger has no injectable clock, so tests that call it must pick
@@ -86,14 +87,28 @@ struct UserNotificationsAdapterTests {
     /// ahead of a whole-second `now` names the second that is already `now`.
     /// A calendar trigger for that second never fires, so it must deliver
     /// immediately instead.
-    @Test("A fire date less than a second after now maps to no trigger, which delivers immediately")
-    func fireDateWithinOneSecondOfNowDeliversImmediately() {
+    @Test("A trigger instant (fire date truncated to the second) not after now maps to no trigger")
+    func triggerInstantNotAfterNowDeliversImmediately() {
         let now = Self.wholeSeconds(Date())
         let fireDate = now.addingTimeInterval(0.4)
 
         let mapped = UserNotificationsAdapter.makeRequest(Self.cadenceRequest(fireDate: fireDate), now: now)
 
         #expect(mapped.trigger == nil)
+    }
+
+    /// The other side of the boundary: one whole second ahead is still a
+    /// future instant. It doesn't call `nextTriggerDate()`, because the real
+    /// clock may pass that second before the assertion runs.
+    @Test("A trigger instant one second after now gets a calendar trigger")
+    func triggerInstantOneSecondAfterNowGetsCalendarTrigger() throws {
+        let now = Self.wholeSeconds(Date())
+        let fireDate = now.addingTimeInterval(1.0)
+
+        let mapped = UserNotificationsAdapter.makeRequest(Self.cadenceRequest(fireDate: fireDate), now: now)
+
+        let trigger = try #require(mapped.trigger as? UNCalendarNotificationTrigger)
+        #expect(trigger.repeats == false)
     }
 
     // MARK: DST (§13)
@@ -254,7 +269,8 @@ struct UserNotificationsAdapterTests {
     }
 
     /// Builds a request firing `secondsAfterTransition` after the next DST
-    /// transition of the given direction in `zoneIdentifier`, then asserts
+    /// transition of the given direction in `zoneIdentifier` (passed as the
+    /// device calendar, so the result doesn't depend on the host zone), then asserts
     /// that the trigger's next fire instant is exactly that absolute instant
     /// and that the zone the trigger names has no offset change across the
     /// transition.
@@ -273,7 +289,11 @@ struct UserNotificationsAdapterTests {
         )
         let fireDate = wholeSeconds(transition.addingTimeInterval(secondsAfterTransition))
 
-        let mapped = UserNotificationsAdapter.makeRequest(cadenceRequest(fireDate: fireDate), now: now)
+        var deviceCalendar = Calendar(identifier: .gregorian)
+        deviceCalendar.timeZone = zone
+        let mapped = UserNotificationsAdapter.makeRequest(
+            cadenceRequest(fireDate: fireDate), now: now, calendar: deviceCalendar
+        )
 
         let trigger = try #require(mapped.trigger as? UNCalendarNotificationTrigger, sourceLocation: sourceLocation)
         #expect(trigger.nextTriggerDate() == fireDate, sourceLocation: sourceLocation)
