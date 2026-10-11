@@ -174,9 +174,11 @@ jobs:
     # 31334462438's `xcodebuild test` step for all 29 accessibility tests
     # measured 18m47s (~19 min) on its diagnosed rerun. This job also pays
     # checkout + setup-xcode, up to 3 downloadPlatform attempts (15s backoff
-    # each), and the boot step's own 10-min allowance below -- 30 min has no
-    # headroom once those are added on top of the ~19-min test step, and
-    # 45 min covers that math with only a flat margin. But audit-stress.yml's
+    # each), and the boot step's own 20-min allowance below (raised from 10
+    # after a healthy 8.7-minute boot on 2026-10-09 crossed it). Added to the
+    # ~19-min test step, that worst case is about 42 minutes, so 45 min would
+    # leave almost no margin. On 2026-10-08 the suite, now 39 tests, took
+    # about 13 minutes per run in audit-stress.yml. audit-stress.yml's
     # own header documents a 2.1x spread on the same runner/test/scheme
     # combination -- 23, 23, 29, 33, 38, and 49 minutes across six
     # consecutive full-workflow runs of the 5x sweep -- and this job's
