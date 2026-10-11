@@ -12,411 +12,81 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-08-09
-- Baseline: `main` at `b10f9ac` (merged GitHub PR #44, the TF-02 production
-  runtime implementation)
-- Active work: the docs-only `TF-02` close checkpoint on
-  `codex/audit-retry-action` in the linked worktree
-  `Regards Mobile App Audit Repair`. The production fresh-install, manual
-  accessibility smoke, and §14 physical-device acceptance pass are complete.
-  PR #44 merged only after its exact-head hosted semantic review and all
-  required checks approved. Final post-merge authority is green: diagnosed
-  failed-job rerun attempt 3 passed 29/29, and exact-main stress passed all 5
-  suites. The first one-run job exposed an intermittent XCTest action-delivery
-  failure in the audited launch-retry fixture; exact-main focused reproduction
-  passed 5/5 and the original case passed on the failed-job rerun. That failure
-  reproduced 0/5, below §17's repair threshold. The rerun instead caught an iOS
-  **Ready for Apple Intelligence** notification as “Potentially inaccessible
-  text”; its xcresult targeted system UI, so it is outside the product-finding
-  threshold. The existing `tap(_:until:message:)` helper remains limited to
-  onboarding controls whose first auto-scroll tap may not dispatch. Applying
-  its bounded second tap to the launch-retry Try Again fixture was rejected
-  because it could conceal one genuine failed runtime retry. No source repair
-  is committed or published.
-- Next ready work: `TF-03` and `TF-04` are independent lanes. Branch both from
-  the same exact `main` after this close checkpoint merges, then respect the
-  collision locks below.
-- Open TF pull request: GitHub PR #45 is the docs-only TF-02 close checkpoint
-  on `codex/audit-retry-action`; auto-merge is off while its exact-head hosted
-  review findings are addressed. GitHub PR #44 merged as `b10f9ac`; GitHub PR
-  #43 merged as `8adeb0d`; GitHub PR #42 merged as `d8193ff`.
-- Worktree hazard found and contained inside PR #43, never on `main`: a
-  file-sync process in this worktree creates byte-identical `"* 2"` copies of
-  recently written files, and `git add -A` sweeps them into the commit. PR
-  #43's first commit `e1d0e5e` carried twelve — nine `"* 2.swift"` test copies
-  and three `"* 2.sh"` guard-script copies. `git ls-tree d8193ff` confirms
-  `main` has none, so no merged commit was ever affected.
-  The XcodeGen determinism gate caught the Swift copies immediately: the
-  committed `project.pbxproj` did not reference them, so every build and test
-  job passed against the committed project while a fresh `xcodegen` from the
-  same tree produced nine extra files. The hosted review caught the three
-  shell copies. Each was verified byte-identical to its tracked original
-  before deletion; no unique work was discarded.
-  Standing mitigation for any agent working in this worktree: never
-  `git add -A`. Stage explicit paths, and check `find . -name "* 2.*"`
-  before committing.
-- TF-03 implementation landed on branch `claude/tf-03-contacts-reconciliation`
-  in the linked worktree `Regards Mobile App TF03`, not yet reviewed or
-  merged. `ContactsReconciler` (new, `Platform/Contacts/`) reconciles the
-  persisted `Contact` table against the system store on launch (returning
-  users), foreground (`AppLaunchCoordinator.handleSceneActivation()` via
-  `RootView`'s `scenePhase`), and `CNContactStoreDidChange`
-  (`ContactsSource.changeNotifications()`, new protocol requirement with a
-  never-emitting default so existing fakes compile unchanged): new refs
-  import untracked, missing refs archive (never hard-delete), reappearing
-  refs un-archive, changed name/phones/emails refresh, corrupt rows are
-  matched by neither path and left untouched. `ContactRepository
-  .fetchAllWithDiagnostics()` (new, default-extension-backed for in-memory
-  backends, real per-row decode in `GRDBContactRepository`) closes R50:
-  `AllContactsViewModel` now shows healthy contacts plus a corruption
-  count/banner instead of going fully unavailable on one bad row; `fetchAll()`
-  is unchanged and still fail-closed for callers that need all-or-nothing
-  (duplicate detection, the importer's existing-ref check). R35: `ContactsImp
-  orter.runFirstLaunchImport()` now tolerates a per-row write failure
-  (logged + counted in `Result.failed`, never joins the resolved-ref set so a
-  rerun retries it) instead of aborting the batch. R25: `CNContactsSource
-  .fetchAllContacts()` now runs `enumerateContacts` via a new
-  `runOffCooperativePool` helper (GCD global queue) instead of the calling
-  cooperative-pool thread; a synthetic 5k-contact regression proves the pool
-  stays responsive during the enumeration. Local evidence only: strict
-  SwiftLint clean, temp-dir `xcodegen generate` byte-identical to the
-  committed project, and `xcodebuild test` green — 60/60 in the newly
-  added/touched suites and 282/282 across the complete `RegardsTests` target,
-  on a dedicated `RegardsTF03` simulator (iOS 26.5) with a dedicated
-  `/tmp/RegardsTF03DerivedData`. No physical-device run yet (that's TF-18's
-  A15 budget confirmation for R25, and general device acceptance before this
-  closes). Open design question flagged for review: a contact that drops out
-  of a `.limited` selection (not deleted from the system, just deselected) is
-  archived by this reconciler exactly like a deletion, since Regards can't
-  tell the two apart from `fetchAllContacts()` alone; it un-archives cleanly
-  if the user re-adds it to the selection. §21's OS-beta-season note calls
-  out limited-access behavior drift as the likeliest silent breaker, so this
-  interaction is worth explicit scrutiny before it closes.
-- A staged review of that commit returned `REQUEST_CHANGES` and the ruling on
-  the open design question above: archive-on-deselect is **not** acceptable —
-  a `.limited` deselection (or an `.authorized → .limited` downgrade) must be
-  a no-op for archiving. A consolidated fix batch on the same branch
-  addresses it plus 11 further items, committed separately (never amending
-  the original commit): the archive sweep now runs only under `.authorized`,
-  with regressions for both the steady-state and the downgrade-mid-session
-  case; `ContactsReconciler.refreshed()` now re-derives a stale `preferred
-  ChannelValue` for phone/email channels instead of leaving a deep link
-  pointed at a number the contact no longer has (a live bug the original
-  commit shipped, caught by review, fixed with a guard so an unset value is
-  never invented from scratch); `AllContactsScreen` reloads on `scenePhase`
-  becoming active so an already-open tab reflects reconciliation results,
-  not just a fresh `.task` appearance (Overdue/Upcoming stay TF-04's); the
-  5k-contact off-pool regression was rewritten to saturate
-  `activeProcessorCount` concurrent enumerations and prove pool
-  responsiveness via signal-gated counting instead of a wall-clock sleep
-  assertion (the original version passed even against pre-fix code whenever
-  the host had spare cores); reconciliation triggers are now single-flight
-  with coalescing (`reconciliationTask`/`reconciliationPending`) so an
-  overlapping foreground and store-change notification serialize into at
-  most one extra pass instead of racing concurrent `.reconcile()` calls
-  against the same database; the corrupt-row unit proof for plain
-  `fetchAll()` (fail-closed, unchanged by R50) was restored after the
-  original commit's AllContactsViewModel test switch left it uncovered; and
-  the R50 corruption banner now has a unit-level accessibility-tree
-  inspection proving its combined VoiceOver label, since the XCUITest mock
-  fixtures have no way to seed a corrupt row. `AppLaunchCoordinator.swift`'s
-  reconciliation methods moved to `AppLaunchCoordinator+Reconciliation.swift`
-  (lint length). Full local evidence after the fix batch: 297/297
-  `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen generate`
-  byte-identical. Manual VoiceOver smoke for the corruption-banner state is
-  still outstanding — needs a supervisor-arranged recorded pass before merge
-  (checklist in the fix-batch report). Not pushed as of this round; later
-  pushed as GitHub PR #48 (`claude/tf-03-contacts-reconciliation` → `main`)
-  — see below.
-- A third review round found one further blocker in that fix batch: the
-  `AllContactsScreen` reload was keyed off raw `scenePhase`, which races
-  `AppLaunchCoordinator`'s own reconciliation pass (the scene-phase handler
-  and the screen's reload both fire off the same foreground transition with
-  no ordering guarantee, so the screen almost always read the store before
-  reconciliation finished) and never fired at all for a
-  `CNContactStoreDidChange` landing while the user was already sitting on
-  the Contacts tab. Fixed by threading `AppLaunchCoordinator
-  .reconciliationCount` down through `RootView` → `RegardsTabRoot` →
-  `AllContactsScreen` as `reconciliationGeneration`, which only advances
-  strictly *after* a pass completes for every trigger kind — the screen now
-  reloads on that instead. A new test hosts the real screen and proves the
-  reload happens through `reconciliationGeneration` observation alone (no
-  direct `viewModel.load()` call in the test). Also landed: a TOCTOU guard
-  in `ContactsReconciler` (re-reads authorization after `fetchAllContacts()`
-  and requires both reads `.authorized` before the archive sweep, so a
-  downgrade landing mid-enumeration can't mass-archive under a stale
-  status), a comment flagging that the preferred-value re-derivation's
-  exact-string-match assumption breaks once `EditContactScreen` (PR27)
-  lets a user edit that value directly, restored write protection on
-  `reconciliationCount`/`reconciliationCoalesceCount` (a private nested
-  counters struct plus narrow `recordReconciliationPass()`/
-  `recordReconciliationCoalesce()` mutators, since the file split had left
-  them as plain settable `var`s), and a burst-coalescing test proving
-  `changeNotifications()`'s real `.bufferingNewest(1)` policy collapses many
-  rapid store-change notifications into far fewer than one pass each.
-  299/299 `RegardsTests`, strict SwiftLint clean, temp-dir `xcodegen
-  generate` byte-identical. Not pushed as of this round either; a fourth
-  review round returned APPROVE (a burst-coalescing test fix, the last
-  non-blocking item) and the branch was then pushed and opened as GitHub PR
-  #48 (`claude/tf-03-contacts-reconciliation` → `main`).
-- PR #48 has been through five further hosted-review rounds since opening,
-  none merged yet: round 5 fixed a CI-only flake in the corruption-banner
-  accessibility test (in-process UIKit tree inspection never materializes
-  assistive technology on a headless runner); round 6 replaced that test
-  with an XCUI-driven one seeded via a new `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
-  launch flag, closed a silent-onboarding-completion gap when every import
-  row fails, and fixed a wrong doc comment about which channels re-derive a
-  stale preferred value; round 7 added a mass-archive guard, field-scoped
-  reconciliation writes (so a concurrent `lastInteractedAt` write can't be
-  reverted by a reconcile pass), and store-change replay/ordering fixes;
-  round 8 empirically re-proved the off-pool-saturation regression actually
-  discriminates (three earlier "fixes" to it turned out not to, only caught
-  by reverting the implementation and running the suite), added
-  `updateReconciledFields` contract coverage on both backends, and gated
-  reconciliation on a genuine background→active scenePhase edge; round 9
-  (in progress) fixes a production-breaking bug the round 8 gate shipped
-  with — real foregrounding never delivers `.background` directly to
-  `.active` (it routes through `.inactive`), so that gate could never fire
-  on a device — plus extends the mass-archive guard to a two-consecutive-pass
-  rule covering ambiguous partial reads, not just wholesale-empty ones. Not
-  yet merged; the manual VoiceOver smoke recording for the corruption-banner
-  state remains outstanding.
+- Updated: 2026-10-11
+- Baseline: `main` at `6c0d633` (merge of PR #60, after PR #57 raised the
+  stress-job limits: job timeout 75 to 120 minutes, boot step 10 to 20
+  minutes). A confirming `Audit stress` run on `78dad7d` is in progress: run
+  `38121994128`.
+- Active work: no merged TF work is in progress. `TF-03` acceptance is
+  owner work (see `Owner gates`); its code is merged in PR #48. Lanes for
+  `TF-05` (`claude/tf-05-reminder-window-editor`, worktree
+  `../RegardsMobileApp-TF05`) and `TF-06`
+  (`claude/tf-06-notification-adapter`, worktree `../RegardsMobileApp-TF06`)
+  started 2026-10-11. Their rows stay `READY` here because the closing
+  rule below reserves `ACTIVE` and `DONE` for the pull request that carries
+  the implementation; each lane sets its own row. A restart finds the lanes
+  through restart protocol step 2 (worktrees and branches), not this table.
+- Next ready work: `TF-05` and `TF-06` stay `READY`, since their only
+  dependency, `TF-04`, is `DONE`. `TF-06` has a hard gate: it must not ship
+  notification scheduling until R57 is resolved (owner ruling 2026-08-22, see
+  its queue row).
+- Blocked: `TF-07` needs `TF-05` and `TF-06`, and `TF-11` needs `TF-06`. Both
+  also need `TF-03`, which stays `OWNER` until its acceptance run passes, so
+  both stay `BLOCKED`.
+- Open pull requests:
+  - PR #58 (`claude/tf-03-close`): this checkpoint. It is TF-03 work.
+  - PR #59 (`claude/org-codex-review`): infra. It adds a Codex cross-model
+    review to the org. It is not TF work.
+- Worktree hazard: a file-sync process in this worktree creates byte-identical
+  `"* 2"` copies of recently written files, and `git add -A` sweeps them into
+  commits. PR #43 carried twelve before review caught them; `main` has none.
+  Standing mitigation for any agent in this worktree: never `git add -A`.
+  Stage explicit paths, and check `find . -name "* 2.*"` before committing.
+- Stress job: the nightly `Audit stress` run has been red or cancelled since
+  about 2026-09-21, with 1 pass in the last 20 runs. Each 5x iteration takes
+  about 13 minutes (39 tests). Five iterations take about 65 minutes, and
+  setup, boot, and build add about 8 more, so a full run needs about 73 minutes
+  against the old 75-minute limit. Two runs failed at the 10-minute boot step
+  limit. On 2026-10-09, `bootstatus` took 8.7 minutes, and the status-bar setup
+  after it pushed the step past 10 minutes.
+- Green CI on `6c0d633`: Lint (`38123416925`) and Guards (`38123416912`)
+  passed; iOS CI (`38123416916`) is in progress. On `78dad7d`, iOS CI
+  (`38121978206`) passed determinism, build, and unit tests; its
+  post-merge accessibility audit was cancelled when PR #60 merged. Before
+  that, iOS CI (`36099491997`), Lint (`36099491904`), and Guards
+  (`36099491878`) passed on `1bf6352`.
+- Owner action needed: TF-03 acceptance. See `Owner gates`.
+
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
 - External TestFlight gate: after `TF-18`
 - Continuation: active Codex heartbeat `continue-regards-work-after-pr-20`,
   every 3 hours, targeting this persistent task
-- Owner action needed now: none for TF-02. The connected-device permission,
-  import, file-protection, populated-tabs, and accessibility acceptance pass is
-  complete. No product, legal, signing, or App Store decision is required.
-- Current-main automation is green on exact `b10f9ac`. iOS CI run
-  `31334462438` passed determinism, build,
-  unit tests, and coverage at exact `b10f9ac`, then failed its one-run
-  accessibility job only in
-  `testProductionOpenFailurePassesAuditAndRetryRecovers`. Its recording and
-  activity log show XCTest synthesized the tap inside **Try Again**, but the
-  fixture remained on the failure screen; the product recovery contracts pass,
-  as does a focused exact-main five-iteration reproduction. Failed-job rerun
-  attempt 2 passed that original test and failed only because an iOS **Ready
-  for Apple Intelligence** notification overlaid the defensive
-  ready-without-runtime fixture; the xcresult's failure screenshot and issue
-  description prove Apple audited the system banner's text. Manually
-  dispatched exact-main stress run `31334531081` passed all 5 complete suites,
-  including both launch-recovery fixtures in every run. No product or test
-  source change is warranted under §17. Diagnosed failed-job rerun attempt 3
-  then passed all 29 accessibility tests in 18m47s, leaving iOS CI run
-  `31334462438` green on exact `b10f9ac`.
-- Current TF-02 local evidence: the 266-test unit suite passes; the
-  append-only v1→v2 path carries representative rows through all six tables;
-  the shared mock/GRDB contract cases pass; strict SwiftLint, privacy/domain/
-  Android guards, review-agent parity, source-boundary fixtures, diff checks, and
-  temporary-copy XcodeGen determinism pass. The exact-source Release simulator
-  build also passes. The exact-source launch accessibility slice passes 8/8 on
-  the dedicated iOS 26.5 iPhone 17 Pro
-  simulator (`D06660F8-D261-46FE-8CF4-8D8190104F80`), covering a successful
-  import, denial plus browse-only recovery, one import failure plus retry, a
-  recoverable database-open failure, the mock launch audit, import failure plus
-  browse-only recovery, and the defensive ready-without-runtime recovery. Its
-  accessibility5 CTA helper retries one tap only when XCTest's automatic
-  scroll completes without delivering the first synthesized action. The
-  fail-once regression also waits for the CTA's real enabled state before
-  retrying, closing a status-render timing race found by the final slice. Final
-  staged review found that rapid repeated launch
-  retries could overlap. Retry accepts the failed phase plus the defensive
-  ready-without-runtime recovery, and marks loading before suspending; its
-  blocking-factory regression proves one retry runtime attempt and a stable
-  final phase. The simulator was created for the production smoke, so no
-  existing simulator data needed deletion or reuse.
-- PR #44 hosted-review repair: the birthday blocker was a documentation-truth
-  issue, not a reason to fetch unused personal data. Architecture now states
-  that TF-02 reads only identifiers, names, phones, and emails, and PR30 must
-  re-add and disclose `CNContactBirthdayKey` when occasion scheduling consumes
-  it. The new launch-failure screen is registered in the audited-screen table
-  and the manual-smoke script covers announcement, focus, and Try Again.
-  Malformed persisted `occasionTime` now has direct boundary and visible-launch
-  coverage; a corrupt Contact row is proved to leave onboarding retryable.
-  A blocked-authorization regression proves a permission tap racing launch
-  performs one import, and the source now rejects that stale automatic path.
-  Mock and GRDB interaction repositories agree that non-positive limits return
-  an empty result, the new onboarding text/background pair is contrast-gated,
-  and the defensive ready-without-runtime Try Again path is functional.
-  Persisted `occasionTime`, Contacts re-entry, and R11 ownership are documented
-  against TF-07/PR29 instead of overstated. The hosted suggestion to silently
-  replace an invalid reminder-window singleton was not taken: R9a/R47 require
-  visible failure because changing reminder timing without consent is unsafe.
-  Its focused launch, persistence, repository-contract, and contrast cases pass
-  on iOS 26.5; strict SwiftLint reports zero violations. The only hosted
-  test-fake preference was consciously left local because that fake records
-  `fetchAll` versus `fetchTracked`, which the shared stub does not model.
-- PR #44 exact-head hosted review run `31298203075` found that an import
-  exception exposed Retry but not the promised browse-only escape. Both import
-  failure paths now expose **Continue without contacts**, retain a retry path,
-  and use truthful resumable-copy; cancellation also becomes a visible retry
-  state. Focused coordinator regressions cover cancellation, profile-save
-  failure, repeated import/continue taps, and a corrupt stored contact. Mock and
-  GRDB reminder-window reads now reject the same invalid stored value; required
-  JSON arrays fail on SQL NULL; noncanonical occasion times fail decoding; and
-  All Contacts ordering has deterministic priority/name/id tie-breaks. The
-  ready-without-runtime recovery is now an audited fixture, failure
-  announcement precedes focus, onboarding announcement/focus sequencing is
-  stale-task-safe, and the changed CTA foreground/background pairs are in the
-  contrast registry. Cancellation is evaluated only after stale startup work
-  yields to a completed onboarding action; the 19 coordinator recovery and
-  launch tests cover both a non-cooperative canceled runtime open and the
-  cancellation-plus-user-action race without elapsed-time sleeps. R25's
-  off-cooperative-pool 5k import remains in PR21 /
-  TF-03, where §14 and §19 assign the Contacts enumeration redesign and its
-  synthetic regression; TF-02 does not widen its schema-foundation scope to
-  close that later item.
-- PR #44 exact-head hosted review run `31300926594` then found one blocker on
-  `ed6023b`: All Contacts recomputed its O(N) filter from every eager row,
-  producing quadratic first-render work once the production import populated a
-  real address book. The repair hoists one filtered value per SwiftUI body
-  evaluation and renders rows in a `LazyVStack`; a 750-contact screen-render
-  regression proves one projection per body evaluation and constructs fewer
-  than the ten filtered rows in a bounded viewport. The directly applicable
-  hardening is also complete: current `.limited` and `.restricted` launch
-  states are covered, a pre-existing denial is announced/focused through a
-  hosting regression and audited on first render, the exact file-backed
-  database path creates its protected
-  directory and survives reopen, v1→v2 preserves a legacy per-contact override
-  plus non-null quiet hours, and migration JSON encoding now has a direct
-  invalid-UTF-8 fail-closed regression.
-  The remaining hosted suggestions keep their authoritative owners: §3/§7
-  explicitly require first-launch `entitlementTier = trial`; §9 defines a
-  per-contact override as a full `ReminderWindow`; PR21 / TF-03 owns R25's
-  off-pool 5k enumeration and R35's per-row import tolerance; R9a requires
-  visible failure rather than silently resetting reminder timing; and TF-07
-  owns production `occasionTime` injection. Stored-row corruption continues to
-  fail visibly instead of silently hiding local user data.
-- Hosted semantic rerun `31303643205` approved the still-published `ed6023b`
-  head and surfaced four should-fixes. The newer worktree now splits successful
-  import from onboarding-profile completion so a save failure reports the
-  truthful cause and retries without importing twice; the launch retry uses an
-  explicit token-colored 44-point surface backed by the registered contrast
-  pair; `AGENTS.md` and the mock-runtime comment describe production-first
-  launch and the release-blocking audit policy; and R50 assigns
-  corruption-aware partial display to TF-03 without silently discarding a raw
-  row. Exact regressions prove both the post-import save recovery and the
-  current fail-visible stored-row behavior. All production-reachable arbitrary
-  errors and contact identifiers now use private OSLog interpolation.
-- TF-02 production smoke completed 2026-08-08 with the exact Release simulator
-  product from `/tmp/RegardsTF02ShippingDerivedData` on the dedicated iOS 26.5
-  iPhone 17 Pro (`D06660F8-D261-46FE-8CF4-8D8190104F80`). The old task-only
-  Regards install was removed, its retained Contacts authorization was
-  explicitly revoked then reset, and a fresh install produced new app and data
-  containers. The truthful pre-prompt led to the real system Contacts prompt,
-  `Select Contacts`, John Appleseed, and `Allow Selected Contact`. Production
-  tabs then loaded, and All Contacts exposed exactly `1 contact` and the John
-  Appleseed button. The file-backed database exists only at
-  `Library/Application Support/Regards/regards.sqlite`; it records migrations
-  `v1` and `v2`, one imported `Contact`, one `ReminderWindow`, and one trial
-  `UserProfile`, with the other three production tables empty as expected.
-  Accessibility Inspector targeted that final Regards process. Its audits of
-  All Contacts and imported Contact Detail produced no warnings, while the
-  Simulator accessibility hierarchy exposed the screen and section headings,
-  natural John Appleseed row, working Back path, and unavailable action states
-  without inert buttons. Dynamic Type at `accessibility5` kept the imported row,
-  search, Contact Detail content, Back path, and adaptive tab control visible
-  and tappable. Reduce Motion and Increased Contrast were each tested on and
-  off; navigation remained coherent and text, icons, cards, and the priority
-  treatment stayed legible. Accessibility Inspector was restored to standard
-  Dynamic Type, Reduce Motion off, and Increased Contrast off. Findings: none.
-- TF-02 physical-device acceptance completed 2026-08-09 on the connected
-  `Comm Link 17` iPhone running iOS 26.6. The exact current-source Release app
-  built with automatic development signing, installed when Regards was absent,
-  and launched through the real Contacts pre-prompt and system limited-access
-  chooser. One selected contact imported, onboarding completed, and the
-  production tabs loaded. A privacy-preserving database check read counts and
-  state only: one Contact, one trial UserProfile, one ReminderWindow, and a
-  completed onboarding flag. Accessibility Inspector produced no warnings on
-  the populated All Contacts state at default Dynamic Type or at its maximum
-  Dynamic Type override with Reduce Motion and Increased Contrast enabled.
-  The owner then completed the VoiceOver pass through the imported row, Contact
-  Detail, Back path, and tab controls and reported the labels, order, focus,
-  and layout usable. A read-only LLDB `FileManager` query inside the signed
-  device process returned
-  `NSFileProtectionCompleteUntilFirstUserAuthentication` for both the Regards
-  Application Support directory and `regards.sqlite`. The app was detached and
-  the Accessibility Inspector overrides were verified back at defaults.
-  Findings: none.
-- The prior exact-worktree `$regards-pr-review` rerule on `52487b0` was
-  `APPROVE` across
-  correctness, security/privacy, code quality, tests, accessibility, and
-  fit/finish. The physical-device and file-protection coverage holes are
-  cleared; no blocker, should-fix, question, or confirmed test hole remains.
-  Five optional file-organization nits were consciously left as non-semantic
-  preferences: split `ProductionRepositoryFactory` into its own Data file and
-  add `MARK` sections to four long launch/UI-test files.
-- PR #44 hosted semantic review run `31328636788` then found one valid blocker
-  on `52487b0`: OnboardingScreen's status-effect task compared the message
-  captured by a value-type view to itself, so an overlapping transition could
-  re-announce stale recovery copy and refocus a removed action. The worktree
-  now uses a live generation token across both suspension points. A
-  deterministic hosting regression overlaps two status transitions and proves
-  that only the newest message announces and focuses. The directly applicable
-  should-fixes are also closed: imported
-  phone and email arrays still preserve raw values, but invalid domestic,
-  extension, alphabetic, non-ASCII-digit, too-short, too-long, and malformed
-  email values can no longer become a non-empty preferred deep-link value;
-  selection takes the first valid phone and otherwise the first valid email,
-  with the canonical ChannelCatalog rule accepting only safe separator
-  normalization around a leading `+` and 7–15 ASCII digits; and
-  ReminderWindow's Codable regression now round-trips non-nil wrapping quiet
-  hours. Production GRDB construction now lives behind the Data-layer
-  `ProductionRepositoryFactory`; App composition and App-level tests receive
-  only repository-protocol environments. The file-backed factory is exercised
-  against an injectable temporary Application Support root, proving protected
-  creation, migration, repository reads/writes, persistence, and reopen; App
-  recovery tests use the configured shared repository fakes. The final affected
-  slice passes 103 expanded cases / 87 logical tests with zero failures, and
-  the complete unit bundle passes 259/259 (317 expanded device-configured
-  cases). The five affected launch audits pass 5/5 at accessibility5. A manual
-  simulator walkthrough now explicitly covers denial → **Continue without
-  contacts**, import failure → Retry, and launch failure → **Try Again**;
-  every action reached its expected destination and Accessibility Inspector
-  reported no warnings on all three recovery surfaces.
-  The remaining suggestions retain their existing owners or are already
-  covered at the real boundary: §10.8/R14 deliberately lets the browse-only
-  escape complete onboarding until PR29 adds Settings re-entry; TF-03 owns
-  R25's off-pool/chunked 5k import and R35/R50 per-row corruption tolerance;
-  TF-07 owns resident-timezone scheduling; missing reminder-window state must
-  remain a visible launch failure rather than silently synthesizing user timing
-  under R9a/R47; the file-backed reopen regression already reapplies the GRDB
-  migrator to an existing v2 store; there is no suspension point between
-  assigning a healthy runtime and choosing its profile phase; and production
-  CNContact identifiers are non-empty while the importer de-duplicates every
-  identifier within a pass. RootView's guard reads live observable coordinator
-  state and its two defensive failure fixtures remain audited, unlike the
-  repaired value-input OnboardingScreen case. The hosted narrative and bounded
-  polling nits are corrected by this evidence and the new `eventually` helper.
-- The final exact-worktree `$regards-pr-review` verdict is `APPROVE` across
-  correctness, security/privacy, code quality, tests, accessibility, and
-  fit/finish. There are no blockers, fixes, coverage holes, questions, or
-  accessibility findings. Five optional file-organization nits remain
-  consciously deferred because they do not change behavior. The exact-source
-  Release simulator build also passes after the final composition seam.
-- Hosted semantic review run `31332360018` approved pushed head `dab40f8`
-  without blockers and surfaced seven should-fixes. All seven are closed in
-  the final worktree candidate. The PR20 architecture row now names the real
-  production runtime and truthfully allows empty Overdue and Upcoming tabs
-  until TF-11 / PR29 adds starter selection and marks those contacts tracked;
-  R14 explicitly leaves imported rows untracked until that work lands. A v1 invalid
-  per-contact override remains present and fails visibly after migration rather
-  than being silently normalized. Direct GRDB tests cover a missing and a
-  corrupt ReminderWindow singleton. Persisted occasion-time decoding rejects
-  out-of-range minutes and wrong-length values. Saving nil quiet hours writes
-  SQL NULL and round-trips nil. RootView launch-failure effects now carry a
-  generation token across both suspension points, and a deterministic hosting
-  regression proves that a repeated same-copy failure suppresses stale
-  announcement and focus work. The focused data, validation, contract, and
-  hosting slice passes 35/35; the complete unit bundle passes 266/266; and the
-  two affected launch-failure accessibility audits and retry flows pass 2/2 on
-  the pinned iOS 26.5 simulator. Strict SwiftLint, privacy/domain/Android
-  guards, source-boundary fixtures, review-agent parity, workflow YAML, diff
-  checks, duplicate-file scanning, temporary-copy XcodeGen determinism, and the
-  exact-source generic Release simulator build pass.
 - Copyright owner: repository, product, and App Store references use
   `Considerate Software LLC`; the PolyForm Noncommercial terms are unchanged.
+
+- Owner rulings, 2026-10-11:
+  - `TF-05` and `TF-06` run in parallel despite sharing the `RegardsApp`,
+    generated-project, and execution-docs locks. The second to merge rebases
+    and regates.
+  - `R55` moves to `TF-07`.
+  - `TF-06`'s on-device exit checks (a notification fires at a window
+    boundary; its actions round-trip) move to `TF-07`'s airplane-mode device
+    test.
+- History: the PR that carries each closed item's evidence.
+  - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
+    physical-device acceptance, including the
+    `NSFileProtectionCompleteUntilFirstUserAuthentication` check on
+    2026-08-09, is in PR #45's checkpoint text (`git show
+    ee601a5:TESTFLIGHT_PLAN.md`).
+  - TF-03: code merged in PR #48 (merged as `6886be3` on 2026-08-11). PR
+    #48's description records a corruption-banner VoiceOver check run
+    against `--regards-mock-runtime`, with no iOS version or findings line,
+    so it does not meet `accessibility-smoke.md`'s contract; a recorded
+    corruption-banner VoiceOver smoke is step 7 of the acceptance run (see
+    `Owner gates`).
+  - TF-04: PR #49 (merged as `02873e8` on 2026-09-14).
+  - Earlier checkpoint text, including the round-by-round TF-02 and TF-03
+    review history, is in the git history of this file.
 
 Only change `Active work`, `Next ready work`, and the queue status in the same
 pull request that changes the corresponding implementation. A run that stops
@@ -524,11 +194,11 @@ numbers.
 | TF-00 | DONE | — | Install this durable control plane, make both agent adapters share the same review contract, and schedule continuation | execution infrastructure; GitHub PR #22 |
 | TF-01 | DONE | TF-00 | Truth, platform modernization, and hygiene pass: complete the remaining mock-state, stable-identity, dead-asset, and preservation-safe cleanup work; the completed platform, CI, package, and documentation slices agree with the repository | dedicated modernization slice in GitHub PR #24; PR18–PR19; R13 escape route, R16, R19–R22, R27–R34, R40, R42–R43 |
 | TF-02 | DONE | TF-01 | Production DB v2, shared repository contracts, real environment at launch, resumable first import, and a basic onboarding gate; fresh simulator install reaches populated tabs. Includes flipping the boot path from `AppRuntime.makeMock` to `makeProduction`, the remaining half of R9a | PR20; R9a, R23, R39 |
-| TF-03 | ACTIVE | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
+| TF-03 | OWNER | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
 | TF-04 | DONE | TF-02 | Caught up, Snooze, and Log other persist from every surface they appear on (Contact Detail: all three, as buttons; Overdue: Caught up and Snooze as native `List`/`.swipeActions`, swipe right and left; Upcoming: Caught up only, cadence rows only, swipe right; neither list screen has a Log-other row action, and Upcoming ships no Snooze action; tapping a list row previews the channel action pending TF-08; both screens migrated from `ScrollView`/`RegardsCard` per-row buttons to `List` in round 12, which R52 records); Snooze via a narrow `SchedulingPass` DB-only stub (single cadence `ScheduledReminder` write, no window/engine/reconciliation — PR25 absorbs it); live lists update via `ContactRepository.observeTracked()`; interaction, action, and mock/GRDB parity tests pass | PR22; R11, R24, R34, R36, R46, R52 |
-| TF-05 | BLOCKED | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly | PR23; R4, R9 |
-| TF-06 | BLOCKED | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
-| TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved | PR25; R4–R6, R10–R11, R24 |
+| TF-05 | READY | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly; the editor never changes a timezone: the global editor writes back the one it loaded and a per-contact override copies the global window's (`saveNeverChangesTimezone`, the R55 ruling of 2026-10-11) | PR23; R4, R9 |
+| TF-06 | READY | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
+| TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved. Also owns (owner rulings 2026-10-11): R55, and TF-06's on-device exit checks (a local notification fires at a window boundary; its Caught up and Snooze actions round-trip), run in the airplane-mode device test | PR25; R4–R6, R10–R11, R24, R55, R57 |
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
 | TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
 | TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
@@ -559,7 +229,7 @@ needed; then the TF-13 → TF-15 → TF-17 → TF-16 → TF-18 joins. Joins bran
 from the combined current `main`, never from only one parent. Independent
 siblings use separate linked worktrees. Stacks are reserved for real
 dependency edges and are rebased and retargeted to `main` after their parent
-merges.
+merges. As of 2026-10-11, `TF-05` and `TF-06` are the active pair.
 
 Treat shared schema/location transitions and high-collision composition as
 locks, not artificial global dependencies. Only one lane may own a schema or
@@ -855,9 +525,56 @@ of bounded reviewable slices. The order is fixed; do not overlap them:
 
 Current gates:
 
-- No owner gate is active. `TF-02` is agent-owned repository work. R30 stays
-  intentionally open; no unique work may be removed merely to close a hygiene
-  row.
+- TF-03 acceptance (`OWNER`). The owner runs this pass on a physical iPhone,
+  using a production build from `main` at `6c0d633` or later. Steps 1-6 use
+  no `--regards-mock-runtime` and no `REGARDS_UI_TEST_*` flag; step 7 needs
+  both. Full Contacts access is required (`.authorized`). Limited Access
+  never archives, so the delete steps prove nothing under Limited Access.
+  The 5k off-pool half of R25 is already proven by the synthetic regression
+  test in PR #48, so this pass covers the PR21 exit check plus the
+  corruption-banner VoiceOver smoke.
+
+  1. Complete onboarding with full Contacts access. Use two test contacts in
+     the system Contacts app: Contact A to rename and Contact B to delete.
+  2. Rename Contact A in the Contacts app. Foreground Regards. Confirm All
+     Contacts shows the new name.
+  3. Delete Contact B in the Contacts app. Foreground Regards and note the
+     time. Confirm Contact B is still in All Contacts. The first miss is
+     recorded but not archived yet.
+  4. Between 2 and 3 minutes after step 3, force-quit and relaunch
+     Regards, and note the time. Confirm Contact B is still in All Contacts.
+  5. Between 5 and 6 minutes after step 3, and so less than 5 minutes after
+     step 4, foreground Regards. Confirm Contact B is gone from All Contacts.
+     Both bounds matter. If the relaunch had lost the debounce state, the
+     launch pass at step 4 would record the miss again, and Contact B could
+     not archive until 5 minutes after step 4, which is after this window.
+     `AppLaunchArchivePersistenceTests.archiveDebounceStateSurvivesRelaunch`
+     proves the same in unit form.
+  6. Re-add Contact B in the Contacts app. Foreground Regards. Confirm a
+     Contact B row is back in All Contacts. A re-added contact gets a new
+     system identifier, so it imports as a new row; that is expected.
+     Un-archiving a row whose identifier reappears (the PR21 "un-archive"
+     clause) can't be produced from the Contacts app on demand and is
+     proven by `ContactsReconcilerTests.reconcileUnarchivesReappearingContact`.
+
+  The PR21 clause "history survives archive" isn't visible in the UI: the
+  archived row is hidden, and a re-added contact is a new row. It is proven
+  by `ContactsReconcilerResilienceTests`
+  (`archiveSurvivesWithScheduledReminderAndInteractionLogHistory` and
+  `deleteThenReAddLandsAsNewRowKeepingArchivedHistory`, both from PR #48).
+
+  7. Corruption banner VoiceOver smoke. A corrupt row can't be produced on
+     demand in a production build; the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
+     fixture works only under the Debug mock runtime. So for this step
+     only, launch a Debug build of the same sha with `--regards-mock-runtime`
+     and `REGARDS_UI_TEST_SEED_CORRUPT_ROW=1`, run the corruption-banner item
+     in `ios/docs/accessibility-smoke.md` with VoiceOver on, and record it in
+     that file's Reporting format, including the iOS version and a Findings
+     line.
+
+  Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___).
+  Findings: ___.
+- R30 stays intentionally open; no unique work may be removed merely to close a hygiene row.
 
 ### PR #24 modernization accessibility evidence
 
