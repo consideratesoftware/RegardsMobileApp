@@ -452,7 +452,9 @@ struct RegardsTabRoot: View {
     private func settingsDestination(for route: RegardsSettingsRoute) -> some View {
         switch route {
         case .reminderWindows:
-            ReminderWindowsScreen()
+            ReminderWindowsScreen(
+                viewModel: Self.makeReminderWindowsViewModel(runtime: runtime, upcoming: upcomingVM)
+            )
         case .mergeDuplicates:
             MergeDuplicatesScreen(viewModel: mergeDuplicatesVM)
         case .transparency:
