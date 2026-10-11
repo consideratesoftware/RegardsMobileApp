@@ -453,6 +453,8 @@ Every fresh or scheduled agent run follows this order:
    in the pull-request body. Review and CI monitoring do not consume a lane.
 7. Run proportionate local checks before push. Every pull request must pass the
    repository gates and `$regards-pr-review` (or `/pr-review`) before merge.
+   The Claude Code org runs both and needs both verdicts
+   (`ENGINEERING_ORG.md` merge conditions).
 8. Update this checkpoint in the same pull request. Never mark an item `DONE`
    before its acceptance evidence and required checks exist.
 

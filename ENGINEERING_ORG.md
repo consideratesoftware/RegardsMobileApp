@@ -36,7 +36,9 @@ a new non-reviewer role must not be named `pr-*`.
 The 2 Codex roles need the Codex CLI installed and logged in on this Mac
 (`/codex:setup` checks both). They run on Sid's ChatGPT plan, not the
 Anthropic API. Codex never edits a lane: both roles run read-only, and a
-Claude engineer applies any fix they lead to.
+Claude engineer applies any fix they lead to. Codex's network use is
+development tooling on this Mac; it has nothing to do with the app's
+no-network invariant (§11), which the guards still enforce on app code.
 
 ## How one work item moves
 
@@ -80,8 +82,10 @@ All of these, on the current head, with no averaging:
 1. Every required check green.
 2. Hosted `Regards staged review`: zero unresolved blockers.
 3. `/pr-review` verdict APPROVE.
-4. `codex-reviewer` verdict APPROVE, or every Codex blocker disputed in the
-   PR body with the `ARCHITECTURE.md` section that settles it.
+4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
+   with every Codex blocker disputed in the PR body with the
+   `ARCHITECTURE.md` section that settles it. UNAVAILABLE never satisfies
+   this condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
 

@@ -9,10 +9,10 @@ For a pull-request review, invoke `/pr-review` from
 must stay equivalent to their `.codex/agents/` adapters; CI enforces that with
 `scripts/check-review-agent-parity.sh`.
 
-The delivery side is an engineering org of Claude-only agents described in
-`ENGINEERING_ORG.md`: `/org` is the engineering manager; `tech-lead`,
-`senior-ios-engineer`, `ios-engineer`, `qa-engineer`, `verifier`,
-`build-engineer`, `on-call-engineer`, `release-manager`, and `tech-writer`
-are the roles. `codex-reviewer` and the Codex plugin's `codex:codex-rescue`
+The delivery side is an engineering org of Claude Code agents, plus 2
+read-only Codex roles, described in `ENGINEERING_ORG.md`: `/org` is the
+engineering manager; `tech-lead`, `senior-ios-engineer`, `ios-engineer`,
+`qa-engineer`, `verifier`, `build-engineer`, `on-call-engineer`,
+`release-manager`, and `tech-writer` are the roles. `codex-reviewer` and the Codex plugin's `codex:codex-rescue`
 add a read-only Codex review and second opinion. The parity check covers
 only the `pr-*` reviewers.

@@ -74,22 +74,28 @@ For each slice in the tech lead's plan:
    before the lane parks.
 
 After the last slice: launch `tech-writer` with the DOC SIBLINGS list and
-the facts from the slice reports. Commit, then in one batch run
-`/pr-review origin/main` from inside the lane's worktree and launch `codex-reviewer`
-with the worktree, base `origin/main`, the item's §14 row, and its claimed
-R-numbers. Treat blockers from both the same way: they go to the slice
+the facts from the slice reports. Commit, fetch, then in one batch run
+`/pr-review origin/main...HEAD` from inside the lane's worktree and launch
+`codex-reviewer` with the worktree, the same target `origin/main...HEAD`,
+the item's §14 row, and its claimed R-numbers. The three-dot target
+compares against the merge base, so commits that landed on `main` after the
+lane branched don't show up as reversions. Treat blockers from both the same way: they go to the slice
 owner (design questions to `tech-lead` first), one round, then both review
 again. Drop a Codex finding only when it contradicts `ARCHITECTURE.md`, and
 record the section, as `/pr-review` does. If `codex-reviewer` reports
 UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate in
-`ENGINEERING_ORG.md`. Two rounds maximum, then the second opinion.
+`ENGINEERING_ORG.md`, and an UNAVAILABLE run does not use up a review
+round. Two rounds maximum, then the second opinion. Whenever the head
+moves after a Codex verdict (a repair, a rebase, an on-call fix), launch
+`codex-reviewer` again on the new head before Stage 4 re-checks merge
+conditions; the release manager can't launch agents.
 
 Second opinion: before parking a lane on a second REFUTED or a second
 REQUEST_CHANGES, launch `codex:codex-rescue` (from the Codex plugin) once with the lane worktree,
 the slice, the refutation or blockers verbatim, and the instruction
 "read-only diagnosis: do not edit files; name the root cause and the
 smallest fix, with file:line". Send its diagnosis to `tech-lead` for a
-ruling. If the tech lead accepts it, the slice owner gets one last repair
+ruling. If Codex is unavailable, skip the second opinion and park. If the tech lead accepts it, the slice owner gets one last repair
 round and the verifier or both reviews run once more. Otherwise, or if
 that round fails, park the lane with the refutation, blockers, and Codex
 diagnosis in the report.
@@ -107,7 +113,7 @@ watches CI and the hosted review, routes repairs, records the checkpoint via
 ## /org: <date>
 MAIN: sha | a11y audit: pass/fail | 5x stress: pass/fail
 LANES (n/3 occupied):
-- TF-##: branch | stage reached | PR #n | release-manager STATE
+- TF-##: branch | stage reached | PR #n | release-manager STATE | Codex: verdict @ sha
 RESUMED:
 - PR #n: release-manager STATE
 WAITED: READY items not started, with lock or budget reason
