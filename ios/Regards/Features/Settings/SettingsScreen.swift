@@ -83,12 +83,6 @@ public struct SettingsScreen: View {
             guard newPhase == .active else { return }
             Task { await notifications?.refresh() }
         }
-        // The row changes in place, so VoiceOver would otherwise say nothing
-        // after the prompt closes or the user returns from iOS Settings.
-        .onChange(of: notifications?.status) { oldStatus, newStatus in
-            guard oldStatus != nil, let newStatus else { return }
-            AccessibilityNotification.Announcement(Self.notificationAnnouncement(for: newStatus)).post()
-        }
     }
 
     private var header: some View {
@@ -228,14 +222,6 @@ public struct SettingsScreen: View {
             Text(subtitle)
                 .font(.footnote)
                 .foregroundStyle(RegardsDS.muted)
-        }
-    }
-
-    private static func notificationAnnouncement(for status: NotificationAuthorizationStatus) -> String {
-        switch status {
-        case .notDetermined: "Notifications not set up"
-        case .denied: "Notifications off"
-        case .authorized: "Notifications on"
         }
     }
 }
