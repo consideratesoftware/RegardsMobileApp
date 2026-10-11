@@ -59,6 +59,7 @@ STATE: MERGED | GREEN, WAITING ON OWNER | RED (parked after 2 rounds) | DRAFT (s
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n
 /pr-review: verdict
+CODEX REVIEW: verdict @ head sha vs base | disputed blockers with ARCHITECTURE.md §, or none
 OWNER CHECKLIST: exact steps, or none
 LANE: freed | still occupied
 ```

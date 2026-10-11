@@ -21,7 +21,8 @@ branch claims to close.
    change the branch:
 
    ```bash
-   out="${TMPDIR:-/tmp}/codex-review-$(git -C "<worktree>" rev-parse --short HEAD).md"
+   head=$(git -C "<worktree>" rev-parse --short HEAD)
+   out=$(mktemp "${TMPDIR:-/tmp}/codex-review-$head-XXXXXX")
    codex exec -C "<worktree>" -s read-only -o "$out" \
      'Use the $regards-pr-review skill to review this branch against <base>.
       Work item: <TF-## and §14 row, or "none">. Claimed R-closures: <list or "none">.
@@ -30,15 +31,22 @@ branch claims to close.
       "PRE-FLIGHT: skipped (read-only sandbox; gates run by build-engineer and CI)".
       Do not edit any file. Return only the consolidated review in the
       skill'"'"'s format.'
+   echo "codex exit $?"
    ```
 
+   `mktemp` gives every run its own empty file, so a failed run can never
+   pick up an earlier run's verdict.
    Don't add `--ephemeral`: the skill starts one Codex sub-agent per
    reviewer, and those need the saved parent session. A docs or CI diff
    took about 3 minutes; a feature lane takes longer. Use a Bash timeout of
    600000 ms. If it times out, run it once more with `run_in_background`
    and wait for it to finish.
-3. Read `$out`. If it is missing or has no `VERDICT:` line, report
-   `VERDICT: UNAVAILABLE` with the last 20 lines of Codex's output.
+3. Report `VERDICT: UNAVAILABLE` with the last 20 lines of Codex's output
+   if any of these is true: `codex exit` is not 0, `$out` is empty, or
+   `$out` has no line that is exactly `VERDICT: APPROVE` or
+   `VERDICT: REQUEST_CHANGES`. Otherwise read `$out`. Also check that
+   `git -C "<worktree>" rev-parse --short HEAD` still equals `$head`; if the
+   branch moved during the review, report UNAVAILABLE and say so.
 
 Warnings about `/tmp/xcrun_db` or `DARWIN_USER_CACHE_DIR` come from the
 read-only sandbox and do not affect the review.

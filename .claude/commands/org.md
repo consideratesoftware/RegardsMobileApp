@@ -75,7 +75,7 @@ For each slice in the tech lead's plan:
 
 After the last slice: launch `tech-writer` with the DOC SIBLINGS list and
 the facts from the slice reports. Commit, then in one batch run
-`/pr-review` from inside the lane's worktree and launch `codex-reviewer`
+`/pr-review origin/main` from inside the lane's worktree and launch `codex-reviewer`
 with the worktree, base `origin/main`, the item's §14 row, and its claimed
 R-numbers. Treat blockers from both the same way: they go to the slice
 owner (design questions to `tech-lead` first), one round, then both review
