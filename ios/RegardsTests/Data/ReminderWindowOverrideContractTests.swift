@@ -16,6 +16,16 @@ struct ReminderWindowOverrideContractTests {
         timezoneIdentifier: "Etc/UTC"
     )
 
+    /// An active contact with an override different from the one under test.
+    /// Every test that writes (or refuses to write) an override seeds one, so
+    /// a write that drops its `id` filter changes this row and fails the
+    /// `fetch(id:)` equality check. Returns the row as stored.
+    private static func seedBystander(_ contacts: any ContactRepository) async throws -> Contact {
+        let bystander = contractContact(id: try contractUUID(190), suffix: "override-bystander", tracked: true)
+        try await contacts.upsert(bystander)
+        return try #require(try await contacts.fetch(id: bystander.id))
+    }
+
     @Test(
         "updateReminderWindowOverride stores the window, reports a match, and leaves every other field alone",
         arguments: RepositoryContractBackend.allCases
@@ -25,6 +35,7 @@ struct ReminderWindowOverrideContractTests {
         let original = contractContact(id: try contractUUID(171), suffix: "override-write", tracked: true)
         try await repositories.contacts.upsert(original)
         let stored = try #require(try await repositories.contacts.fetch(id: original.id))
+        let bystander = try await Self.seedBystander(repositories.contacts)
         let window = Self.saturdayMorning
 
         let matched = try await repositories.contacts.updateReminderWindowOverride(id: original.id, window: window)
@@ -35,6 +46,7 @@ struct ReminderWindowOverrideContractTests {
         var expected = stored
         expected.reminderWindowOverride = window
         #expect(reloaded == expected)
+        #expect(try await repositories.contacts.fetch(id: bystander.id) == bystander)
     }
 
     @Test(
@@ -140,6 +152,7 @@ struct ReminderWindowOverrideContractTests {
         )
         try await repositories.interactions.append(log)
         try await repositories.reminders.upsert(reminder)
+        let bystander = try await Self.seedBystander(contacts)
 
         try await dbQueue.write { db in
             let others = try Row.fetchAll(db, sql: "PRAGMA table_info(Contact)")
@@ -187,6 +200,7 @@ struct ReminderWindowOverrideContractTests {
 
         #expect(matched)
         #expect(try await contacts.fetch(id: original.id)?.reminderWindowOverride == Self.saturdayMorning)
+        #expect(try await contacts.fetch(id: bystander.id) == bystander)
         let logs = try await repositories.interactions.fetchRecent(forContact: original.id, limit: 10)
         let reminders = try await repositories.reminders.fetchPending(forContact: original.id)
         #expect(logs.map(\.id) == [log.id])
@@ -256,6 +270,7 @@ struct ReminderWindowOverrideContractTests {
     func reportsFalseForMissingId(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
         let missingId = try contractUUID(176)
+        let bystander = try await Self.seedBystander(repositories.contacts)
 
         let matched = try await repositories.contacts.updateReminderWindowOverride(
             id: missingId,
@@ -264,6 +279,7 @@ struct ReminderWindowOverrideContractTests {
 
         #expect(!matched)
         #expect(try await repositories.contacts.fetch(id: missingId) == nil)
+        #expect(try await repositories.contacts.fetch(id: bystander.id) == bystander)
     }
 
     @Test(
@@ -280,6 +296,7 @@ struct ReminderWindowOverrideContractTests {
         )
         try await repositories.contacts.upsert(original)
         let stored = try #require(try await repositories.contacts.fetch(id: original.id))
+        let bystander = try await Self.seedBystander(repositories.contacts)
 
         let matched = try await repositories.contacts.updateReminderWindowOverride(
             id: original.id,
@@ -288,6 +305,7 @@ struct ReminderWindowOverrideContractTests {
 
         #expect(!matched)
         #expect(try await repositories.contacts.fetch(id: original.id) == stored)
+        #expect(try await repositories.contacts.fetch(id: bystander.id) == bystander)
     }
 
     /// Upcoming rebuilds its rows from `observeTracked()`. A field-scoped
