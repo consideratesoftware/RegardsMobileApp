@@ -186,14 +186,16 @@ struct UpcomingViewModelRaceTests {
         #expect(viewModel.totalCount == 0)
     }
 
-    /// `updateWindow` reloads through `performLoad()`, so a `load()` that began
-    /// before it and is still parked at `fetchTracked()` must not write its
-    /// rows over the new window's result. The parked load holds a snapshot in
-    /// which the contact is due in 3 days (a row under either horizon); the
-    /// store has since moved it to 10 days (a row only under the 14-day
-    /// horizon). It is released only after `updateWindow` has returned, so
-    /// without the generation guard it would resurrect a row the 7-day
-    /// horizon drops.
+    /// Guards stale data through the generation check, not a stale window:
+    /// `performLoad()` reads `self.window` after its awaits, so once
+    /// `updateWindow` has set it no load builds rows from the old window.
+    /// What a parked load can still carry is the contact snapshot it read
+    /// before `updateWindow` ran. Here that snapshot has the contact due in
+    /// 3 days (a row under the 7-day horizon too); the store has since moved
+    /// it to 10 days (a row only under the 14-day horizon). The parked load
+    /// is released after `updateWindow` returns, so without the
+    /// `generation == loadGeneration` guard it would resurrect a row the new
+    /// window drops.
     @Test("A load() in flight when updateWindow runs does not overwrite the new window's rows")
     func updateWindowSurvivesConcurrentInFlightLoad() async throws {
         let stale = UpcomingFixtures.contact(

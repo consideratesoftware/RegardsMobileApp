@@ -123,6 +123,61 @@ struct UpcomingViewModelWindowTests {
         #expect(rowContactIDs == Set(others.map(\.id)))
     }
 
+    /// The override reaches `nextAllowedSlot` only. Horizon, time zone and day
+    /// headers stay global (I4). The override here sits 14 hours ahead of UTC
+    /// with a 30-day horizon, so any leak into those three shows up:
+    /// - A is due in 10 days. The global 7-day horizon excludes it; a leaked
+    ///   30-day horizon would show it.
+    /// - B's slot is 01:00 Saturday in Kiritimati, which is 11:00 Friday UTC.
+    ///   The row must read "11:00 am" under "Today", not "1:00 am" under
+    ///   "Tomorrow".
+    @Test("An override never changes the horizon, the time zone, or the day headers")
+    func overrideNeverChangesHorizonTimezoneOrHeaders() async throws {
+        let global = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            timezoneIdentifier: "Etc/UTC",
+            digestHorizonDays: 7
+        )
+        let allDayKiritimati = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            timezoneIdentifier: "Pacific/Kiritimati",
+            digestHorizonDays: 30
+        )
+        let earlyMorningKiritimati = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 1), end: TimeOfDay(hour: 2))],
+            timezoneIdentifier: "Pacific/Kiritimati",
+            digestHorizonDays: 30
+        )
+        let tenDaysOut = UpcomingFixtures.contact(
+            systemRef: "horizon-leak", cadenceDays: 14,
+            reminderWindowOverride: allDayKiritimati,
+            lastInteractedAt: Self.now.addingTimeInterval(-4 * 86_400)
+        )
+        let inside = UpcomingFixtures.contact(
+            systemRef: "zone-leak", cadenceDays: 7,
+            reminderWindowOverride: earlyMorningKiritimati
+        )
+        // Both would show under the override's own 30-day horizon.
+        let tenDaysSlot = try #require(ReminderEngine().nextAllowedSlot(
+            from: Self.now.addingTimeInterval(10 * 86_400), in: allDayKiritimati, includingContainingSlot: false
+        ))
+        #expect(tenDaysSlot > Self.now.addingTimeInterval(8 * 86_400))
+        #expect(tenDaysSlot < Self.now.addingTimeInterval(30 * 86_400))
+        let viewModel = Self.viewModel(contacts: [tenDaysOut, inside], window: global)
+
+        await viewModel.load()
+
+        #expect(Self.cadenceRow(for: tenDaysOut, in: viewModel) == nil)
+        let row = try #require(Self.cadenceRow(for: inside, in: viewModel))
+        #expect(row.scheduledFor == (try Self.utc("2027-01-15T11:00:00Z")))
+        #expect(row.timeOfDayText == "11:00 am")
+        #expect(row.dayHeader == "Today · Fri Jan 15")
+        #expect(viewModel.groups.map(\.header) == ["Today · Fri Jan 15"])
+    }
+
     /// 2026-03-08 is the US spring-forward Sunday: 02:00 EST jumps to 03:00 EDT.
     /// 07:00 on that day is 11:00 UTC. Adding 7 hours to local midnight would
     /// give 08:00 EDT (12:00 UTC), so the wrong answer is one hour off.
