@@ -69,6 +69,20 @@ public protocol ContactRepository: Sendable {
     /// blocker 1's occasion-row false confirmation).
     @discardableResult
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool
+    /// Field-scoped write for the per-contact reminder-window editor (TF-05):
+    /// moves exactly `reminderWindowOverride`. Contact Detail holds a `Contact`
+    /// snapshot while the editor is open, so a whole-row `upsert` from it
+    /// would revert a concurrent reconciler write or a "Caught up"
+    /// `lastInteractedAt` write landing in between (§7). Never reads the row
+    /// it's writing.
+    ///
+    /// Validates `window` first and throws `ReminderWindow.ValidationError`
+    /// without writing anything. `nil` clears the override to SQL NULL
+    /// ("use the global window"), never the JSON text `"null"` (R39).
+    /// Returns `false` when `id` is missing or archived, the same "no match"
+    /// rule as `updateLastInteractedAt`.
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool
     /// Corruption-aware read (R50, `AllContactsViewModel`): every row that
     /// decodes, plus a diagnostic for each row that doesn't. Never mutates,
     /// deletes, or silently skips the corrupt row — it stays exactly as
@@ -191,6 +205,19 @@ public extension ContactRepository {
     func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
         guard var contact = try await fetch(id: id), contact.isActive else { return false }
         contact.lastInteractedAt = date
+        try await upsert(contact)
+        return true
+    }
+
+    /// Same fallback shape as `updateLastInteractedAt` above, for in-memory
+    /// test fakes. Validates before the fetch because a fake's `upsert` may
+    /// not. `GRDBContactRepository` and `MockContactRepository` override this
+    /// with a write that never reads the row first.
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try window?.validate()
+        guard var contact = try await fetch(id: id), contact.isActive else { return false }
+        contact.reminderWindowOverride = window
         try await upsert(contact)
         return true
     }
@@ -377,8 +404,8 @@ struct GRDBContactRepository: ContactRepository {
     /// reads the row first, so it can't clobber a concurrent write outside
     /// the five columns listed here.
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
-        let phonesJson = try Self.encodeJSONArray(fields.phoneNumbers)
-        let emailsJson = try Self.encodeJSONArray(fields.emailAddresses)
+        let phonesJson = try Self.encodeJSON(fields.phoneNumbers)
+        let emailsJson = try Self.encodeJSON(fields.emailAddresses)
         try await dbQueue.write { db in
             try db.execute(
                 sql: """
@@ -418,11 +445,29 @@ struct GRDBContactRepository: ContactRepository {
         }
     }
 
+    /// Real field-scoped `UPDATE`, same shape as `updateLastInteractedAt`
+    /// above: never reads the row, matches only an active contact, and
+    /// reports the match from `db.changesCount`. A `nil` window binds a Swift
+    /// `nil`, which GRDB writes as SQL NULL (R39).
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try window?.validate()
+        let json = try window.map { try Self.encodeJSON($0) }
+        return try await dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE Contact SET reminderWindowOverride = ? WHERE id = ? AND archivedAt IS NULL",
+                arguments: [json, id.uuidString]
+            )
+            return db.changesCount > 0
+        }
+    }
+
     /// Duplicates `Records.swift`'s file-private `encodeJSON` (same
-    /// `JSONEncoder` + UTF-8 encoding) rather than widening its visibility
-    /// for one extra call site.
-    private static func encodeJSONArray(_ values: [String]) throws -> String {
-        let data = try JSONEncoder().encode(values)
+    /// `JSONEncoder` + UTF-8 encoding) rather than widening its visibility.
+    /// `ContactRecord.toDomain()` decodes the override column with a plain
+    /// `JSONDecoder`, so this encoder must stay a plain `JSONEncoder` too.
+    private static func encodeJSON<Value: Encodable>(_ value: Value) throws -> String {
+        let data = try JSONEncoder().encode(value)
         guard let json = String(bytes: data, encoding: .utf8) else {
             throw DataError.invalidJSONEncoding
         }

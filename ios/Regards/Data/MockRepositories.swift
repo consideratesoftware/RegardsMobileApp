@@ -345,6 +345,19 @@ extension MockStore {
         return true
     }
 
+    /// Mirrors `GRDBContactRepository.updateReminderWindowOverride`: validates before touching anything, writes only
+    /// this field, and treats an archived contact as "no match." Stores through `mockStoredContact` so the override
+    /// round-trips the same JSON GRDB would persist. Broadcasts for the same R23 parity as the writes above.
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) throws -> Bool {
+        try window?.validate()
+        guard var c = contacts[id], c.isActive else { return false }
+        c.reminderWindowOverride = window
+        contacts[id] = try mockStoredContact(c)
+        broadcastTrackedChange()
+        return true
+    }
+
     func allGroups() -> [ContactGroup] { Array(groups.values) }
     func group(id: UUID) -> ContactGroup? { groups[id] }
     func upsertGroup(_ g: ContactGroup) throws { groups[g.id] = try mockStoredGroup(g) }
