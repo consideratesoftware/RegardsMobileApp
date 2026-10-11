@@ -81,13 +81,16 @@ final class ScreensAccessibilityTests: XCTestCase {
             to: "screen.reminder-windows",
             in: app
         )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["Thursday allowed"]
-                .waitForExistence(timeout: 5),
-            "The second T day pill must announce Thursday, not Tuesday."
-        )
-        XCTAssertTrue(app.descendants(matching: .any)["Sunday not allowed"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["Saturday not allowed"].exists)
+        // Day pills are Buttons: the label is the day name, the value says
+        // whether it is allowed. The second T pill must announce Thursday.
+        let thursday = app.buttons["Thursday"]
+        XCTAssertTrue(thursday.waitForExistence(timeout: 5),
+                      "The second T day pill must announce Thursday, not Tuesday.")
+        XCTAssertEqual(thursday.value as? String, "allowed")
+        XCTAssertEqual(app.buttons["Sunday"].value as? String, "not allowed")
+        XCTAssertEqual(app.buttons["Saturday"].value as? String, "not allowed")
+        // Rounded: layout reports 43.99999999999997 for a 44pt frame.
+        XCTAssertGreaterThanOrEqual(thursday.frame.height.rounded(), 44, "Day pills need a 44pt touch target.")
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
