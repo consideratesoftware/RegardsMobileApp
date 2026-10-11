@@ -60,4 +60,48 @@ extension ScreensAccessibilityTests {
         )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
+
+    /// Edits a range time through the real DatePicker and checks the stored
+    /// value. The picker runs on a fixed UTC reference, so it must read the
+    /// stored 22:00 as "10:00 PM" before any edit: without
+    /// `.environment(\.timeZone, .gmt)` it reads in the device zone and shows
+    /// another hour on any host that is not UTC. Known limit: on a UTC host
+    /// the two readings agree, so a missing `.gmt` cannot be told apart there.
+    @MainActor
+    func testReminderWindowPickerStoresTheEditedTime() throws {
+        let app = openReminderWindows()
+        let rangeEnd = rangeTimeButton("Range 2 end", in: app)
+        XCTAssertTrue(rangeEnd.waitForExistence(timeout: 5))
+        XCTAssertEqual(normalizedTime(rangeEnd), "10:00 PM", "The stored 22:00 must read as 10:00 PM.")
+
+        rangeEnd.tap()
+        let hourWheel = app.pickerWheels.element(boundBy: 0)
+        XCTAssertTrue(hourWheel.waitForExistence(timeout: 5), "The time picker should open.")
+        hourWheel.adjust(toPickerWheelValue: "9")
+        app.buttons["PopoverDismissRegion"].tap()
+        XCTAssertEqual(normalizedTime(rangeEnd), "9:00 PM")
+
+        app.buttons["reminder-windows.save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.settings"].waitForExistence(timeout: 10))
+        navigateFromSettings(
+            triggerIdentifier: "settings.reminder-windows",
+            to: "screen.reminder-windows",
+            in: app
+        )
+        let reopened = rangeTimeButton("Range 2 end", in: app)
+        XCTAssertTrue(reopened.waitForExistence(timeout: 5))
+        XCTAssertEqual(normalizedTime(reopened), "9:00 PM", "The saved 21:00 should be what the editor loads.")
+    }
+
+    @MainActor
+    private func rangeTimeButton(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        app.datePickers.matching(NSPredicate(format: "label BEGINSWITH %@", title))
+            .firstMatch.buttons["Time Picker"]
+    }
+
+    /// The formatted value uses a narrow no-break space before AM/PM on newer systems.
+    @MainActor
+    private func normalizedTime(_ element: XCUIElement) -> String {
+        ((element.value as? String) ?? "").replacingOccurrences(of: "\u{202F}", with: " ")
+    }
 }
