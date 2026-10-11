@@ -1,13 +1,15 @@
 import Foundation
 import UserNotifications
 
-// R57 gate (ARCHITECTURE.md §19, owner ruling 2026-08-22): TF-06 ships this
-// adapter with a working `schedule` and no production caller. Nothing may
-// build a `ReminderNotificationRequest` from a `ScheduledReminder` row, and
-// `SchedulingPass` takes no notification dependency, until TF-07 resolves
-// R57. `NotificationSchedulingGateTests` fails the unit suite if app code
-// outside `Platform/Notifications/` calls `.schedule(`, names
-// `UNUserNotificationCenter`, or builds a `UNNotificationRequest(`.
+// R57 gate (ARCHITECTURE.md §19, owner ruling 2026-08-22): TF-06 must not
+// ship notification scheduling. `SchedulingPass.snooze` writes a raw
+// `now + 7d` with no window resolution, so a notification scheduled from
+// that row would fire outside the user's declared window, the one promise
+// §9 says can't break. This adapter therefore has no way to hand a request
+// to the notification center: `NotificationScheduling` carries permission
+// and actions only, and TF-07 adds `schedule`, `cancel`, and
+// `pendingIdentifiers` in the PR that resolves R57.
+// `NotificationSchedulingGateTests` enforces the gate until then.
 
 /// Permission state mirrored from `UNAuthorizationStatus`, so callers outside
 /// the Platform layer never import UserNotifications.
@@ -63,14 +65,13 @@ public struct ReminderNotificationRequest: Sendable, Equatable {
 
 /// Seam over `UNUserNotificationCenter` (§9a). Production wires
 /// `UserNotificationsAdapter.shared`; tests and the DEBUG mock launch inject
-/// a fake so they never raise the system permission alert.
+/// a fake so they never raise the system permission alert. TF-06 ships 3 of
+/// §9a's members; `schedule`, `cancel`, and `pendingIdentifiers` arrive with
+/// R57's fix in TF-07 (see the file header).
 public protocol NotificationScheduling: Sendable {
     /// Raises the system prompt on first call; returns whether alerts are allowed.
     func requestAuthorization() async throws -> Bool
     func authorizationStatus() async -> NotificationAuthorizationStatus
-    func pendingIdentifiers() async -> Set<String>
-    func schedule(_ requests: [ReminderNotificationRequest]) async throws
-    func cancel(identifiers: [String]) async
     /// Actions the user takes on delivered notifications. Single consumer:
     /// a second concurrent iterator is a programmer error and traps.
     var actions: AsyncStream<NotificationAction> { get }
@@ -125,23 +126,6 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
         return Self.status(from: settings.authorizationStatus)
     }
 
-    public func pendingIdentifiers() async -> Set<String> {
-        let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
-        return Set(pending.map(\.identifier))
-    }
-
-    public func schedule(_ requests: [ReminderNotificationRequest]) async throws {
-        let center = UNUserNotificationCenter.current()
-        let now = Date()
-        for request in requests {
-            try await center.add(Self.makeRequest(request, now: now))
-        }
-    }
-
-    public func cancel(identifiers: [String]) async {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
-    }
-
     // MARK: - UNUserNotificationCenterDelegate
 
     /// `UNNotificationResponse` and its `userInfo` aren't `Sendable`, so the
@@ -171,7 +155,14 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// `fireDate` at or before `now` gets a nil trigger, which delivers
     /// immediately (§9 contract 5: a past slot start is an immediate
     /// delivery); a calendar trigger for a past instant would never fire.
-    static func makeRequest(_ request: ReminderNotificationRequest, now: Date) -> UNNotificationRequest {
+    ///
+    /// - Parameter now: read immediately before this request is added to the
+    ///   center, once per request.
+    static func makeRequest(
+        _ request: ReminderNotificationRequest,
+        now: Date,
+        calendar: Calendar = Calendar(identifier: .gregorian)
+    ) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = request.title
         content.body = request.body
@@ -181,8 +172,9 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
             content.userInfo = [contactIdKey: contactId.uuidString]
         }
 
-        var utc = Calendar(identifier: .gregorian)
-        utc.timeZone = .gmt
+        // `calendar` carries the device zone; it is overwritten to GMT here.
+        // Tests pass a DST-zone calendar to prove this line matters on any host.
+        var utc = calendar; utc.timeZone = .gmt
         let components = utc.dateComponents(
             [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second],
             from: request.fireDate
