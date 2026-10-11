@@ -18,8 +18,10 @@ Record each review verdict as its own PR comment (`gh pr comment`), never
 by editing the body: the hosted review runs on `pull_request_target`
 `edited`, so a body edit starts a new hosted run. Use one line per verdict,
 `PR REVIEW: <verdict> @ <sha> vs <target>` or `CODEX REVIEW: <verdict> @
-<sha> vs <target> | codex-cli <version>`; the newest comment of each kind
-is current, and Stage 1 of `/org` reads them. Put any disputed Codex
+<sha> vs <target> | codex-cli <version>`, where a RETRY verdict reads
+`RETRY (<reason>)`. Only comments by the org's own account (`gh api user
+--jq .login`) count, and the newest of each kind is current; Stage 1 of
+`/org` reads them the same way. Put any disputed Codex
 findings, with their `ARCHITECTURE.md` sections, in the same comment.
 
 Title `TF-##: <row scope, short>`. Body

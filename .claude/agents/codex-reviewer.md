@@ -62,13 +62,14 @@ printed:
 
 ```bash
 wt='<worktree>'
-nohup sh -c 'codex exec -C "$1" -s read-only -o "$2" - < "$3" & echo $! > "$2.pid"; wait $!; echo $? > "$2.exit"' \
+nohup perl -e 'setpgrp(0,0); exec @ARGV' sh -c 'echo $$ > "$2.pgid"; codex exec -C "$1" -s read-only -o "$2" - < "$3"; echo $? > "$2.exit"' \
   sh "$wt" '<out>' '<prompt>' > '<out>.log' 2>&1 &
 echo started
 ```
 
-The wrapper records Codex's own process id in `<out>.pid`, because the
-prompt arrives on stdin and no process name contains it.
+`perl ... setpgrp` puts the wrapper, Codex, and every process Codex starts
+in a new process group, and the wrapper records that group's id in
+`<out>.pgid`. The prompt arrives on stdin, so no process name contains it.
 
 `-o` is `codex exec`'s short form of `--output-last-message`. Then wait, with
 a Bash timeout of 600000 ms per call:
@@ -83,20 +84,19 @@ took about 3 minutes. If it is still running after the third wait, stop it
 and confirm it stopped, then report RETRY with reason "timeout":
 
 ```bash
-pid=$(cat '<out>.pid' 2>/dev/null)
-if [ -n "$pid" ]; then
-  for child in $(pgrep -P "$pid"); do pkill -P "$child"; done
-  pkill -P "$pid"; kill "$pid"
-  sleep 3; kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
-  kill -0 "$pid" 2>/dev/null && echo "still running $pid" || echo "stopped $pid"
+pg=$(cat '<out>.pgid' 2>/dev/null)
+if [ -n "$pg" ]; then
+  kill -TERM -- -"$pg"; sleep 3
+  pgrep -g "$pg" >/dev/null && { kill -KILL -- -"$pg"; sleep 1; }
+  pgrep -g "$pg" >/dev/null && echo "still running group $pg" || echo "stopped group $pg"
 else
-  echo "no pid file"
+  echo "no pgid file"
 fi
 ```
 
-That stops Codex, its children, and their children (Codex's per-reviewer
-sub-agents). If it prints "still running", report UNAVAILABLE with that
-line.
+That stops the whole group, including Codex's per-reviewer sub-agents, and
+checks none survived. If it prints "still running", report UNAVAILABLE with
+that line.
 
 Otherwise:
 
