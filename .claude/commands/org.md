@@ -57,9 +57,13 @@ For each open TF PR:
    PR's head with `git worktree add`. A RETRY gets the one rerun Stage 3 allows. A
    Codex UNAVAILABLE on the current head is an owner gate: interview Sid
    before rerunning it.
-2. In every case, launch `release-manager` with both current verdicts to
-   re-evaluate the PR. If it reports CODEX STALE, handle it as in Stage 4. It will route red checks to `on-call-engineer`,
-   park on owner gates, or merge when all conditions hold.
+2. If that lane's worktree is clean and at the PR's head, launch
+   `release-manager` with both current verdicts to re-evaluate the PR. If
+   it reports CODEX STALE, handle it as in Stage 4. It will route red
+   checks to `on-call-engineer`, park on owner gates, or merge when all
+   conditions hold. Otherwise the lane is in progress: observe only.
+   Report its state, and leave repairs, branch updates, and review reruns
+   to that lane's own Stage 3 and Stage 4.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
