@@ -48,9 +48,22 @@ extension ScreensAccessibilityTests {
         assertRowIsButton(true, in: app, "Denied offers a button to iOS Settings.")
         XCTAssertFalse(row.label.contains("Turn on notifications"), "Denied must not offer to prompt.")
         // XCUITest cannot read an accessibility hint, so the audit's
-        // description check is the only coverage of it. Not tapped: that
-        // would leave the app.
+        // description check is the only coverage of it.
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+
+        // The button must really leave the app for iOS Settings. A button
+        // wired to anything else (the prompt, say) would be inert here, and
+        // nothing else in the suite would notice.
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        app.buttons[Self.notificationsRowID].tap()
+        XCTAssertTrue(
+            settings.wait(for: .runningForeground, timeout: 10),
+            "Open iOS Settings should bring the iOS Settings app to the foreground."
+        )
+        settings.terminate()
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), "Regards should come back to the foreground.")
+        XCTAssertTrue(notificationsRow(in: app).label.hasPrefix("Notifications off"))
     }
 
     @MainActor
