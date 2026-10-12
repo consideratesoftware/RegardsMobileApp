@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 enum RegardsSettingsRoute: Hashable {
     case reminderWindows
@@ -166,9 +165,7 @@ public struct SettingsScreen: View {
                     ),
                     icon: "arrow.up.forward.app"
                 ) {
-                    if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                        openURL(url)
-                    }
+                    viewModel.openNotificationSettings(using: openURL)
                 }
             case .authorized:
                 notificationStatusRow(

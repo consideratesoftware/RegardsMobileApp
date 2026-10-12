@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import UIKit
 
 /// State behind the Settings notifications row (§10 item 7). The row has
 /// three states, one per `NotificationAuthorizationStatus`, and only the
@@ -76,5 +77,13 @@ public final class NotificationPermissionViewModel {
             Self.log.error("notification authorization request failed: \(error, privacy: .private)")
         }
         await refresh()
+    }
+
+    /// Opens the Regards page in iOS Settings, where a denied permission can
+    /// be changed. Lives here so the view holds no URL logic and a test can
+    /// pass its own `OpenURLAction` and see the URL.
+    public func openNotificationSettings(using openURL: OpenURLAction) {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+        openURL(url)
     }
 }
