@@ -41,11 +41,16 @@ public final class NotificationPermissionViewModel {
     /// The row changes in place, so VoiceOver says nothing unless this does.
     /// It announces "Notifications on" or "Notifications off" when a status
     /// it already knew changes to authorized or denied. It stays silent on the
-    /// first read and when the status is unchanged. Nothing announces a move
+    /// first read and when the status is unchanged, including when another
+    /// refresh already applied the change. Nothing announces a move
     /// back to `.notDetermined`: iOS doesn't do that while the app runs.
     public func refresh() async {
-        let previous = status
         let current = await notifications.authorizationStatus()
+        // Read after the await, with no suspension before the write below. Two
+        // overlapping refreshes (the request's own, and the scene turning
+        // active when the system prompt closes) then see each other's result,
+        // so only the first to apply a change announces it.
+        let previous = status
         status = current
         guard let previous, previous != current else { return }
         switch current {

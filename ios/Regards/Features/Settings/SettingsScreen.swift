@@ -144,18 +144,26 @@ public struct SettingsScreen: View {
             switch status {
             case .notDetermined:
                 notificationButton(
-                    title: "Turn on notifications",
-                    subtitle: "iOS will ask whether Regards can show alerts and play sounds.",
-                    hint: "iOS will ask whether Regards can show alerts and play sounds.",
+                    NotificationRowCopy(
+                        title: "Turn on notifications",
+                        accessibilityLabel: "Turn on notifications",
+                        subtitle: "iOS will ask whether Regards can show alerts and play sounds.",
+                        hint: "iOS will ask whether Regards can show alerts and play sounds."
+                    ),
                     icon: nil
                 ) {
                     Task { await viewModel.requestAuthorization() }
                 }
             case .denied:
                 notificationButton(
-                    title: "Open iOS Settings",
-                    subtitle: "Notifications are off for Regards.",
-                    hint: "Notifications are off for Regards. Opens the notification settings for Regards in iOS.",
+                    NotificationRowCopy(
+                        title: "Open iOS Settings",
+                        // The state is in the label, not only the hint, so it
+                        // is heard with hints turned off.
+                        accessibilityLabel: "Notifications off. Open iOS Settings",
+                        subtitle: "Notifications are off for Regards.",
+                        hint: "Opens the notification settings for Regards in iOS."
+                    ),
                     icon: "arrow.up.forward.app"
                 ) {
                     if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
@@ -171,16 +179,21 @@ public struct SettingsScreen: View {
         }
     }
 
+    private struct NotificationRowCopy {
+        let title: String
+        let accessibilityLabel: String
+        let subtitle: String
+        let hint: String
+    }
+
     private func notificationButton(
-        title: String,
-        subtitle: String,
-        hint: String,
+        _ copy: NotificationRowCopy,
         icon: String?,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack {
-                notificationText(title: title, subtitle: subtitle)
+                notificationText(title: copy.title, subtitle: copy.subtitle)
                 Spacer()
                 if let icon {
                     Image(systemName: icon)
@@ -196,8 +209,8 @@ public struct SettingsScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings.notifications")
-        .accessibilityLabel(title)
-        .accessibilityHint(hint)
+        .accessibilityLabel(copy.accessibilityLabel)
+        .accessibilityHint(copy.hint)
     }
 
     /// Plain text with no button trait: an authorized permission has nothing
