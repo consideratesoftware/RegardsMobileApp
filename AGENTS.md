@@ -190,7 +190,9 @@ mechanical gates, then use the mirrored read-only agents:
 `pr-tests` for code/test changes; and `pr-accessibility` plus
 `pr-fit-finish` when their UI/docs path rules match. Any blocker means
 `REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
-checks. `.agents/README.md` describes the adapters, and
+checks. The Claude Code org (`ENGINEERING_ORG.md`) runs both orchestrators
+on each lane and needs both verdicts before merge. `.agents/README.md`
+describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
 The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions

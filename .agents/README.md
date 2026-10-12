@@ -20,6 +20,12 @@ Both use the same role names and the same `APPROVE` / `REQUEST_CHANGES`
 contract. Product-specific review law belongs in the mirrored reviewer
 instructions or `ARCHITECTURE.md`, not in a provider-only workflow.
 
+The Claude Code org runs both orchestrators on every lane: `/pr-review`
+directly, and `$regards-pr-review` through the `codex-reviewer` agent, which
+calls `codex exec` read-only in the lane worktree. Keeping the two adapters
+in sync is what makes the Codex verdict a review of the same contract by a
+different model family.
+
 ## Hosted review gate
 
 `.github/workflows/claude-pr-review.yml` runs the same staged contract and
