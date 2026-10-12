@@ -35,6 +35,21 @@ under a **Manual accessibility smoke** heading.
       (Settings → Accessibility → Display & Text Size → Larger Text → slider
       all the way up). App re-renders without clipping or truncation.
 
+## Settings notifications
+
+Run on a fresh install, then check each state the row can show.
+
+- [ ] Not determined: the Settings row reads "Turn on notifications" as a
+      button. Activating it raises the iOS prompt once.
+- [ ] Grant the prompt: the row reads "Notifications on" as text with no
+      button, and VoiceOver announces "Notifications on".
+- [ ] Denied (deny the prompt, or turn off notifications for Regards in iOS
+      Settings): the row reads "Notifications off. Open iOS Settings" as a
+      button. Activating it opens Regards' notification settings in iOS
+      Settings.
+- [ ] Authorized in iOS Settings: return to Regards. The row reads
+      "Notifications on" as text with no button.
+
 ## Screen checklist
 
 Apply this checklist to every screen changed by the pull request:

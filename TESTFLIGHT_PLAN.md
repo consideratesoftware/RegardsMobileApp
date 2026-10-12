@@ -13,10 +13,11 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-10-11
-- Baseline: `main` at `6c0d633` (merge of PR #60, after PR #57 raised the
-  stress-job limits: job timeout 75 to 120 minutes, boot step 10 to 20
-  minutes). A confirming `Audit stress` run on `78dad7d` is in progress: run
-  `38121994128`.
+- Baseline: `main` at `dbd06a2` (merge of PR #59). The earlier baseline was
+  `6c0d633` (merge of PR #60, after PR #57 raised the stress-job limits: job
+  timeout 75 to 120 minutes, boot step 10 to 20 minutes). A confirming
+  `Audit stress` run on `78dad7d` passed: run `38121994128`, completed
+  2026-10-11.
 - Active work: no merged TF work is in progress. `TF-03` acceptance is
   owner work (see `Owner gates`); its code is merged in PR #48. Lanes for
   `TF-05` (`claude/tf-05-reminder-window-editor`, worktree
@@ -26,6 +27,8 @@ never pick up Android work.
   rule below reserves `ACTIVE` and `DONE` for the pull request that carries
   the implementation; each lane sets its own row. A restart finds the lanes
   through restart protocol step 2 (worktrees and branches), not this table.
+  `TF-06` lane state: all 3 slices verified; PR pending. Its queue row stays
+  `READY` until the release manager sets it at merge.
 - Next ready work: `TF-05` and `TF-06` stay `READY`, since their only
   dependency, `TF-04`, is `DONE`. `TF-06` has a hard gate: it must not ship
   notification scheduling until R57 is resolved (owner ruling 2026-08-22, see
@@ -34,9 +37,7 @@ never pick up Android work.
   also need `TF-03`, which stays `OWNER` until its acceptance run passes, so
   both stay `BLOCKED`.
 - Open pull requests:
-  - PR #58 (`claude/tf-03-close`): this checkpoint. It is TF-03 work.
-  - PR #59 (`claude/org-codex-review`): infra. It adds a Codex cross-model
-    review to the org. It is not TF work.
+  - PR #61 (`claude/org-session-interviews`): infra. It is not TF work.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
