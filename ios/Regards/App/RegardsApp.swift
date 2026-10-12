@@ -481,7 +481,8 @@ struct RegardsTabRoot: View {
                 runtime: runtime
             ),
             accessibilityEffects: .live,
-            rowActionAnnouncer: RowActionAnnouncer()
+            rowActionAnnouncer: RowActionAnnouncer(),
+            makeWindowEditor: { Self.makeContactWindowEditor(contactId: $0, runtime: runtime) }
         )
     }
 }

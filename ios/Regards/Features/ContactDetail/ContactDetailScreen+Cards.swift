@@ -35,9 +35,46 @@ extension ContactDetailScreen {
                         isDanger: viewModel.overdueSummary.isOverdue,
                         valueFocus: $isStatusFocused
                     )
+                    // Same gate as Snooze: an untracked or no-cadence contact
+                    // never gets a cadence reminder, so a window means nothing.
+                    if viewModel.canEditReminderWindow {
+                        Hair(inset: 16)
+                        reminderWindowRow(contact: contact)
+                    }
                 }
             }
         }
+    }
+
+    func reminderWindowRow(contact: Contact) -> some View {
+        let value = contact.reminderWindowOverride == nil ? "Your default" : "Custom"
+        let change = Button {
+            windowEditor = makeWindowEditor(contact.id)
+        } label: {
+            Text("Change")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(RegardsDS.accentInk)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Change reminder window")
+        .accessibilityIdentifier("contact-detail.window-change")
+        return AccessibilityAdaptiveLayout {
+            HStack(spacing: 12) {
+                detailValue(label: "Reminder window", value: value, isAccent: false, isDanger: false)
+                Spacer()
+                change
+            }
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 8) {
+                detailValue(label: "Reminder window", value: value, isAccent: false, isDanger: false)
+                change
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     func channelCard(contact: Contact) -> some View {

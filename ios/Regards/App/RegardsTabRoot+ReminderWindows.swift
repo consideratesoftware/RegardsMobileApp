@@ -24,4 +24,22 @@ extension RegardsTabRoot {
             onSaved: { await upcoming.updateWindow($0) }
         )
     }
+
+    /// One contact's override editor, built per push from Contact Detail. It
+    /// saves through `updateReminderWindowOverride`, so it needs no `onSaved`:
+    /// Upcoming follows `observeTracked`, and Contact Detail re-reads the
+    /// contact when the editor closes.
+    @MainActor
+    static func makeContactWindowEditor(
+        contactId: UUID,
+        runtime: AppRuntime
+    ) -> ReminderWindowsViewModel {
+        ReminderWindowsViewModel(
+            target: .contact(contactId),
+            window: runtime.environment.window,
+            contacts: runtime.environment.contacts,
+            clock: runtime.clock,
+            onSaved: { _ in }
+        )
+    }
 }

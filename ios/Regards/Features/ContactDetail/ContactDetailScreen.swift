@@ -8,6 +8,10 @@ public struct ContactDetailScreen: View {
     // file limit, and `private` is file-scoped.
     @State var viewModel: ContactDetailViewModel
     @State private var previewContact: Contact?
+    // Set at tap time so every push gets a fresh editor view model (the
+    // same reason `contactDetail(for:)` builds a fresh screen model per push).
+    // Not `private`: the Cadence card's Change button lives in `+Cards`.
+    @State var windowEditor: ReminderWindowsViewModel?
     @State private var showsLogOtherChannelPicker = false
     // Wrapped in `@State` via `init` — see `RowActionAnnouncer`'s doc comment for why.
     @State private var rowActionAnnouncer: RowActionAnnouncer
@@ -22,14 +26,19 @@ public struct ContactDetailScreen: View {
     // exactly the class of bug that shipped unannounced/unfocused row
     // actions to device — every construction site must say which it means.
     var accessibilityEffects: RowActionAccessibilityEffects
+    // No default, for the same reason: a screen built without it would show a
+    // Change button that opens nothing.
+    let makeWindowEditor: @MainActor (UUID) -> ReminderWindowsViewModel
 
     public init(
         viewModel: ContactDetailViewModel,
         accessibilityEffects: RowActionAccessibilityEffects,
-        rowActionAnnouncer: RowActionAnnouncer
+        rowActionAnnouncer: RowActionAnnouncer,
+        makeWindowEditor: @escaping @MainActor (UUID) -> ReminderWindowsViewModel
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.accessibilityEffects = accessibilityEffects
+        self.makeWindowEditor = makeWindowEditor
         self._rowActionAnnouncer = State(initialValue: rowActionAnnouncer)
     }
 
@@ -71,6 +80,20 @@ public struct ContactDetailScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $previewContact) { contact in
             EditContactScreen(contact: contact)
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { windowEditor != nil },
+            set: { if !$0 { windowEditor = nil } }
+        )) {
+            if let windowEditor {
+                ReminderWindowsScreen(viewModel: windowEditor)
+            }
+        }
+        // The editor writes the override straight to the repository, so the
+        // "Your default / Custom" row re-reads the contact when the editor
+        // closes by saving, resetting, or the back button.
+        .onChange(of: windowEditor == nil) { _, closed in
+            if closed { Task { await viewModel.load() } }
         }
         // See `LogOtherChannelSheet`'s doc comment: a `.sheet` we build
         // ourselves, replacing an earlier `confirmationDialog` that rendered

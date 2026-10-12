@@ -369,6 +369,16 @@ public final class ContactDetailViewModel {
         return CadenceDescriptor.describe(days: days)
     }
 
+    /// Whether the "Reminder window" row and its Change button show. Same
+    /// gate as Overdue, Upcoming and the Snooze button (`tracked &&
+    /// cadenceDays != nil`) plus an active contact: only a tracked contact
+    /// with a cadence gets a cadence reminder, and the override write
+    /// refuses an archived one.
+    public var canEditReminderWindow: Bool {
+        guard let c = contact else { return false }
+        return c.tracked && c.cadenceDays != nil && c.archivedAt == nil
+    }
+
     /// Folds in a pending snooze (R56 fix, promoted from deferred at staged
     /// review): previously computed purely from `Contact`'s own fields —
     /// `cadenceDays`, `lastInteractedAt`, `createdAt` — with no read of any
