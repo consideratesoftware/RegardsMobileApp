@@ -220,6 +220,56 @@ struct NotificationPermissionViewModelTests {
         #expect(recorder.messages.isEmpty)
     }
 
+    // MARK: Overlapping calls
+
+    /// Two refreshes in flight (the scene turning active while the request's
+    /// own re-read runs) both see the change. Only the first to apply it
+    /// speaks.
+    @Test("Two overlapping refreshes after a change announce it once")
+    func overlappingRefreshesAnnounceOnce() async {
+        let fake = DebugNotificationScheduling(status: .denied)
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(fake, recorder)
+        await viewModel.load()
+        await fake.setStatus(.authorized)
+
+        async let first: Void = viewModel.refresh()
+        async let second: Void = viewModel.refresh()
+        _ = await (first, second)
+
+        #expect(viewModel.status == .authorized)
+        #expect(recorder.messages == ["Notifications on"])
+    }
+
+    @Test("A request with an overlapping refresh announces the grant once")
+    func requestWithOverlappingRefreshAnnouncesOnce() async {
+        let fake = DebugNotificationScheduling(status: .notDetermined, requestOutcome: .grant)
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(fake, recorder)
+        await viewModel.load()
+
+        async let request: Void = viewModel.requestAuthorization()
+        async let refresh: Void = viewModel.refresh()
+        _ = await (request, refresh)
+
+        #expect(viewModel.status == .authorized)
+        #expect(recorder.messages == ["Notifications on"])
+    }
+
+    @Test("A second tap while the prompt is open does not prompt again")
+    func doubleTapPromptsOnce() async {
+        let fake = DebugNotificationScheduling(status: .notDetermined, requestOutcome: .grant)
+        let viewModel = Self.viewModel(fake)
+        await viewModel.load()
+
+        async let first: Void = viewModel.requestAuthorization()
+        async let second: Void = viewModel.requestAuthorization()
+        _ = await (first, second)
+
+        #expect(await fake.requestCount == 1)
+        #expect(viewModel.status == .authorized)
+    }
+
     // MARK: Helpers
 
     /// Collects what the view model said, in order.

@@ -44,7 +44,7 @@ extension ScreensAccessibilityTests {
         let app = launchToSettings(notificationStatus: "denied")
         let row = notificationsRow(in: app)
 
-        XCTAssertTrue(row.label.contains("Open iOS Settings"))
+        XCTAssertEqual(row.label, "Notifications off. Open iOS Settings")
         assertRowIsButton(true, in: app, "Denied offers a button to iOS Settings.")
         XCTAssertFalse(row.label.contains("Turn on notifications"), "Denied must not offer to prompt.")
         // XCUITest cannot read an accessibility hint, so the audit's
