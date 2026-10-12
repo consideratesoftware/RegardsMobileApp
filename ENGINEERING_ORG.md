@@ -117,8 +117,9 @@ Only Sid can do these, and the org never pretends one happened. When a
 gate, an OPEN FOR OWNER ruling, or a reviewer's "Questions for Sid" item
 comes up, the engineering manager interviews Sid in the session with
 `AskUserQuestion`: related questions batched, recommendation first, with
-the context to answer in one pass. Each answer goes on the PR as a comment
-(or into the PR description if the PR isn't open yet). Physical tasks,
+the context to answer in one pass. Each answer goes on the PR as a comment; if
+the PR isn't open yet, the release manager posts it as the first comment
+when it opens the PR. Physical tasks,
 such as a device run or a VoiceOver smoke, are presented the same way as
 exact steps, and Sid's result is recorded the same way. Only work that
 needs the answer waits; if Sid isn't in the session, the rest continues and
