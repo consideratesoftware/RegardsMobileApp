@@ -1,5 +1,7 @@
 import Foundation
+import SwiftUI
 import Testing
+import UIKit
 @testable import Regards
 
 /// TF-06 slice 3 (§10 item 7). The Settings notifications row shows one of
@@ -220,6 +222,26 @@ struct NotificationPermissionViewModelTests {
         #expect(recorder.messages.isEmpty)
     }
 
+    // MARK: Open iOS Settings
+
+    @Test("Open iOS Settings opens the app's notification settings URL, once")
+    func openNotificationSettingsOpensTheNotificationSettingsURL() async {
+        let fake = DebugNotificationScheduling(status: .denied)
+        let viewModel = Self.viewModel(fake)
+        await viewModel.load()
+        let opened = OpenedURLs()
+        let action = OpenURLAction { url in
+            opened.urls.append(url)
+            return .handled
+        }
+
+        viewModel.openNotificationSettings(using: action)
+
+        #expect(opened.urls.map(\.absoluteString) == [UIApplication.openNotificationSettingsURLString])
+        #expect(await fake.requestCount == 0)
+        #expect(viewModel.status == .denied)
+    }
+
     // MARK: Overlapping calls
 
     /// Two refreshes in flight (the scene turning active while the request's
@@ -271,6 +293,10 @@ struct NotificationPermissionViewModelTests {
     }
 
     // MARK: Helpers
+
+    private final class OpenedURLs {
+        var urls: [URL] = []
+    }
 
     /// Collects what the view model said, in order.
     private final class AnnouncementRecorder {
