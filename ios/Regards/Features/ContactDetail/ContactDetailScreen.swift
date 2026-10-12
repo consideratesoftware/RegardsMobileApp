@@ -89,12 +89,6 @@ public struct ContactDetailScreen: View {
                 ReminderWindowsScreen(viewModel: windowEditor)
             }
         }
-        // The editor writes the override straight to the repository, so the
-        // "Your default / Custom" row re-reads the contact when the editor
-        // closes by saving, resetting, or the back button.
-        .onChange(of: windowEditor == nil) { _, closed in
-            if closed { Task { await viewModel.load() } }
-        }
         // See `LogOtherChannelSheet`'s doc comment: a `.sheet` we build
         // ourselves, replacing an earlier `confirmationDialog` that rendered
         // as a popover with no reachable Cancel control.
