@@ -46,6 +46,117 @@ struct ReminderWindowsViewModelOverrideTests {
         #expect(after.target == expectedTarget)
     }
 
+    /// I3: the editor never changes a zone, and an override is always stamped
+    /// with the global zone, occasion time and horizon at save. An override
+    /// stored with different values for all three (say, written before the
+    /// global zone changed) must come out aligned with the global window;
+    /// only its days, ranges and quiet hours are the user's to keep.
+    @Test("Re-saving an override replaces its zone, occasion time and horizon with the global ones")
+    func resaveAlignsOverrideWithGlobalZoneOccasionAndHorizon() async throws {
+        let quiet = TimeRange(start: TimeOfDay(hour: 22), end: TimeOfDay(hour: 6))
+        let drifted = ReminderWindow(
+            allowedDays: [.saturday, .sunday],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 10), end: TimeOfDay(hour: 12))],
+            quietHours: quiet,
+            timezoneIdentifier: "Pacific/Kiritimati",
+            occasionTime: TimeOfDay(hour: 3),
+            digestHorizonDays: 7
+        )
+        #expect(drifted.timezoneIdentifier != Fixtures.storedGlobal.timezoneIdentifier)
+        #expect(drifted.occasionTime != Fixtures.storedGlobal.occasionTime)
+        #expect(drifted.digestHorizonDays != Fixtures.storedGlobal.digestHorizonDays)
+        let world = try await Fixtures.makeWorld(targetOverride: drifted)
+        let editor = Fixtures.editor(.contact(world.target.id), world: world, recorder: Fixtures.SaveRecorder())
+        await editor.load()
+        let before = try await world.snapshot()
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        let after = try await world.snapshot()
+        let expected = ReminderWindow(
+            allowedDays: drifted.allowedDays,
+            allowedTimeRanges: drifted.allowedTimeRanges,
+            quietHours: quiet,
+            timezoneIdentifier: Fixtures.storedGlobal.timezoneIdentifier,
+            occasionTime: Fixtures.storedGlobal.occasionTime,
+            digestHorizonDays: Fixtures.storedGlobal.digestHorizonDays
+        )
+        #expect(after.target?.reminderWindowOverride == expected)
+        #expect(after.global == before.global)
+        #expect(after.bystander == before.bystander)
+    }
+
+    @Test("Saving after a failed load writes nothing")
+    func saveAfterFailedLoadWritesNothing() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let flaky = FailFirstFetchWindowRepository(wrapped: world.environment.window, counter: CallCounter())
+        let editor = Fixtures.editor(.global, contacts: world.environment.contacts, window: flaky, recorder: recorder)
+        await editor.load()
+        #expect(editor.loadState == .failed)
+        let before = try await world.snapshot()
+        // The draft is still the editor's seed, not the stored window.
+        editor.draft.allowedDays = .sunday
+
+        let saved = await editor.save()
+
+        #expect(!saved)
+        #expect(try await world.snapshot() == before)
+        #expect(recorder.windows.isEmpty)
+    }
+
+    @Test("An archived contact's editor fails to load instead of presenting an editable window")
+    func archivedContactDoesNotLoad() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Self.saturdayMorning)
+        try await world.environment.contacts.archive(id: world.target.id, at: Fixtures.now)
+        let editor = Fixtures.editor(.contact(world.target.id), world: world, recorder: Fixtures.SaveRecorder())
+
+        await editor.load()
+
+        #expect(editor.loadState == .failed)
+        #expect(editor.loadFailureMessage == "This contact is no longer available.")
+        #expect(editor.contactName == nil)
+        #expect(!editor.hasStoredOverride)
+        let saved = await editor.save()
+        #expect(!saved)
+    }
+
+    @Test("Saving for a contact archived after load reports failure and writes nothing")
+    func saveForContactArchivedAfterLoadFails() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let editor = Fixtures.editor(.contact(world.target.id), world: world, recorder: recorder)
+        await editor.load()
+        try await world.environment.contacts.archive(id: world.target.id, at: Fixtures.now)
+        let before = try await world.snapshot()
+        editor.draft.allowedDays = .saturday
+
+        let saved = await editor.save()
+
+        #expect(!saved)
+        #expect(editor.validationMessage != nil)
+        #expect(!editor.hasStoredOverride)
+        #expect(try await world.snapshot() == before)
+        #expect(recorder.windows.isEmpty)
+    }
+
+    @Test("Using the default window for a contact archived after load reports failure")
+    func resetForContactArchivedAfterLoadFails() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Self.saturdayMorning)
+        let editor = Fixtures.editor(.contact(world.target.id), world: world, recorder: Fixtures.SaveRecorder())
+        await editor.load()
+        try await world.environment.contacts.archive(id: world.target.id, at: Fixtures.now)
+        let before = try await world.snapshot()
+
+        let cleared = await editor.resetToDefault()
+
+        #expect(!cleared)
+        #expect(editor.validationMessage != nil)
+        #expect(editor.hasStoredOverride)
+        #expect(try await world.snapshot() == before)
+    }
+
     @Test("Using the default window clears that contact's override and touches nothing else")
     func resetToDefaultClearsOverride() async throws {
         let world = try await Fixtures.makeWorld(targetOverride: Self.saturdayMorning)

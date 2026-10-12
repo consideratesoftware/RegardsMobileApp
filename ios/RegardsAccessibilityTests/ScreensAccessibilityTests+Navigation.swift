@@ -24,10 +24,12 @@ extension ScreensAccessibilityTests {
     func launchToOverdue(
         dynamicTypeSize: String? = nil,
         includeDuplicateFixture: Bool = false,
-        seedCorruptRow: Bool = false
+        seedCorruptRow: Bool = false,
+        extraLaunchEnvironment: [String: String] = [:]
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("--regards-mock-runtime")
+        for (key, value) in extraLaunchEnvironment { app.launchEnvironment[key] = value }
         if let dynamicTypeSize {
             app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
         }
@@ -48,8 +50,14 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
-    func launchToSettings(includeDuplicateFixture: Bool = false) -> XCUIApplication {
-        let app = launchToOverdue(includeDuplicateFixture: includeDuplicateFixture)
+    func launchToSettings(
+        includeDuplicateFixture: Bool = false,
+        extraLaunchEnvironment: [String: String] = [:]
+    ) -> XCUIApplication {
+        let app = launchToOverdue(
+            includeDuplicateFixture: includeDuplicateFixture,
+            extraLaunchEnvironment: extraLaunchEnvironment
+        )
         navigateToTab(
             named: "Settings",
             from: "screen.overdue",

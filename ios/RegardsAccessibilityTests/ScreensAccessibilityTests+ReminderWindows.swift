@@ -12,8 +12,8 @@ import XCTest
 extension ScreensAccessibilityTests {
 
     @MainActor
-    private func openReminderWindows() -> XCUIApplication {
-        let app = launchToSettings()
+    private func openReminderWindows(extraLaunchEnvironment: [String: String] = [:]) -> XCUIApplication {
+        let app = launchToSettings(extraLaunchEnvironment: extraLaunchEnvironment)
         navigateFromSettings(
             triggerIdentifier: "settings.reminder-windows",
             to: "screen.reminder-windows",
@@ -65,11 +65,14 @@ extension ScreensAccessibilityTests {
     /// value. The picker runs on a fixed UTC reference, so it must read the
     /// stored 22:00 as "10:00 PM" before any edit: without
     /// `.environment(\.timeZone, .gmt)` it reads in the device zone and shows
-    /// another hour on any host that is not UTC. Known limit: on a UTC host
-    /// the two readings agree, so a missing `.gmt` cannot be told apart there.
+    /// another hour. The launch sets TZ to America/Los_Angeles so that holds
+    /// on a UTC host as well.
     @MainActor
     func testReminderWindowPickerStoresTheEditedTime() throws {
-        let app = openReminderWindows()
+        // TZ pins the app's zone to one that is never UTC, so a missing
+        // `.gmt` pin is caught on UTC CI runners too (the host zone is not
+        // what decides it).
+        let app = openReminderWindows(extraLaunchEnvironment: ["TZ": "America/Los_Angeles"])
         let rangeEnd = rangeTimeButton("Range 2 end", in: app)
         XCTAssertTrue(rangeEnd.waitForExistence(timeout: 5))
         XCTAssertEqual(normalizedTime(rangeEnd), "10:00 PM", "The stored 22:00 must read as 10:00 PM.")
