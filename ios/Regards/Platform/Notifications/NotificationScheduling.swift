@@ -13,7 +13,9 @@ import UserNotifications
 // `NotificationSchedulingGateTests` enforces this on raw source text:
 // G1, no other app file names the center type; G2, this file never
 // contains the center's enqueue verb; G3, this file names the center type
-// exactly 4 times (3 `.current()` calls and the delegate parameter).
+// exactly 4 times (3 `.current()` calls and the delegate parameter); G4, no
+// app file, this one included, names the system's notification request type
+// or any of its trigger types.
 
 /// Permission state mirrored from `UNAuthorizationStatus`, so callers outside
 /// the Platform layer never import UserNotifications.
