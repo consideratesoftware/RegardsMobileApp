@@ -159,8 +159,11 @@ consciously defer every blocker before merging. It must not:
   dependency. Review and CI monitoring may continue alongside all three lanes.
 
 When an owner-only action blocks the next acceptance criterion, mark the item
-`OWNER`, write one exact checklist under `Owner gates`, and continue any
-independent `READY` work. Ask once, not on every scheduled run.
+`OWNER`, record what's needed under `Owner gates` so a restart can see it,
+and continue any independent `READY` work. Ask Sid in the session as an
+interview (`ENGINEERING_ORG.md`, Owner gates), with exact steps for any
+physical task, and record the answer as a PR comment. If Sid isn't in the
+session, ask when Sid is next there; ask once, not on every scheduled run.
 
 ## Release gates
 
