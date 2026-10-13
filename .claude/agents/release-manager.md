@@ -57,8 +57,11 @@ PR, never in the root checkout.
   UNAVAILABLE never passes. UNAVAILABLE is an owner gate: report it for
   the engineering manager's interview.
 - The branch is up to date with `main` before the final reviews. If it is
-  behind, update it (`gh api -X PUT repos/{owner}/{repo}/pulls/<n>/update-branch`)
-  and report CODEX STALE so both reviews run on the merge commit.
+  behind, update it (`gh api -X PUT repos/{owner}/{repo}/pulls/<n>/update-branch`),
+  then bring the lane worktree to the new head with `git -C <lane> fetch`
+  and `git -C <lane> merge --ff-only origin/<branch>` (if that refuses, the
+  lane has unpushed work: stop and report it), and report CODEX STALE so
+  both reviews run on the merge commit.
 - If either review's newest verdict names a sha other than the current
   head, report STATE CODEX STALE and stop; the engineering manager reruns
   both reviews and relaunches you.

@@ -116,8 +116,14 @@ the section, as `/pr-review` does for its own findings.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits or discards the files), then run it
-once more. A second RETRY on the same head counts as UNAVAILABLE. Once the
-lane has a PR, post every Codex result on it as a verdict comment.
+once more. If that rerun also returns RETRY, post it on the PR as
+`CODEX REVIEW: UNAVAILABLE (second RETRY) @ <sha> ...`, so a restart sees an
+owner gate instead of rerunning again. Once the lane has a PR, post every
+Codex result on it as a verdict comment that carries only the verdict line
+and the blocker and should-fix counts. Never paste Codex's output into a PR
+comment: comments are read by the repository's `@claude` workflow, and
+quoted diff text could trigger it. The full review stays in the lane's
+report.
 On UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate in
 `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up a review
 round. Two rounds maximum, then the second opinion.
