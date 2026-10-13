@@ -14,6 +14,9 @@ public struct SettingsScreen: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @AccessibilityFocusState private var notificationRowFocused: Bool
+    /// Whether this screen is showing. The status can change while a pushed
+    /// screen covers it, and focus must not move on a screen the user isn't on.
+    @State private var isOnScreen = false
 
     public init(notifications: NotificationPermissionViewModel?) {
         self.notifications = notifications
@@ -170,6 +173,8 @@ public struct SettingsScreen: View {
         .accessibilityIdentifier("screen.settings")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { isOnScreen = true }
+        .onDisappear { isOnScreen = false }
         .task { await notifications?.load() }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
@@ -181,7 +186,7 @@ public struct SettingsScreen: View {
         // announcement is cut off. The yield lets the new row reach the
         // accessibility tree first. Not on the first read.
         .onChange(of: notifications?.status) { oldStatus, newStatus in
-            guard oldStatus != nil, newStatus != nil, oldStatus != newStatus else { return }
+            guard isOnScreen, oldStatus != nil, newStatus != nil else { return }
             notificationRowFocused = false
             Task { @MainActor in
                 await Task.yield()
