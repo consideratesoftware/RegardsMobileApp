@@ -27,6 +27,12 @@ public final class NotificationPermissionViewModel {
     /// Speaks a status change. Injected so a test can see what was said.
     private let announce: @MainActor (String) -> Void
     private var isRequesting = false
+    /// Numbers each status read, assigned before its `await`. A read whose
+    /// result arrives after a newer read's was applied is dropped, so a slow,
+    /// older answer can't undo a newer one (for example `.notDetermined`
+    /// landing after `.authorized` would bring the "Turn on" button back).
+    private var latestReadNumber = 0
+    private var appliedReadNumber = 0
     private static let log = RegardsLogger.feature("NotificationPermission")
 
     public init(
@@ -52,7 +58,12 @@ public final class NotificationPermissionViewModel {
     /// refresh already applied the change. Nothing announces a move
     /// back to `.notDetermined`: iOS doesn't do that while the app runs.
     public func refresh() async {
+        latestReadNumber += 1
+        let readNumber = latestReadNumber
         let current = await notifications.authorizationStatus()
+        // Older than a result already applied: drop it.
+        guard readNumber > appliedReadNumber else { return }
+        appliedReadNumber = readNumber
         // Read after the await, with no suspension before the write below. Two
         // overlapping refreshes (the request's own, and the scene turning
         // active when the system prompt closes) then see each other's result,
@@ -78,15 +89,22 @@ public final class NotificationPermissionViewModel {
         guard status == .notDetermined, !isRequesting else { return }
         isRequesting = true
         defer { isRequesting = false }
+        var requestThrew = false
         do {
             _ = try await notifications.requestAuthorization()
             requestFailed = false
         } catch {
             Self.log.error("notification authorization request failed: \(error, privacy: .private)")
+            requestThrew = true
+        }
+        await refresh()
+        // iOS can record the user's decision even when the request throws.
+        // Report the failure only if the permission is still undecided, so
+        // VoiceOver doesn't hear an error and then the new state.
+        if requestThrew, status == .notDetermined {
             requestFailed = true
             announce(Self.requestFailedMessage)
         }
-        await refresh()
     }
 
     /// Opens the Regards page in iOS Settings, where a denied permission can
