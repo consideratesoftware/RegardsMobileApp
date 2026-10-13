@@ -13,6 +13,9 @@ extension AppLaunchCoordinator {
         let environment = ProcessInfo.processInfo.environment
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--regards-mock-runtime") {
+            // `unavailable` passes no notification seam at all, so a UI test
+            // can check that Settings shows no Notifications section.
+            let notificationStatus = environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
             return AppLaunchCoordinator(
                 mockRuntime: .makeMock(
                     includeDuplicateFixture:
@@ -22,11 +25,11 @@ extension AppLaunchCoordinator {
                 ),
                 // Never the real adapter here: a system permission alert
                 // would cover the accessibility audits this launch serves.
-                notifications: DebugNotificationScheduling(
-                    status: NotificationAuthorizationStatus(
-                        rawValue: environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
-                    ) ?? .notDetermined
-                )
+                notifications: notificationStatus == "unavailable"
+                    ? nil
+                    : DebugNotificationScheduling(
+                        status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined
+                    )
             )
         }
         if arguments.contains("--regards-launch-fails-once") {
