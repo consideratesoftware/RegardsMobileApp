@@ -32,6 +32,12 @@ extension ScreensAccessibilityTests {
         // The fake grants the request, so no system alert appears.
         app.buttons[Self.notificationsRowID].tap()
 
+        // The row swaps in place after the grant. Wait for the button to be
+        // gone before reading the label, so the old row can't be read.
+        XCTAssertTrue(
+            app.buttons[Self.notificationsRowID].waitForNonExistence(timeout: 10),
+            "The Turn on notifications button should be replaced after the grant."
+        )
         let on = notificationsRow(in: app)
         XCTAssertTrue(on.label.contains("Notifications on"), "The row should read Notifications on.")
         XCTAssertFalse(on.label.contains("Turn on notifications"), "The prompt copy should be gone.")
@@ -82,6 +88,19 @@ extension ScreensAccessibilityTests {
         let app = launchToSettings(dynamicTypeSize: "accessibility5", notificationStatus: "denied")
         _ = notificationsRow(in: app)
 
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    /// A launch with no notification seam has nothing to show, and a row that
+    /// did nothing would be inert. The other Settings rows prove the screen
+    /// itself did load, so the absence isn't a screen that failed to render.
+    @MainActor
+    func testSettingsWithoutNotificationSeamHasNoNotificationsRow() throws {
+        let app = launchToSettings(notificationStatus: "unavailable")
+
+        XCTAssertTrue(app.descendants(matching: .any)["settings.reminder-windows"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)[Self.notificationsRowID].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["\(Self.notificationsRowID).error"].exists)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 }

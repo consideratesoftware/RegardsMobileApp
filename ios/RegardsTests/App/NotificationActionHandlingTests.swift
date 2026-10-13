@@ -19,8 +19,8 @@ struct NotificationActionHandlingTests {
     /// 2027-03-10 10:00 in Los Angeles: seven calendar days later crosses the
     /// 2027-03-14 spring-forward, so a 7 * 86_400 s push would land an hour
     /// off in the window's zone.
-    private static let windowZone = TimeZone(identifier: "America/Los_Angeles")!
-    private static let now: Date = {
+    static let windowZone = TimeZone(identifier: "America/Los_Angeles")!
+    static let now: Date = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = windowZone
         return calendar.date(from: DateComponents(year: 2027, month: 3, day: 10, hour: 10))!
@@ -31,7 +31,7 @@ struct NotificationActionHandlingTests {
         return calendar.date(from: DateComponents(year: 2027, month: 3, day: 17, hour: 10))!
     }
 
-    private struct Harness {
+    struct Harness {
         let launch: AppLaunchCoordinator
         let fake: DebugNotificationScheduling
         let repositories: RepositoryContractRepositories
@@ -83,6 +83,10 @@ struct NotificationActionHandlingTests {
     }
 
     // MARK: Snooze
+
+    // The two Snooze tests below pin today's date math (a raw `now + 7` calendar
+    // days, R57). TF-07 resolves R57 so the snooze lands inside the user's
+    // reminder window, and will change the dates they expect.
 
     @Test(
         "Snooze from a notification pushes the reminder seven calendar days in the window zone",
@@ -234,72 +238,77 @@ struct NotificationActionHandlingTests {
         try await Self.expectUntouched(harness, bystander)
     }
 
-    // MARK: Single consumer and wiring
-
-    /// A failed first attempt never reaches the consumer-start point, so this
-    /// pins that a retry still ends up with one working consumer, not that the
-    /// single-consumer guard holds. `consumerStartsOnceWhenStartRunsTwice`
-    /// covers the guard.
-    @Test("A launch that fails once and is retried consumes actions exactly once")
-    func retryAfterFailedLaunchStillConsumesActionsOnce() async throws {
-        let attempts = LaunchAttempts()
-        let harness = try await Self.harness(
-            backend: .mock,
-            onboarded: true,
-            makeRuntimeFailureCount: 1,
-            attempts: attempts
-        )
-        let contact = try await Self.seed(harness, id: 612, suffix: "retry")
-        let barrier = try await Self.seed(harness, id: 613, suffix: "retry-barrier")
-
-        await harness.launch.start()
-        #expect(harness.launch.phase == .failed)
-        await harness.launch.retry()
-        #expect(harness.launch.phase == .ready)
-        #expect(await attempts.count == 2)
-
-        harness.fake.send(.caughtUp(contact.id))
-        harness.fake.send(.snooze(barrier.id))
-        await Self.expectBarrierSettled(harness, barrier.id)
-
-        let logs = try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
-        #expect(logs.count == 1)
-    }
-
-    /// A second `start()` on a launched coordinator (the root view's task can
-    /// run again) takes the early-return path, which calls the consumer-start
-    /// point again. Without the `notificationActionTask == nil` guard a second
-    /// iterator would join the stream, which traps.
     @Test(
-        "Calling start() a second time reaches the consumer start again but consumes actions exactly once",
+        "An action for a contact that no longer exists writes nothing",
         arguments: RepositoryContractBackend.allCases
     )
-    func consumerStartsOnceWhenStartRunsTwice(backend: RepositoryContractBackend) async throws {
+    func actionForMissingContactWritesNothing(backend: RepositoryContractBackend) async throws {
         let harness = try await Self.readyHarness(backend: backend)
-        let contact = try await Self.seed(harness, id: 614, suffix: "start-twice")
-        let barrier = try await Self.seed(harness, id: 615, suffix: "start-twice-barrier")
+        let missingId = try contractUUID(699)
+        let bystander = try await Self.seed(harness, id: 621, suffix: "missing-bystander")
+        let barrier = try await Self.seed(harness, id: 622, suffix: "missing-barrier")
 
-        await harness.launch.start()
-
-        harness.fake.send(.caughtUp(contact.id))
+        harness.fake.send(.caughtUp(missingId))
+        harness.fake.send(.snooze(missingId))
         harness.fake.send(.snooze(barrier.id))
         await Self.expectBarrierSettled(harness, barrier.id)
-        let logs = try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+
+        #expect(try await harness.repositories.interactions.fetchRecent(forContact: missingId, limit: 10).isEmpty)
+        #expect(try await harness.repositories.reminders.fetchPending(forContact: missingId).isEmpty)
+        try await Self.expectUntouched(harness, bystander)
+    }
+
+    @Test("A contact read that throws writes nothing, and the next action is still handled")
+    func contactReadFailureWritesNothingAndConsumerContinues() async throws {
+        let contacts = StubContactRepository()
+        // All three stubs: the mock backend's interaction store rejects a log
+        // for a contact that only exists in the stub contact repository.
+        let harness = try await Self.readyHarness(
+            backend: .mock,
+            contacts: contacts,
+            reminders: StubReminderRepository(),
+            interactions: StubInteractionRepository()
+        )
+        let failed = try await Self.seed(harness, id: 623, suffix: "read-fails")
+        let next = try await Self.seed(harness, id: 624, suffix: "read-fails-next")
+        await contacts.armFetchFailures(1)
+
+        harness.fake.send(.caughtUp(failed.id))
+        harness.fake.send(.caughtUp(next.id))
+
+        // Poll with `fetchAll()`, not `fetch(id:)`: the armed failure belongs
+        // to the handler's first read, and a polling `fetch` would use it up.
+        let handledNext = await Self.waitFor {
+            try await harness.repositories.contacts.fetchAll()
+                .first { $0.id == next.id }?.lastInteractedAt == Self.now
+        }
+        #expect(handledNext, "the action after the failed read was never applied")
+        try await Self.expectUntouched(harness, failed)
+        let logs = try await harness.repositories.interactions.fetchRecent(forContact: next.id, limit: 10)
         #expect(logs.count == 1)
     }
 
-    @Test("Production launch wires the shared notification adapter")
-    func productionWiresSharedAdapter() throws {
-        let dependencies = try #require(AppLaunchCoordinator.production().dependencies)
+    @Test("A Snooze whose write throws leaves no row, and the next action is still handled")
+    func snoozeWriteFailureLeavesNoRowAndConsumerContinues() async throws {
+        let harness = try await Self.readyHarness(backend: .mock, reminders: StubReminderRepository.failingUpsert())
+        let failed = try await Self.seed(harness, id: 625, suffix: "snooze-fails")
+        let next = try await Self.seed(harness, id: 626, suffix: "snooze-fails-next")
 
-        #expect((dependencies.notifications as AnyObject?) === UserNotificationsAdapter.shared)
+        harness.fake.send(.snooze(failed.id))
+        harness.fake.send(.caughtUp(next.id))
+
+        let handledNext = await Self.waitFor {
+            try await harness.repositories.contacts.fetch(id: next.id)?.lastInteractedAt == Self.now
+        }
+        #expect(handledNext, "the action after the failed Snooze was never applied")
+        try await Self.expectUntouched(harness, failed)
     }
 }
 
 extension NotificationActionHandlingTests {
     // MARK: Helpers
 
-    private actor LaunchAttempts {
+    actor LaunchAttempts {
         private(set) var count = 0
         func record() -> Int {
             count += 1
@@ -307,15 +316,43 @@ extension NotificationActionHandlingTests {
         }
     }
 
-    private struct LaunchFailure: Error {}
+    struct LaunchFailure: Error {}
+
+    /// Holds `makeRuntime` until the test releases it, so a test can act
+    /// while the first `start()` is still loading.
+    actor LaunchGate {
+        private(set) var isWaiting = false
+        private var isReleased = false
+        private var continuation: CheckedContinuation<Void, Never>?
+
+        func pause() async {
+            isWaiting = true
+            guard !isReleased else { return }
+            await withCheckedContinuation { continuation = $0 }
+        }
+
+        func release() {
+            isReleased = true
+            continuation?.resume()
+            continuation = nil
+        }
+    }
 
     /// A started, onboarded coordinator over `backend`, optionally with a
     /// replacement interaction repository.
-    private static func readyHarness(
+    static func readyHarness(
         backend: RepositoryContractBackend,
+        contacts: (any ContactRepository)? = nil,
+        reminders: (any ReminderRepository)? = nil,
         interactions: (any InteractionRepository)? = nil
     ) async throws -> Harness {
-        let harness = try await Self.harness(backend: backend, onboarded: true, interactions: interactions)
+        let harness = try await Self.harness(
+            backend: backend,
+            onboarded: true,
+            contacts: contacts,
+            reminders: reminders,
+            interactions: interactions
+        )
         await harness.launch.start()
         #expect(harness.launch.phase == .ready)
         return harness
@@ -323,20 +360,31 @@ extension NotificationActionHandlingTests {
 
     /// Builds the coordinator without starting it. `makeRuntimeFailureCount`
     /// makes the first N launch attempts throw.
-    private static func harness(
+    static func harness(
         backend: RepositoryContractBackend,
         onboarded: Bool,
+        contacts: (any ContactRepository)? = nil,
+        reminders: (any ReminderRepository)? = nil,
         interactions: (any InteractionRepository)? = nil,
         makeRuntimeFailureCount: Int = 0,
-        attempts: LaunchAttempts = LaunchAttempts()
+        attempts: LaunchAttempts = LaunchAttempts(),
+        gate: LaunchGate? = nil
     ) async throws -> Harness {
         let now = Self.now
-        let repositories = try backend.makeRepositories()
+        let backendRepositories = try backend.makeRepositories()
+        let repositories = RepositoryContractRepositories(
+            contacts: contacts ?? backendRepositories.contacts,
+            groups: backendRepositories.groups,
+            reminders: reminders ?? backendRepositories.reminders,
+            interactions: interactions ?? backendRepositories.interactions,
+            window: backendRepositories.window,
+            profile: backendRepositories.profile
+        )
         let environment = AppEnvironment(
             contacts: repositories.contacts,
             groups: repositories.groups,
             reminders: repositories.reminders,
-            interactions: interactions ?? repositories.interactions,
+            interactions: repositories.interactions,
             window: repositories.window,
             profile: repositories.profile
         )
@@ -360,6 +408,7 @@ extension NotificationActionHandlingTests {
         let launch = AppLaunchCoordinator(
             dependencies: .init(
                 makeRuntime: {
+                    await gate?.pause()
                     let attempt = await attempts.record()
                     if attempt <= makeRuntimeFailureCount { throw LaunchFailure() }
                     return runtime
@@ -379,7 +428,7 @@ extension NotificationActionHandlingTests {
 
     /// Stores a contact and returns it as read back, so later comparisons use
     /// the persisted values (timestamps are stored to the second).
-    private static func seed(
+    static func seed(
         _ harness: Harness,
         id: Int,
         suffix: String,
@@ -397,7 +446,7 @@ extension NotificationActionHandlingTests {
 
     /// A contact no action targeted still has no log, no pending row, and its
     /// original `lastInteractedAt`.
-    private static func expectUntouched(_ harness: Harness, _ contact: Contact) async throws {
+    static func expectUntouched(_ harness: Harness, _ contact: Contact) async throws {
         #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
         #expect(try await harness.repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
         let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
@@ -405,8 +454,10 @@ extension NotificationActionHandlingTests {
     }
 
     /// Polls `condition` with `Task.yield()` between attempts, up to a fixed
-    /// iteration count, instead of sleeping.
-    private static func waitFor(_ condition: () async throws -> Bool) async -> Bool {
+    /// iteration count, instead of sleeping. A condition that throws counts as
+    /// "not yet" (`try?`): a repository read can fail while a write is still
+    /// in flight, and the final check after the loop decides the result.
+    static func waitFor(_ condition: () async throws -> Bool) async -> Bool {
         for _ in 0..<3_000 {
             if (try? await condition()) == true { return true }
             await Task.yield()
@@ -416,7 +467,7 @@ extension NotificationActionHandlingTests {
 
     /// The barrier action is a Snooze for `contactId`; once its pending row
     /// exists, every earlier action has been handled.
-    private static func expectBarrierSettled(_ harness: Harness, _ contactId: UUID) async {
+    static func expectBarrierSettled(_ harness: Harness, _ contactId: UUID) async {
         let settled = await waitFor {
             try await harness.scheduler.pendingSnoozeDate(contactId: contactId) != nil
         }

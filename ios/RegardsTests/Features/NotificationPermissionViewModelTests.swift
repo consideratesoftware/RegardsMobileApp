@@ -57,6 +57,7 @@ struct NotificationPermissionViewModelTests {
 
         await viewModel.requestAuthorization()
         #expect(viewModel.status == .authorized)
+        #expect(!viewModel.requestFailed)
 
         // A second tap is a no-op: the permission is decided now.
         await viewModel.requestAuthorization()
@@ -222,6 +223,93 @@ struct NotificationPermissionViewModelTests {
         #expect(recorder.messages.isEmpty)
     }
 
+    // MARK: Request error
+
+    private static let errorMessage = NotificationPermissionViewModel.requestFailedMessage
+
+    @Test("A request that throws shows the error and announces it")
+    func requestThatThrowsShowsAndAnnouncesTheError() async {
+        let fake = DebugNotificationScheduling(status: .notDetermined, requestOutcome: .fail)
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(fake, recorder)
+        await viewModel.load()
+        #expect(!viewModel.requestFailed)
+
+        await viewModel.requestAuthorization()
+
+        #expect(viewModel.requestFailed)
+        #expect(recorder.messages == [Self.errorMessage])
+    }
+
+    @Test("Each failed attempt announces the error again")
+    func repeatedThrowsAnnounceEachTime() async {
+        let fake = DebugNotificationScheduling(status: .notDetermined, requestOutcome: .fail)
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(fake, recorder)
+        await viewModel.load()
+
+        await viewModel.requestAuthorization()
+        await viewModel.requestAuthorization()
+
+        #expect(viewModel.requestFailed)
+        #expect(recorder.messages == [Self.errorMessage, Self.errorMessage])
+    }
+
+    @Test("A later request that succeeds clears the error")
+    func laterSuccessfulRequestClearsTheError() async {
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(FailsOnceThenGrants(), recorder)
+        await viewModel.load()
+        await viewModel.requestAuthorization()
+        #expect(viewModel.requestFailed)
+
+        await viewModel.requestAuthorization()
+
+        #expect(!viewModel.requestFailed)
+        #expect(viewModel.status == .authorized)
+        #expect(recorder.messages == [Self.errorMessage, "Notifications on"])
+    }
+
+    @Test("A request that succeeds clears the error even when the status stays undecided")
+    func successWithoutAStatusChangeClearsTheError() async {
+        let viewModel = Self.viewModel(FailsOnceThenGrants(decidesOnSuccess: false))
+        await viewModel.load()
+        await viewModel.requestAuthorization()
+        #expect(viewModel.requestFailed)
+
+        await viewModel.requestAuthorization()
+
+        #expect(!viewModel.requestFailed)
+        #expect(viewModel.status == .notDetermined)
+    }
+
+    @Test("Re-reading an unchanged status keeps the error")
+    func unchangedRefreshKeepsTheError() async {
+        let fake = DebugNotificationScheduling(status: .notDetermined, requestOutcome: .fail)
+        let viewModel = Self.viewModel(fake)
+        await viewModel.load()
+        await viewModel.requestAuthorization()
+
+        await viewModel.refresh()
+
+        #expect(viewModel.requestFailed)
+    }
+
+    @Test("A real status change clears the error")
+    func statusChangeClearsTheError() async {
+        let fake = DebugNotificationScheduling(status: .notDetermined, requestOutcome: .fail)
+        let viewModel = Self.viewModel(fake)
+        await viewModel.load()
+        await viewModel.requestAuthorization()
+        #expect(viewModel.requestFailed)
+
+        await fake.setStatus(.denied)
+        await viewModel.refresh()
+
+        #expect(!viewModel.requestFailed)
+        #expect(viewModel.status == .denied)
+    }
+
     // MARK: Open iOS Settings
 
     @Test("Open iOS Settings opens the app's notification settings URL, once")
@@ -291,7 +379,9 @@ struct NotificationPermissionViewModelTests {
         #expect(await fake.requestCount == 1)
         #expect(viewModel.status == .authorized)
     }
+}
 
+extension NotificationPermissionViewModelTests {
     // MARK: Helpers
 
     private final class OpenedURLs {
@@ -332,6 +422,33 @@ struct NotificationPermissionViewModelTests {
         func requestAuthorization() async throws -> Bool {
             status = decision
             throw DebugNotificationScheduling.RequestFailed()
+        }
+
+        func authorizationStatus() async -> NotificationAuthorizationStatus { status }
+    }
+
+    /// The first request throws and leaves the status undecided; the second
+    /// grants. `DebugNotificationScheduling` has one fixed outcome, so it
+    /// can't script a failure followed by a success.
+    private actor FailsOnceThenGrants: NotificationScheduling {
+        private var status = NotificationAuthorizationStatus.notDetermined
+        private var attempts = 0
+        /// False makes the second request succeed without deciding anything.
+        private let decidesOnSuccess: Bool
+
+        init(decidesOnSuccess: Bool = true) {
+            self.decidesOnSuccess = decidesOnSuccess
+        }
+
+        nonisolated var actions: AsyncStream<NotificationAction> {
+            AsyncStream { $0.finish() }
+        }
+
+        func requestAuthorization() async throws -> Bool {
+            attempts += 1
+            if attempts == 1 { throw DebugNotificationScheduling.RequestFailed() }
+            if decidesOnSuccess { status = .authorized }
+            return true
         }
 
         func authorizationStatus() async -> NotificationAuthorizationStatus { status }

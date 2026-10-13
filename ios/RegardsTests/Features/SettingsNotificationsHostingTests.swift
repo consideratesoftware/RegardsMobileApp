@@ -8,8 +8,9 @@ import UIKit
 /// the view model: the scene turning active re-reads the permission. It hosts
 /// the real `SettingsScreen` in a window with `DebugNotificationScheduling`,
 /// so no system prompt is involved. The denied row's "open the settings URL"
-/// is not here: a hosted SwiftUI button exposes no accessibility elements to a
-/// unit test, so it can't be activated (see the TF-06 report for the seam).
+/// is covered in `NotificationPermissionViewModelTests` and the denied-state
+/// UI test: a hosted SwiftUI button exposes no accessibility elements to a
+/// unit test, so it can't be activated here.
 ///
 /// Follows `RootViewSceneActivationTests`: a harness view feeds `scenePhase`
 /// from an observable model, and waits pump the run loop so SwiftUI commits.

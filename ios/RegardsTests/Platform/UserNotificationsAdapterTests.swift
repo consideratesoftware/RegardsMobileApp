@@ -73,6 +73,48 @@ struct UserNotificationsAdapterTests {
         #expect(UserNotificationsAdapter.action(identifier: "regards.caught-up", userInfo: userInfo) == nil)
     }
 
+    // MARK: Delegate seam
+
+    /// `receive` is what the notification center's delegate method calls once
+    /// it has copied the response apart, so the yield-and-complete behavior is
+    /// testable without a `UNNotificationResponse`, which can't be built.
+    @Test("A decoded response is yielded as an action and the completion runs once")
+    func receiveYieldsDecodedActionAndCallsCompletion() async {
+        let adapter = UserNotificationsAdapter()
+        var completions = 0
+
+        adapter.receive(identifier: "regards.snooze", userInfo: ["contactId": contactX.uuidString]) {
+            completions += 1
+        }
+
+        #expect(await Self.firstBufferedAction(of: adapter) == .snooze(contactX))
+        #expect(completions == 1)
+    }
+
+    @Test(
+        "A default tap or an undecodable response yields nothing but still runs the completion",
+        arguments: [
+            (UNNotificationDefaultActionIdentifier, contactX.uuidString as String?),
+            ("regards.caught-up", nil),
+            ("regards.snooze", "not-a-uuid"),
+        ]
+    )
+    func receiveOfUndecodableResponseYieldsNothingButCompletes(identifier: String, contactId: String?) async {
+        let adapter = UserNotificationsAdapter()
+        var userInfo: [AnyHashable: Any] = [:]
+        if let contactId { userInfo["contactId"] = contactId }
+        var completions = 0
+
+        adapter.receive(identifier: identifier, userInfo: userInfo) { completions += 1 }
+        // A real action sent next arrives first only if the first yielded nothing.
+        adapter.receive(identifier: "regards.caught-up", userInfo: ["contactId": contactX.uuidString]) {
+            completions += 1
+        }
+
+        #expect(await Self.firstBufferedAction(of: adapter) == .caughtUp(contactX))
+        #expect(completions == 2)
+    }
+
     // MARK: Authorization status
 
     @Test(
@@ -96,5 +138,19 @@ struct UserNotificationsAdapterTests {
         let future = try #require(UNAuthorizationStatus(rawValue: 99))
 
         #expect(UserNotificationsAdapter.status(from: future) == .denied)
+    }
+
+    /// The first action `receive` has already yielded, or nil if it yielded
+    /// none. `receive` yields synchronously into an unbounded buffer, so the
+    /// reader is cancelled at once: a buffered action is still returned, and
+    /// an empty stream ends the read instead of hanging the test.
+    private static func firstBufferedAction(of adapter: UserNotificationsAdapter) async -> NotificationAction? {
+        let stream = adapter.actions
+        let reader = Task { () -> NotificationAction? in
+            var iterator = stream.makeAsyncIterator()
+            return await iterator.next()
+        }
+        reader.cancel()
+        return await reader.value
     }
 }
