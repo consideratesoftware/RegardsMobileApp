@@ -5,7 +5,7 @@ import XCTest
 /// tracked with a cadence).
 ///
 /// Identifiers: the row's Change button is `contact-detail.window-change`, and
-/// the row's value texts are "Your default" / "Custom". The editor's own ids
+/// the row's value texts are "Default window" / "Custom window". The editor's own ids
 /// (`screen.reminder-windows`, `reminder-windows.save`,
 /// `reminder-windows.use-default`, `reminder-windows.horizon-7`) come from
 /// slice 3.
@@ -48,13 +48,13 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
-    /// Row state follows the override: "Your default" -> save -> "Custom" ->
-    /// "Use my default window" -> "Your default".
+    /// Row state follows the override: "Default window" -> save -> "Custom window" ->
+    /// "Use default window" -> "Default window".
     @MainActor
     func testContactWindowRowFollowsOverride() throws {
         let app = launchToContactDetailFromContacts()
-        XCTAssertTrue(app.staticTexts["Your default"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Custom"].exists)
+        XCTAssertTrue(app.staticTexts["Default window"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Custom window"].exists)
 
         // Change -> edit a day -> Save.
         openOverrideEditor(in: app)
@@ -68,24 +68,25 @@ extension ScreensAccessibilityTests {
             app.descendants(matching: .any)["screen.contact-detail"].waitForExistence(timeout: 10),
             "A successful save should return to Contact Detail."
         )
-        XCTAssertTrue(app.staticTexts["Custom"].waitForExistence(timeout: 5), "The row should now read Custom.")
-        XCTAssertFalse(app.staticTexts["Your default"].exists)
+        XCTAssertTrue(app.staticTexts["Custom window"].waitForExistence(timeout: 5), "The row should now read Custom.")
+        XCTAssertFalse(app.staticTexts["Default window"].exists)
 
-        // Reopen -> the editor offers the reset -> Use my default window.
+        // Reopen -> the editor offers the reset -> Use default window.
         openOverrideEditor(in: app)
         let useDefault = app.buttons["reminder-windows.use-default"]
-        XCTAssertTrue(useDefault.waitForExistence(timeout: 5), "A stored override should offer Use my default window.")
+        XCTAssertTrue(useDefault.waitForExistence(timeout: 5), "A stored override should offer Use default window.")
+        XCTAssertEqual(useDefault.label, "Use default window")
         useDefault.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["screen.contact-detail"].waitForExistence(timeout: 10),
             "Using the default window should return to Contact Detail."
         )
-        XCTAssertTrue(app.staticTexts["Your default"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Custom"].exists)
+        XCTAssertTrue(app.staticTexts["Default window"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Custom window"].exists)
     }
 
     /// An override saved for the first contact leaves the second contact's
-    /// row at "Your default".
+    /// row at "Default window".
     @MainActor
     func testContactWindowOverrideDoesNotShowOnOtherContacts() throws {
         let app = launchToContactDetailFromContacts()
@@ -94,7 +95,7 @@ extension ScreensAccessibilityTests {
         XCTAssertTrue(sunday.waitForExistence(timeout: 5))
         sunday.tap()
         app.buttons["reminder-windows.save"].tap()
-        XCTAssertTrue(app.staticTexts["Custom"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Custom window"].waitForExistence(timeout: 10))
 
         app.buttons["BackButton"].tap()
         let contacts = app.descendants(matching: .any)["screen.contacts"]
@@ -105,10 +106,10 @@ extension ScreensAccessibilityTests {
 
         XCTAssertTrue(app.descendants(matching: .any)["screen.contact-detail"].waitForExistence(timeout: 10))
         XCTAssertTrue(
-            app.staticTexts["Your default"].waitForExistence(timeout: 5),
+            app.staticTexts["Default window"].waitForExistence(timeout: 5),
             "A different contact must keep following the global window."
         )
-        XCTAssertFalse(app.staticTexts["Custom"].exists)
+        XCTAssertFalse(app.staticTexts["Custom window"].exists)
     }
 
     /// Owner ruling: leaving the editor with unsaved edits discards them
@@ -127,7 +128,7 @@ extension ScreensAccessibilityTests {
         // Back without saving, then Change again.
         app.buttons["BackButton"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["screen.contact-detail"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Your default"].exists, "Nothing was saved, so the row is unchanged.")
+        XCTAssertTrue(app.staticTexts["Default window"].exists, "Nothing was saved, so the row is unchanged.")
         openOverrideEditor(in: app)
 
         let reopened = app.buttons["Sunday"]

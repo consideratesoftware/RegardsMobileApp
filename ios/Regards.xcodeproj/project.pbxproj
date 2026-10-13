@@ -41,6 +41,7 @@
 		31D2738073F7C43035F7BF65 /* ScreensAccessibilityTests+RowActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7824B1F71B424AEAA2407782 /* ScreensAccessibilityTests+RowActions.swift */; };
 		3658680CA6D7E7D28C86C228 /* Eventually.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBBFE7DF137363D94B872FE /* Eventually.swift */; };
 		36DDF0FC9E135C34E29412DC /* ContactAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B718FFDD5767AE98D80A1EF /* ContactAccessibilityTests.swift */; };
+		3716B8FC6F64783F45EC86CD /* ScreensAccessibilityTests+NoInventedTimes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAA351624691C85A8CD1799 /* ScreensAccessibilityTests+NoInventedTimes.swift */; };
 		37EA3EDF75290ED89C6DFFED /* ScreensAccessibilityTests+ReminderWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F9A2DC2ADCBC31904F66FE /* ScreensAccessibilityTests+ReminderWindows.swift */; };
 		3CD64DE48976BBB5B7BAC907 /* ContactWriteTrackingFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4BC46872D022EC2D29BB71 /* ContactWriteTrackingFakes.swift */; };
 		3F41DC0E58374974EDAA29C9 /* SchedulingPassCaughtUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBA009B745C8E8BB5DD68B1 /* SchedulingPassCaughtUpTests.swift */; };
@@ -143,6 +144,7 @@
 		C17E9AC4724CF5518EDC0353 /* MockRepositories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A61EE486988C12FCD099BEB /* MockRepositories.swift */; };
 		C55A581F07D2B3ACC5964E9E /* DatabaseEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34F3B77FC1249E22E2AB870 /* DatabaseEncodingTests.swift */; };
 		C8D5AB8C903B7B893049282C /* ScreensAccessibilityTests+Assertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACAF82F1B446277BBAF4B1BD /* ScreensAccessibilityTests+Assertions.swift */; };
+		C9F1471BB12A78C99CB7EF1E /* ReminderWindowsViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC3ED374B7ABAAE3E016FF3 /* ReminderWindowsViewModelSaveTests.swift */; };
 		CB1192EDCAC1990240969487 /* DatabaseMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8660B33741B4961FAB6E2884 /* DatabaseMigrator.swift */; };
 		CB3CA010C4EBE1D62D594D9E /* ContactsReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0796D2167027FBCEF07289C /* ContactsReconciler.swift */; };
 		CB6DFAAA9FE0A26F371A6E87 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B5E6620099016E635E9FB5 /* Contact.swift */; };
@@ -276,6 +278,7 @@
 		643E9B8BC03764B764C76D0C /* RegardsTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsTypography.swift; sourceTree = "<group>"; };
 		645F304158BCF17CFC169BE5 /* ReminderWindowPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowPersistenceTests.swift; sourceTree = "<group>"; };
 		6503B3BB978A8B62DEF9F730 /* Repositories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repositories.swift; sourceTree = "<group>"; };
+		6BC3ED374B7ABAAE3E016FF3 /* ReminderWindowsViewModelSaveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsViewModelSaveTests.swift; sourceTree = "<group>"; };
 		6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsSourceTests.swift; sourceTree = "<group>"; };
 		6EBBC73AB0E37150D6BA6A81 /* EditContactScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditContactScreen.swift; sourceTree = "<group>"; };
 		6ECBEE4461B73A577811E570 /* ContactDetailViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactDetailViewModelTests.swift; sourceTree = "<group>"; };
@@ -285,6 +288,7 @@
 		749A533304ABA207075077DC /* ReminderWindowRepositoryReadContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowRepositoryReadContractTests.swift; sourceTree = "<group>"; };
 		758853CDEABD9FE42140D77B /* ReminderWindowsScreen+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReminderWindowsScreen+Sections.swift"; sourceTree = "<group>"; };
 		7824B1F71B424AEAA2407782 /* ScreensAccessibilityTests+RowActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+RowActions.swift"; sourceTree = "<group>"; };
+		7AAA351624691C85A8CD1799 /* ScreensAccessibilityTests+NoInventedTimes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+NoInventedTimes.swift"; sourceTree = "<group>"; };
 		7ABF76C0C5D07E0E054F54E3 /* MockRepositoriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockRepositoriesTests.swift; sourceTree = "<group>"; };
 		7BB9BC25AB0C2BDDD3AF5EDB /* RowActionAccessibilityEffectsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowActionAccessibilityEffectsTests.swift; sourceTree = "<group>"; };
 		7CEFE1FAFED8E294FEE4B401 /* PriorityTier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriorityTier.swift; sourceTree = "<group>"; };
@@ -563,6 +567,7 @@
 				089D71C160EADA0013F662BB /* ScreensAccessibilityTests+ContactWindow.swift */,
 				BB0724812EE6771B9D8443CB /* ScreensAccessibilityTests+Contracts.swift */,
 				44784660B920D198E5EFCB5A /* ScreensAccessibilityTests+Navigation.swift */,
+				7AAA351624691C85A8CD1799 /* ScreensAccessibilityTests+NoInventedTimes.swift */,
 				81AAC5A27726A4A3B00D4A15 /* ScreensAccessibilityTests+PresentedSurfaces.swift */,
 				35F9A2DC2ADCBC31904F66FE /* ScreensAccessibilityTests+ReminderWindows.swift */,
 				F5B5CB400E9AC786E916B015 /* ScreensAccessibilityTests+RepresentativeStates.swift */,
@@ -703,6 +708,7 @@
 				723E82F7157B98EA59162495 /* ReminderWindowsScreenReappearTests.swift */,
 				5D63A8C1D2611B3DDFBB8804 /* ReminderWindowsViewModelEditingTests.swift */,
 				A591319D2F55F5CC5A837F26 /* ReminderWindowsViewModelOverrideTests.swift */,
+				6BC3ED374B7ABAAE3E016FF3 /* ReminderWindowsViewModelSaveTests.swift */,
 				06DB31564E7E54375B8B7FCB /* ReminderWindowsViewModelTests.swift */,
 				7BB9BC25AB0C2BDDD3AF5EDB /* RowActionAccessibilityEffectsTests.swift */,
 				C59E559490C6DEA7049F62EE /* UpcomingViewModelActionTests.swift */,
@@ -1038,6 +1044,7 @@
 				1B058C7794CEC5B78B662A88 /* ReminderWindowsScreenReappearTests.swift in Sources */,
 				BA9B58908963F98CE7A23F85 /* ReminderWindowsViewModelEditingTests.swift in Sources */,
 				80DC0EB649CD8AD9D62671B3 /* ReminderWindowsViewModelOverrideTests.swift in Sources */,
+				C9F1471BB12A78C99CB7EF1E /* ReminderWindowsViewModelSaveTests.swift in Sources */,
 				F98BE2E4842EF3E6CBDA8657 /* ReminderWindowsViewModelTests.swift in Sources */,
 				4FA92BCDA8B77555BBC3747B /* RepositoriesTests.swift in Sources */,
 				9D872359157DA01ECDBB62A0 /* RepositoryFakes.swift in Sources */,
@@ -1153,6 +1160,7 @@
 				CF3320154FCFF7B545D22AEB /* ScreensAccessibilityTests+ContactWindow.swift in Sources */,
 				AE13C2C40E62BBA193C7BDF9 /* ScreensAccessibilityTests+Contracts.swift in Sources */,
 				72F4EC4397F159AD0AE72961 /* ScreensAccessibilityTests+Navigation.swift in Sources */,
+				3716B8FC6F64783F45EC86CD /* ScreensAccessibilityTests+NoInventedTimes.swift in Sources */,
 				B8514599BE1D235865740300 /* ScreensAccessibilityTests+PresentedSurfaces.swift in Sources */,
 				37EA3EDF75290ED89C6DFFED /* ScreensAccessibilityTests+ReminderWindows.swift in Sources */,
 				B81B01F7304D599A7DC80F69 /* ScreensAccessibilityTests+RepresentativeStates.swift in Sources */,

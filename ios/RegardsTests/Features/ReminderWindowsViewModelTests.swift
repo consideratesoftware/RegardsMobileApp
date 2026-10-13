@@ -5,7 +5,6 @@ import Testing
 /// TF-05 slice 3, global target: the editor's save-time validation (I1). Every
 /// refusal must leave the whole store untouched and skip `onSaved`; every
 /// success writes exactly the draft plus the stored zone, never a new one.
-///
 @MainActor
 struct ReminderWindowsViewModelTests {
 
@@ -134,6 +133,10 @@ struct ReminderWindowsViewModelTests {
         try await Self.expectRefused(saved, editor: editor, world: world, before: before, recorder: recorder)
         // Same as the wrapping case: the editor's own message, not the repository's generic failure.
         #expect(editor.validationMessage == "Pick at least one day.")
+        // With quiet hours turned off there is nothing quiet to blame.
+        editor.draft.quietHours = nil
+        #expect(!(await editor.save()))
+        #expect(editor.validationMessage?.localizedCaseInsensitiveContains("quiet") == false)
     }
 
     @Test("Quiet hours whose start equals their end are rejected")
@@ -208,10 +211,10 @@ struct ReminderWindowsViewModelTests {
     }
 
     /// R55 evidence: the editor cannot change the zone. The stored zone is
-    /// Lord Howe; the device zone is not.
+    /// Lord Howe, so a save that took the device zone would read differently
+    /// on any host that is not at Lord Howe.
     @Test("Saving the global window keeps the stored time zone")
     func saveNeverChangesTimezone() async throws {
-        #expect(TimeZone.current.identifier != "Australia/Lord_Howe")
         let world = try await Fixtures.makeWorld()
         let recorder = Fixtures.SaveRecorder()
         let editor = await Self.globalEditor(world, recorder: recorder)
@@ -258,14 +261,14 @@ struct ReminderWindowsViewModelTests {
 
     enum DraftCase: String, CaseIterable, CustomTestStringConvertible, Sendable {
         case valid, quietWraps, touchingRanges
-        case noDays, wrappingRange, overlappingRanges, zeroLengthQuiet, zeroCapacity
+        case noDays, wrappingRange, overlappingRanges, zeroLengthRange, zeroLengthQuiet, zeroCapacity
 
         var testDescription: String { rawValue }
 
         var saves: Bool {
             switch self {
             case .valid, .quietWraps, .touchingRanges: true
-            case .noDays, .wrappingRange, .overlappingRanges, .zeroLengthQuiet, .zeroCapacity: false
+            case .noDays, .wrappingRange, .overlappingRanges, .zeroLengthRange, .zeroLengthQuiet, .zeroCapacity: false
             }
         }
 
@@ -281,6 +284,7 @@ struct ReminderWindowsViewModelTests {
             case .noDays: editor.draft.allowedDays = []
             case .wrappingRange: editor.draft.allowedTimeRanges = [range(22, 1)]
             case .overlappingRanges: editor.draft.allowedTimeRanges = [range(10, 12), range(11, 13)]
+            case .zeroLengthRange: editor.draft.allowedTimeRanges = [range(10, 10)]
             case .zeroLengthQuiet: editor.draft.quietHours = range(22, 22)
             case .zeroCapacity:
                 editor.draft.allowedDays = .allDays

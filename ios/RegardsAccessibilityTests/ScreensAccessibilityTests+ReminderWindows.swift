@@ -73,8 +73,11 @@ extension ScreensAccessibilityTests {
         // `.gmt` pin is caught on UTC CI runners too (the host zone is not
         // what decides it).
         let app = openReminderWindows(extraLaunchEnvironment: ["TZ": "America/Los_Angeles"])
+        // Wait on a plain identifier query; the predicate-derived time
+        // buttons are then read with `.exists` only.
+        XCTAssertTrue(app.buttons["reminder-windows.add-range"].waitForExistence(timeout: 5))
         let rangeEnd = rangeTimeButton("Range 2 end", in: app)
-        XCTAssertTrue(rangeEnd.waitForExistence(timeout: 5))
+        XCTAssertTrue(rangeEnd.exists, "Range 2 end should be on the editor.")
         XCTAssertEqual(normalizedTime(rangeEnd), "10:00 PM", "The stored 22:00 must read as 10:00 PM.")
 
         rangeEnd.tap()
@@ -91,8 +94,9 @@ extension ScreensAccessibilityTests {
             to: "screen.reminder-windows",
             in: app
         )
+        XCTAssertTrue(app.buttons["reminder-windows.add-range"].waitForExistence(timeout: 5))
         let reopened = rangeTimeButton("Range 2 end", in: app)
-        XCTAssertTrue(reopened.waitForExistence(timeout: 5))
+        XCTAssertTrue(reopened.exists, "Range 2 end should be on the reopened editor.")
         XCTAssertEqual(normalizedTime(reopened), "9:00 PM", "The saved 21:00 should be what the editor loads.")
     }
 
@@ -106,5 +110,32 @@ extension ScreensAccessibilityTests {
     @MainActor
     private func normalizedTime(_ element: XCUIElement) -> String {
         ((element.value as? String) ?? "").replacingOccurrences(of: "\u{202F}", with: " ")
+    }
+
+    /// The day summary describes the chosen days. Monday plus Saturday is
+    /// neither "Weekends only." nor "Any day."; weekdays plus Saturday is not
+    /// "Any day." The summary copy itself is the screen's; these check the two
+    /// wrong answers do not appear.
+    @MainActor
+    func testDaySummaryDoesNotMislabelMixedDays() throws {
+        let app = openReminderWindows()
+        XCTAssertTrue(app.buttons["reminder-windows.add-range"].waitForExistence(timeout: 5))
+        func toggle(_ names: [String]) {
+            for name in names { app.buttons[name].tap() }
+        }
+
+        // Weekdays (the mock default) -> Monday plus Saturday.
+        toggle(["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])
+        XCTAssertEqual(app.buttons["Monday"].value as? String, "allowed")
+        XCTAssertEqual(app.buttons["Saturday"].value as? String, "allowed")
+        XCTAssertEqual(app.buttons["Tuesday"].value as? String, "not allowed")
+        XCTAssertFalse(app.staticTexts["Weekends only."].exists, "Monday plus Saturday is not weekends only.")
+        XCTAssertFalse(app.staticTexts["Any day."].exists)
+
+        // Weekdays plus Saturday.
+        toggle(["Tuesday", "Wednesday", "Thursday", "Friday"])
+        XCTAssertEqual(app.buttons["Friday"].value as? String, "allowed")
+        XCTAssertFalse(app.staticTexts["Any day."].exists, "Weekdays plus Saturday is not every day.")
+        XCTAssertFalse(app.staticTexts["Weekends only."].exists)
     }
 }

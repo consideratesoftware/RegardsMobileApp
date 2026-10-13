@@ -85,17 +85,49 @@ struct ReminderWindowsViewModelEditingTests {
         #expect(editor.draft == expected)
     }
 
-    @Test("addRange appends 09:00 to 10:00 and changes nothing else")
-    func addRangeAppendsDefaultRange() async throws {
+    @Test("addRange adds the first free hour after the last range and changes nothing else")
+    func addRangeAppendsFirstFreeHourAfterLastRange() async throws {
         let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
         let before = editor.draft
+        #expect(editor.canAddRange)
 
         editor.addRange()
 
         var expected = before
-        expected.allowedTimeRanges.append(Self.range(9, 10))
+        expected.allowedTimeRanges.append(Self.range(16, 17)) // the last range is 14:00 to 16:00
         #expect(editor.draft == expected)
         #expect(editor.draft.allowedTimeRanges.count == 3)
+    }
+
+    @Test("addRange clamps to the last minute of the day when less than an hour is left")
+    func addRangeClampsAtTheEndOfTheDay() async throws {
+        let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
+
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), Self.range(20, 22)]
+        editor.addRange()
+        #expect(editor.draft.allowedTimeRanges.last == Self.range(22, 23))
+
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), Self.range(20, 23)]
+        editor.addRange()
+        #expect(editor.draft.allowedTimeRanges.last == TimeRange(start: Self.time(23), end: Self.time(23, 59)))
+
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: Self.time(23, 30))]
+        editor.addRange()
+        #expect(editor.draft.allowedTimeRanges.last == TimeRange(start: Self.time(23, 30), end: Self.time(23, 59)))
+    }
+
+    @Test("addRange is unavailable and does nothing when the last range already ends at 23:59")
+    func addRangeUnavailableWhenTheDayIsFull() async throws {
+        let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: Self.time(23, 59))]
+        #expect(!editor.canAddRange)
+        #expect(editor.nextNewRange == nil)
+        let before = editor.draft
+
+        editor.addRange()
+
+        #expect(editor.draft == before)
+        #expect(ReminderWindowsViewModel.addRangeUnavailableReason.contains("11:59 pm"))
     }
 
     @Test("removeRange removes the chosen range but refuses the last one, and canRemoveRange agrees")
@@ -139,6 +171,10 @@ struct ReminderWindowsViewModelEditingTests {
         let plainWorld = try await Fixtures.makeWorld()
         let plain = await Self.loadedEditor(.contact(plainWorld.target.id), world: plainWorld)
         #expect(!plain.hasStoredOverride)
+        // Saving the window unchanged writes nothing and leaves the default.
+        #expect(await plain.save())
+        #expect(!plain.hasStoredOverride)
+        plain.draft.allowedDays = .saturday
         #expect(await plain.save())
         #expect(plain.hasStoredOverride)
         #expect(await plain.resetToDefault())

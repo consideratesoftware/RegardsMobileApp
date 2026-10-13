@@ -1,0 +1,183 @@
+import Foundation
+import Testing
+@testable import Regards
+
+/// What a save writes, field by field, for both targets (I1, I3). Each test
+/// checks the written values and that everything it must not touch is
+/// unchanged: the other window, the other contacts, and `onSaved`.
+@MainActor
+struct ReminderWindowsViewModelSaveTests {
+
+    private typealias Fixtures = ReminderWindowEditorFixtures
+    typealias DraftCase = ReminderWindowsViewModelTests.DraftCase
+
+    private static func loadedEditor(
+        _ target: ReminderWindowsViewModel.Target,
+        world: Fixtures.World,
+        recorder: Fixtures.SaveRecorder,
+        now: Date = Fixtures.now
+    ) async -> ReminderWindowsViewModel {
+        let editor = Fixtures.editor(target, world: world, recorder: recorder, now: now)
+        await editor.load()
+        return editor
+    }
+
+    private static func window(
+        _ base: ReminderWindow,
+        days: DayOfWeekMask? = nil,
+        zone: String? = nil,
+        occasionTime: TimeOfDay? = nil,
+        horizon: Int? = nil
+    ) -> ReminderWindow {
+        ReminderWindow(
+            allowedDays: days ?? base.allowedDays,
+            allowedTimeRanges: base.allowedTimeRanges,
+            quietHours: base.quietHours,
+            timezoneIdentifier: zone ?? base.timezoneIdentifier,
+            occasionTime: occasionTime ?? base.occasionTime,
+            digestHorizonDays: horizon ?? base.digestHorizonDays
+        )
+    }
+
+    @Test("Saving the global window stores the edited occasion time and nothing else changes")
+    func globalSaveStoresEditedOccasionTime() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.loadedEditor(.global, world: world, recorder: recorder)
+        #expect(editor.draft.occasionTime == TimeOfDay(hour: 7, minute: 15))
+        let before = try await world.snapshot()
+        editor.draft.occasionTime = TimeOfDay(hour: 8, minute: 30)
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        let expected = Self.window(Fixtures.storedGlobal, occasionTime: TimeOfDay(hour: 8, minute: 30))
+        let after = try await world.snapshot()
+        #expect(after.global == expected)
+        #expect(recorder.windows == [expected])
+        #expect(after.target == before.target)
+        #expect(after.bystander == before.bystander)
+    }
+
+    @Test("Saving a contact override obeys the same refusals, writes only on success, and never touches global",
+          arguments: ReminderWindowsViewModelTests.DraftCase.allCases)
+    func contactValidationNilIffSaveWrites(draft: DraftCase) async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.loadedEditor(.contact(world.target.id), world: world, recorder: recorder)
+        let before = try await world.snapshot()
+        // A contact with no override opens on the global window, so an
+        // untouched draft would be an unchanged save. Give every case a
+        // difference from it first.
+        editor.draft.allowedDays = .saturday
+        draft.apply(to: editor)
+
+        let saved = await editor.save()
+
+        let after = try await world.snapshot()
+        #expect(saved == draft.saves)
+        #expect((editor.validationMessage == nil) == saved)
+        let overrideChanged = after.target?.reminderWindowOverride != before.target?.reminderWindowOverride
+        #expect(overrideChanged == saved)
+        #expect(after.global == before.global)
+        #expect(after.bystander == before.bystander)
+        #expect(recorder.windows.isEmpty)
+    }
+
+    /// The zone comes from the window as loaded, so a change to the stored
+    /// zone while the editor is open cannot slip in through a save.
+    @Test("Saving the global window keeps the zone it loaded with, not one stored since")
+    func globalSaveKeepsTheLoadedTimezone() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.loadedEditor(.global, world: world, recorder: recorder)
+        try await world.environment.window.saveGlobal(
+            Self.window(Fixtures.storedGlobal, zone: "Pacific/Kiritimati")
+        )
+        editor.draft.allowedDays = .saturday
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        let expected = Self.window(Fixtures.storedGlobal, days: .saturday)
+        #expect(expected.timezoneIdentifier == "Australia/Lord_Howe")
+        #expect(try await world.environment.window.fetchGlobal() == expected)
+        #expect(recorder.windows == [expected])
+    }
+
+    /// An override is stamped from the global window as it is at save time,
+    /// so it never lags a change made while the editor was open.
+    @Test("An override save copies the latest global zone, occasion time and horizon")
+    func overrideSaveCopiesTheLatestGlobal() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.loadedEditor(.contact(world.target.id), world: world, recorder: recorder)
+        let loadedDraft = editor.draft
+        let latest = Self.window(
+            Fixtures.storedGlobal, zone: "Pacific/Kiritimati", occasionTime: TimeOfDay(hour: 3), horizon: 7
+        )
+        try await world.environment.window.saveGlobal(latest)
+        editor.draft.allowedDays = .saturday
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        let contact = try #require(try await world.environment.contacts.fetch(id: world.target.id))
+        let stored = try #require(contact.reminderWindowOverride)
+        #expect(stored.timezoneIdentifier == "Pacific/Kiritimati")
+        #expect(stored.occasionTime == TimeOfDay(hour: 3))
+        #expect(stored.digestHorizonDays == 7)
+        #expect(stored.allowedDays == .saturday)
+        #expect(stored.allowedTimeRanges == loadedDraft.allowedTimeRanges)
+        #expect(stored.quietHours == loadedDraft.quietHours)
+        #expect(try await world.environment.window.fetchGlobal() == latest)
+    }
+
+    /// 2026-03-08 is the US spring-forward Sunday. From Saturday noon the
+    /// next Sunday's 02:00 to 03:00 does not exist, but later Sundays have it,
+    /// so the window has capacity.
+    @Test("A Sunday 02:00 window saves the day before the spring-forward Sunday")
+    func sundayWindowSavesTheDayBeforeSpringForward() async throws {
+        let newYork = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 18), end: TimeOfDay(hour: 22))],
+            timezoneIdentifier: "America/New_York",
+            occasionTime: TimeOfDay(hour: 7, minute: 15),
+            digestHorizonDays: 30
+        )
+        let world = try await Fixtures.makeWorld(global: newYork)
+        let recorder = Fixtures.SaveRecorder()
+        let saturdayNoon = try #require(ISO8601DateFormatter().date(from: "2026-03-07T17:00:00Z")) // 12:00 EST
+        let editor = await Self.loadedEditor(.global, world: world, recorder: recorder, now: saturdayNoon)
+        let sundayRange = TimeRange(start: TimeOfDay(hour: 2), end: TimeOfDay(hour: 3))
+        editor.draft.allowedDays = .sunday
+        editor.draft.allowedTimeRanges = [sundayRange]
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(editor.validationMessage == nil)
+        let stored = try await world.environment.window.fetchGlobal()
+        #expect(stored.allowedDays == .sunday)
+        #expect(stored.allowedTimeRanges == [sundayRange])
+        #expect(stored.timezoneIdentifier == "America/New_York")
+    }
+
+    @Test("A contact with no override that saves an unchanged draft writes nothing and stays on the default")
+    func unchangedContactSaveWritesNothing() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.loadedEditor(.contact(world.target.id), world: world, recorder: recorder)
+        let before = try await world.snapshot()
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(editor.validationMessage == nil)
+        #expect(!editor.hasStoredOverride)
+        let after = try await world.snapshot()
+        #expect(after == before)
+        #expect(after.target?.reminderWindowOverride == nil)
+        #expect(recorder.windows.isEmpty)
+    }
+}
