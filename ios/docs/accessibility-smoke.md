@@ -38,7 +38,8 @@ under a **Manual accessibility smoke** heading.
 ## Settings notifications
 
 Run on a fresh install. The visible text and the VoiceOver label can differ,
-so check the label.
+so check the label. When the permission state changes, VoiceOver focus moves
+to the row.
 
 - [ ] Not determined: the row shows "Turn on notifications", which VoiceOver
       reads as a button. Activating it raises the iOS prompt once.
@@ -51,8 +52,10 @@ so check the label.
       and its button stays tappable.
 - [ ] Grant the prompt from not determined: VoiceOver announces "Notifications
       on", and the row reads it as text with no button.
-- [ ] A failed permission request shows the request-error line in the row, and
-      VoiceOver announces it. Exact text: [pending, from the TF-06 engineer].
+- [ ] A failed permission request shows "Couldn't ask for notification
+      permission. Try again." under the Settings notifications card
+      (`settings.notifications.error`), and VoiceOver announces the same text.
+      The line clears on the next successful request or a real status change.
 - [ ] Return from iOS Settings after a change: VoiceOver announces the new
       state. This step needs a denied state first. From denied, turn
       notifications on for Regards in iOS Settings, then return. The row then

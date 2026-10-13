@@ -73,7 +73,7 @@ never pick up Android work.
   - `TF-06`'s on-device exit checks (a notification fires at a window
     boundary; its actions round-trip) move to `TF-07`'s airplane-mode device
     test.
-- Owner decisions, 2026-10-11 session interview (no PR comment records these yet): keep the Settings row's copy permission-only until TF-07 adds the reminder explanation; the notification action label is "Snooze 1 week"; ship the Settings row now, with no TestFlight build before TF-07 and TF-08.
+- Owner decisions (recorded in the TF-06 PR's first comment (owner session interview, 2026-10-11)): keep the Settings row's copy permission-only until TF-07 adds the reminder explanation; the notification action label is "Snooze 1 week"; ship the Settings row now, with no TestFlight build before TF-07 and TF-08.
 - History: the PR that carries each closed item's evidence.
   - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
     physical-device acceptance, including the
