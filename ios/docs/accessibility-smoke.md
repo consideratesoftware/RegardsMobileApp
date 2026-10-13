@@ -56,6 +56,29 @@ Apply this checklist to every screen changed by the pull request:
       needs/need attention.") with no separate icon announcement, and
       VoiceOver can still reach a healthy row below it.
 
+## Reminder windows
+
+Run this when the PR touches the reminder-window editor or Contact Detail's
+Reminder window row.
+
+- [ ] Settings → Reminder windows: each day pill reads its full day name (for
+      example, "Thursday") and its value, "allowed" or "not allowed".
+- [ ] Turn off every day and activate Save. An inline message appears, and
+      VoiceOver announces it. The screen stays open, and the draft is unchanged.
+- [ ] Repeat with an overlapping time range, then with quiet hours whose start
+      equals end. Each refusal is announced the same way.
+- [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
+      the new "Next N days" label.
+- [ ] Change a day, leave without Save, and reopen the editor. The change is
+      gone, and nothing asks for confirmation.
+- [ ] Open Contact Detail for a tracked contact with a cadence. "Reminder
+      window" reads "Your default", with a Change button. Activate Change, then
+      Save. The editor dismisses, and the row reads "Custom".
+- [ ] In that override editor, activate "Use my default window". The editor
+      dismisses, and the row reads "Your default".
+- [ ] At Dynamic Type `accessibility5`, the day pills, time ranges, Save, and
+      "Use my default window" fit without clipping and stay tappable.
+
 ## Reporting
 
 In the PR description:

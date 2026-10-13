@@ -12,17 +12,16 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-11
-- Baseline: `main` at `6c0d633` (merge of PR #60, after PR #57 raised the
-  stress-job limits: job timeout 75 to 120 minutes, boot step 10 to 20
-  minutes). A confirming `Audit stress` run on `78dad7d` is in progress: run
-  `38121994128`.
+- Updated: 2026-10-12
+- Baseline: `main` at `dbd06a2` (merge of PR #59). The `TF-05` lane branch
+  merged it at `207a570`.
 - Active work: no merged TF work is in progress. `TF-03` acceptance is
   owner work (see `Owner gates`); its code is merged in PR #48. Lanes for
   `TF-05` (`claude/tf-05-reminder-window-editor`, worktree
   `../RegardsMobileApp-TF05`) and `TF-06`
   (`claude/tf-06-notification-adapter`, worktree `../RegardsMobileApp-TF06`)
-  started 2026-10-11. Their rows stay `READY` here because the closing
+  started 2026-10-11. `TF-05` lane state: all 4 slices verified; PR pending.
+  Their rows stay `READY` here because the closing
   rule below reserves `ACTIVE` and `DONE` for the pull request that carries
   the implementation; each lane sets its own row. A restart finds the lanes
   through restart protocol step 2 (worktrees and branches), not this table.
@@ -34,9 +33,8 @@ never pick up Android work.
   also need `TF-03`, which stays `OWNER` until its acceptance run passes, so
   both stay `BLOCKED`.
 - Open pull requests:
-  - PR #58 (`claude/tf-03-close`): this checkpoint. It is TF-03 work.
-  - PR #59 (`claude/org-codex-review`): infra. It adds a Codex cross-model
-    review to the org. It is not TF work.
+  - PR #61 (`claude/org-session-interviews`): infra. It is not TF work.
+  - No TF-05 or TF-06 pull request is open yet.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
@@ -72,6 +70,10 @@ never pick up Android work.
   - `TF-06`'s on-device exit checks (a notification fires at a window
     boundary; its actions round-trip) move to `TF-07`'s airplane-mode device
     test.
+  - `TF-05` rulings (extra repair rounds on slices 1 and 3; silent discard of
+    unsaved editor edits; the Overdue footer's time removed, with nothing
+    computed in its place): recorded in the TF-05 PR's first comment (owner
+    session interview, 2026-10-11).
 - History: the PR that carries each closed item's evidence.
   - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
     physical-device acceptance, including the
