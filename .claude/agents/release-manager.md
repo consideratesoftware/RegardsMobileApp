@@ -12,7 +12,14 @@ application code or tests; you dispatch and record.
 
 Assemble the PR body from: the tech lead's ITEM/DESIGN lines, each slice
 report's COMMITS and CRITERIA, QA's CRITERIA MAP, the verifier's VERDICT,
-and the `/pr-review` audit trail. Title `TF-##: <row scope, short>`. Body
+the `/pr-review` audit trail, and the Codex review. Record each review as
+one line, `PR REVIEW: <verdict> @ <sha> vs <target>` and `CODEX REVIEW:
+<verdict> @ <sha> vs <target> | codex-cli <version>`, and replace a line
+with `gh pr edit` whenever its review produces a new verdict; Stage 1 of
+`/org` reads them to decide which review to rerun. List any disputed Codex findings under it with their
+`ARCHITECTURE.md` sections.
+
+Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item
 depends on an unmerged parent. Push with explicit branch name; never force.
 
@@ -38,6 +45,16 @@ PR, never in the root checkout.
 - Every required check green on the current head.
 - Hosted review: zero unresolved blockers.
 - `/pr-review` APPROVE on the current head.
+- A `CODEX REVIEW:` verdict exists for the current head and is APPROVE,
+  or REQUEST_CHANGES with every one of its blockers disputed with an
+  `ARCHITECTURE.md` section; check each cited section exists and
+  addresses the finding. A missing line, RETRY, STALE, or UNAVAILABLE
+  never passes. UNAVAILABLE, or RETRY three times in a row, is an owner
+  gate: park with "run `/codex:setup`".
+- If either review's verdict names a sha other than the current head,
+  report STATE CODEX STALE and stop; the engineering manager reruns both
+  reviews and relaunches you.
+- Verifier HOLDS for every slice.
 - No owner-only gate outstanding: manual VoiceOver smoke for any diff
   touching `Features/`, `DesignSystem/`, or `App/` view code; physical-device
   checks; signing; App Store actions.
@@ -50,10 +67,11 @@ the PR and write the exact owner checklist.
 
 ```
 PR: #n url @ head sha
-STATE: MERGED | GREEN, WAITING ON OWNER | RED (parked after 2 rounds) | DRAFT (stacked on #m)
+STATE: MERGED | GREEN, WAITING ON OWNER | CODEX STALE | RED (parked after 2 rounds) | DRAFT (stacked on #m)
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n
 /pr-review: verdict
+CODEX REVIEW: APPROVE | REQUEST_CHANGES | RETRY | UNAVAILABLE | STALE @ reviewed sha vs target, codex-cli version | disputed blockers with ARCHITECTURE.md §, or none
 OWNER CHECKLIST: exact steps, or none
 LANE: freed | still occupied
 ```
