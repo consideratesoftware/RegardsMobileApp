@@ -27,7 +27,7 @@ public enum NotificationAuthorizationStatus: String, Sendable, Equatable {
 
 /// The two notification shapes §9 contract 5 defines: one contact's cadence
 /// reminder, or a digest for every contact sharing a slot start.
-public enum NotificationCategory: String, Sendable, Equatable, CaseIterable {
+public enum NotificationCategory: String, Sendable, Equatable {
     case cadence = "regards.cadence"
     case digest = "regards.digest"
 }
@@ -48,7 +48,8 @@ public protocol NotificationScheduling: Sendable {
     func requestAuthorization() async throws -> Bool
     func authorizationStatus() async -> NotificationAuthorizationStatus
     /// Actions the user takes on delivered notifications. Single consumer:
-    /// a second concurrent iterator is a programmer error and traps.
+    /// with a second concurrent iterator, each action goes to only one of them
+    /// and the two run concurrently, so actions are no longer handled in order.
     var actions: AsyncStream<NotificationAction> { get }
 }
 
@@ -71,7 +72,8 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     private static let caughtUpActionIdentifier = "regards.caught-up"
     private static let snoozeActionIdentifier = "regards.snooze"
 
-    override private init() {
+    /// Internal so a test can build a fresh adapter; production uses `shared`.
+    override init() {
         // Unbounded: an action tapped on a cold launch arrives before the
         // consumer starts (it waits for the runtime), and user taps are few.
         (actions, continuation) = AsyncStream.makeStream(
@@ -104,29 +106,39 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     // MARK: - UNUserNotificationCenterDelegate
 
     /// `UNNotificationResponse` and its `userInfo` aren't `Sendable`, so the
-    /// response is decoded here, synchronously, and only the `Sendable`
-    /// `NotificationAction` crosses into the stream.
+    /// response is copied out here, synchronously, before anything leaves
+    /// this method.
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let action = Self.action(
+        receive(
             identifier: response.actionIdentifier,
-            userInfo: response.notification.request.content.userInfo
+            userInfo: response.notification.request.content.userInfo,
+            completion: completionHandler
         )
-        if let action {
+    }
+
+    /// Decodes a response and yields the action, if there is one. Only the
+    /// `Sendable` `NotificationAction` crosses into the stream. Always calls
+    /// `completion`, so the system is told the response was handled even when
+    /// it decoded to nothing. Split out so a test can drive it without a
+    /// `UNNotificationResponse`, which can't be constructed.
+    func receive(identifier: String, userInfo: [AnyHashable: Any], completion: () -> Void) {
+        if let action = Self.action(identifier: identifier, userInfo: userInfo) {
             continuation.yield(action)
         }
-        completionHandler()
+        completion()
     }
 
     // MARK: - Pure mapping (tested without the notification center)
 
     /// Cadence notifications carry Caught up and Snooze 1 week; both open the
-    /// app (owner ruling 2026-10-11). There's no custom Open action: the OS
-    /// default tap already opens the app, and an action that did nothing more
-    /// would be an inert control (§10, R11). Digests carry no actions.
+    /// app (owner ruling 2026-10-11, recorded in the PR #58 comment). There's
+    /// no custom Open action: the OS default tap already opens the app, and an
+    /// action that did nothing more would be an inert control (§10, R11).
+    /// Digests carry no actions.
     static var categories: Set<UNNotificationCategory> {
         let caughtUp = UNNotificationAction(
             identifier: caughtUpActionIdentifier,

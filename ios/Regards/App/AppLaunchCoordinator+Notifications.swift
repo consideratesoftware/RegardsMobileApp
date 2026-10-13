@@ -14,8 +14,9 @@ extension AppLaunchCoordinator {
     /// this on every exit, once `phase` is decided (`.ready`, `.onboarding`,
     /// or `.failed`), so an action that launched the app (buffered in the
     /// stream until now) is judged against the real phase and never held
-    /// across a failed launch. Idempotent: `retry()` reaches this again and
-    /// must not start a second iterator, which would trap.
+    /// across a failed launch. Idempotent: `retry()` reaches this again. A
+    /// second iterator wouldn't trap; it would split actions between two tasks
+    /// that run concurrently.
     func beginConsumingNotificationActions() {
         guard notificationActionTask == nil, let notifications else { return }
         let actions = notifications.actions
@@ -44,7 +45,48 @@ extension AppLaunchCoordinator {
         }
         switch action {
         case .caughtUp(let contactId):
-            await markCaughtUpFromNotification(contactId: contactId, runtime: runtime)
+            // The same sequence as the view models' Caught up: clear any pending
+            // snooze through `SchedulingPass.caughtUp`, log the interaction, and
+            // restore the snooze if logging fails (see
+            // `SchedulingPass.restorePendingAfterFailedCaughtUp`).
+            //
+            // This is the 4th inline copy, after `OverdueViewModel`,
+            // `UpcomingViewModel`, and `ContactDetailViewModel`. Extracting a shared
+            // helper would mean editing those 3 locked view-model files, which
+            // TF-07 rewrites anyway for R60; the extraction belongs there.
+            //
+            // The eligibility check comes first because neither later step has it:
+            // `caughtUp` has no precondition by design, and `InteractionLogging`
+            // checks only `isActive`. A notification can outlive the contact's
+            // tracking, so an untracked or no-cadence contact must write nothing.
+            let contacts = runtime.environment.contacts
+            do {
+                guard let contact = try await contacts.fetch(id: contactId),
+                      contact.isActive, contact.tracked, contact.cadenceDays != nil else {
+                    Self.notificationLog.info("ignored Caught up from a notification for an ineligible contact")
+                    return
+                }
+            } catch {
+                Self.notificationLog.error(
+                    "Caught up from a notification couldn't read the contact: \(error, privacy: .private)"
+                )
+                return
+            }
+
+            let logging = InteractionLogging(contacts: contacts, interactions: runtime.environment.interactions)
+            var clearedPendingSnooze = false
+            do {
+                clearedPendingSnooze = try await runtime.scheduler.caughtUp(contactId: contactId)
+                try await logging.markCaughtUp(contactId: contactId, at: runtime.clock())
+            } catch {
+                Self.notificationLog.error("Caught up from a notification failed: \(error, privacy: .private)")
+                guard clearedPendingSnooze else { return }
+                do {
+                    try await runtime.scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
+                } catch {
+                    Self.notificationLog.error("couldn't restore the cleared snooze: \(error, privacy: .private)")
+                }
+            }
         case .snooze(let contactId):
             do {
                 // `snooze` checks tracked, cadence, and active itself and
@@ -55,51 +97,6 @@ extension AppLaunchCoordinator {
                 }
             } catch {
                 Self.notificationLog.error("Snooze from a notification failed: \(error, privacy: .private)")
-            }
-        }
-    }
-
-    /// The same sequence as the view models' Caught up: clear any pending
-    /// snooze through `SchedulingPass.caughtUp`, log the interaction, and
-    /// restore the snooze if logging fails (see
-    /// `SchedulingPass.restorePendingAfterFailedCaughtUp`).
-    ///
-    /// This is the 4th inline copy, after `OverdueViewModel`,
-    /// `UpcomingViewModel`, and `ContactDetailViewModel`. Extracting a shared
-    /// helper would mean editing those 3 locked view-model files, which
-    /// TF-07 rewrites anyway for R60; the extraction belongs there.
-    ///
-    /// The eligibility check comes first because neither later step has it:
-    /// `caughtUp` has no precondition by design, and `InteractionLogging`
-    /// checks only `isActive`. A notification can outlive the contact's
-    /// tracking, so an untracked or no-cadence contact must write nothing.
-    private func markCaughtUpFromNotification(contactId: UUID, runtime: AppRuntime) async {
-        let contacts = runtime.environment.contacts
-        do {
-            guard let contact = try await contacts.fetch(id: contactId),
-                  contact.isActive, contact.tracked, contact.cadenceDays != nil else {
-                Self.notificationLog.info("ignored Caught up from a notification for an ineligible contact")
-                return
-            }
-        } catch {
-            Self.notificationLog.error(
-                "Caught up from a notification couldn't read the contact: \(error, privacy: .private)"
-            )
-            return
-        }
-
-        let logging = InteractionLogging(contacts: contacts, interactions: runtime.environment.interactions)
-        var clearedPendingSnooze = false
-        do {
-            clearedPendingSnooze = try await runtime.scheduler.caughtUp(contactId: contactId)
-            try await logging.markCaughtUp(contactId: contactId, at: runtime.clock())
-        } catch {
-            Self.notificationLog.error("Caught up from a notification failed: \(error, privacy: .private)")
-            guard clearedPendingSnooze else { return }
-            do {
-                try await runtime.scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
-            } catch {
-                Self.notificationLog.error("couldn't restore the cleared snooze: \(error, privacy: .private)")
             }
         }
     }

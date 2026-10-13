@@ -177,7 +177,7 @@ final class AppLaunchCoordinator {
 
     /// Not `private`: `AppLaunchCoordinator+DebugLaunch.swift` calls this
     /// across the file split (see that file's header comment).
-    init(mockRuntime: AppRuntime, notifications: (any NotificationScheduling)? = nil) {
+    init(mockRuntime: AppRuntime, notifications: (any NotificationScheduling)?) {
         self.phase = .ready
         self.runtime = mockRuntime
         self.dependencies = nil
@@ -223,8 +223,9 @@ final class AppLaunchCoordinator {
         guard !didStart, let dependencies else {
             // No launch body runs here: the DEBUG mock launch, or a
             // coordinator whose phase was set without one. Its phase is
-            // already decided unless another `start()` is still loading,
-            // which starts the consumer itself when it finishes.
+            // already decided (DEBUG `testingPhase: .loading` excepted) unless
+            // another `start()` is still loading, which starts the consumer
+            // itself when it finishes.
             if phase != .loading { beginConsumingNotificationActions() }
             return
         }

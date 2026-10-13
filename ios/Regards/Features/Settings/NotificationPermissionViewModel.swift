@@ -16,6 +16,12 @@ import UIKit
 @Observable @MainActor
 public final class NotificationPermissionViewModel {
     public private(set) var status: NotificationAuthorizationStatus?
+    /// True after the system request threw, so the tap didn't look dead. The
+    /// row shows `requestFailedMessage` under it. Cleared when a later request
+    /// succeeds or the status changes.
+    public private(set) var requestFailed = false
+
+    public static let requestFailedMessage = "Couldn't ask for notification permission. Try again."
 
     private let notifications: any NotificationScheduling
     /// Speaks a status change. Injected so a test can see what was said.
@@ -54,6 +60,7 @@ public final class NotificationPermissionViewModel {
         let previous = status
         status = current
         guard let previous, previous != current else { return }
+        requestFailed = false
         switch current {
         case .authorized: announce("Notifications on")
         case .denied: announce("Notifications off")
@@ -73,8 +80,11 @@ public final class NotificationPermissionViewModel {
         defer { isRequesting = false }
         do {
             _ = try await notifications.requestAuthorization()
+            requestFailed = false
         } catch {
             Self.log.error("notification authorization request failed: \(error, privacy: .private)")
+            requestFailed = true
+            announce(Self.requestFailedMessage)
         }
         await refresh()
     }
