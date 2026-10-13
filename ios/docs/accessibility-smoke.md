@@ -72,12 +72,12 @@ Reminder window row.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is
       gone, and nothing asks for confirmation.
 - [ ] Open Contact Detail for a tracked contact with a cadence. "Reminder
-      window" reads "Your default", with a Change button. Activate Change, then
-      Save. The editor dismisses, and the row reads "Custom".
-- [ ] In that override editor, activate "Use my default window". The editor
-      dismisses, and the row reads "Your default".
+      window" reads "Default window", with a Change button. Activate Change,
+      then Save. The editor dismisses, and the row reads "Custom window".
+- [ ] In that override editor, activate "Use default window". The editor
+      dismisses, and the row reads "Default window".
 - [ ] At Dynamic Type `accessibility5`, the day pills, time ranges, Save, and
-      "Use my default window" fit without clipping and stay tappable.
+      "Use default window" fit without clipping and stay tappable.
 
 ## Reporting
 
