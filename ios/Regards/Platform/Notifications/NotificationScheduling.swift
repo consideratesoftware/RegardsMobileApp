@@ -47,9 +47,9 @@ public protocol NotificationScheduling: Sendable {
     /// Raises the system prompt on first call; returns whether alerts are allowed.
     func requestAuthorization() async throws -> Bool
     func authorizationStatus() async -> NotificationAuthorizationStatus
-    /// Actions the user takes on delivered notifications. Single consumer:
-    /// with a second concurrent iterator, each action goes to only one of them
-    /// and the two run concurrently, so actions are no longer handled in order.
+    /// Actions the user takes on delivered notifications. Read it from one
+    /// consumer only: a second concurrent iterator would take some of the
+    /// actions and run alongside the first, so they'd be handled out of order.
     var actions: AsyncStream<NotificationAction> { get }
 }
 
@@ -60,8 +60,10 @@ public protocol NotificationScheduling: Sendable {
 /// (`AsyncStream` and its `Continuation` over a `Sendable` element). The
 /// notification center is looked up per call rather than stored.
 ///
-/// Exactly one instance per process (`shared`), because the center holds its
-/// delegate weakly and `actions` allows one consumer.
+/// Production uses only `shared`. The system notification center keeps its
+/// delegate weakly, so `shared` is the one instance that stays alive to
+/// receive responses, and `actions` has a single consumer. A second adapter
+/// would receive no responses. The initializer is internal for tests.
 public final class UserNotificationsAdapter: NSObject, NotificationScheduling, UNUserNotificationCenterDelegate {
     public static let shared = UserNotificationsAdapter()
 
@@ -72,7 +74,7 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     private static let caughtUpActionIdentifier = "regards.caught-up"
     private static let snoozeActionIdentifier = "regards.snooze"
 
-    /// Internal so a test can build a fresh adapter; production uses `shared`.
+    /// Internal so a test can build a fresh adapter; see the type's comment.
     override init() {
         // Unbounded: an action tapped on a cold launch arrives before the
         // consumer starts (it waits for the runtime), and user taps are few.
