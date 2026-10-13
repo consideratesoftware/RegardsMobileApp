@@ -61,9 +61,11 @@ For each open TF PR:
    `release-manager` with both current verdicts to re-evaluate the PR. If
    it reports CODEX STALE, handle it as in Stage 4. It will route red
    checks to `on-call-engineer`, park on owner gates, or merge when all
-   conditions hold. Otherwise the lane is in progress: observe only.
-   Report its state, and leave repairs, branch updates, and review reruns
-   to that lane's own Stage 3 and Stage 4.
+   conditions hold. Otherwise the lane is in progress. If step 6 of Stage
+   0 found another session using it, observe only and report its state.
+   If no session is using it, the lane was abandoned: Stage 2 resumes it
+   as a staffed lane (it counts against the budget), picking up Stage 3 at
+   the first slice without a HOLDS verdict.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
@@ -119,8 +121,9 @@ dirty tree: the lane's owner commits or discards the files), then run it
 once more. If that rerun also returns RETRY, post it on the PR as
 `CODEX REVIEW: UNAVAILABLE (second RETRY) @ <sha> ...`, so a restart sees an
 owner gate instead of rerunning again. Once the lane has a PR, post every
-Codex result on it as a verdict comment that carries only the verdict line
-and the blocker and should-fix counts. Never paste Codex's output into a PR
+Codex result on it as a verdict comment that carries only the verdict line,
+the blocker and should-fix counts, and one line per disputed blocker in the
+form `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. Never paste Codex's output into a PR
 comment: comments are read by the repository's `@claude` workflow, and
 quoted diff text could trigger it. The full review stays in the lane's
 report.

@@ -21,8 +21,9 @@ by editing the body: the hosted review runs on `pull_request_target`
 <sha> vs <target> | codex-cli <version>`. Only unedited comments (`lastEditedAt` null) by the
 org's own account (`gh api user --jq .login`) count, and the newest of
 each kind is current; Stage 1 of `/org` reads them the same way. Never
-edit a verdict comment; post a new one. Put any disputed Codex findings,
-with their `ARCHITECTURE.md` sections, in the same comment.
+edit a verdict comment; post a new one. Disputed Codex blockers go in the same comment,
+one line each: `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. Never
+copy review or diff text into a comment.
 
 Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item

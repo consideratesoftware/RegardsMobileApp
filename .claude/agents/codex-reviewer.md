@@ -62,7 +62,7 @@ printed:
 
 ```bash
 wt='<worktree>'
-nohup sh -c 'codex exec -C "$1" -s read-only -o "$2" - < "$3"; echo $? > "$2.exit"' \
+nohup sh -c 'perl -e "alarm shift; exec @ARGV" 1560 codex exec -C "$1" -s read-only -o "$2" - < "$3"; echo $? > "$2.exit"' \
   sh "$wt" '<out>' '<prompt>' > '<out>.log' 2>&1 &
 echo started
 ```
@@ -75,11 +75,11 @@ for i in $(seq 1 54); do [ -s '<out>.exit' ] && break; sleep 10; done
 cat '<out>.exit' 2>/dev/null || echo "still running"
 ```
 
-Repeat that wait up to 3 times (about 27 minutes in all). A docs or CI diff
-took about 3 minutes. If it is still running after the third wait, report
-UNAVAILABLE with reason "timeout" and leave it alone. Don't try to stop it:
-it runs read-only and writes only to its own `<out>` file, which nothing
-reads again. Otherwise:
+`perl ... alarm` gives Codex a hard 26-minute limit: the operating system
+ends it then, and the exit code is 142. Repeat that wait up to 3 times
+(about 27 minutes in all), so the exit file always exists by the third
+wait. A docs or CI diff took about 3 minutes. An exit code of 142 means the
+review timed out: report UNAVAILABLE with reason "timeout". Otherwise:
 
 ```bash
 echo "codex exit $(cat '<out>.exit')"

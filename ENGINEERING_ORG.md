@@ -117,9 +117,11 @@ Only Sid can do these, and the org never pretends one happened. When a
 gate, an OPEN FOR OWNER ruling, or a reviewer's "Questions for Sid" item
 comes up, the engineering manager interviews Sid in the session with
 `AskUserQuestion`: related questions batched, recommendation first, with
-the context to answer in one pass. Each answer goes on the PR as a comment; if
-the PR isn't open yet, the release manager posts it as the first comment
-when it opens the PR. Physical tasks,
+the context to answer in one pass. Each answer goes on the PR as a comment. If
+the PR isn't open yet, the tech writer records the answer in the lane's
+`TESTFLIGHT_PLAN.md` Owner gates entry in the next lane commit, so it
+survives a stopped session, and the release manager posts it as the PR's
+first comment when it opens the PR. Physical tasks,
 such as a device run or a VoiceOver smoke, are presented the same way as
 exact steps, and Sid's result is recorded the same way. Only work that
 needs the answer waits; if Sid isn't in the session, the rest continues and
