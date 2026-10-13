@@ -63,10 +63,28 @@ Reminder window row.
 
 - [ ] Settings → Reminder windows: each day pill reads its full day name (for
       example, "Thursday") and its value, "allowed" or "not allowed".
-- [ ] Turn off every day and activate Save. An inline message appears, and
-      VoiceOver announces it. The screen stays open, and the draft is unchanged.
+- [ ] Turn off every day and activate Save. Focus moves to the error message,
+      and then VoiceOver announces it. The screen stays open, and the draft is
+      unchanged.
 - [ ] Repeat with an overlapping time range, then with quiet hours whose start
-      equals end. Each refusal is announced the same way.
+      equals end. Each refusal moves focus to the message, then announces it.
+- [ ] Quiet hours that cover every allowed time are refused with "Quiet hours
+      cover every allowed time, so no reminder could ever fire. Shorten the
+      quiet hours or add a time range." Without quiet hours, the same case reads
+      "No reminder could ever fire in this window. Add a day or a longer time
+      range."
+- [ ] Select each day set and listen to the day summary: "No days selected.",
+      "Weekdays only. Weekends are yours.", "Weekends only.", "Any day.", or a
+      list of the selected day names.
+- [ ] "+ Add range" is labelled "Add range" and adds the first free hour after
+      the last range. Move the last range to end at 11:59 pm: the button is
+      disabled, and its hint says "The last range already ends at 11:59 pm, so
+      there's no time left after it."
+- [ ] The quiet-hours toggle is labelled "Never between". Its value speaks
+      "<start> to <end>", or "off" when disabled.
+- [ ] Global editor only: "Morning-of time" has the hint "Birthdays and
+      anniversaries, separate from cadence." The footer reads "All times local ·
+      <zone name>. DST handled automatically."
 - [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
       the new "Next N days" label.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is
@@ -78,6 +96,11 @@ Reminder window row.
       dismisses, and the row reads "Default window".
 - [ ] At Dynamic Type `accessibility5`, the day pills, time ranges, Save, and
       "Use default window" fit without clipping and stay tappable.
+- [ ] Open the editor for a contact on the default window, change nothing, and
+      activate Save. The editor closes, and the row still reads "Default window".
+- [ ] Contact Detail has no "Next reminder" row.
+- [ ] Overdue shows no digest time and no footer sentence. The lead reads
+      "Send your regards".
 
 ## Reporting
 
