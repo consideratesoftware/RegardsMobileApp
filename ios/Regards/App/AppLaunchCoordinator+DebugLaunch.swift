@@ -28,7 +28,12 @@ extension AppLaunchCoordinator {
                 notifications: notificationStatus == "unavailable"
                     ? nil
                     : DebugNotificationScheduling(
-                        status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined
+                        status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined,
+                        // `fail` makes the system request throw, so a UI test
+                        // can reach the Settings request-error line.
+                        requestOutcome: environment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] == "fail"
+                            ? .fail
+                            : .grant
                     )
             )
         }
