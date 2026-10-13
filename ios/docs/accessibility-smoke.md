@@ -37,18 +37,26 @@ under a **Manual accessibility smoke** heading.
 
 ## Settings notifications
 
-Run on a fresh install, then check each state the row can show.
+Run on a fresh install. The visible text and the VoiceOver label can differ,
+so check the label.
 
-- [ ] Not determined: the Settings row reads "Turn on notifications" as a
-      button. Activating it raises the iOS prompt once.
-- [ ] Grant the prompt: the row reads "Notifications on" as text with no
-      button, and VoiceOver announces "Notifications on".
-- [ ] Denied (deny the prompt, or turn off notifications for Regards in iOS
-      Settings): the row reads "Notifications off. Open iOS Settings" as a
-      button. Activating it opens Regards' notification settings in iOS
+- [ ] Not determined: the row shows "Turn on notifications", which VoiceOver
+      reads as a button. Activating it raises the iOS prompt once.
+- [ ] Deny the prompt: VoiceOver announces "Notifications off".
+- [ ] Denied: the visible text is "Open iOS Settings" over "Notifications are
+      off for Regards." VoiceOver reads "Notifications off. Open iOS Settings"
+      as a button. Activating it opens Regards' notification settings in iOS
       Settings.
-- [ ] Authorized in iOS Settings: return to Regards. The row reads
-      "Notifications on" as text with no button.
+- [ ] At Dynamic Type `accessibility5`, the denied row wraps without clipping,
+      and its button stays tappable.
+- [ ] Grant the prompt from not determined: VoiceOver announces "Notifications
+      on", and the row reads it as text with no button.
+- [ ] A failed permission request shows the request-error line in the row, and
+      VoiceOver announces it. Exact text: [pending, from the TF-06 engineer].
+- [ ] Return from iOS Settings after a change: VoiceOver announces the new
+      state. This step needs a denied state first. From denied, turn
+      notifications on for Regards in iOS Settings, then return. The row then
+      reads "Notifications on" as text with no button.
 
 ## Screen checklist
 
