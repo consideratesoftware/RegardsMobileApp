@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The live reminder-window editor (ARCHITECTURE.md §10 screen 9). The same
 /// screen edits the global window and, from Contact Detail, one contact's
-/// override; an override shows days, ranges, and quiet hours only (I3).
+/// override; an override shows days, ranges, and quiet hours only. Occasion time and
+/// horizon stay global.
 public struct ReminderWindowsScreen: View {
     /// `@State`, not a plain property: the Settings destination closure runs
     /// again on every root re-render and hands over a fresh view model each
@@ -12,6 +13,8 @@ public struct ReminderWindowsScreen: View {
     let clock: () -> Date
     private let announce: @MainActor (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @AccessibilityFocusState private var errorFocused: Bool
+    @State private var refusalAnnouncer = RowActionAnnouncer()
     @ScaledMetric(relativeTo: .subheadline) var pillSize: CGFloat = 36
 
     public init(viewModel: ReminderWindowsViewModel,
@@ -63,8 +66,16 @@ public struct ReminderWindowsScreen: View {
         .task {
             if viewModel.loadState == .loading { await viewModel.load() }
         }
+        // Focus lands on the error banner first, then the message is spoken:
+        // a focus change flushes VoiceOver's speech queue, so announcing
+        // first would cut the message off (same order as `RowActionAnnouncer`
+        // gives Overdue and Upcoming).
         .onChange(of: viewModel.failureCount) {
-            if let message = viewModel.validationMessage { announce(message) }
+            guard let message = viewModel.validationMessage else { return }
+            refusalAnnouncer.fire(
+                message,
+                effects: RowActionAccessibilityEffects(announce: announce, didFocus: {})
+            ) { errorFocused = true }
         }
     }
 
@@ -83,7 +94,7 @@ public struct ReminderWindowsScreen: View {
                 occasionSection
                 horizonSection
             }
-            Text("All times local · \(viewModel.timezoneIdentifier). DST handled automatically.")
+            Text("All times local · \(viewModel.timezoneName). DST handled automatically.")
                 .font(.caption)
                 .foregroundStyle(RegardsDS.muted)
                 .multilineTextAlignment(.center)
@@ -138,6 +149,7 @@ public struct ReminderWindowsScreen: View {
                 .font(.footnote)
                 .foregroundStyle(RegardsDS.accentInk)
                 .accessibilityIdentifier("reminder-windows.error")
+                .accessibilityFocused($errorFocused)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -150,7 +162,7 @@ public struct ReminderWindowsScreen: View {
     // MARK: - Override extras
 
     private var overrideNote: some View {
-        Text("Occasion time and the Upcoming horizon follow your default window.")
+        Text("Occasion time and the Upcoming horizon follow the default window.")
             .font(.footnote)
             .foregroundStyle(RegardsDS.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -162,7 +174,7 @@ public struct ReminderWindowsScreen: View {
         Button {
             Task { if await viewModel.resetToDefault() { dismiss() } }
         } label: {
-            Text("Use my default window")
+            Text("Use default window")
                 .font(.body.weight(.medium))
                 .foregroundStyle(RegardsDS.accentInk)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

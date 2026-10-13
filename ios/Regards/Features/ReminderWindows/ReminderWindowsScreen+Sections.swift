@@ -43,12 +43,13 @@ extension ReminderWindowsScreen {
         } label: {
             ZStack {
                 Circle()
-                    // `accentInk` so the white day letter passes AA body contrast.
+                    // `background` on `accentInk` is a registered 4.5:1 pair in
+                    // both appearances; raw white fails in dark mode.
                     .fill(active ? RegardsDS.accentInk : RegardsDS.hairSoft)
                     .frame(width: pillSize, height: pillSize)
                 Text(label.letter)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(active ? Color.white : RegardsDS.muted)
+                    .foregroundStyle(active ? RegardsDS.background : RegardsDS.muted)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
@@ -85,12 +86,15 @@ extension ReminderWindowsScreen {
 
     private var daysSummary: String {
         let days = viewModel.draft.allowedDays
-        let hasWeekdays = days.contains(.weekdays)
-        let hasWeekends = !days.isDisjoint(with: .weekends)
-        if hasWeekdays && !hasWeekends { return "Weekdays only. Weekends are yours." }
-        if !hasWeekdays && hasWeekends { return "Weekends only." }
-        if hasWeekdays && hasWeekends { return "Any day." }
-        return days.isEmpty ? "No days selected." : "Some days selected."
+        switch days {
+        case []: return "No days selected."
+        case .weekdays: return "Weekdays only. Weekends are yours."
+        case .weekends: return "Weekends only."
+        case .allDays: return "Any day."
+        default:
+            let names = Self.dayLabels.filter { days.contains($0.day) }.map(\.name)
+            return ListFormatter.localizedString(byJoining: names) + "."
+        }
     }
 
     // MARK: - Time ranges
@@ -114,13 +118,15 @@ extension ReminderWindowsScreen {
                     } label: {
                         Text("+ Add range")
                             .font(.body.weight(.medium))
-                            .foregroundStyle(RegardsDS.accentInk)
+                            .foregroundStyle(viewModel.canAddRange ? RegardsDS.accentInk : RegardsDS.muted)
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .padding(.horizontal, 16)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Add time range")
+                    .disabled(!viewModel.canAddRange)
+                    .accessibilityLabel("Add range")
+                    .accessibilityHint(viewModel.canAddRange ? "" : ReminderWindowsViewModel.addRangeUnavailableReason)
                     .accessibilityIdentifier("reminder-windows.add-range")
                 }
             }
@@ -229,12 +235,12 @@ extension ReminderWindowsScreen {
                             Text(quietHoursLabel)
                                 .font(RegardsFont.mono(.footnote))
                                 .foregroundStyle(RegardsDS.muted)
+                                .accessibilityLabel(quietHoursSpoken)
                         }
                     }
                     // Matches the active day-pill `accentInk` fill on this
                     // screen so the two accent-colored controls read as one family.
                     .tint(RegardsDS.accentInk)
-                    .accessibilityLabel("Quiet hours")
                     .accessibilityIdentifier("reminder-windows.quiet-toggle")
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -274,7 +280,12 @@ extension ReminderWindowsScreen {
 
     private var quietHoursLabel: String {
         guard let q = viewModel.draft.quietHours else { return "off" }
-        return "\(Self.format(q.start)) → \(Self.format(q.end))"
+        return "\(q.start.displayLabel) → \(q.end.displayLabel)"
+    }
+
+    private var quietHoursSpoken: String {
+        guard let q = viewModel.draft.quietHours else { return "off" }
+        return "\(q.start.displayLabel) to \(q.end.displayLabel)"
     }
 
     // MARK: - Occasion and horizon (global only)
@@ -316,8 +327,14 @@ extension ReminderWindowsScreen {
         .accessibilityHidden(true)
     }
 
+    // The caption is hidden above (the picker's own title speaks the label)
+    // and spoken here as the picker's hint instead.
     private var occasionPicker: some View {
-        TimePickerField(title: "Morning-of time", time: $viewModel.draft.occasionTime)
+        TimePickerField(
+            title: "Morning-of time",
+            hint: "Birthdays and anniversaries, separate from cadence.",
+            time: $viewModel.draft.occasionTime
+        )
     }
 
     var horizonSection: some View {
@@ -361,10 +378,6 @@ extension ReminderWindowsScreen {
     // MARK: - Helpers
 
     private typealias DayLabel = (day: DayOfWeekMask, letter: String, name: String)
-
-    private static func format(_ time: TimeOfDay) -> String {
-        String(format: "%02d:%02d", time.hour, time.minute)
-    }
 
     private static let dayLabels: [DayLabel] = [
         (.sunday, "S", "Sunday"), (.monday, "M", "Monday"),

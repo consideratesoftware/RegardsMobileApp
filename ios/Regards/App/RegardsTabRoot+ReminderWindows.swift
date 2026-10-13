@@ -4,10 +4,11 @@ extension RegardsTabRoot {
     /// The global reminder-window editor, composed like the factories in
     /// `RegardsApp.swift` (same justification: `AppRuntimeTests` reaches the
     /// composition through this seam). It lives in its own file because
-    /// `RegardsApp.swift` is at SwiftLint's 500-line limit.
+    /// `RegardsApp.swift` is near SwiftLint's 500-line limit.
     ///
     /// `onSaved` is how a global save reaches the live Upcoming view model
-    /// (I2); without it the tab keeps the launch window until relaunch. The
+    /// (so Upcoming's horizon and rows follow a saved window); without it the
+    /// tab keeps the launch window until relaunch. The
     /// editor writes through the repositories, never `runtime.window`, which
     /// stays the launch snapshot (R55 ruling: the editor cannot change a
     /// timezone, so the scheduler calendar cannot go stale).
@@ -28,7 +29,7 @@ extension RegardsTabRoot {
     /// One contact's override editor, built per push from Contact Detail. It
     /// saves through `updateReminderWindowOverride`, so it needs no `onSaved`:
     /// Upcoming follows `observeTracked`, and Contact Detail re-reads the
-    /// contact when the editor closes.
+    /// contact when it reappears.
     @MainActor
     static func makeContactWindowEditor(
         contactId: UUID,
@@ -39,7 +40,7 @@ extension RegardsTabRoot {
             window: runtime.environment.window,
             contacts: runtime.environment.contacts,
             clock: runtime.clock,
-            onSaved: { _ in }
+            onSaved: { _ in } // An override save reaches Upcoming through observeTracked.
         )
     }
 }

@@ -89,6 +89,7 @@
 		7D597EFD10C14663F2587DBB /* RegardsAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8422BFBA98540419934AFFB6 /* RegardsAppIntents.swift */; };
 		7F44DC93287BA6FA73797344 /* UpcomingViewModelDuplicateRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3DA6BFDA4063C9B02119DA /* UpcomingViewModelDuplicateRowTests.swift */; };
 		80DC0EB649CD8AD9D62671B3 /* ReminderWindowsViewModelOverrideTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A591319D2F55F5CC5A837F26 /* ReminderWindowsViewModelOverrideTests.swift */; };
+		82B4C9CF1FA0CB4ABA29F1FB /* TimePickerField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D16147E4A38A9832234AE8 /* TimePickerField.swift */; };
 		82E1E49B109EF8FF03503537 /* UpcomingViewModelActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59E559490C6DEA7049F62EE /* UpcomingViewModelActionTests.swift */; };
 		83AA10666D5A7C26D5895344 /* ContactsReconcilerResilienceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A6A21C2DCA33AADA047708 /* ContactsReconcilerResilienceTests.swift */; };
 		84BF0060BAF9E333A37B6D38 /* RegardsPlatformEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531E4D36CE29E5551F8C3E3E /* RegardsPlatformEffects.swift */; };
@@ -115,7 +116,6 @@
 		9C21800EF35738C4209D8A07 /* RegardsTabRoot+ReminderWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8726A1F1905B5171325F4C3C /* RegardsTabRoot+ReminderWindows.swift */; };
 		9D872359157DA01ECDBB62A0 /* RepositoryFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0ABE512E2B05FB378890460 /* RepositoryFakes.swift */; };
 		A014E843B51D4756241CEE84 /* MergeDuplicatesViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E06DD4E5622574D16D1559B7 /* MergeDuplicatesViewModelTests.swift */; };
-		A3576607E5783EC9663ADC22 /* ReminderWindowsTimePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFD561D89628F419EDBCBE3 /* ReminderWindowsTimePicker.swift */; };
 		A5D9F43AF9DAEB2B469E469C /* ContactsSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11810902C3217ECA1F287118 /* ContactsSource.swift */; };
 		A708FFAF946E893F9E9A686D /* Records.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41C65FC7F190CCD94311E1CA /* Records.swift */; };
 		A8875687A7350049E9019ACE /* OverdueViewModelActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFEAB693894E205010B8179E /* OverdueViewModelActionTests.swift */; };
@@ -225,7 +225,6 @@
 		196DC04E6A284D9227CF2232 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1A40C514B390F4D2E4D15531 /* SchedulingPassSnoozeCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassSnoozeCalendarTests.swift; sourceTree = "<group>"; };
 		1ADC5733A26E2C5DEF5A8AA3 /* AppLaunchCoordinator+Reconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppLaunchCoordinator+Reconciliation.swift"; sourceTree = "<group>"; };
-		1AFD561D89628F419EDBCBE3 /* ReminderWindowsTimePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsTimePicker.swift; sourceTree = "<group>"; };
 		1D391EC6269B1A1F6020933D /* ReminderWindowsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsScreen.swift; sourceTree = "<group>"; };
 		20802BC7F9889673640365A0 /* RegardsTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RegardsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		212E7604734F51D4345DEAFB /* TransparencyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparencyScreen.swift; sourceTree = "<group>"; };
@@ -292,6 +291,7 @@
 		7DF5695280B533191F946271 /* OnboardingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScreen.swift; sourceTree = "<group>"; };
 		8174EBCF2C3834E4430A332E /* ChannelTapPreviewMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelTapPreviewMessageTests.swift; sourceTree = "<group>"; };
 		81AAC5A27726A4A3B00D4A15 /* ScreensAccessibilityTests+PresentedSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+PresentedSurfaces.swift"; sourceTree = "<group>"; };
+		82D16147E4A38A9832234AE8 /* TimePickerField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePickerField.swift; sourceTree = "<group>"; };
 		8422BFBA98540419934AFFB6 /* RegardsAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsAppIntents.swift; sourceTree = "<group>"; };
 		843338B9ADB21D66831CBD33 /* RegardsNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsNavigation.swift; sourceTree = "<group>"; };
 		858D00E29EA76BF067B5CF33 /* UpcomingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingViewModel.swift; sourceTree = "<group>"; };
@@ -482,8 +482,8 @@
 			children = (
 				1D391EC6269B1A1F6020933D /* ReminderWindowsScreen.swift */,
 				758853CDEABD9FE42140D77B /* ReminderWindowsScreen+Sections.swift */,
-				1AFD561D89628F419EDBCBE3 /* ReminderWindowsTimePicker.swift */,
 				635DD8ABC5566F908EA70F10 /* ReminderWindowsViewModel.swift */,
+				82D16147E4A38A9832234AE8 /* TimePickerField.swift */,
 			);
 			path = ReminderWindows;
 			sourceTree = "<group>";
@@ -1125,7 +1125,6 @@
 				FD93025B908FC944215CA8CD /* ReminderWindow.swift in Sources */,
 				EBCADBC774640A2718183EA8 /* ReminderWindowsScreen+Sections.swift in Sources */,
 				B1F6E0651085EDD681B5C249 /* ReminderWindowsScreen.swift in Sources */,
-				A3576607E5783EC9663ADC22 /* ReminderWindowsTimePicker.swift in Sources */,
 				058C66CEF661FE635DC6BCF9 /* ReminderWindowsViewModel.swift in Sources */,
 				6BDBCCAB29C3A16FAE2A7310 /* Repositories.swift in Sources */,
 				4589711B20E9C794C63E66F0 /* RowActionAccessibilityEffects.swift in Sources */,
@@ -1134,6 +1133,7 @@
 				8AB2F404FE525C0D7F43A21C /* SettingsScreen.swift in Sources */,
 				7234F46728E9FD30A25C4FA4 /* Tag.swift in Sources */,
 				6CC51AA3DEEDC42042CBE745 /* TimeOfDay.swift in Sources */,
+				82B4C9CF1FA0CB4ABA29F1FB /* TimePickerField.swift in Sources */,
 				50AE036BE6ADA7D882B22017 /* TransparencyScreen.swift in Sources */,
 				5951E761049F9668A6D912DF /* UpcomingScreen.swift in Sources */,
 				5D36A7874AE199580C968218 /* UpcomingViewModel+Formatting.swift in Sources */,

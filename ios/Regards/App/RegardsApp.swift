@@ -453,7 +453,8 @@ struct RegardsTabRoot: View {
         switch route {
         case .reminderWindows:
             ReminderWindowsScreen(
-                viewModel: Self.makeReminderWindowsViewModel(runtime: runtime, upcoming: upcomingVM)
+                viewModel: Self.makeReminderWindowsViewModel(runtime: runtime, upcoming: upcomingVM),
+                clock: runtime.clock
             )
         case .mergeDuplicates:
             MergeDuplicatesScreen(viewModel: mergeDuplicatesVM)

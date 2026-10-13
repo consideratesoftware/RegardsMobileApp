@@ -4,11 +4,19 @@ import SwiftUI
 ///
 /// `TimeOfDay` is a wall-clock value with no date, so the picker's `Date` is
 /// built on a fixed 2000-01-01 UTC reference and the picker is pinned to UTC.
-/// A device-zone round trip would shift the value on a DST day, and trap
-/// `TimeOfDay`'s range precondition on a zone with a 30-minute offset.
+/// UTC has no DST, so the wall-clock value the user picks is the value
+/// stored, whatever zone the device is in. A round trip through the device
+/// zone could shift it by an hour on a DST day.
 struct TimePickerField: View {
     let title: String
+    var hint: String?
     @Binding var time: TimeOfDay
+
+    init(title: String, hint: String? = nil, time: Binding<TimeOfDay>) {
+        self.title = title
+        self.hint = hint
+        self._time = time
+    }
 
     var body: some View {
         DatePicker(
@@ -23,6 +31,7 @@ struct TimePickerField: View {
         .environment(\.timeZone, .gmt)
         .frame(minHeight: 44)
         .accessibilityLabel(title)
+        .accessibilityHint(hint ?? "")
     }
 }
 
@@ -40,6 +49,12 @@ extension TimeOfDay {
     /// minutes lands on the same wall-clock reading.
     var pickerDate: Date {
         Self.pickerReference.addingTimeInterval(TimeInterval(minutesSinceMidnight * 60))
+    }
+
+    /// The same locale-aware text the picker shows ("10:30 PM", or "22:30" in
+    /// a 24-hour locale), for labels that sit beside a picker.
+    var displayLabel: String {
+        pickerDate.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: .gmt))
     }
 
     /// Reads the hour and minute the picker shows, which are UTC components

@@ -5,7 +5,7 @@ import SwiftUI
 /// `--strict`. A pure move: same views, same labels, same identifiers, which
 /// `ScreensAccessibilityTests` asserts exactly.
 ///
-/// These call `detailRow`, `stubAction`, `nextReminderLabel`, and
+/// These call `detailRow`, `stubAction`, and
 /// `valueColor`, which is why the sections extension in that file is no
 /// longer `private` — see the comment at its declaration.
 extension ContactDetailScreen {
@@ -23,9 +23,6 @@ extension ContactDetailScreen {
                         action: "Change",
                         actionIdentifier: "contact-detail.cadence-change-unavailable"
                     )
-                    Hair(inset: 16)
-                    detailRow(label: "Next reminder", value: nextReminderLabel(contact: contact),
-                              isAccent: true)
                     Hair(inset: 16)
                     detailRow(label: "Last talked", value: viewModel.lastTalkedLabel)
                     Hair(inset: 16)
@@ -47,7 +44,7 @@ extension ContactDetailScreen {
     }
 
     func reminderWindowRow(contact: Contact) -> some View {
-        let value = contact.reminderWindowOverride == nil ? "Your default" : "Custom"
+        let value = contact.reminderWindowOverride == nil ? "Default window" : "Custom window"
         let change = Button {
             windowEditor = makeWindowEditor(contact.id)
         } label: {

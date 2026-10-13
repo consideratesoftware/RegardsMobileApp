@@ -128,8 +128,8 @@ public final class UpcomingViewModel {
         await performLoad()
     }
 
-    /// Swaps in a newly saved global window and reloads (I2). The generation
-    /// bump in `performLoad()` drops any in-flight load built on the old one.
+    /// Swaps in a newly saved global window and reloads, so the rows and the
+    /// horizon follow it at once. The generation bump in `performLoad()` drops any in-flight load built on the old one.
     public func updateWindow(_ window: ReminderWindow) async {
         self.window = window
         await performLoad()
@@ -387,7 +387,7 @@ public final class UpcomingViewModel {
                 // other.
                 let snoozedUntil = snoozedUntilByContact[contact.id] ?? .distantPast
                 let target = max(now, overdueAt, snoozedUntil)
-                // Only slot math resolves the per-contact override (I4);
+                // Only slot math resolves the per-contact override;
                 // horizon, timezone, and day headers stay global. TF-07's R10
                 // swap deletes this interim second resolution point (§9).
                 // nil means zero capacity (R4) in the global window or a

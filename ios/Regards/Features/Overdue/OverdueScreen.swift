@@ -139,7 +139,7 @@ public struct OverdueScreen: View {
         )
         .plainListRow(topPadding: 18)
 
-        digestRow
+        digestLead
             .plainListRow(topPadding: 8, bottomPadding: 16)
     }
 
@@ -177,43 +177,14 @@ public struct OverdueScreen: View {
             if !viewModel.otherRows.isEmpty {
                 rowSection(for: viewModel.otherRows, header: "Others · overdue")
             }
-
-            Text("Reminders stay inside your chosen windows.")
-                .font(.footnote)
-                .foregroundStyle(RegardsDS.muted)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .plainListRow(topPadding: 22)
-        }
-    }
-
-    private var digestRow: some View {
-        AccessibilityAdaptiveLayout {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                digestLead
-                digestTime
-                Spacer(minLength: 0)
-            }
-        } accessibility: {
-            VStack(alignment: .leading, spacing: 2) {
-                digestLead
-                digestTime
-            }
         }
     }
 
     private var digestLead: some View {
-        Text("Send your regards —")
+        Text("Send your regards")
             .font(RegardsFont.serifItalic(.title2))
             .foregroundStyle(RegardsDS.ink)
             .accessibilityIdentifier("overdue.digest-lead")
-    }
-
-    private var digestTime: some View {
-        Text(viewModel.nextDigestLabel)
-            .font(.subheadline)
-            .foregroundStyle(RegardsDS.muted)
-            .accessibilityIdentifier("overdue.digest-time")
     }
 
     private var emptyState: some View {

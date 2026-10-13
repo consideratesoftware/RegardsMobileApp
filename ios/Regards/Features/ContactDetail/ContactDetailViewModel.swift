@@ -256,9 +256,7 @@ public final class ContactDetailViewModel {
     /// overdue state while the snooze is still pending — without a reload
     /// here, the screen kept reading "N days overdue" from the pre-snooze
     /// snapshot until some *unrelated* trigger (a tab switch, a pop/push)
-    /// happened to reload it. `nextReminderLabel`'s own hardcoded
-    /// placeholder is a separate, still-open gap (R11) this reload does not
-    /// touch. Most other screen labels (`cadenceLabel`, `lastTalkedLabel`)
+    /// happened to reload it. Most other screen labels (`cadenceLabel`, `lastTalkedLabel`)
     /// are untouched by a snooze and simply re-derive the same values.
     ///
     /// Returns whether the write succeeded — see `markCaughtUp`'s doc

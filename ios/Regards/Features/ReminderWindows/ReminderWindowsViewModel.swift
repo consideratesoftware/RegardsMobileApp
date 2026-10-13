@@ -4,17 +4,20 @@ import Observation
 /// Live editor state for the global reminder window and a single contact's
 /// override (ARCHITECTURE.md §9, §10 screen 9).
 ///
-/// **Invariant I1.** Every window this type writes passes `validate()`, has no
-/// overlapping allowed ranges, has a quiet-hours start that differs from its
-/// end, and yields a non-nil `ReminderEngine.nextAllowedSlot`. All four are
-/// checked in `save()` and nowhere else: `validate()` also runs when stored
-/// data decodes, so a stricter rule there would make already-stored windows
-/// fail at launch. A failed check writes nothing and sets `validationMessage`.
+/// **What a saved window guarantees.** Every window this type writes passes
+/// `validate()`, has no overlapping allowed ranges, has a quiet-hours start
+/// that differs from its end, and can fire at least once
+/// (`ReminderEngine.nextAllowedSlot` is non-nil now or 8 days from now). All
+/// of it is checked in `save()` and nowhere else: `validate()` also runs when
+/// stored data decodes, so a stricter rule there would make already-stored
+/// windows fail at launch. A failed check writes nothing and sets
+/// `validationMessage`.
 ///
-/// **Invariant I3.** An override copies the global timezone, occasion time, and
-/// horizon at save time, and this editor never changes a timezone. R55's
-/// ruling depends on that: the scheduler calendar built from the launch window
-/// cannot go stale because of an edit made here.
+/// **Timezone.** This editor never changes a timezone: a global save writes
+/// back the zone it loaded, and an override copies the global zone, occasion
+/// time, and horizon at save time. R55's ruling depends on that: the
+/// scheduler calendar built from the launch window cannot go stale because of
+/// an edit made here.
 @MainActor @Observable
 public final class ReminderWindowsViewModel {
 
@@ -74,13 +77,19 @@ public final class ReminderWindowsViewModel {
     public private(set) var failureCount = 0
     public private(set) var isSaving = false
     public private(set) var timezoneIdentifier = TimeZone.current.identifier
+    /// The loaded zone's name for display ("Pacific Time"), never the raw
+    /// identifier.
+    public var timezoneName: String {
+        TimeZone(identifier: timezoneIdentifier)?.localizedName(for: .generic, locale: .current)
+            ?? timezoneIdentifier
+    }
     /// Set when the target is a contact: used for the screen header.
     public private(set) var contactName: String?
-    /// True while the contact has a stored override that "Use my default
+    /// True while the contact has a stored override that "Use default
     /// window" can clear.
     public private(set) var hasStoredOverride = false
     private(set) var loadState: RegardsLoadState = .loading
-    private(set) var loadFailureMessage = "Couldn't load your reminder window."
+    private(set) var loadFailureMessage = ReminderWindowsViewModel.loadFailureText
 
     private let window: any ReminderWindowRepository
     private let contacts: any ContactRepository
@@ -89,8 +98,8 @@ public final class ReminderWindowsViewModel {
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
     /// `onSaved` is deliberately undefaulted: it is how a global save reaches
-    /// `UpcomingViewModel.updateWindow` (I2). A defaulted no-op is how an
-    /// editor ends up saving a window the Upcoming tab never sees. It is not
+    /// `UpcomingViewModel.updateWindow`. A defaulted no-op is how an editor
+    /// ends up saving a window the Upcoming tab never sees. It is not
     /// called for an override save, which reaches Upcoming through
     /// `observeTracked`.
     public init(target: Target,
@@ -131,7 +140,7 @@ public final class ReminderWindowsViewModel {
             validationMessage = nil
             loadState = .loaded
         } catch {
-            loadFailureMessage = "Couldn't load your reminder window."
+            loadFailureMessage = Self.loadFailureText
             loadState = .failed
         }
     }
@@ -149,8 +158,25 @@ public final class ReminderWindowsViewModel {
     /// Adds 09:00 to 10:00. If that overlaps an existing range, `save()`
     /// refuses and says so.
     public func addRange() {
-        draft.allowedTimeRanges.append(Self.newRange)
+        if let range = nextNewRange { draft.allowedTimeRanges.append(range) }
     }
+
+    /// The range "+ Add range" adds: the hour after the latest end among the
+    /// current ranges, clamped to the last minute of the day. `nil` when the
+    /// latest range already ends at 23:59, so nothing fits after it.
+    public var nextNewRange: TimeRange? {
+        guard let latestEnd = draft.allowedTimeRanges.map(\.end).max() else { return Self.newRange }
+        let lastMinute = 24 * 60 - 1
+        guard latestEnd.minutesSinceMidnight < lastMinute else { return nil }
+        let end = min(latestEnd.minutesSinceMidnight + 60, lastMinute)
+        return TimeRange(start: latestEnd, end: TimeOfDay(minutesSinceMidnight: end))
+    }
+
+    public var canAddRange: Bool { nextNewRange != nil }
+
+    /// Spoken as the disabled "Add range" button's hint.
+    public static let addRangeUnavailableReason =
+        "The last range already ends at 11:59 pm, so there's no time left after it."
 
     public var canRemoveRange: Bool { draft.allowedTimeRanges.count > 1 }
 
@@ -193,7 +219,15 @@ public final class ReminderWindowsViewModel {
         isSaving = true
         defer { isSaving = false }
         do {
+            // A global save writes back the timezone this editor loaded and
+            // displayed. An override copies the latest global one.
             let global = try await window.fetchGlobal()
+            // A contact on the default window who saves without editing
+            // stays on the default: no override is created.
+            if case .contact = target, !hasStoredOverride, draft == Draft(global) {
+                validationMessage = nil
+                return true
+            }
             let candidate = makeWindow(global: global)
             if let refusal = refusal(for: candidate) {
                 fail(refusal)
@@ -213,7 +247,7 @@ public final class ReminderWindowsViewModel {
             validationMessage = nil
             return true
         } catch {
-            fail("Couldn't save your reminder window. Try again.")
+            fail(Self.saveFailureMessage)
             return false
         }
     }
@@ -233,15 +267,15 @@ public final class ReminderWindowsViewModel {
             validationMessage = nil
             return true
         } catch {
-            fail("Couldn't switch back to your default window. Try again.")
+            fail("Couldn't switch back to the default window. Try again.")
             return false
         }
     }
 
     // MARK: - Validation
 
-    /// The global window supplies the timezone for both targets, and the
-    /// occasion time and horizon for an override (I3).
+    /// A global save keeps the zone loaded with the draft. An override takes
+    /// the latest global window's zone, occasion time, and horizon.
     private func makeWindow(global: ReminderWindow) -> ReminderWindow {
         switch target {
         case .global:
@@ -249,7 +283,7 @@ public final class ReminderWindowsViewModel {
                 allowedDays: draft.allowedDays,
                 allowedTimeRanges: draft.allowedTimeRanges,
                 quietHours: draft.quietHours,
-                timezoneIdentifier: global.timezoneIdentifier,
+                timezoneIdentifier: timezoneIdentifier,
                 occasionTime: draft.occasionTime,
                 digestHorizonDays: draft.digestHorizonDays
             )
@@ -271,7 +305,7 @@ public final class ReminderWindowsViewModel {
         } catch let error as ReminderWindow.ValidationError {
             return Self.message(for: error)
         } catch {
-            return "This window isn't valid."
+            return Self.invalidWindowMessage
         }
         if Self.hasOverlap(candidate.allowedTimeRanges) {
             return "Time ranges can't overlap. Move one so it starts after the other ends."
@@ -279,11 +313,25 @@ public final class ReminderWindowsViewModel {
         if let quiet = candidate.quietHours, quiet.start == quiet.end {
             return "Quiet hours need a start and an end that differ."
         }
-        if ReminderEngine().nextAllowedSlot(from: clock(), in: candidate) == nil {
-            return "Quiet hours cover every allowed time, so no reminder could ever fire. "
-                + "Shorten the quiet hours or add a time range."
+        if !canFire(candidate) {
+            if candidate.quietHours != nil {
+                return "Quiet hours cover every allowed time, so no reminder could ever fire. "
+                    + "Shorten the quiet hours or add a time range."
+            }
+            return "No reminder could ever fire in this window. Add a day or a longer time range."
         }
         return nil
+    }
+
+    /// One search covers 8 days, and a DST gap can empty a single day's slot.
+    /// The window has no capacity only if both searches, now and 8 days on,
+    /// find nothing.
+    private func canFire(_ candidate: ReminderWindow) -> Bool {
+        let engine = ReminderEngine()
+        let now = clock()
+        if engine.nextAllowedSlot(from: now, in: candidate) != nil { return true }
+        let later = now.addingTimeInterval(8 * 86_400)
+        return engine.nextAllowedSlot(from: later, in: candidate) != nil
     }
 
     private static func message(for error: ReminderWindow.ValidationError) -> String {
@@ -298,7 +346,7 @@ public final class ReminderWindowsViewModel {
             return "A time range has to end later the same day. "
                 + "Only quiet hours can run past midnight."
         case .invalidTimezoneIdentifier, .invalidDigestHorizonDays:
-            return "This window isn't valid."
+            return invalidWindowMessage
         }
     }
 
@@ -307,6 +355,10 @@ public final class ReminderWindowsViewModel {
         let sorted = ranges.sorted { $0.start < $1.start }
         return zip(sorted, sorted.dropFirst()).contains { $1.start < $0.end }
     }
+
+    private static let invalidWindowMessage = "This window isn't valid."
+    private static let saveFailureMessage = "Couldn't save your reminder window. Try again."
+    private static let loadFailureText = "Couldn't load your reminder window."
 
     private func fail(_ message: String) {
         validationMessage = message
