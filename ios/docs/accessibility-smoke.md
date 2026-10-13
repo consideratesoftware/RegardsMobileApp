@@ -76,12 +76,13 @@ Reminder window row.
 - [ ] Select each day set and listen to the day summary: "No days selected.",
       "Weekdays only. Weekends are yours.", "Weekends only.", "Any day.", or a
       list of the selected day names.
-- [ ] "+ Add range" is labelled "Add range" and adds the first free hour after
-      the last range. Move the last range to end at 11:59 pm: the button is
+- [ ] "+ Add range" is labelled "Add range" and adds a one-hour range that starts at
+      the latest range end, clamped to 11:59 pm. Set the latest range to end at
+      11:59 pm: the button is
       disabled, and its hint says "The last range already ends at 11:59 pm, so
       there's no time left after it."
-- [ ] The quiet-hours toggle is labelled "Never between". Its value speaks
-      "<start> to <end>", or "off" when disabled.
+- [ ] The quiet-hours toggle reads "Never between", then "<start> to <end>" or
+      "off", then its on or off state. Check it in both modes.
 - [ ] Global editor only: "Morning-of time" has the hint "Birthdays and
       anniversaries, separate from cadence." The footer reads "All times local ·
       <zone name>. DST handled automatically."
