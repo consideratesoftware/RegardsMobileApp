@@ -38,12 +38,14 @@ under a **Manual accessibility smoke** heading.
 ## Settings notifications
 
 Run on a fresh install. The visible text and the VoiceOver label can differ,
-so check the label. When the permission state changes, VoiceOver focus moves
-to the row.
+so check the label. When the permission state changes while Settings is on screen, VoiceOver
+focus moves to the new status line.
 
 - [ ] Not determined: the row shows "Turn on notifications", which VoiceOver
       reads as a button. Activating it raises the iOS prompt once.
 - [ ] Deny the prompt: VoiceOver announces "Notifications off".
+- [ ] Decide the prompt, grant or deny: VoiceOver focus lands on the new status
+      line.
 - [ ] Denied: the visible text is "Open iOS Settings" over "Notifications are
       off for Regards." VoiceOver reads "Notifications off. Open iOS Settings"
       as a button. Activating it opens Regards' notification settings in iOS
