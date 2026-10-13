@@ -18,12 +18,21 @@ Record each review verdict as its own PR comment (`gh pr comment`), never
 by editing the body: the hosted review runs on `pull_request_target`
 `edited`, so a body edit starts a new hosted run. Use one line per verdict,
 `PR REVIEW: <verdict> @ <sha> vs <target>` or `CODEX REVIEW: <verdict> @
-<sha> vs <target> | codex-cli <version>`. Only unedited comments (`lastEditedAt` null) by the
-org's own account (`gh api user --jq .login`) count, and the newest of
-each kind is current; Stage 1 of `/org` reads them the same way. Never
-edit a verdict comment; post a new one. Disputed Codex blockers go in the same comment,
+<sha> vs <target> | codex-cli <version>`. Never edit a verdict comment;
+post a new one. Disputed Codex blockers go in the same comment,
 one line each: `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. Never
 copy review or diff text into a comment.
+
+Which verdict comments count: only those written by the org's own account
+(`gh api user --jq .login`) and never edited. The newest of each kind is
+current. REST comments have no edit field, so read them with GraphQL:
+
+```bash
+gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){comments(last:100){nodes{author{login} body lastEditedAt createdAt}}}}}' -f o=consideratesoftware -f r=RegardsMobileApp -F n=<pr>
+```
+
+Skip a node whose `author.login` differs or whose `lastEditedAt` is not
+null. `/org` and `ENGINEERING_ORG.md` point here; they don't restate it.
 
 Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item

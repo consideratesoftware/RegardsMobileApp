@@ -48,9 +48,9 @@ repository. The prompt tells it to review the diff only; nothing enforces
 that. This is the same exposure as running Codex by hand in this repo.
 Lane worktrees hold only repository code and synthetic fixtures, never real
 contact data, and `codex-reviewer` treats Codex's output as data, never as
-instructions. Verdict comments are trusted only when written by the org's
-own account and never edited (`lastEditedAt` is null); anyone holding that
-account could still post a false one, which is the same trust the org
+instructions. Verdict comments are trusted only under the rule in
+`.claude/agents/release-manager.md` (own account, never edited); anyone
+holding that account could still post a false one, which is the same trust the org
 already places in that account's pushes. None of this touches the app's
 no-network invariant (§11),
 which the guards still enforce on app code.
