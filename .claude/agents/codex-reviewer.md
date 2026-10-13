@@ -93,7 +93,7 @@ and those need the saved parent session.
 **Step 4. Verdict.** Report RETRY, with the reason and the last 20 lines of
 Codex's output, if any of these is true:
 
-- `codex exit` is not 0.
+- `codex exit` is not 0 or 142 (142 is the timeout; Step 3 reports it as UNAVAILABLE).
 - `<out>` is empty, or the verdict can't be read. The verdict is the first
   line starting `VERDICT:` after the first line starting `## PR Review`,
   and it must be exactly `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES`.
