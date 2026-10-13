@@ -94,13 +94,18 @@ struct NotificationPermissionViewModelTests {
         arguments: [NotificationAuthorizationStatus.denied, .authorized]
     )
     func requestThatThrowsAfterTheUserDecidedShowsTheDecision(decision: NotificationAuthorizationStatus) async {
-        let viewModel = Self.viewModel(DecidesThenThrows(decision: decision))
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(ScriptedNotifications(requests: [.fails(deciding: decision)]), recorder)
         await viewModel.load()
         #expect(viewModel.status == .notDetermined)
 
         await viewModel.requestAuthorization()
 
         #expect(viewModel.status == decision)
+        // The decision is what changed, so it is the only thing announced: no
+        // "couldn't ask" error for a prompt the user did answer.
+        #expect(recorder.messages == [decision == .authorized ? "Notifications on" : "Notifications off"])
+        #expect(!viewModel.requestFailed)
     }
 
     @Test(
@@ -223,6 +228,9 @@ struct NotificationPermissionViewModelTests {
         #expect(recorder.messages.isEmpty)
     }
 
+}
+
+extension NotificationPermissionViewModelTests {
     // MARK: Request error
 
     private static let errorMessage = NotificationPermissionViewModel.requestFailedMessage
@@ -258,7 +266,9 @@ struct NotificationPermissionViewModelTests {
     @Test("A later request that succeeds clears the error")
     func laterSuccessfulRequestClearsTheError() async {
         let recorder = AnnouncementRecorder()
-        let viewModel = Self.viewModel(FailsOnceThenGrants(), recorder)
+        let viewModel = Self.viewModel(
+            ScriptedNotifications(requests: [.fails(deciding: nil), .succeeds(deciding: .authorized)]), recorder
+        )
         await viewModel.load()
         await viewModel.requestAuthorization()
         #expect(viewModel.requestFailed)
@@ -272,7 +282,9 @@ struct NotificationPermissionViewModelTests {
 
     @Test("A request that succeeds clears the error even when the status stays undecided")
     func successWithoutAStatusChangeClearsTheError() async {
-        let viewModel = Self.viewModel(FailsOnceThenGrants(decidesOnSuccess: false))
+        let viewModel = Self.viewModel(
+            ScriptedNotifications(requests: [.fails(deciding: nil), .succeeds(deciding: nil)])
+        )
         await viewModel.load()
         await viewModel.requestAuthorization()
         #expect(viewModel.requestFailed)
@@ -308,6 +320,36 @@ struct NotificationPermissionViewModelTests {
 
         #expect(!viewModel.requestFailed)
         #expect(viewModel.status == .denied)
+    }
+
+    // MARK: Out-of-order reads
+
+    /// Two status reads overlap and the older one finishes last, as the
+    /// scene turning active during the prompt can make happen. The older
+    /// answer is stale and must not overwrite the newer one, or the row would
+    /// offer to prompt again for a permission already granted.
+    @Test("A stale status read that finishes last does not overwrite a newer one")
+    func staleStatusReadFinishingLastDoesNotRegressStatus() async {
+        let fake = ScriptedNotifications(immediateReads: 1, heldReads: 2)
+        let recorder = AnnouncementRecorder()
+        let viewModel = Self.viewModel(fake, recorder)
+        await viewModel.load()
+        #expect(viewModel.status == .notDetermined)
+        await fake.setStatus(.authorized)
+
+        let older = Task { await viewModel.refresh() }
+        #expect(await NotificationActionHandlingTests.waitFor { await fake.heldReadCount == 1 })
+        let newer = Task { await viewModel.refresh() }
+        #expect(await NotificationActionHandlingTests.waitFor { await fake.heldReadCount == 2 })
+        await fake.release(read: 1, as: .authorized)
+        await newer.value
+        await fake.release(read: 0, as: .notDetermined)
+        await older.value
+
+        #expect(viewModel.status == .authorized)
+        #expect(recorder.messages == ["Notifications on"])
+        await viewModel.requestAuthorization()
+        #expect(await fake.requestCount == 0)
     }
 
     // MARK: Open iOS Settings
@@ -401,56 +443,5 @@ extension NotificationPermissionViewModelTests {
         NotificationPermissionViewModel(notifications: notifications) { message in
             recorder?.messages.append(message)
         }
-    }
-
-    /// `DebugNotificationScheduling.fail` throws without changing the status,
-    /// which can't tell a view model that re-reads after a throw from one
-    /// that doesn't. This one records the user's decision and then throws,
-    /// as a prompt that is answered and then errors would.
-    private actor DecidesThenThrows: NotificationScheduling {
-        private var status = NotificationAuthorizationStatus.notDetermined
-        private let decision: NotificationAuthorizationStatus
-
-        init(decision: NotificationAuthorizationStatus) {
-            self.decision = decision
-        }
-
-        nonisolated var actions: AsyncStream<NotificationAction> {
-            AsyncStream { $0.finish() }
-        }
-
-        func requestAuthorization() async throws -> Bool {
-            status = decision
-            throw DebugNotificationScheduling.RequestFailed()
-        }
-
-        func authorizationStatus() async -> NotificationAuthorizationStatus { status }
-    }
-
-    /// The first request throws and leaves the status undecided; the second
-    /// grants. `DebugNotificationScheduling` has one fixed outcome, so it
-    /// can't script a failure followed by a success.
-    private actor FailsOnceThenGrants: NotificationScheduling {
-        private var status = NotificationAuthorizationStatus.notDetermined
-        private var attempts = 0
-        /// False makes the second request succeed without deciding anything.
-        private let decidesOnSuccess: Bool
-
-        init(decidesOnSuccess: Bool = true) {
-            self.decidesOnSuccess = decidesOnSuccess
-        }
-
-        nonisolated var actions: AsyncStream<NotificationAction> {
-            AsyncStream { $0.finish() }
-        }
-
-        func requestAuthorization() async throws -> Bool {
-            attempts += 1
-            if attempts == 1 { throw DebugNotificationScheduling.RequestFailed() }
-            if decidesOnSuccess { status = .authorized }
-            return true
-        }
-
-        func authorizationStatus() async -> NotificationAuthorizationStatus { status }
     }
 }

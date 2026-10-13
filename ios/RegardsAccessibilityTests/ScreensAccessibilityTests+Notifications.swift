@@ -103,4 +103,47 @@ extension ScreensAccessibilityTests {
         XCTAssertFalse(app.descendants(matching: .any)["\(Self.notificationsRowID).error"].exists)
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
+
+    // MARK: Request failure
+
+    /// The UI test target can't import the app module, so this repeats
+    /// `NotificationPermissionViewModel.requestFailedMessage`.
+    private static let requestFailedMessage = "Couldn't ask for notification permission. Try again."
+
+    /// Taps "Turn on notifications" with a request that throws and returns once
+    /// the error line shows. The row must stay a button so the user can retry.
+    @MainActor
+    private func showRequestFailure(dynamicTypeSize: String?) -> XCUIApplication {
+        let app = launchToSettings(
+            dynamicTypeSize: dynamicTypeSize,
+            notificationStatus: "notDetermined",
+            notificationRequestOutcome: "fail"
+        )
+        XCTAssertTrue(notificationsRow(in: app).label.contains("Turn on notifications"))
+        XCTAssertFalse(app.descendants(matching: .any)[Self.notificationsErrorID].exists, "No error before a tap.")
+
+        app.buttons[Self.notificationsRowID].tap()
+
+        let error = app.descendants(matching: .any)[Self.notificationsErrorID]
+        XCTAssertTrue(error.waitForExistence(timeout: 10), "A failed request should show an error line.")
+        XCTAssertEqual(error.label, Self.requestFailedMessage)
+        assertRowIsButton(true, in: app, "A failed request leaves the row retryable.")
+        return app
+    }
+
+    private static let notificationsErrorID = "settings.notifications.error"
+
+    @MainActor
+    func testSettingsNotificationRequestFailureShowsErrorLine() throws {
+        let app = showRequestFailure(dynamicTypeSize: nil)
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    @MainActor
+    func testSettingsNotificationRequestFailurePassesAuditAtAccessibility5() throws {
+        let app = showRequestFailure(dynamicTypeSize: "accessibility5")
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
 }

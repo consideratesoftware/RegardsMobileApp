@@ -25,7 +25,8 @@ extension ScreensAccessibilityTests {
         dynamicTypeSize: String? = nil,
         includeDuplicateFixture: Bool = false,
         seedCorruptRow: Bool = false,
-        notificationStatus: String? = nil
+        notificationStatus: String? = nil,
+        notificationRequestOutcome: String? = nil
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("--regards-mock-runtime")
@@ -41,6 +42,9 @@ extension ScreensAccessibilityTests {
         if let notificationStatus {
             app.launchEnvironment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] = notificationStatus
         }
+        if let notificationRequestOutcome {
+            app.launchEnvironment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] = notificationRequestOutcome
+        }
         app.launch()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
         XCTAssertTrue(overdue.waitForExistence(timeout: 10),
@@ -55,12 +59,14 @@ extension ScreensAccessibilityTests {
     func launchToSettings(
         includeDuplicateFixture: Bool = false,
         dynamicTypeSize: String? = nil,
-        notificationStatus: String? = nil
+        notificationStatus: String? = nil,
+        notificationRequestOutcome: String? = nil
     ) -> XCUIApplication {
         let app = launchToOverdue(
             dynamicTypeSize: dynamicTypeSize,
             includeDuplicateFixture: includeDuplicateFixture,
-            notificationStatus: notificationStatus
+            notificationStatus: notificationStatus,
+            notificationRequestOutcome: notificationRequestOutcome
         )
         navigateToTab(
             named: "Settings",

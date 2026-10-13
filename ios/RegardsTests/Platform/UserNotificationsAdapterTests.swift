@@ -5,10 +5,13 @@ import UserNotifications
 
 private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 
-/// TF-06 (§10, R11). Every assertion goes through the adapter's pure statics,
-/// so no test touches the real notification center and none can raise the
-/// system permission alert. The request-building and trigger tests return in
-/// TF-07 with the code they cover (restore from fec13d7).
+/// TF-06 (§10, R11). Most assertions go through the adapter's pure statics
+/// (categories, decoding, status mapping). The `receive` tests build a fresh
+/// `UserNotificationsAdapter()` and read its `actions` stream, which is also
+/// free of the system notification center. Neither touches the real center, so
+/// none can raise the system permission alert. The request-building and
+/// trigger tests return in TF-07 with the code they cover (restore from
+/// fec13d7).
 struct UserNotificationsAdapterTests {
 
     // MARK: Categories
@@ -143,7 +146,10 @@ struct UserNotificationsAdapterTests {
     /// The first action `receive` has already yielded, or nil if it yielded
     /// none. `receive` yields synchronously into an unbounded buffer, so the
     /// reader is cancelled at once: a buffered action is still returned, and
-    /// an empty stream ends the read instead of hanging the test.
+    /// an empty stream ends the read instead of hanging the test. This relies
+    /// on `AsyncStream` handing an already-buffered element to an iterator whose
+    /// task was cancelled before its first `next()`; the tests passing is the
+    /// evidence that it does.
     private static func firstBufferedAction(of adapter: UserNotificationsAdapter) async -> NotificationAction? {
         let stream = adapter.actions
         let reader = Task { () -> NotificationAction? in

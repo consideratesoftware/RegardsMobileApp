@@ -5,7 +5,7 @@ import Testing
 /// Launch-time behavior of the notification action consumer: what a buffered
 /// action meets when `start()` is still loading, fails, retries, or ends in
 /// onboarding, and that exactly one consumer runs. Shares the harness in
-/// `AppLaunchCoordinatorNotificationActionTests.swift`.
+/// `NotificationActionHandlingTests.swift`.
 extension NotificationActionHandlingTests {
     // MARK: Single consumer and wiring
 
