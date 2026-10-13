@@ -8,9 +8,10 @@ import Testing
 /// Every instant is written as an ISO-8601 UTC string so the expectations do
 /// not depend on the calendar code under test.
 ///
-/// Not here: `saveAllowedForSundayWindowOnSpringForwardDay` and
-/// `timeOfDayDateRoundTripAllMinutes` need the slice 3 editor view model and
-/// its picker conversion, so they belong in `ReminderWindowsViewModelTests`.
+/// The editor-side DST tests are elsewhere:
+/// `saveAllowedForSundayWindowOnSpringForwardDay` in
+/// `ReminderWindowsViewModelTests` and `timeOfDayDateRoundTripAllMinutes` in
+/// `ReminderWindowPersistenceTests`.
 @MainActor
 struct UpcomingViewModelWindowTests {
 

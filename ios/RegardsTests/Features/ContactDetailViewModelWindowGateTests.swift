@@ -7,9 +7,8 @@ import Testing
 /// and not archived (the same gate Snooze uses). A window means nothing for
 /// any other contact.
 ///
-/// ASSUMED name: `ContactDetailViewModel.canEditReminderWindow: Bool`. The
-/// engineer is exposing the gate under this or a similar name; adjust the one
-/// reference below if it differs.
+/// The gate is `ContactDetailViewModel.canEditReminderWindow`, which the
+/// Contact Detail screen reads to show the row.
 private let gateNow = Date(timeIntervalSince1970: 1_800_000_000)
 
 @MainActor

@@ -10,9 +10,8 @@ import Testing
 /// mutation is indistinguishable there. It is caught on any other zone. TF-06
 /// documented the same limit when it dropped `NSTimeZone.default` mutation.
 ///
-/// ASSUMED: `RegardsTabRoot.makeReminderWindowsViewModel(runtime:upcoming:)`
-/// returns the global-target editor wired so `onSaved` calls
-/// `upcoming.updateWindow`. It did not exist when this was written.
+/// `RegardsTabRoot.makeReminderWindowsViewModel(runtime:upcoming:)` returns the
+/// global-target editor wired so `onSaved` calls `upcoming.updateWindow`.
 @MainActor
 struct ReminderWindowPersistenceTests {
 

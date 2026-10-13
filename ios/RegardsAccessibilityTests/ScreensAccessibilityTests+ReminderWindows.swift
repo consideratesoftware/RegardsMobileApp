@@ -3,12 +3,12 @@ import XCTest
 /// TF-05 slice 3: the live Reminder windows editor, driven through Settings
 /// on the mock runtime (global window: weekdays, Asia/Kolkata, 14-day horizon).
 ///
-/// Identifiers (from the screen's work in progress): day pills are Buttons
-/// labelled with the full day name and valued "allowed" / "not allowed";
-/// horizon choices are `reminder-windows.horizon-7|14|30`; the toolbar button
-/// is `reminder-windows.save`; the inline error is `reminder-windows.error`.
-/// `testContactWindowOverrideEditorPassesAudit` waits for slice 4's Contact
-/// Detail entry point.
+/// Identifiers: day pills are Buttons labelled with the full day name and
+/// valued "allowed" / "not allowed"; horizon choices are
+/// `reminder-windows.horizon-7|14|30`; the toolbar button is
+/// `reminder-windows.save`; the inline error is `reminder-windows.error`.
+/// The override editor opened from Contact Detail is covered in
+/// `ScreensAccessibilityTests+ContactWindow.swift`.
 extension ScreensAccessibilityTests {
 
     @MainActor
