@@ -57,12 +57,6 @@ For each open TF PR:
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
-Abandoned lanes come first, whether or not they have a PR. A lane worktree
-from Stage 0 step 2 that no other session is using (step 6) is resumed, not
-recreated: per `TESTFLIGHT_PLAN.md`'s restart protocol, keep its files and
-continue Stage 3 at the first slice without a HOLDS verdict, using its
-plan and slice reports. Each resumed lane counts against the budget.
-
 For each READY item in queue order, up to the budget:
 
 1. Launch `tech-lead` with the queue row and §14 criteria verbatim. Wait
