@@ -73,8 +73,9 @@ public protocol ContactRepository: Sendable {
     /// moves exactly `reminderWindowOverride`. Contact Detail holds a `Contact`
     /// snapshot while the editor is open, so a whole-row `upsert` from it
     /// would revert a concurrent reconciler write or a "Caught up"
-    /// `lastInteractedAt` write landing in between (§7). Never reads the row
-    /// it's writing.
+    /// `lastInteractedAt` write landing in between (§7). The GRDB and mock
+    /// conformers never read the row they're writing; the protocol-extension
+    /// default below, kept for in-memory test fakes, fetches then upserts.
     ///
     /// Validates `window` first and throws `ReminderWindow.ValidationError`
     /// without writing anything. `nil` clears the override to SQL NULL
@@ -404,8 +405,8 @@ struct GRDBContactRepository: ContactRepository {
     /// reads the row first, so it can't clobber a concurrent write outside
     /// the five columns listed here.
     func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
-        let phonesJson = try Self.encodeJSON(fields.phoneNumbers)
-        let emailsJson = try Self.encodeJSON(fields.emailAddresses)
+        let phonesJson = try encodeJSON(fields.phoneNumbers)
+        let emailsJson = try encodeJSON(fields.emailAddresses)
         try await dbQueue.write { db in
             try db.execute(
                 sql: """
@@ -452,7 +453,7 @@ struct GRDBContactRepository: ContactRepository {
     @discardableResult
     func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
         try window?.validate()
-        let json = try window.map { try Self.encodeJSON($0) }
+        let json = try window.map { try encodeJSON($0) }
         return try await dbQueue.write { db in
             try db.execute(
                 sql: "UPDATE Contact SET reminderWindowOverride = ? WHERE id = ? AND archivedAt IS NULL",
@@ -460,18 +461,6 @@ struct GRDBContactRepository: ContactRepository {
             )
             return db.changesCount > 0
         }
-    }
-
-    /// Duplicates `Records.swift`'s file-private `encodeJSON` (same
-    /// `JSONEncoder` + UTF-8 encoding) rather than widening its visibility.
-    /// `ContactRecord.toDomain()` decodes the override column with a plain
-    /// `JSONDecoder`, so this encoder must stay a plain `JSONEncoder` too.
-    private static func encodeJSON<Value: Encodable>(_ value: Value) throws -> String {
-        let data = try JSONEncoder().encode(value)
-        guard let json = String(bytes: data, encoding: .utf8) else {
-            throw DataError.invalidJSONEncoding
-        }
-        return json
     }
 
     func fetchAllWithDiagnostics() async throws -> ContactFetchReport {

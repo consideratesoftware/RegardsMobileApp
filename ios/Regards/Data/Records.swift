@@ -305,7 +305,10 @@ private func decodeOptionalJSON<Value: Decodable>(
     return try JSONDecoder().decode(Optional<Value>.self, from: Data(json.utf8))
 }
 
-private func encodeJSON<Value: Encodable>(_ value: Value) throws -> String {
+/// Internal, not file-private: `GRDBContactRepository`'s field-scoped writes
+/// share it, so every JSON column is written by one plain `JSONEncoder` that
+/// the plain `JSONDecoder` reads above can always decode.
+func encodeJSON<Value: Encodable>(_ value: Value) throws -> String {
     let data = try JSONEncoder().encode(value)
     guard let json = String(bytes: data, encoding: .utf8) else {
         throw DataError.invalidJSONEncoding
