@@ -4,11 +4,15 @@ import XCTest
 /// the override editor it opens, on the mock runtime (every seeded contact is
 /// tracked with a cadence).
 ///
-/// ASSUMED identifiers, not yet confirmed by the slice 4 engineer: the row's
-/// Change button `contact-detail.window-change`, and the row's value texts
-/// "Your default" / "Custom". The editor's own ids (`screen.reminder-windows`,
-/// `reminder-windows.save`, `reminder-windows.use-default`,
-/// `reminder-windows.horizon-7`) come from slice 3.
+/// Identifiers: the row's Change button is `contact-detail.window-change`, and
+/// the row's value texts are "Your default" / "Custom". The editor's own ids
+/// (`screen.reminder-windows`, `reminder-windows.save`,
+/// `reminder-windows.use-default`, `reminder-windows.horizon-7`) come from
+/// slice 3.
+///
+/// Not covered here: deleting the `if viewModel.canEditReminderWindow` check in
+/// `ContactDetailScreen+Cards.swift` is caught only by review and the unit gate
+/// test, because every mock-seeded contact is tracked with a cadence.
 extension ScreensAccessibilityTests {
 
     private static let changeWindowIdentifier = "contact-detail.window-change"
@@ -105,5 +109,29 @@ extension ScreensAccessibilityTests {
             "A different contact must keep following the global window."
         )
         XCTAssertFalse(app.staticTexts["Custom"].exists)
+    }
+
+    /// Owner ruling: leaving the editor with unsaved edits discards them
+    /// silently. Each Change must push a fresh editor that starts from the
+    /// stored window; a cached editor would bring the discarded edit back.
+    @MainActor
+    func testEachChangeStartsFromTheStoredWindow() throws {
+        let app = launchToContactDetailFromContacts()
+        openOverrideEditor(in: app)
+        let sunday = app.buttons["Sunday"]
+        XCTAssertTrue(sunday.waitForExistence(timeout: 5))
+        let stored = sunday.value as? String
+        sunday.tap()
+        XCTAssertNotEqual(sunday.value as? String, stored, "The day pill should toggle.")
+
+        // Back without saving, then Change again.
+        app.buttons["BackButton"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.contact-detail"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Your default"].exists, "Nothing was saved, so the row is unchanged.")
+        openOverrideEditor(in: app)
+
+        let reopened = app.buttons["Sunday"]
+        XCTAssertTrue(reopened.waitForExistence(timeout: 5))
+        XCTAssertEqual(reopened.value as? String, stored, "A new push must start from the stored window.")
     }
 }
