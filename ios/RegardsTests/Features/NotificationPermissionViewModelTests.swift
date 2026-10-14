@@ -6,8 +6,10 @@ import UIKit
 
 /// TF-06 slice 3 (§10 item 7). The Settings notifications row shows one of
 /// three states and only prompts from `.notDetermined`. These tests drive the
-/// view model with `DebugNotificationScheduling`, so none touches the real
-/// notification center and none can raise the system permission alert.
+/// view model with `DebugNotificationScheduling`, or with `ScriptedNotifications`
+/// where they need a request that throws or a status read held back, so none
+/// touches the real notification center and none can raise the system
+/// permission alert.
 ///
 /// The view model speaks a status change through an injected closure. Tests
 /// that are not about announcements pass a no-op, so the test host never
@@ -227,7 +229,6 @@ struct NotificationPermissionViewModelTests {
         #expect(viewModel.status == .notDetermined)
         #expect(recorder.messages.isEmpty)
     }
-
 }
 
 extension NotificationPermissionViewModelTests {
@@ -329,7 +330,7 @@ extension NotificationPermissionViewModelTests {
     /// answer is stale and must not overwrite the newer one, or the row would
     /// offer to prompt again for a permission already granted.
     @Test("A stale status read that finishes last does not overwrite a newer one")
-    func staleStatusReadFinishingLastDoesNotRegressStatus() async {
+    func staleStatusReadFinishingLastDoesNotRegressStatus() async throws {
         let fake = ScriptedNotifications(immediateReads: 1, heldReads: 2)
         let recorder = AnnouncementRecorder()
         let viewModel = Self.viewModel(fake, recorder)
@@ -338,9 +339,9 @@ extension NotificationPermissionViewModelTests {
         await fake.setStatus(.authorized)
 
         let older = Task { await viewModel.refresh() }
-        #expect(await NotificationActionHandlingTests.waitFor { await fake.heldReadCount == 1 })
+        try #require(await NotificationActionHandlingTests.waitFor { await fake.heldReadCount == 1 })
         let newer = Task { await viewModel.refresh() }
-        #expect(await NotificationActionHandlingTests.waitFor { await fake.heldReadCount == 2 })
+        try #require(await NotificationActionHandlingTests.waitFor { await fake.heldReadCount == 2 })
         await fake.release(read: 1, as: .authorized)
         await newer.value
         await fake.release(read: 0, as: .notDetermined)

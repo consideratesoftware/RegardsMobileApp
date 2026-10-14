@@ -338,8 +338,8 @@ extension NotificationActionHandlingTests {
         }
     }
 
-    /// A started, onboarded coordinator over `backend`, optionally with a
-    /// replacement interaction repository.
+    /// A started, onboarded coordinator over `backend`, optionally with
+    /// replacement contact, reminder, or interaction repositories.
     static func readyHarness(
         backend: RepositoryContractBackend,
         contacts: (any ContactRepository)? = nil,
