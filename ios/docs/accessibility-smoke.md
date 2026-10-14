@@ -70,9 +70,7 @@ Reminder window row.
       equals end. Each refusal moves focus to the message, then announces it.
 - [ ] Quiet hours that cover every allowed time are refused with "Quiet hours
       cover every allowed time, so no reminder could ever fire. Shorten the
-      quiet hours or add a time range." Without quiet hours, the same case reads
-      "No reminder could ever fire in this window. Add a day or a longer time
-      range."
+      quiet hours or add a time range."
 - [ ] Select each day set and listen to the day summary: "No days selected.",
       "Weekdays only. Weekends are yours.", "Weekends only.", "Any day.", or a
       list of the selected day names.
