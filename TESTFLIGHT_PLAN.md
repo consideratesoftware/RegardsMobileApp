@@ -72,8 +72,9 @@ never pick up Android work.
     test.
   - `TF-05` rulings (extra repair rounds on slices 1 and 3; silent discard of
     unsaved editor edits; the Overdue footer's time removed, with nothing
-    computed in its place): recorded in the TF-05 PR's first comment (owner
-    session interview, 2026-10-11).
+    computed in its place): recorded in the TF-05 PR's first comment
+    (https://github.com/consideratesoftware/RegardsMobileApp/pull/63#issuecomment-6170431309;
+    owner rulings 2, 3, 5, and 6).
 - History: the PR that carries each closed item's evidence.
   - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
     physical-device acceptance, including the
