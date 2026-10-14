@@ -313,12 +313,11 @@ public final class ReminderWindowsViewModel {
         if let quiet = candidate.quietHours, quiet.start == quiet.end {
             return "Quiet hours need a start and an end that differ."
         }
+        // Past `validate()`, only quiet hours can leave a window with no
+        // capacity: without them every valid range yields a slot on some day.
         if !canFire(candidate) {
-            if candidate.quietHours != nil {
-                return "Quiet hours cover every allowed time, so no reminder could ever fire. "
-                    + "Shorten the quiet hours or add a time range."
-            }
-            return "No reminder could ever fire in this window. Add a day or a longer time range."
+            return "Quiet hours cover every allowed time, so no reminder could ever fire. "
+                + "Shorten the quiet hours or add a time range."
         }
         return nil
     }
