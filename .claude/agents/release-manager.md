@@ -70,7 +70,7 @@ PR, never in the root checkout.
   behind, update it (`gh api -X PUT repos/{owner}/{repo}/pulls/<n>/update-branch`),
   then bring the lane worktree to the new head with `git -C <lane> fetch`
   and `git -C <lane> merge --ff-only origin/<branch>` (if that refuses, the
-  lane has unpushed work: stop and report it), and report CODEX STALE so
+  lane has unpushed work: stop and report it), and set STATE: CODEX STALE so
   both reviews run on the merge commit.
 - If either review's newest verdict names a sha other than the current
   head, report STATE CODEX STALE and stop; the engineering manager reruns

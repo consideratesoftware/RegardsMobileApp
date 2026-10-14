@@ -134,11 +134,12 @@ for Sid to find later.
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
 - Codex when a `CODEX REVIEW: UNAVAILABLE` verdict stands on the PR: either
-  `codex-reviewer` reported it (Codex needs setup, or a review timed out),
-  or the engineering manager posted it after a second RETRY on the same
-  head. Sid runs `/codex:setup`, and `codex login` if it asks, or says what
-  else to do. The PR waits; the org does not merge without the Codex
-  verdict.
+  `codex-reviewer` reported it (Codex needs setup) or the engineering
+  manager posted it after a second RETRY on the same head. If Codex needs
+  setup, Sid runs `/codex:setup`, and `codex login` if it asks. If the
+  second RETRY was a timeout, Sid reruns the review when OpenAI is
+  responsive, or splits the diff. The PR waits; the org does not merge
+  without the Codex verdict.
 - Scope changes to the queue or dependency graph.
 
 Simulator gates run on this Mac through `build-engineer`; GitHub-hosted

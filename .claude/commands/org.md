@@ -107,7 +107,7 @@ the section, as `/pr-review` does for its own findings.
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits or discards the files), then run it
 once more. If that rerun also returns RETRY, post it on the PR as
-`CODEX REVIEW: UNAVAILABLE (second RETRY) @ <sha> ...`, so a restart sees an
+`CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> ...`, so a restart sees an
 owner gate instead of rerunning again. Once the lane has a PR, post every
 Codex result on it as a verdict comment that carries only the verdict line,
 the blocker and should-fix counts, and one line per disputed blocker in the

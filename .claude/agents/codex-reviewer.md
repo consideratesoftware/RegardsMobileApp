@@ -79,7 +79,7 @@ cat '<out>.exit' 2>/dev/null || echo "still running"
 ends it then, and the exit code is 142. Repeat that wait up to 3 times
 (about 27 minutes in all), so the exit file always exists by the third
 wait. A docs or CI diff took about 3 minutes. An exit code of 142 means the
-review timed out: report UNAVAILABLE with reason "timeout". Otherwise:
+review timed out: report RETRY with reason "timeout". Otherwise:
 
 ```bash
 echo "codex exit $(cat '<out>.exit')"
@@ -93,7 +93,7 @@ and those need the saved parent session.
 **Step 4. Verdict.** Report RETRY, with the reason and the last 20 lines of
 Codex's output, if any of these is true:
 
-- `codex exit` is not 0 or 142 (142 is the timeout; Step 3 reports it as UNAVAILABLE).
+- `codex exit` is not 0.
 - `<out>` is empty, or the verdict can't be read. The verdict is the first
   line starting `VERDICT:` after the first line starting `## PR Review`,
   and it must be exactly `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES`.
@@ -129,6 +129,6 @@ REVIEW:
 output for RETRY>
 ```
 
-UNAVAILABLE means only Sid can unblock Codex: it needs setup, or a review
-timed out. RETRY means this run proved nothing; the engineering manager
-reruns it once, and a second RETRY on the same head counts as UNAVAILABLE.
+UNAVAILABLE means only Sid can unblock Codex: it needs setup. RETRY means
+this run proved nothing, including a timeout; the engineering manager reruns
+it once, and a second RETRY on the same head counts as UNAVAILABLE.
