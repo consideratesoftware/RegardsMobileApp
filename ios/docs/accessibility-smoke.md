@@ -38,8 +38,12 @@ under a **Manual accessibility smoke** heading.
 ## Settings notifications
 
 Run on a fresh install. The visible text and the VoiceOver label can differ,
-so check the label. When the permission state changes while Settings is on screen, VoiceOver
-focus moves to the new status line.
+so check the label. When the permission state changes while Settings is on
+screen, VoiceOver focus moves to the new status line.
+
+Deny and grant each start from not determined, and iOS asks only once per
+install. Delete and reinstall Regards between the deny steps and the grant
+step.
 
 - [ ] Not determined: the row shows "Turn on notifications", which VoiceOver
       reads as a button. Activating it raises the iOS prompt once.
@@ -58,6 +62,20 @@ focus moves to the new status line.
       permission. Try again." under the Settings notifications card
       (`settings.notifications.error`), and VoiceOver announces the same text.
       The line clears on the next successful request or a real status change.
+      Recipe: DEBUG build, scheme launch argument `--regards-mock-runtime`, and
+      environment `REGARDS_UI_TEST_NOTIFICATION_STATUS=notDetermined` and
+      `REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME=fail`. The XCUI test
+      `testSettingsNotificationRequestFailureShowsErrorLine` covers the visible
+      line. This step checks only what VoiceOver says.
+- [ ] Focus does not jump from a covered screen (negative check): from
+      Settings, push Transparency. Change notifications for Regards in iOS
+      Settings, then return to Regards. VoiceOver focus stays on Transparency
+      and does not move to the notifications status line. Go back to Settings
+      afterwards.
+- [ ] First Settings open after launch (owner ruling 11, [PR #62 comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/62#issuecomment-6175786339)):
+      note whether the notifications row pops in and pushes Privacy and Help
+      down. Record the answer in the smoke record. Reserve the row's height only
+      if the shift is visible.
 - [ ] Return from iOS Settings after a change: VoiceOver announces the new
       state. This step needs a denied state first. From denied, turn
       notifications on for Regards in iOS Settings, then return. The row then

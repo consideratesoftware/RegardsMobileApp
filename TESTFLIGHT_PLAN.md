@@ -12,7 +12,7 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-11
+- Updated: 2026-10-14
 - Baseline: `main` at `dbd06a2` (merge of PR #59). The earlier baseline was
   `6c0d633` (merge of PR #60, after PR #57 raised the stress-job limits: job
   timeout 75 to 120 minutes, boot step 10 to 20 minutes). A confirming
@@ -27,7 +27,7 @@ never pick up Android work.
   rule below reserves `ACTIVE` and `DONE` for the pull request that carries
   the implementation; each lane sets its own row. A restart finds the lanes
   through restart protocol step 2 (worktrees and branches), not this table.
-  `TF-06` lane state: all 3 slices verified; PR pending. Its queue row stays
+  `TF-06` lane state: all 3 slices verified; PR #62 (draft). Its queue row stays
   `READY` until the release manager sets it at merge.
 - Next ready work: `TF-05` and `TF-06` stay `READY`, since their only
   dependency, `TF-04`, is `DONE`. `TF-06` has a hard gate: it must not ship
@@ -38,6 +38,7 @@ never pick up Android work.
   both stay `BLOCKED`.
 - Open pull requests:
   - PR #61 (`claude/org-session-interviews`): infra. It is not TF work.
+  - PR #62 (`claude/tf-06-notification-adapter`, draft): TF-06, the notification adapter, permission UI, and actions.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
@@ -73,7 +74,7 @@ never pick up Android work.
   - `TF-06`'s on-device exit checks (a notification fires at a window
     boundary; its actions round-trip) move to `TF-07`'s airplane-mode device
     test.
-- Owner decisions (rulings 4 to 6, [rulings comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/62#issuecomment-6138950217): keep the Settings row's copy permission-only until TF-07 schedules reminders; the Snooze action label is "Snooze 1 week"; ship the Settings row in TF-06. The first TestFlight build waits for TF-08 and TF-11 (Internal TestFlight gate, Current checkpoint).
+- Owner decisions (rulings 4 to 6, [rulings comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/62#issuecomment-6138950217)): keep the Settings row's copy permission-only until TF-07 schedules reminders; the Snooze action label is "Snooze 1 week"; ship the Settings row in TF-06. The first TestFlight build waits for TF-08 and TF-11 (Internal TestFlight gate, Current checkpoint).
 - History: the PR that carries each closed item's evidence.
   - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
     physical-device acceptance, including the
