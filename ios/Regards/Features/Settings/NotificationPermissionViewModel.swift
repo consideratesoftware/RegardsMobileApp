@@ -57,6 +57,11 @@ public final class NotificationPermissionViewModel {
     /// first read and when the status is unchanged, including when another
     /// refresh already applied the change. Nothing announces a move
     /// back to `.notDetermined`: iOS doesn't do that while the app runs.
+    ///
+    /// The announcement doesn't depend on whether Settings is on screen: the
+    /// user just changed the permission in iOS Settings and should hear the
+    /// result. Moving VoiceOver focus is different. `SettingsScreen` does that
+    /// only while it is showing.
     public func refresh() async {
         latestReadNumber += 1
         let readNumber = latestReadNumber

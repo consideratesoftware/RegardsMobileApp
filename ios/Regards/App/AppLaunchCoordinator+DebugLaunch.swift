@@ -1,12 +1,13 @@
 import Foundation
 
 /// The DEBUG-only launch-argument factory (`--regards-mock-runtime` and the
-/// UI-test-only launch scenarios) plus its private fixture types. Split from
-/// `AppLaunchCoordinator.swift` to keep that file's primary type body under
-/// the lint length limit — this factory only calls `AppLaunchCoordinator`'s
-/// initializers, so nothing here needed to become less private except
-/// `init(mockRuntime:)` itself, which the file-split forced from `private`
-/// to plain `internal`.
+/// UI-test-only launch scenarios) plus its fixture types, which are private
+/// except `DebugNotificationScheduling`, because unit tests use it too. Split
+/// from `AppLaunchCoordinator.swift` to keep that file's primary type body
+/// under the lint length limit — this factory only calls
+/// `AppLaunchCoordinator`'s initializers, so nothing else here needed to
+/// become less private except `init(mockRuntime:)` itself, which the
+/// file-split forced from `private` to plain `internal`.
 extension AppLaunchCoordinator {
 #if DEBUG
     static func configuredForCurrentProcess() -> AppLaunchCoordinator {
@@ -85,8 +86,8 @@ extension AppLaunchCoordinator {
 }
 
 #if DEBUG
-/// Fake `NotificationScheduling` for the `--regards-mock-runtime` launch,
-/// unit tests, and previews. It never touches the system notification
+/// Fake `NotificationScheduling` for the `--regards-mock-runtime` launch and
+/// unit tests. It never touches the system notification
 /// center, so it never raises the permission alert. The status is whatever
 /// the caller passes (the mock launch reads `REGARDS_UI_TEST_NOTIFICATION_STATUS`),
 /// a request from `.notDetermined` resolves to the scripted `requestOutcome`,

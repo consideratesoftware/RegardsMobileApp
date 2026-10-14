@@ -53,12 +53,15 @@ extension AppLaunchCoordinator {
             // This is the 4th inline copy, after `OverdueViewModel`,
             // `UpcomingViewModel`, and `ContactDetailViewModel`. Extracting a shared
             // helper would mean editing those 3 locked view-model files, which
-            // TF-07 rewrites anyway for R60; the extraction belongs there.
+            // TF-07 rewrites anyway for R10; the extraction belongs there.
             //
             // The eligibility check comes first because neither later step has it:
             // `caughtUp` has no precondition by design, and `InteractionLogging`
             // checks only `isActive`. A notification can outlive the contact's
             // tracking, so an untracked or no-cadence contact must write nothing.
+            // The check is best-effort: `markCaughtUp` re-checks `isActive` and
+            // throws for an inactive contact (the handler then restores the
+            // snooze), and R59 and R60 cover the rest.
             let contacts = runtime.environment.contacts
             do {
                 guard let contact = try await contacts.fetch(id: contactId),
