@@ -404,7 +404,7 @@ involved. Both were checked against an actual XCTest screenshot of the
 exact failing run rather than assumed innocent: Overdue showed "Leia
 Organa," "Padmé Amidala," "Luke Skywalker," and "Lando Calrissian" all
 rendering in full, and Contact Detail showed "Leia Organa," "Open
-WhatsApp," "Caught up" / "Snooze 1 week" / "Log other," "every 2 weeks,"
+WhatsApp," "Caught up" / "Snooze 1 wk" / "Log other," "every 2 weeks,"
 "3 weeks ago · Mar 27," and "9 days overdue" all fully legible — nothing
 visibly clipped on either screen. The issue text on every one of these
 findings was identical and is the tell: *"Text of this
