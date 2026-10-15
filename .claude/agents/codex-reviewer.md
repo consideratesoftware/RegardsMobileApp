@@ -77,8 +77,7 @@ cat '<out>.exit' 2>/dev/null || echo "still running"
 
 `perl ... alarm` gives Codex a hard 26-minute limit: the operating system
 ends it then, and the exit code is 142. Repeat that wait up to 3 times
-(about 27 minutes in all), so the exit file always exists by the third
-wait. A docs or CI diff took about 3 minutes. An exit code of 142 means the
+(about 27 minutes in all). A docs or CI diff took about 3 minutes. An exit code of 142 means the
 review timed out: report RETRY with reason "timeout". Otherwise:
 
 ```bash
@@ -93,6 +92,8 @@ and those need the saved parent session.
 **Step 4. Verdict.** Report RETRY, with the reason and the last 20 lines of
 Codex's output, if any of these is true:
 
+- `<out>.exit` is still missing or empty after the third wait: reason
+  "timeout".
 - `codex exit` is not 0.
 - `<out>` is empty, or the verdict can't be read. The verdict is the first
   line starting `VERDICT:` after the first line starting `## PR Review`,
