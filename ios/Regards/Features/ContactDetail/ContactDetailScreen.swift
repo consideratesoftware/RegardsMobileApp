@@ -216,7 +216,7 @@ extension ContactDetailScreen {
         // Overdue/Upcoming gate a cadence row on `tracked && cadenceDays !=
         // nil`; an untracked/no-cadence contact has no `ScheduledReminder`.
         if contact.tracked, contact.cadenceDays != nil {
-            secondaryAction("Snooze 1 wk", identifier: "contact-detail.snooze") {
+            secondaryAction("Snooze 1 week", identifier: "contact-detail.snooze") {
                 Task {
                     let succeeded = await viewModel.snooze()
                     // Success moves focus like every other action here,
@@ -229,11 +229,10 @@ extension ContactDetailScreen {
                     }
                 }
             }
-            // "1 wk" reads as a literal abbreviation without this. No name,
-            // unlike Overdue/Upcoming's "Snooze <name> 1 week": the name
-            // distinguishes rows there, while this screen is about one
-            // contact and its siblings are plain "Caught up"/"Log other".
-            .accessibilityLabel("Snooze 1 week")
+            // No name in the label, unlike Overdue/Upcoming's "Snooze <name>
+            // 1 week": the name distinguishes rows there, while this screen
+            // is about one contact and its siblings are plain
+            // "Caught up"/"Log other".
             .accessibilityHint("Pushes the next reminder out one week.")
         }
         secondaryAction("Log other", identifier: "contact-detail.log-other") {
@@ -308,26 +307,13 @@ extension ContactDetailScreen {
 
     func detailRow(label: String,
                    value: String,
-                   action: String? = nil,
-                   actionIdentifier: String? = nil,
                    isAccent: Bool = false,
                    isDanger: Bool = false,
                    valueFocus: AccessibilityFocusState<Bool>.Binding? = nil) -> some View {
-        AccessibilityAdaptiveLayout {
-            HStack(spacing: 12) {
-                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger, valueFocus: valueFocus)
-                Spacer()
-                stubAction(action, identifier: actionIdentifier)
-            }
-        } accessibility: {
-            VStack(alignment: .leading, spacing: 8) {
-                detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger, valueFocus: valueFocus)
-                stubAction(action, identifier: actionIdentifier)
-            }
+        detailValue(label: label, value: value, isAccent: isAccent, isDanger: isDanger, valueFocus: valueFocus)
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
     }
 
     func detailValue(label: String,
