@@ -24,7 +24,11 @@ one line each: `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. Never
 copy review or diff text into a comment.
 
 Which verdict comments count: only those written by the org's own account
-(`gh api user --jq .login`) and never edited. The newest of each kind is
+(`gh api user --jq .login`), never edited, and whose first line matches
+`PR REVIEW: <APPROVE|REQUEST_CHANGES> @ <sha> vs <target>` or
+`CODEX REVIEW: <APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE...> @ <sha> vs
+<target> | codex-cli <version>`. A comment that only contains those words
+(an owner answer, a dispute) doesn't count. The newest of each kind is
 current. REST comments have no edit field, so read them with GraphQL:
 
 ```bash
