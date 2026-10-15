@@ -20,7 +20,7 @@ never pick up Android work.
   `TF-05` (`claude/tf-05-reminder-window-editor`, worktree
   `../RegardsMobileApp-TF05`) and `TF-06`
   (`claude/tf-06-notification-adapter`, worktree `../RegardsMobileApp-TF06`)
-  started 2026-10-11. `TF-05` lane state: all 4 slices verified; PR pending.
+  started 2026-10-11. `TF-05` lane state: all 4 slices verified; PR #63 (draft).
   Their rows stay `READY` here because the closing
   rule below reserves `ACTIVE` and `DONE` for the pull request that carries
   the implementation; each lane sets its own row. A restart finds the lanes
@@ -34,7 +34,8 @@ never pick up Android work.
   both stay `BLOCKED`.
 - Open pull requests:
   - PR #61 (`claude/org-session-interviews`): infra. It is not TF work.
-  - No TF-05 or TF-06 pull request is open yet.
+  - PR #63 (`claude/tf-05-reminder-window-editor`): TF-05, draft.
+  - PR #62 (`claude/tf-06-notification-adapter`): TF-06, draft.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.

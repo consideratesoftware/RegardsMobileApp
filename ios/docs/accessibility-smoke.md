@@ -63,9 +63,11 @@ Reminder window row.
 
 - [ ] Settings → Reminder windows: each day pill reads its full day name (for
       example, "Thursday") and its value, "allowed" or "not allowed".
-- [ ] Turn off every day and activate Save. Focus moves to the error message,
-      and then VoiceOver announces it. The screen stays open, and the draft is
-      unchanged.
+- [ ] Turn off every day and activate Save. The error banner scrolls into view,
+      focus moves to it, and then VoiceOver announces the message. The screen
+      stays open, and the draft is unchanged.
+- [ ] Scroll to the bottom of the editor and activate Save with a refusal. The
+      error banner is visible on screen, and focus moves to it.
 - [ ] Repeat with an overlapping time range, then with quiet hours whose start
       equals end. Each refusal moves focus to the message, then announces it.
 - [ ] Quiet hours that cover every allowed time are refused with "Quiet hours
@@ -74,23 +76,23 @@ Reminder window row.
 - [ ] Select each day set and listen to the day summary: "No days selected.",
       "Weekdays only. Weekends are yours.", "Weekends only.", "Any day.", or a
       list of the selected day names.
-- [ ] "+ Add range" is labelled "Add range" and adds a one-hour range that starts at
-      the latest range end, clamped to 11:59 pm. Set the latest range to end at
-      11:59 pm: the button is
-      disabled, and its hint says "The last range already ends at 11:59 pm, so
-      there's no time left after it."
+- [ ] "+ Add range" is labelled "Add range" and adds a one-hour range that
+      starts at the latest range end, clamped to 11:59 pm. When the latest range
+      already ends at 11:59 pm, the button is disabled, and its hint says "The
+      last range already ends at 11:59 pm, so there's no time left after it."
 - [ ] The quiet-hours toggle reads "Never between", then "<start> to <end>" or
       "off", then its on or off state. Check it in both modes.
 - [ ] Global editor only: "Morning-of time" has the hint "Birthdays and
       anniversaries, separate from cadence." The footer reads "All times local ·
-      <zone name>. DST handled automatically."
+      <zone name>. Daylight saving time is handled automatically."
 - [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
       the new "Next N days" label.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is
       gone, and nothing asks for confirmation.
 - [ ] Open Contact Detail for a tracked contact with a cadence. "Reminder
       window" reads "Default window", with a Change button. Activate Change,
-      then Save. The editor dismisses, and the row reads "Custom window".
+      change one day or one time range, then Save. The editor dismisses, and
+      the row reads "Custom window".
 - [ ] In that override editor, activate "Use default window". The editor
       dismisses, and the row reads "Default window".
 - [ ] At Dynamic Type `accessibility5`, the day pills, time ranges, Save, and
