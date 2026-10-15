@@ -39,12 +39,9 @@ never pick up Android work.
   against the old 75-minute limit. Two runs failed at the 10-minute boot step
   limit. On 2026-10-09, `bootstatus` took 8.7 minutes, and the status-bar setup
   after it pushed the step past 10 minutes.
-- Green CI on `6c0d633`: Lint (`38123416925`) and Guards (`38123416912`)
-  passed; iOS CI (`38123416916`) is in progress. On `78dad7d`, iOS CI
-  (`38121978206`) passed determinism, build, and unit tests; its
-  post-merge accessibility audit was cancelled when PR #60 merged. Before
-  that, iOS CI (`36099491997`), Lint (`36099491904`), and Guards
-  (`36099491878`) passed on `1bf6352`.
+- Green CI on `a887ece`: Lint (`38789306794`) and Guards (`38789306705`)
+  passed. iOS CI (`38789306696`) was still in progress when checked on
+  2026-10-15, so confirm it before relying on `a887ece` as green.
 - Owner action needed: TF-03 acceptance. See `Owner gates`.
 
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
@@ -230,7 +227,7 @@ needed; then the TF-13 → TF-15 → TF-17 → TF-16 → TF-18 joins. Joins bran
 from the combined current `main`, never from only one parent. Independent
 siblings use separate linked worktrees. Stacks are reserved for real
 dependency edges and are rebased and retargeted to `main` after their parent
-merges. As of 2026-10-11, `TF-05` and `TF-06` are the active pair.
+merges. `TF-05` (PR #63) and `TF-06` (PR #62) both merged on 2026-10-15.
 
 Treat shared schema/location transitions and high-collision composition as
 locks, not artificial global dependencies. Only one lane may own a schema or
