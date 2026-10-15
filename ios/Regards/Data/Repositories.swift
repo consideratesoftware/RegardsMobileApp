@@ -73,9 +73,11 @@ public protocol ContactRepository: Sendable {
     /// moves exactly `reminderWindowOverride`. Contact Detail holds a `Contact`
     /// snapshot while the editor is open, so a whole-row `upsert` from it
     /// would revert a concurrent reconciler write or a "Caught up"
-    /// `lastInteractedAt` write landing in between (§7). The GRDB and mock
-    /// conformers never read the row they're writing; the protocol-extension
-    /// default below, kept for in-memory test fakes, fetches then upserts.
+    /// `lastInteractedAt` write landing in between (§7). The GRDB conformer
+    /// never reads the row it's writing: one `UPDATE ... WHERE id = ?`. The
+    /// mock reads its in-memory copy and rewrites it in one synchronous step,
+    /// so nothing can interleave. The protocol-extension default below, kept
+    /// for in-memory test fakes, fetches then upserts.
     ///
     /// Validates `window` first and throws `ReminderWindow.ValidationError`
     /// without writing anything. `nil` clears the override to SQL NULL

@@ -143,9 +143,9 @@ extension ContactDetailScreen {
 
 // `internal`, not `private`: the card builders moved to
 // `ContactDetailScreen+Cards.swift` at SwiftLint's 500-line file limit and
-// call `detailRow`, `stubAction`, and `valueColor`
-// from there. `private` is file-scoped, so keeping it would mean either
-// duplicating those helpers or threading them through as parameters.
+// call `detailRow`, `stubAction`, and `valueColor` from there. `private` is
+// file-scoped, so keeping it would mean either duplicating those helpers or
+// threading them through as parameters.
 extension ContactDetailScreen {
 
     // MARK: - Sections

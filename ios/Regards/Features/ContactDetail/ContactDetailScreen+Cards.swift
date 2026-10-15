@@ -2,12 +2,13 @@ import SwiftUI
 
 /// Contact Detail's card sections, split out of `ContactDetailScreen.swift`
 /// when that file reached SwiftLint's 500-line `file_length` limit under
-/// `--strict`. A pure move: same views, same labels, same identifiers, which
-/// `ScreensAccessibilityTests` asserts exactly.
+/// `--strict`. The split kept the views, labels, and identifiers unchanged,
+/// which `ScreensAccessibilityTests` asserts exactly. The Reminder window row
+/// and the removal of the "Next reminder" row came later (TF-05).
 ///
-/// These call `detailRow`, `stubAction`, and
-/// `valueColor`, which is why the sections extension in that file is no
-/// longer `private` — see the comment at its declaration.
+/// These call `detailRow`, `stubAction`, and `valueColor`, which is why the
+/// sections extension in that file is no longer `private`; see the comment at
+/// its declaration.
 extension ContactDetailScreen {
 
     // MARK: - Cards

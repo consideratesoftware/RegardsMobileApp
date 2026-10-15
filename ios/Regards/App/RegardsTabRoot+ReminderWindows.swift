@@ -8,10 +8,10 @@ extension RegardsTabRoot {
     ///
     /// `onSaved` is how a global save reaches the live Upcoming view model
     /// (so Upcoming's horizon and rows follow a saved window); without it the
-    /// tab keeps the launch window until relaunch. The
-    /// editor writes through the repositories, never `runtime.window`, which
-    /// stays the launch snapshot (R55 ruling: the editor cannot change a
-    /// timezone, so the scheduler calendar cannot go stale).
+    /// tab keeps the launch window until relaunch. The editor writes through
+    /// the repositories, never `runtime.window`, which stays the launch
+    /// snapshot (R55 ruling: the editor cannot change a timezone, so the
+    /// scheduler calendar cannot go stale).
     @MainActor
     static func makeReminderWindowsViewModel(
         runtime: AppRuntime,
