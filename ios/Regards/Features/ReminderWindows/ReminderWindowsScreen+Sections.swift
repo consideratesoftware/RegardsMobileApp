@@ -114,7 +114,7 @@ extension ReminderWindowsScreen {
                         Hair(inset: 16)
                     }
                     Button {
-                        viewModel.addRange()
+                        if let message = viewModel.addRange() { speak(message) }
                     } label: {
                         Text("+ Add range")
                             .font(.body.weight(.medium))
@@ -125,6 +125,7 @@ extension ReminderWindowsScreen {
                     }
                     .buttonStyle(.plain)
                     .disabled(!viewModel.canAddRange)
+                    // The visible "+" is decoration; VoiceOver reads the verb.
                     .accessibilityLabel("Add range")
                     .accessibilityHint(viewModel.canAddRange ? "" : ReminderWindowsViewModel.addRangeUnavailableReason)
                     .accessibilityIdentifier("reminder-windows.add-range")
@@ -164,7 +165,7 @@ extension ReminderWindowsScreen {
     private var nowFraction: Double {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: viewModel.timezoneIdentifier) ?? .current
-        let comps = calendar.dateComponents([.hour, .minute], from: clock())
+        let comps = calendar.dateComponents([.hour, .minute], from: viewModel.clock())
         let minutes = Double((comps.hour ?? 0) * 60 + (comps.minute ?? 0))
         return minutes / 1440.0
     }
@@ -172,7 +173,7 @@ extension ReminderWindowsScreen {
     private func timeRangeRow(_ index: Int) -> some View {
         let number = index + 1
         let remove = Button {
-            viewModel.removeRange(at: index)
+            if let message = viewModel.removeRange(at: index) { speak(message) }
         } label: {
             Text("Remove")
                 .font(.footnote)
@@ -181,10 +182,12 @@ extension ReminderWindowsScreen {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Several rows each show "Remove"; the label says which range.
         .accessibilityLabel("Remove range \(number)")
         return AccessibilityAdaptiveLayout {
             HStack(spacing: 10) {
                 TimePickerField(title: "Range \(number) start", time: rangeBinding(index, isStart: true))
+                // Visual separator: the two pickers' titles already say start and end.
                 Text("→")
                     .foregroundStyle(RegardsDS.muted)
                     .accessibilityHidden(true)
@@ -224,7 +227,7 @@ extension ReminderWindowsScreen {
 
     var quietHoursSection: some View {
         VStack(spacing: 0) {
-            SectionHeader("Quiet hours · hard override")
+            SectionHeader("Quiet hours")
             RegardsCard {
                 VStack(spacing: 0) {
                     Toggle(isOn: $viewModel.quietHoursEnabled) {
@@ -235,12 +238,18 @@ extension ReminderWindowsScreen {
                             Text(quietHoursLabel)
                                 .font(RegardsFont.mono(.footnote))
                                 .foregroundStyle(RegardsDS.muted)
-                                .accessibilityLabel(quietHoursSpoken)
                         }
                     }
                     // Matches the active day-pill `accentInk` fill on this
                     // screen so the two accent-colored controls read as one family.
                     .tint(RegardsDS.accentInk)
+                    // On: the visible words, with "to" for the arrow. Off: the
+                    // visible subtitle is "off", which would be read twice
+                    // (label, then the switch's own "off" value), so the
+                    // label is the feature name instead.
+                    .accessibilityLabel(
+                        viewModel.quietHoursEnabled ? "Never between, \(quietHoursSpoken)" : "Quiet hours"
+                    )
                     .accessibilityIdentifier("reminder-windows.quiet-toggle")
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -259,6 +268,7 @@ extension ReminderWindowsScreen {
         return AccessibilityAdaptiveLayout {
             HStack(spacing: 10) {
                 TimePickerField(title: "Quiet hours start", time: start)
+                // Visual separator: the two pickers' titles already say start and end.
                 Text("→")
                     .foregroundStyle(RegardsDS.muted)
                     .accessibilityHidden(true)
@@ -320,7 +330,7 @@ extension ReminderWindowsScreen {
             Text("Morning-of time")
                 .font(.body.weight(.medium))
                 .foregroundStyle(RegardsDS.ink)
-            Text("Birthdays + anniversaries, separate from cadence.")
+            Text("Birthdays and anniversaries, separate from cadence.")
                 .font(.caption)
                 .foregroundStyle(RegardsDS.muted)
         }

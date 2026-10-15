@@ -93,8 +93,11 @@ public final class ReminderWindowsViewModel {
 
     private let window: any ReminderWindowRepository
     private let contacts: any ContactRepository
-    private let clock: () -> Date
+    /// The clock `save()` probes capacity with. The screen reads the same one
+    /// for its "now" marker, so both agree.
+    let clock: () -> Date
     private let onSaved: @MainActor (ReminderWindow) async -> Void
+    @ObservationIgnored private var loadedDraft: Draft?
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
     /// `onSaved` is deliberately undefaulted: it is how a global save reaches
@@ -136,6 +139,7 @@ public final class ReminderWindowsViewModel {
                 hasStoredOverride = contact.reminderWindowOverride != nil
                 draft = Draft(contact.reminderWindowOverride ?? global)
             }
+            loadedDraft = draft
             if let quiet = draft.quietHours { rememberedQuietHours = quiet }
             validationMessage = nil
             loadState = .loaded
@@ -155,10 +159,20 @@ public final class ReminderWindowsViewModel {
         draft.allowedDays.formSymmetricDifference(day)
     }
 
-    /// Adds 09:00 to 10:00. If that overlaps an existing range, `save()`
-    /// refuses and says so.
-    public func addRange() {
-        if let range = nextNewRange { draft.allowedTimeRanges.append(range) }
+    /// Appends `nextNewRange`: 09:00 to 10:00 when there is no range, otherwise
+    /// one hour starting at the latest existing end (clamped to 23:59). It
+    /// starts where the latest range ends, so it never overlaps. Does nothing
+    /// when `canAddRange` is false.
+    ///
+    /// Returns what the screen speaks, because VoiceOver gets no other
+    /// feedback that a range appeared at the bottom of the list: "Range 2
+    /// added, 10:00 PM to 11:00 PM" (times in the locale's format).
+    @discardableResult
+    public func addRange() -> String? {
+        guard let range = nextNewRange else { return nil }
+        draft.allowedTimeRanges.append(range)
+        return "Range \(draft.allowedTimeRanges.count) added, "
+            + "\(range.start.displayLabel) to \(range.end.displayLabel)"
     }
 
     /// The range "+ Add range" adds: the hour after the latest end among the
@@ -180,9 +194,15 @@ public final class ReminderWindowsViewModel {
 
     public var canRemoveRange: Bool { draft.allowedTimeRanges.count > 1 }
 
-    public func removeRange(at index: Int) {
-        guard canRemoveRange, draft.allowedTimeRanges.indices.contains(index) else { return }
+    /// Returns what the screen speaks: the removed row's Remove button
+    /// disappears with it, taking VoiceOver focus along, so say what happened
+    /// and how many ranges remain: "Range 2 removed. 1 range left."
+    @discardableResult
+    public func removeRange(at index: Int) -> String? {
+        guard canRemoveRange, draft.allowedTimeRanges.indices.contains(index) else { return nil }
         draft.allowedTimeRanges.remove(at: index)
+        let remaining = draft.allowedTimeRanges.count
+        return "Range \(index + 1) removed. \(remaining) \(remaining == 1 ? "range" : "ranges") left."
     }
 
     public func setRange(at index: Int, start: TimeOfDay? = nil, end: TimeOfDay? = nil) {
@@ -219,15 +239,18 @@ public final class ReminderWindowsViewModel {
         isSaving = true
         defer { isSaving = false }
         do {
-            // A global save writes back the timezone this editor loaded and
-            // displayed. An override copies the latest global one.
-            let global = try await window.fetchGlobal()
             // A contact on the default window who saves without editing
-            // stays on the default: no override is created.
-            if case .contact = target, !hasStoredOverride, draft == Draft(global) {
+            // stays on the default: no override is created. Compared with the
+            // draft as loaded, not today's global window, which may have
+            // changed while the editor was open.
+            if case .contact = target, !hasStoredOverride, draft == loadedDraft {
                 validationMessage = nil
                 return true
             }
+            // An override copies the latest global window's zone, occasion
+            // time, and horizon. A global save writes back the zone this
+            // editor loaded and displayed.
+            let global = try await window.fetchGlobal()
             let candidate = makeWindow(global: global)
             if let refusal = refusal(for: candidate) {
                 fail(refusal)

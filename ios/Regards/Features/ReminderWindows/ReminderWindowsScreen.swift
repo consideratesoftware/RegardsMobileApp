@@ -2,28 +2,25 @@ import SwiftUI
 
 /// The live reminder-window editor (ARCHITECTURE.md §10 screen 9). The same
 /// screen edits the global window and, from Contact Detail, one contact's
-/// override; an override shows days, ranges, and quiet hours only. Occasion time and
-/// horizon stay global.
+/// override; an override shows days, ranges, and quiet hours only. Occasion
+/// time and horizon stay global.
 public struct ReminderWindowsScreen: View {
     /// `@State`, not a plain property: the Settings destination closure runs
     /// again on every root re-render and hands over a fresh view model each
     /// time. `State` keeps the first one for as long as this screen is on the
     /// stack, so edits survive a re-render and a new push starts clean.
     @State var viewModel: ReminderWindowsViewModel
-    let clock: () -> Date
     private let announce: @MainActor (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var errorFocused: Bool
-    @State private var refusalAnnouncer = RowActionAnnouncer()
+    @State private var announcer = RowActionAnnouncer()
     @ScaledMetric(relativeTo: .subheadline) var pillSize: CGFloat = 36
 
     public init(viewModel: ReminderWindowsViewModel,
-                clock: @escaping () -> Date = { Date() },
                 announce: @escaping @MainActor (String) -> Void = {
                     AccessibilityNotification.Announcement($0).post()
                 }) {
         self._viewModel = State(initialValue: viewModel)
-        self.clock = clock
         self.announce = announce
     }
 
@@ -32,19 +29,39 @@ public struct ReminderWindowsScreen: View {
         return false
     }
 
+    /// Scroll target for the inline error banner (the banner's accessibility
+    /// identifier is `reminder-windows.error`).
+    private static let errorBannerID = "reminder-windows.error-banner"
+
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                header
-                switch viewModel.loadState {
-                case .loading:
-                    ProgressView("Loading")
-                        .padding(.top, 40)
-                case .failed:
-                    loadFailure
-                case .loaded:
-                    editor
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
+                    switch viewModel.loadState {
+                    case .loading:
+                        ProgressView("Loading")
+                            .padding(.top, 40)
+                    case .failed:
+                        loadFailure
+                    case .loaded:
+                        editor
+                    }
                 }
+            }
+            // Save sits in the toolbar, so the user is usually scrolled
+            // away from the banner at the top. Scroll to it first, then move
+            // focus there and speak the message: a focus change flushes
+            // VoiceOver's speech queue, so announcing first would cut the
+            // message off (same order as `RowActionAnnouncer` gives Overdue
+            // and Upcoming). No animation, so Reduce Motion needs no branch.
+            // Centered, not top-aligned: top alignment slid the header half
+            // under the navigation bar, which the accessibility audit flags
+            // as potentially inaccessible text.
+            .onChange(of: viewModel.failureCount) {
+                guard let message = viewModel.validationMessage else { return }
+                proxy.scrollTo(Self.errorBannerID, anchor: .center)
+                speak(message) { errorFocused = true }
             }
         }
         .background(RegardsDS.background.ignoresSafeArea())
@@ -66,17 +83,16 @@ public struct ReminderWindowsScreen: View {
         .task {
             if viewModel.loadState == .loading { await viewModel.load() }
         }
-        // Focus lands on the error banner first, then the message is spoken:
-        // a focus change flushes VoiceOver's speech queue, so announcing
-        // first would cut the message off (same order as `RowActionAnnouncer`
-        // gives Overdue and Upcoming).
-        .onChange(of: viewModel.failureCount) {
-            guard let message = viewModel.validationMessage else { return }
-            refusalAnnouncer.fire(
-                message,
-                effects: RowActionAccessibilityEffects(announce: announce, didFocus: {})
-            ) { errorFocused = true }
-        }
+    }
+
+    /// Speaks `message` through the injectable `announce` seam, after `focus`
+    /// when the caller moves VoiceOver focus first.
+    func speak(_ message: String, focus: @escaping @MainActor () -> Void = {}) {
+        announcer.fire(
+            message,
+            effects: RowActionAccessibilityEffects(announce: announce, didFocus: {}),
+            focus: focus
+        )
     }
 
     private var editor: some View {
@@ -94,7 +110,7 @@ public struct ReminderWindowsScreen: View {
                 occasionSection
                 horizonSection
             }
-            Text("All times local · \(viewModel.timezoneName). DST handled automatically.")
+            Text("All times local · \(viewModel.timezoneName). Daylight saving time is handled automatically.")
                 .font(.caption)
                 .foregroundStyle(RegardsDS.muted)
                 .multilineTextAlignment(.center)
@@ -151,6 +167,7 @@ public struct ReminderWindowsScreen: View {
                 .accessibilityIdentifier("reminder-windows.error")
                 .accessibilityFocused($errorFocused)
         }
+        .id(Self.errorBannerID)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
