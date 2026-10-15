@@ -63,11 +63,11 @@ Reminder window row.
 
 - [ ] Settings → Reminder windows: each day pill reads its full day name (for
       example, "Thursday") and its value, "allowed" or "not allowed".
-- [ ] Turn off every day and activate Save. The error banner scrolls into view,
-      focus moves to it, and then VoiceOver announces the message. The screen
-      stays open, and the draft is unchanged.
+- [ ] Turn off every day and activate Save. The error banner scrolls to the
+      center of the screen, focus moves to it, and then VoiceOver announces the
+      message. The screen stays open, and the draft is unchanged.
 - [ ] Scroll to the bottom of the editor and activate Save with a refusal. The
-      error banner is visible on screen, and focus moves to it.
+      error banner scrolls to the center of the screen and focus moves to it.
 - [ ] Repeat with an overlapping time range, then with quiet hours whose start
       equals end. Each refusal moves focus to the message, then announces it.
 - [ ] Quiet hours that cover every allowed time are refused with "Quiet hours
@@ -80,10 +80,17 @@ Reminder window row.
       starts at the latest range end, clamped to 11:59 pm. When the latest range
       already ends at 11:59 pm, the button is disabled, and its hint says "The
       last range already ends at 11:59 pm, so there's no time left after it."
-- [ ] The quiet-hours toggle reads "Never between", then "<start> to <end>" or
-      "off", then its on or off state. Check it in both modes.
-- [ ] Global editor only: "Morning-of time" has the hint "Birthdays and
-      anniversaries, separate from cadence." The footer reads "All times local ·
+- [ ] Activate "+ Add range". VoiceOver announces "Range N added, <start> to
+      <end>", for example "Range 2 added, 10:00 PM to 11:00 PM".
+- [ ] Activate the Remove button on a range (it is absent when only one range
+      is left). VoiceOver announces "Range N removed. X range(s) left.", for
+      example "Range 2 removed. 1 range left."
+- [ ] The "Quiet hours" section header reads "Quiet hours". With quiet hours
+      off, the toggle speaks "Quiet hours" and then "off". With quiet hours on,
+      it speaks "Never between, <start> to <end>" and then "on". Check it in
+      both modes.
+- [ ] Global editor only: the morning-of caption and its hint both read
+      "Birthdays and anniversaries, separate from cadence." The footer reads "All times local ·
       <zone name>. Daylight saving time is handled automatically."
 - [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
       the new "Next N days" label.
