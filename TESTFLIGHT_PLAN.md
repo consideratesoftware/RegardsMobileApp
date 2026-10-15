@@ -12,33 +12,35 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-14
-- Baseline: `main` at `dbd06a2` (merge of PR #59). The earlier baseline was
-  `6c0d633` (merge of PR #60, after PR #57 raised the stress-job limits: job
-  timeout 75 to 120 minutes, boot step 10 to 20 minutes). A confirming
-  `Audit stress` run on `78dad7d` passed: run `38121994128`, completed
-  2026-10-11.
+- Updated: 2026-10-15
+- Baseline: `main` at `de33098` (merge of PR #62, `TF-06`, merged 2026-10-15).
+  The `TF-05` lane branch merged the earlier baseline `dbd06a2` (merge of
+  PR #59) at `207a570`, and merged `de33098` in its second merge commit; as the
+  second lane to merge, it repeated its gates after that merge. The baseline
+  before `dbd06a2` was `6c0d633` (merge of PR #60, after PR #57 raised the
+  stress-job limits: job timeout 75 to 120 minutes, boot step 10 to 20
+  minutes). A confirming `Audit stress` run on `78dad7d` passed: run
+  `38121994128`, completed 2026-10-11.
 - Active work: no merged TF work is in progress. `TF-03` acceptance is
   owner work (see `Owner gates`); its code is merged in PR #48. Lanes for
   `TF-05` (`claude/tf-05-reminder-window-editor`, worktree
   `../RegardsMobileApp-TF05`) and `TF-06`
   (`claude/tf-06-notification-adapter`, worktree `../RegardsMobileApp-TF06`)
-  started 2026-10-11. Their rows stay `READY` here because the closing
+  started 2026-10-11. `TF-06` merged as PR #62 (`de33098`, 2026-10-15), and its
+  queue row is `DONE`. `TF-05` lane state: all 4 slices verified; PR #63
+  (draft, in review). Its row stays `READY` here because the closing
   rule below reserves `ACTIVE` and `DONE` for the pull request that carries
-  the implementation; each lane sets its own row. A restart finds the lanes
+  the implementation; the lane sets its own row. A restart finds the lanes
   through restart protocol step 2 (worktrees and branches), not this table.
-  `TF-06` lane state: all 3 slices verified; PR #62 (draft). Its queue row stays
-  `READY` until the release manager sets it at merge.
-- Next ready work: `TF-05` and `TF-06` stay `READY`, since their only
-  dependency, `TF-04`, is `DONE`. `TF-06` has a hard gate: it must not ship
-  notification scheduling until R57 is resolved (owner ruling 2026-08-22, see
-  its queue row).
-- Blocked: `TF-07` needs `TF-05` and `TF-06`, and `TF-11` needs `TF-06`. Both
-  also need `TF-03`, which stays `OWNER` until its acceptance run passes, so
-  both stay `BLOCKED`.
+- Next ready work: `TF-05` stays `READY`, since its only dependency, `TF-04`,
+  is `DONE`. `TF-06` shipped no notification scheduling, so resolving R57 (owner
+  ruling 2026-08-22, see its queue row) falls to `TF-07`.
+- Blocked: `TF-07` needs `TF-05` (`TF-06` is done), and `TF-11` needs `TF-03`
+  (`TF-06` is done). `TF-03` stays `OWNER` until its acceptance run passes, and
+  `TF-07` also needs it, so both stay `BLOCKED`.
 - Open pull requests:
-  - PR #61 (`claude/org-session-interviews`): infra. It is not TF work.
-  - PR #62 (`claude/tf-06-notification-adapter`, draft): TF-06, the notification adapter, permission UI, and actions.
+  - PR #63 (`claude/tf-05-reminder-window-editor`, draft): TF-05, the
+    reminder-window editor.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
@@ -74,6 +76,11 @@ never pick up Android work.
   - `TF-06`'s on-device exit checks (a notification fires at a window
     boundary; its actions round-trip) move to `TF-07`'s airplane-mode device
     test.
+  - `TF-05` rulings (extra repair rounds on slices 1 and 3; silent discard of
+    unsaved editor edits; the Overdue footer's time removed, with nothing
+    computed in its place): recorded in the TF-05 PR's first comment
+    (https://github.com/consideratesoftware/RegardsMobileApp/pull/63#issuecomment-6170431309;
+    owner rulings 2, 3, 5, and 6).
 - Owner decisions (rulings 4 to 6, [rulings comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/62#issuecomment-6138950217)): keep the Settings row's copy permission-only until TF-07 schedules reminders; the Snooze action label is "Snooze 1 week"; ship the Settings row in TF-06. The first TestFlight build waits for TF-08 and TF-11 (Internal TestFlight gate, Current checkpoint).
 - History: the PR that carries each closed item's evidence.
   - TF-02: PR #44 (merged as `b10f9ac`) and PR #45 (merged as `ee601a5`). The
@@ -88,6 +95,7 @@ never pick up Android work.
     corruption-banner VoiceOver smoke is step 7 of the acceptance run (see
     `Owner gates`).
   - TF-04: PR #49 (merged as `02873e8` on 2026-09-14).
+  - TF-06: PR #62 (merged as `de33098` on 2026-10-15).
   - Earlier checkpoint text, including the round-by-round TF-02 and TF-03
     review history, is in the git history of this file.
 
@@ -202,7 +210,7 @@ numbers.
 | TF-03 | OWNER | TF-02 | Contacts reconciliation on launch/foreground/change, archive safety, limited-authorization handling, per-row import tolerance, corruption-aware All Contacts reads, and an off-cooperative-pool 5k synthetic path | PR21; R25, R35, R50 |
 | TF-04 | DONE | TF-02 | Caught up, Snooze, and Log other persist from every surface they appear on (Contact Detail: all three, as buttons; Overdue: Caught up and Snooze as native `List`/`.swipeActions`, swipe right and left; Upcoming: Caught up only, cadence rows only, swipe right; neither list screen has a Log-other row action, and Upcoming ships no Snooze action; tapping a list row previews the channel action pending TF-08; both screens migrated from `ScrollView`/`RegardsCard` per-row buttons to `List` in round 12, which R52 records); Snooze via a narrow `SchedulingPass` DB-only stub (single cadence `ScheduledReminder` write, no window/engine/reconciliation — PR25 absorbs it); live lists update via `ContactRepository.observeTracked()`; interaction, action, and mock/GRDB parity tests pass | PR22; R11, R24, R34, R36, R46, R52 |
 | TF-05 | READY | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly; the editor never changes a timezone: the global editor writes back the one it loaded and a per-contact override copies the global window's (`saveNeverChangesTimezone`, the R55 ruling of 2026-10-11) | PR23; R4, R9 |
-| TF-06 | READY | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
+| TF-06 | DONE | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
 | TF-07 | BLOCKED | TF-03, TF-04, TF-05, TF-06 | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved. Also owns (owner rulings 2026-10-11, [PR #58 comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/58#issuecomment-6113801644)): R55, and TF-06's on-device exit checks (a local notification fires at a window boundary; its Caught up and Snooze actions round-trip), run in the airplane-mode device test. TF-06 handoff (R57): restore TF-06's request builder and its tests from `fec13d7`, add `schedule`, `cancel`, and `pendingIdentifiers` reading `now` once per request, add `willPresent`, and delete `NotificationSchedulingGateTests` in the PR that resolves R57 | PR25; R4–R6, R10–R11, R24, R55, R57 |
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
 | TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |

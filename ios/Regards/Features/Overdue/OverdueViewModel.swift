@@ -41,7 +41,6 @@ public struct OverdueRowState: Sendable, Identifiable, Equatable {
 public final class OverdueViewModel {
 
     public private(set) var rows: [OverdueRowState] = []
-    public private(set) var nextDigestLabel: String = "next digest at 6:00 pm"
     private(set) var loadState: RegardsLoadState = .loading
 
     private let contacts: any ContactRepository

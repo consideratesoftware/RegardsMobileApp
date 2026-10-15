@@ -2,12 +2,13 @@ import SwiftUI
 
 /// Contact Detail's card sections, split out of `ContactDetailScreen.swift`
 /// when that file reached SwiftLint's 500-line `file_length` limit under
-/// `--strict`. A pure move: same views, same labels, same identifiers, which
-/// `ScreensAccessibilityTests` asserts exactly.
+/// `--strict`. The split kept the views, labels, and identifiers unchanged,
+/// which `ScreensAccessibilityTests` asserts exactly. The Reminder window row
+/// and the removal of the "Next reminder" row came later (TF-05).
 ///
-/// These call `detailRow`, `stubAction`, `nextReminderLabel`, and
-/// `valueColor`, which is why the sections extension in that file is no
-/// longer `private` — see the comment at its declaration.
+/// These call `detailRow`, `stubAction`, and `valueColor`, which is why the
+/// sections extension in that file is no longer `private`; see the comment at
+/// its declaration.
 extension ContactDetailScreen {
 
     // MARK: - Cards
@@ -24,9 +25,6 @@ extension ContactDetailScreen {
                         actionIdentifier: "contact-detail.cadence-change-unavailable"
                     )
                     Hair(inset: 16)
-                    detailRow(label: "Next reminder", value: nextReminderLabel(contact: contact),
-                              isAccent: true)
-                    Hair(inset: 16)
                     detailRow(label: "Last talked", value: viewModel.lastTalkedLabel)
                     Hair(inset: 16)
                     detailRow(
@@ -35,9 +33,46 @@ extension ContactDetailScreen {
                         isDanger: viewModel.overdueSummary.isOverdue,
                         valueFocus: $isStatusFocused
                     )
+                    // Same gate as Snooze: an untracked or no-cadence contact
+                    // never gets a cadence reminder, so a window means nothing.
+                    if viewModel.canEditReminderWindow {
+                        Hair(inset: 16)
+                        reminderWindowRow(contact: contact)
+                    }
                 }
             }
         }
+    }
+
+    func reminderWindowRow(contact: Contact) -> some View {
+        let value = contact.reminderWindowOverride == nil ? "Default window" : "Custom window"
+        let change = Button {
+            windowEditor = makeWindowEditor(contact.id)
+        } label: {
+            Text("Change")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(RegardsDS.accentInk)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Change reminder window")
+        .accessibilityIdentifier("contact-detail.window-change")
+        return AccessibilityAdaptiveLayout {
+            HStack(spacing: 12) {
+                detailValue(label: "Reminder window", value: value, isAccent: false, isDanger: false)
+                Spacer()
+                change
+            }
+        } accessibility: {
+            VStack(alignment: .leading, spacing: 8) {
+                detailValue(label: "Reminder window", value: value, isAccent: false, isDanger: false)
+                change
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     func channelCard(contact: Contact) -> some View {

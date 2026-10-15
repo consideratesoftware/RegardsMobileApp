@@ -8,6 +8,10 @@ public struct ContactDetailScreen: View {
     // file limit, and `private` is file-scoped.
     @State var viewModel: ContactDetailViewModel
     @State private var previewContact: Contact?
+    // Set at tap time so every push gets a fresh editor view model (the
+    // same reason `contactDetail(for:)` builds a fresh screen model per push).
+    // Not `private`: the Cadence card's Change button lives in `+Cards`.
+    @State var windowEditor: ReminderWindowsViewModel?
     @State private var showsLogOtherChannelPicker = false
     // Wrapped in `@State` via `init` — see `RowActionAnnouncer`'s doc comment for why.
     @State private var rowActionAnnouncer: RowActionAnnouncer
@@ -22,14 +26,19 @@ public struct ContactDetailScreen: View {
     // exactly the class of bug that shipped unannounced/unfocused row
     // actions to device — every construction site must say which it means.
     var accessibilityEffects: RowActionAccessibilityEffects
+    // No default, for the same reason: a screen built without it would show a
+    // Change button that opens nothing.
+    let makeWindowEditor: @MainActor (UUID) -> ReminderWindowsViewModel
 
     public init(
         viewModel: ContactDetailViewModel,
         accessibilityEffects: RowActionAccessibilityEffects,
-        rowActionAnnouncer: RowActionAnnouncer
+        rowActionAnnouncer: RowActionAnnouncer,
+        makeWindowEditor: @escaping @MainActor (UUID) -> ReminderWindowsViewModel
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.accessibilityEffects = accessibilityEffects
+        self.makeWindowEditor = makeWindowEditor
         self._rowActionAnnouncer = State(initialValue: rowActionAnnouncer)
     }
 
@@ -71,6 +80,14 @@ public struct ContactDetailScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $previewContact) { contact in
             EditContactScreen(contact: contact)
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { windowEditor != nil },
+            set: { if !$0 { windowEditor = nil } }
+        )) {
+            if let windowEditor {
+                ReminderWindowsScreen(viewModel: windowEditor)
+            }
         }
         // See `LogOtherChannelSheet`'s doc comment: a `.sheet` we build
         // ourselves, replacing an earlier `confirmationDialog` that rendered
@@ -126,9 +143,9 @@ extension ContactDetailScreen {
 
 // `internal`, not `private`: the card builders moved to
 // `ContactDetailScreen+Cards.swift` at SwiftLint's 500-line file limit and
-// call `detailRow`, `stubAction`, `nextReminderLabel`, and `valueColor`
-// from there. `private` is file-scoped, so keeping it would mean either
-// duplicating those helpers or threading them through as parameters.
+// call `detailRow`, `stubAction`, and `valueColor` from there. `private` is
+// file-scoped, so keeping it would mean either duplicating those helpers or
+// threading them through as parameters.
 extension ContactDetailScreen {
 
     // MARK: - Sections
@@ -354,11 +371,6 @@ extension ContactDetailScreen {
         if isDanger { return RegardsDS.danger }
         if isAccent { return RegardsDS.accentInk }
         return RegardsDS.ink
-    }
-
-    func nextReminderLabel(contact: Contact) -> String {
-        // TF-07 replaces this placeholder with the persisted next reminder.
-        "Today, 6:30 pm"
     }
 
     var statusValue: String {

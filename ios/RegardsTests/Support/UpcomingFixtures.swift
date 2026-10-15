@@ -18,7 +18,9 @@ enum UpcomingFixtures {
         systemRef: String,
         displayName: String = "State Contact",
         tracked: Bool = true,
-        cadenceDays: Int? = nil
+        cadenceDays: Int? = nil,
+        reminderWindowOverride: ReminderWindow? = nil,
+        lastInteractedAt: Date? = nil
     ) -> Contact {
         Contact(
             systemContactRef: systemRef,
@@ -27,7 +29,8 @@ enum UpcomingFixtures {
             cadenceDays: cadenceDays,
             preferredChannel: .phoneCall,
             preferredChannelValue: "+14155550199",
-            lastInteractedAt: now.addingTimeInterval(-30 * 86_400)
+            reminderWindowOverride: reminderWindowOverride,
+            lastInteractedAt: lastInteractedAt ?? now.addingTimeInterval(-30 * 86_400)
         )
     }
 }

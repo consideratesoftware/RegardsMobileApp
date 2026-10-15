@@ -105,15 +105,12 @@ extension ScreensAccessibilityTests {
             "Accessibility-sized segment options must stack without overlap."
         )
 
+        // The digest row is just its lead now; the invented "next digest at"
+        // time that used to stack below it is gone.
         let digestLead = app.descendants(matching: .any)["overdue.digest-lead"]
-        let digestTime = app.descendants(matching: .any)["overdue.digest-time"]
         XCTAssertTrue(digestLead.waitForExistence(timeout: 10))
-        XCTAssertTrue(digestTime.waitForExistence(timeout: 10))
-        assertStacked(
-            digestTime,
-            below: digestLead,
-            "The digest time must stack below its lead at accessibility sizes."
-        )
+        XCTAssertEqual(digestLead.label, "Send your regards")
+        XCTAssertFalse(app.descendants(matching: .any)["overdue.digest-time"].exists)
     }
 
     /// Split out of `testAccessibility5AdaptiveContentDoesNotOverlap` — see

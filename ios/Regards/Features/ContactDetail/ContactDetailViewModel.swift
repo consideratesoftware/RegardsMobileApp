@@ -256,9 +256,7 @@ public final class ContactDetailViewModel {
     /// overdue state while the snooze is still pending — without a reload
     /// here, the screen kept reading "N days overdue" from the pre-snooze
     /// snapshot until some *unrelated* trigger (a tab switch, a pop/push)
-    /// happened to reload it. `nextReminderLabel`'s own hardcoded
-    /// placeholder is a separate, still-open gap (R11) this reload does not
-    /// touch. Most other screen labels (`cadenceLabel`, `lastTalkedLabel`)
+    /// happened to reload it. Most other screen labels (`cadenceLabel`, `lastTalkedLabel`)
     /// are untouched by a snooze and simply re-derive the same values.
     ///
     /// Returns whether the write succeeded — see `markCaughtUp`'s doc
@@ -367,6 +365,16 @@ public final class ContactDetailViewModel {
     public var cadenceLabel: String {
         guard let days = contact?.cadenceDays else { return "not tracked" }
         return CadenceDescriptor.describe(days: days)
+    }
+
+    /// Whether the "Reminder window" row and its Change button show. Same
+    /// gate as Overdue, Upcoming and the Snooze button (`tracked &&
+    /// cadenceDays != nil`) plus an active contact: only a tracked contact
+    /// with a cadence gets a cadence reminder, and the override write
+    /// refuses an archived one.
+    public var canEditReminderWindow: Bool {
+        guard let c = contact else { return false }
+        return c.tracked && c.cadenceDays != nil && c.archivedAt == nil
     }
 
     /// Folds in a pending snooze (R56 fix, promoted from deferred at staged

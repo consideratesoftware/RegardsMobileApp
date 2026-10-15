@@ -168,6 +168,33 @@ struct AppRuntimeTests {
         #expect(viewModel.horizonDays == horizonDays)
     }
 
+    /// Composition seam: the Settings editor's save reaches the Upcoming view
+    /// model the tabs show (I2), and changes nothing besides the edited field.
+    @Test("Saving the Settings editor updates the Upcoming horizon and keeps every other field")
+    @MainActor
+    func settingsEditorSaveUpdatesUpcoming() async throws {
+        let runtime = AppRuntime.makeMock()
+        let upcoming = RegardsTabRoot.makeUpcomingViewModel(runtime: runtime)
+        let editor = RegardsTabRoot.makeReminderWindowsViewModel(runtime: runtime, upcoming: upcoming)
+        await editor.load()
+        let before = try await runtime.environment.window.fetchGlobal()
+        let newHorizon = before.digestHorizonDays == 7 ? 30 : 7
+        editor.draft.digestHorizonDays = newHorizon
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(upcoming.horizonDays == newHorizon)
+        let after = try await runtime.environment.window.fetchGlobal()
+        #expect(after.digestHorizonDays == newHorizon)
+        #expect(upcoming.window == after)
+        #expect(after.allowedDays == before.allowedDays)
+        #expect(after.allowedTimeRanges == before.allowedTimeRanges)
+        #expect(after.quietHours == before.quietHours)
+        #expect(after.timezoneIdentifier == before.timezoneIdentifier)
+        #expect(after.occasionTime == before.occasionTime)
+    }
+
     @Test("Production runtime propagates a missing persisted window")
     func productionRuntimeRejectsMissingWindow() async throws {
         let environment = environment(window: StubReminderWindowRepository.missing())

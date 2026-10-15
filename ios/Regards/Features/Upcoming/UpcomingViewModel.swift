@@ -62,7 +62,7 @@ public final class UpcomingViewModel {
     public private(set) var totalCount: Int = 0
     private(set) var loadState: RegardsLoadState = .loading
 
-    public let horizonDays: Int
+    public var horizonDays: Int { window.digestHorizonDays }
 
     /// The row that owns the zoom-transition source for each contact.
     ///
@@ -87,7 +87,7 @@ public final class UpcomingViewModel {
     private let scheduler: SchedulingPass
     private let interactions: any InteractionRepository
     private let engine: ReminderEngine
-    private let window: ReminderWindow
+    private(set) var window: ReminderWindow
     private let clock: () -> Date
     private var loadGeneration = 0
     // `ObservationSubscriptionToken`, not a plain `Task<Void, Never>?`
@@ -120,12 +120,18 @@ public final class UpcomingViewModel {
         self.interactions = interactions
         self.engine = engine
         self.window = window
-        self.horizonDays = window.digestHorizonDays
         self.clock = clock
     }
 
     public func load() async {
         await startObservingIfNeeded()
+        await performLoad()
+    }
+
+    /// Swaps in a newly saved global window and reloads, so the rows and the
+    /// horizon follow it at once. The generation bump in `performLoad()` drops any in-flight load built on the old one.
+    public func updateWindow(_ window: ReminderWindow) async {
+        self.window = window
         await performLoad()
     }
 
@@ -381,16 +387,16 @@ public final class UpcomingViewModel {
                 // other.
                 let snoozedUntil = snoozedUntilByContact[contact.id] ?? .distantPast
                 let target = max(now, overdueAt, snoozedUntil)
-                // `nextAllowedSlot` returns nil for a zero-capacity window
-                // (R4). This is a live path, not a defensive one: the window is
-                // now caller-supplied (R9a), and
-                // `UpcomingViewModelStateTests.zeroCapacityWindowKeepsOccasions`
-                // drives exactly this branch. Skipping the cadence row while
-                // leaving occasion rows intact is the correct degradation —
-                // do not delete this guard as unreachable.
+                // Only slot math resolves the per-contact override;
+                // horizon, timezone, and day headers stay global. TF-07's R10
+                // swap deletes this interim second resolution point (§9).
+                // nil means zero capacity (R4) in the global window or a
+                // stored override: skip this cadence row, keep the others and
+                // every occasion row (`zeroCapacityWindowKeepsOccasions`). Do
+                // not delete this guard as unreachable.
                 guard let fires = engine.nextAllowedSlot(
                     from: target,
-                    in: window,
+                    in: contact.reminderWindowOverride ?? window,
                     includingContainingSlot: max(overdueAt, snoozedUntil) <= now
                 ) else { continue }
                 // An already-overdue contact inside an active window resolves

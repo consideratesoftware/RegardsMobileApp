@@ -26,10 +26,12 @@ extension ScreensAccessibilityTests {
         includeDuplicateFixture: Bool = false,
         seedCorruptRow: Bool = false,
         notificationStatus: String? = nil,
-        notificationRequestOutcome: String? = nil
+        notificationRequestOutcome: String? = nil,
+        extraLaunchEnvironment: [String: String] = [:]
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("--regards-mock-runtime")
+        for (key, value) in extraLaunchEnvironment { app.launchEnvironment[key] = value }
         if let dynamicTypeSize {
             app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
         }
@@ -60,13 +62,15 @@ extension ScreensAccessibilityTests {
         includeDuplicateFixture: Bool = false,
         dynamicTypeSize: String? = nil,
         notificationStatus: String? = nil,
-        notificationRequestOutcome: String? = nil
+        notificationRequestOutcome: String? = nil,
+        extraLaunchEnvironment: [String: String] = [:]
     ) -> XCUIApplication {
         let app = launchToOverdue(
             dynamicTypeSize: dynamicTypeSize,
             includeDuplicateFixture: includeDuplicateFixture,
             notificationStatus: notificationStatus,
-            notificationRequestOutcome: notificationRequestOutcome
+            notificationRequestOutcome: notificationRequestOutcome,
+            extraLaunchEnvironment: extraLaunchEnvironment
         )
         navigateToTab(
             named: "Settings",

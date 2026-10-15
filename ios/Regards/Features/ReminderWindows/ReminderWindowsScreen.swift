@@ -1,33 +1,67 @@
 import SwiftUI
 
+/// The live reminder-window editor (ARCHITECTURE.md §10 screen 9). The same
+/// screen edits the global window and, from Contact Detail, one contact's
+/// override; an override shows days, ranges, and quiet hours only. Occasion
+/// time and horizon stay global.
 public struct ReminderWindowsScreen: View {
-    @State private var window: ReminderWindow
-    private let clock: () -> Date
+    /// `@State`, not a plain property: the Settings destination closure runs
+    /// again on every root re-render and hands over a fresh view model each
+    /// time. `State` keeps the first one for as long as this screen is on the
+    /// stack, so edits survive a re-render and a new push starts clean.
+    @State var viewModel: ReminderWindowsViewModel
+    private let announce: @MainActor (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @AccessibilityFocusState private var errorFocused: Bool
+    @State private var announcer = RowActionAnnouncer()
+    @ScaledMetric(relativeTo: .subheadline) var pillSize: CGFloat = 36
 
-    public init(window: ReminderWindow = .defaultV1(),
-                clock: @escaping () -> Date = { Date() }) {
-        self._window = State(initialValue: window)
-        self.clock = clock
+    public init(viewModel: ReminderWindowsViewModel,
+                announce: @escaping @MainActor (String) -> Void = {
+                    AccessibilityNotification.Announcement($0).post()
+                }) {
+        self._viewModel = State(initialValue: viewModel)
+        self.announce = announce
     }
 
+    private var isOverride: Bool {
+        if case .contact = viewModel.target { return true }
+        return false
+    }
+
+    /// Scroll target for the inline error banner (the banner's accessibility
+    /// identifier is `reminder-windows.error`).
+    private static let errorBannerID = "reminder-windows.error-banner"
+
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                header
-
-                daysSection
-                timeRangesSection
-                quietHoursSection
-                occasionSection
-
-                Text("All times local · \(window.timezoneIdentifier). DST handled automatically.")
-                    .font(.caption)
-                    .foregroundStyle(RegardsDS.muted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 22)
-
-                Color.clear.frame(height: 40)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
+                    switch viewModel.loadState {
+                    case .loading:
+                        ProgressView("Loading")
+                            .padding(.top, 40)
+                    case .failed:
+                        loadFailure
+                    case .loaded:
+                        editor
+                    }
+                }
+            }
+            // Save sits in the toolbar, so the user is usually scrolled
+            // away from the banner at the top. Scroll to it first, then move
+            // focus there and speak the message: a focus change flushes
+            // VoiceOver's speech queue, so announcing first would cut the
+            // message off (same order as `RowActionAnnouncer` gives Overdue
+            // and Upcoming). No animation, so Reduce Motion needs no branch.
+            // Centered, not top-aligned: top alignment slid the header half
+            // under the navigation bar, which the accessibility audit flags
+            // as potentially inaccessible text.
+            .onChange(of: viewModel.failureCount) {
+                guard let message = viewModel.validationMessage else { return }
+                proxy.scrollTo(Self.errorBannerID, anchor: .center)
+                speak(message) { errorFocused = true }
             }
         }
         .background(RegardsDS.background.ignoresSafeArea())
@@ -35,15 +69,64 @@ public struct ReminderWindowsScreen: View {
         .accessibilityIdentifier("screen.reminder-windows")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    Task { if await viewModel.save() { dismiss() } }
+                }
+                .disabled(viewModel.loadState != .loaded || viewModel.isSaving)
+                .accessibilityIdentifier("reminder-windows.save")
+            }
+        }
+        // A re-appearance (a popover closing, a tab switch back) must not
+        // reload over unsaved edits.
+        .task {
+            if viewModel.loadState == .loading { await viewModel.load() }
+        }
+    }
+
+    /// Speaks `message` through the injectable `announce` seam, after `focus`
+    /// when the caller moves VoiceOver focus first.
+    func speak(_ message: String, focus: @escaping @MainActor () -> Void = {}) {
+        announcer.fire(
+            message,
+            effects: RowActionAccessibilityEffects(announce: announce, didFocus: {}),
+            focus: focus
+        )
+    }
+
+    private var editor: some View {
+        VStack(spacing: 0) {
+            if let message = viewModel.validationMessage {
+                errorBanner(message)
+            }
+            daysSection
+            timeRangesSection
+            quietHoursSection
+            if isOverride {
+                overrideNote
+                if viewModel.hasStoredOverride { resetButton }
+            } else {
+                occasionSection
+                horizonSection
+            }
+            Text("All times local · \(viewModel.timezoneName). Daylight saving time is handled automatically.")
+                .font(.caption)
+                .foregroundStyle(RegardsDS.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .padding(.top, 22)
+            Color.clear.frame(height: 40)
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Reminder windows")
+            Text(isOverride ? "Reminder window" : "Reminder windows")
                 .font(.system(.largeTitle, weight: .bold))
                 .foregroundStyle(RegardsDS.ink)
                 .accessibilityAddTraits(.isHeader)
-            Text("when it's OK to nudge you.")
+            Text(subtitle)
                 .font(RegardsFont.serifItalic(.title3))
                 .foregroundStyle(RegardsDS.muted)
         }
@@ -53,224 +136,70 @@ public struct ReminderWindowsScreen: View {
         .padding(.bottom, 6)
     }
 
-    // MARK: - Days
-
-    private var daysSection: some View {
-        VStack(spacing: 0) {
-            SectionHeader("Days")
-            RegardsCard {
-                VStack(spacing: 0) {
-                    HStack {
-                        ForEach(Self.dayLabels, id: \.day) { label in
-                            dayPill(
-                                letter: label.letter,
-                                name: label.name,
-                                active: window.allowedDays.contains(label.day)
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    Hair(inset: 16)
-                    Text(daysSummary)
-                        .font(.footnote)
-                        .foregroundStyle(RegardsDS.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                }
-            }
+    private var subtitle: String {
+        if isOverride {
+            return "just for \(viewModel.contactName ?? "this contact")."
         }
+        return "when it's OK to nudge you."
     }
 
-    private func dayPill(letter: String, name: String, active: Bool) -> some View {
-        ZStack {
-            Circle()
-                // `accentInk` so the white day letter passes AA body contrast.
-                .fill(active ? RegardsDS.accentInk : RegardsDS.hairSoft)
-                .frame(width: 36, height: 36)
-            Text(letter)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(active ? .white : RegardsDS.muted)
+    private var loadFailure: some View {
+        ContentUnavailableView {
+            Label("Can't load the window", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(viewModel.loadFailureMessage)
+        } actions: {
+            Button("Try Again") { Task { await viewModel.load() } }
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("reminder-windows.retry")
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel(active ? "\(name) allowed" : "\(name) not allowed")
+        .padding(.top, 24)
     }
 
-    private var daysSummary: String {
-        let hasWeekdays = window.allowedDays.contains(.weekdays)
-        let hasWeekends = !window.allowedDays.isDisjoint(with: .weekends)
-        if hasWeekdays && !hasWeekends { return "Weekdays only. Weekends are yours." }
-        if !hasWeekdays && hasWeekends { return "Weekends only." }
-        if hasWeekdays && hasWeekends  { return "Any day." }
-        return "No days selected."
-    }
-
-    // MARK: - Time ranges
-
-    private var timeRangesSection: some View {
-        VStack(spacing: 0) {
-            SectionHeader("Time ranges · same on every allowed day")
-            RegardsCard {
-                VStack(spacing: 0) {
-                    timelineBar
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                    Hair(inset: 16)
-                    ForEach(Array(window.allowedTimeRanges.enumerated()), id: \.offset) { idx, range in
-                        timeRangeRow(start: format(range.start), end: format(range.end))
-                        if idx < window.allowedTimeRanges.count - 1 { Hair(inset: 16) }
-                    }
-                    Hair(inset: 16)
-                    // Stub — Phase 1 wires this to a time-range picker. Muted
-                    // so it doesn't look tap-affordable.
-                    HStack {
-                        Text("+ Add range")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(RegardsDS.muted)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-            }
-        }
-    }
-
-    private var timelineBar: some View {
-        GeometryReader { geo in
-            let width = geo.size.width
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(RegardsDS.hairSoft)
-                ForEach(Array(window.allowedTimeRanges.enumerated()), id: \.offset) { _, range in
-                    let startPct = Double(range.start.minutesSinceMidnight) / 1440.0
-                    let endPct = Double(range.end.minutesSinceMidnight) / 1440.0
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(RegardsDS.accent.opacity(0.85))
-                        .frame(width: CGFloat(endPct - startPct) * width)
-                        .offset(x: CGFloat(startPct) * width)
-                }
-                // Real "now" marker — resolved against the window's
-                // timezone so the ruler stays honest for users who travel
-                // across zones (or when the screen is reviewed from a
-                // test harness anchored to a fixed clock).
-                Rectangle()
-                    .fill(RegardsDS.ink)
-                    .frame(width: 2)
-                    .offset(x: width * nowFraction)
-            }
-        }
-        .frame(height: 28)
-        .accessibilityHidden(true)
-    }
-
-    /// 0…1 fraction of the current time through the 24-hour day, resolved in
-    /// the window's timezone.
-    private var nowFraction: Double {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = window.timeZone
-        let comps = calendar.dateComponents([.hour, .minute], from: clock())
-        let minutes = Double((comps.hour ?? 0) * 60 + (comps.minute ?? 0))
-        return minutes / 1440.0
-    }
-
-    private func timeRangeRow(start: String, end: String) -> some View {
-        HStack(spacing: 10) {
-            timeChip(start)
-            Text("→").foregroundStyle(RegardsDS.muted)
-            timeChip(end)
-            Spacer()
-            // Stub — Phase 1 wires the range editor. Muted until interactive.
-            Text("Remove")
+    private func errorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(RegardsDS.accentInk)
+                .accessibilityHidden(true)
+            Text(message)
                 .font(.footnote)
-                .foregroundStyle(RegardsDS.muted)
+                .foregroundStyle(RegardsDS.accentInk)
+                .accessibilityIdentifier("reminder-windows.error")
+                .accessibilityFocused($errorFocused)
         }
-        .padding(.horizontal, 16)
+        .id(Self.errorBannerID)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RegardsDS.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
-    private func timeChip(_ text: String) -> some View {
-        Text(text)
-            .font(RegardsFont.mono(.subheadline).weight(.medium))
-            .foregroundStyle(RegardsDS.ink)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(RegardsDS.hairSoft, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    // MARK: - Override extras
+
+    private var overrideNote: some View {
+        Text("Occasion time and the Upcoming horizon follow the default window.")
+            .font(.footnote)
+            .foregroundStyle(RegardsDS.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
     }
 
-    // MARK: - Quiet hours
-
-    private var quietHoursSection: some View {
-        VStack(spacing: 0) {
-            SectionHeader("Quiet hours · hard override")
-            RegardsCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Never between")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(RegardsDS.ink)
-                        Text(quietHoursLabel)
-                            .font(RegardsFont.mono(.footnote))
-                            .foregroundStyle(RegardsDS.muted)
-                    }
-                    Spacer()
-                    Toggle("", isOn: .constant(window.quietHours != nil))
-                        .labelsHidden()
-                        // Matches the active day-pill `accentInk` fill on
-                        // this same screen so the two accent-colored
-                        // controls read as one family.
-                        .tint(RegardsDS.accentInk)
-                }
+    private var resetButton: some View {
+        Button {
+            Task { if await viewModel.resetToDefault() { dismiss() } }
+        } label: {
+            Text("Use default window")
+                .font(.body.weight(.medium))
+                .foregroundStyle(RegardsDS.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-            }
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("reminder-windows.use-default")
+        .padding(.top, 8)
     }
-
-    private var quietHoursLabel: String {
-        guard let q = window.quietHours else { return "off" }
-        return "\(format(q.start)) → \(format(q.end))"
-    }
-
-    // MARK: - Occasion
-
-    private var occasionSection: some View {
-        VStack(spacing: 0) {
-            SectionHeader("Occasion notifications")
-            RegardsCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Morning-of time")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(RegardsDS.ink)
-                        Text("Birthdays + anniversaries, separate from cadence.")
-                            .font(.caption)
-                            .foregroundStyle(RegardsDS.muted)
-                    }
-                    Spacer()
-                    // Stub — Phase 1 wires the time picker.
-                    Text("09:00")
-                        .font(RegardsFont.mono(.body).weight(.medium))
-                        .foregroundStyle(RegardsDS.muted)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func format(_ time: TimeOfDay) -> String {
-        String(format: "%02d:%02d", time.hour, time.minute)
-    }
-
-    static let dayLabels: [(day: DayOfWeekMask, letter: String, name: String)] = [
-        (.sunday, "S", "Sunday"), (.monday, "M", "Monday"),
-        (.tuesday, "T", "Tuesday"), (.wednesday, "W", "Wednesday"),
-        (.thursday, "T", "Thursday"), (.friday, "F", "Friday"),
-        (.saturday, "S", "Saturday"),
-    ]
 }

@@ -185,4 +185,95 @@ struct UpcomingViewModelRaceTests {
         _ = await action.value
         #expect(viewModel.totalCount == 0)
     }
+
+    /// Guards stale data through the generation check, not a stale window:
+    /// `performLoad()` reads `self.window` after its awaits, so once
+    /// `updateWindow` has set it no load builds rows from the old window.
+    /// What a parked load can still carry is the contact snapshot it read
+    /// before `updateWindow` ran. Here that snapshot has the contact due in
+    /// 3 days (a row under the 7-day horizon too); the store has since moved
+    /// it to 10 days (a row only under the 14-day horizon). The parked load
+    /// is released after `updateWindow` returns, so without the
+    /// `generation == loadGeneration` guard it would resurrect a row the new
+    /// window drops.
+    @Test("A load() in flight when updateWindow runs does not overwrite the new window's rows")
+    func updateWindowSurvivesConcurrentInFlightLoad() async throws {
+        let stale = UpcomingFixtures.contact(
+            systemRef: "update-window-race", cadenceDays: 14,
+            lastInteractedAt: Self.now.addingTimeInterval(-11 * 86_400)
+        )
+        var current = stale
+        current.lastInteractedAt = Self.now.addingTimeInterval(-4 * 86_400)
+        let gate = AsyncGate()
+        let contacts = ParkFirstFetchTrackedContactRepository(
+            wrapped: StubContactRepository([current]),
+            gate: gate,
+            counter: CallCounter(),
+            staleSnapshot: [stale]
+        )
+        let reminders = StubReminderRepository()
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: reminders,
+            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            interactions: StubInteractionRepository(),
+            window: ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 14),
+            clock: { Self.now }
+        )
+        let staleLoad = Task { await viewModel.load() }
+        await gate.waitUntilArrived()
+
+        await viewModel.updateWindow(
+            ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 7)
+        )
+        #expect(viewModel.totalCount == 0)
+
+        await gate.open()
+        await staleLoad.value
+
+        #expect(viewModel.totalCount == 0, "the stale load must not resurrect a row from its old snapshot")
+        #expect(viewModel.horizonDays == 7)
+    }
+}
+
+/// Parks only the **first** `fetchTracked()` until `gate` opens, then returns
+/// `staleSnapshot` (what that read saw before later writes); every later call
+/// passes straight through. `GatedFetchTrackedContactRepository` is binary, so
+/// a second load would park behind the first and the test could not let
+/// `updateWindow` finish while the stale load is still held.
+private struct ParkFirstFetchTrackedContactRepository: ContactRepository {
+    let wrapped: any ContactRepository
+    let gate: AsyncGate
+    let counter: CallCounter
+    let staleSnapshot: [Contact]
+
+    func fetchAll() async throws -> [Contact] { try await wrapped.fetchAll() }
+    func fetchTracked() async throws -> [Contact] {
+        if await counter.next() == 1 {
+            await gate.wait()
+            return staleSnapshot
+        }
+        return try await wrapped.fetchTracked()
+    }
+    func fetch(id: UUID) async throws -> Contact? { try await wrapped.fetch(id: id) }
+    func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {
+        try await wrapped.fetchMembers(ofGroup: groupId)
+    }
+    func upsert(_ contact: Contact) async throws { try await wrapped.upsert(contact) }
+    func archive(id: UUID, at: Date) async throws { try await wrapped.archive(id: id, at: at) }
+    func observeTracked() async -> AsyncStream<[Contact]> { await wrapped.observeTracked() }
+    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
+        try await wrapped.updateReconciledFields(id: id, fields: fields)
+    }
+    @discardableResult
+    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
+        try await wrapped.updateLastInteractedAt(id: id, at: date)
+    }
+    @discardableResult
+    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
+        try await wrapped.updateReminderWindowOverride(id: id, window: window)
+    }
+    func fetchAllWithDiagnostics() async throws -> ContactFetchReport {
+        try await wrapped.fetchAllWithDiagnostics()
+    }
 }
