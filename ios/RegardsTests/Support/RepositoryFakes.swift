@@ -33,6 +33,10 @@ actor StubContactRepository: ContactRepository {
     /// concurrent write removed the row in the gap between them."
     private let missesUpdateLastInteractedAt: Bool
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
+    /// Mutable, not init-time: a test seeds contacts through `fetch`-reading
+    /// helpers first, then arms this so only the calls under test fail, and
+    /// the very next call recovers.
+    private var fetchFailuresRemaining = 0
 
     init(
         _ contacts: [Contact] = [],
@@ -84,7 +88,17 @@ actor StubContactRepository: ContactRepository {
 
     func fetch(id: UUID) async throws -> Contact? {
         try requireSuccess()
+        if fetchFailuresRemaining > 0 {
+            fetchFailuresRemaining -= 1
+            throw RepositoryFakeFailure()
+        }
         return contacts.first { $0.id == id }
+    }
+
+    /// The next `count` calls to `fetch(id:)` throw, then it recovers. Lets a
+    /// test fail one read in the middle of a run that must keep going.
+    func armFetchFailures(_ count: Int) {
+        fetchFailuresRemaining = count
     }
 
     func fetchMembers(ofGroup groupId: UUID) async throws -> [Contact] {

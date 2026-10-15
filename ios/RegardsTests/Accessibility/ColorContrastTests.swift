@@ -28,6 +28,25 @@ struct ColorContrastTests {
         #expect(abs(WCAGContrast.ratio(foreground: white, background: white) - 1.0) < 0.0001)
     }
 
+    /// The Settings notification error line is `RegardsDS.danger` footnote text
+    /// directly on the page background, so it needs the 4.5 body-text ratio in
+    /// both appearances. `RegardsPalette.contrastPairs` has no danger pair, so
+    /// the check lives here until one is registered there.
+    @Test(
+        "Danger text on Background meets AA body contrast in light and dark",
+        arguments: [
+            ("light", RegardsPalette.dangerLight, RegardsPalette.backgroundLight),
+            ("dark", RegardsPalette.dangerDark, RegardsPalette.backgroundDark),
+        ]
+    )
+    func dangerOnBackgroundMeetsBodyContrast(
+        appearance: String, danger: RegardsPalette.SRGB, background: RegardsPalette.SRGB
+    ) {
+        let ratio = WCAGContrast.ratio(foreground: danger.tuple, background: background.tuple)
+
+        #expect(ratio >= 4.5, "danger on background (\(appearance)): \(String(format: "%.2f", ratio))")
+    }
+
     @Test("Muted light vs Background light is comfortably above AA body threshold")
     func mutedLightAboveAA() {
         let ratio = WCAGContrast.ratio(

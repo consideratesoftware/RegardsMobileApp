@@ -35,6 +35,52 @@ under a **Manual accessibility smoke** heading.
       (Settings → Accessibility → Display & Text Size → Larger Text → slider
       all the way up). App re-renders without clipping or truncation.
 
+## Settings notifications
+
+Run on a fresh install. The visible text and the VoiceOver label can differ,
+so check the label. When the permission state changes while Settings is on
+screen, VoiceOver focus moves to the new status line.
+
+Deny and grant each start from not determined, and iOS asks only once per
+install. Delete and reinstall Regards between the deny steps and the grant
+step.
+
+- [ ] Not determined: the row shows "Turn on notifications", which VoiceOver
+      reads as a button. Activating it raises the iOS prompt once.
+- [ ] Deny the prompt: VoiceOver announces "Notifications off".
+- [ ] Decide the prompt, grant or deny: VoiceOver focus lands on the new status
+      line.
+- [ ] Denied: the visible text is "Open iOS Settings" over "Notifications are
+      off for Regards." VoiceOver reads "Notifications off. Open iOS Settings"
+      as a button. Activating it opens Regards' notification settings in iOS
+      Settings.
+- [ ] At Dynamic Type `accessibility5`, the denied row wraps without clipping,
+      and its button stays tappable.
+- [ ] Grant the prompt from not determined: VoiceOver announces "Notifications
+      on", and the row reads it as text with no button.
+- [ ] A failed permission request shows "Couldn't ask for notification
+      permission. Try again." under the Settings notifications card
+      (`settings.notifications.error`), and VoiceOver announces the same text.
+      The line clears on the next successful request or a real status change.
+      Recipe: DEBUG build, scheme launch argument `--regards-mock-runtime`, and
+      environment `REGARDS_UI_TEST_NOTIFICATION_STATUS=notDetermined` and
+      `REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME=fail`. The XCUI test
+      `testSettingsNotificationRequestFailureShowsErrorLine` covers the visible
+      line. This step checks only what VoiceOver says.
+- [ ] Focus does not jump from a covered screen (negative check): from
+      Settings, push Transparency. Change notifications for Regards in iOS
+      Settings, then return to Regards. VoiceOver focus stays on Transparency
+      and does not move to the notifications status line. Go back to Settings
+      afterwards.
+- [ ] First Settings open after launch (owner ruling 11, [PR #62 comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/62#issuecomment-6175786339)):
+      note whether the notifications row pops in and pushes Privacy and Help
+      down. Record the answer in the smoke record. Reserve the row's height only
+      if the shift is visible.
+- [ ] Return from iOS Settings after a change: VoiceOver announces the new
+      state. This step needs a denied state first. From denied, turn
+      notifications on for Regards in iOS Settings, then return. The row then
+      reads "Notifications on" as text with no button.
+
 ## Screen checklist
 
 Apply this checklist to every screen changed by the pull request:
