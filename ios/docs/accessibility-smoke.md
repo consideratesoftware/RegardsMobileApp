@@ -125,9 +125,11 @@ Reminder window row.
       "Weekdays only. Weekends are yours.", "Weekends only.", "Any day.", or a
       list of the selected day names.
 - [ ] "+ Add range" is labelled "Add range" and adds a one-hour range that
-      starts at the latest range end, clamped to 11:59 pm. When the latest range
-      already ends at 11:59 pm, the button is disabled, and its hint says "The
-      last range already ends at 11:59 pm, so there's no time left after it."
+      starts at the latest range end, clamped to 23:59. When the latest range
+      already ends at 23:59, the button is disabled. Its hint shows that time in
+      the locale's format: "11:59 PM" in en_US, "23:59" in a 24-hour locale.
+      Example (en_US): "The last range already ends at 11:59 PM, so there's no
+      time left after it."
 - [ ] Activate "+ Add range". VoiceOver announces "Range N added, <start> to
       <end>", for example "Range 2 added, 10:00 PM to 11:00 PM".
 - [ ] Activate the Remove button on a range (it is absent when only one range
