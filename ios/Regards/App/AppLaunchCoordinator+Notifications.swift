@@ -59,9 +59,11 @@ extension AppLaunchCoordinator {
             // `caughtUp` has no precondition by design, and `InteractionLogging`
             // checks only `isActive`. A notification can outlive the contact's
             // tracking, so an untracked or no-cadence contact must write nothing.
-            // The check is best-effort: `markCaughtUp` re-checks `isActive` and
-            // throws for an inactive contact (the handler then restores the
-            // snooze), and R59 and R60 cover the rest.
+            // The check is best-effort. `markCaughtUp` re-checks `isActive` and
+            // throws for an inactive contact, and the handler restores a snooze
+            // it cleared. A contact untracked between this fetch and the write
+            // still gets the interaction logged, the same as the in-app Caught
+            // up with a stale row; TF-07's reconciliation owns tightening it.
             let contacts = runtime.environment.contacts
             do {
                 guard let contact = try await contacts.fetch(id: contactId),

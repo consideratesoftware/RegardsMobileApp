@@ -22,6 +22,8 @@ public struct SettingsScreen: View {
         self.notifications = notifications
     }
 
+    // MARK: - Body
+
     public var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -194,6 +196,8 @@ public struct SettingsScreen: View {
             }
         }
     }
+
+    // MARK: - Header and rows
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {

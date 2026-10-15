@@ -9,6 +9,8 @@ import Foundation
 /// become less private except `init(mockRuntime:)` itself, which the
 /// file-split forced from `private` to plain `internal`.
 extension AppLaunchCoordinator {
+    // MARK: - Launch factory
+
 #if DEBUG
     static func configuredForCurrentProcess() -> AppLaunchCoordinator {
         let environment = ProcessInfo.processInfo.environment
@@ -84,6 +86,8 @@ extension AppLaunchCoordinator {
     }
 #endif
 }
+
+// MARK: - DEBUG fixtures
 
 #if DEBUG
 /// Fake `NotificationScheduling` for the `--regards-mock-runtime` launch and
