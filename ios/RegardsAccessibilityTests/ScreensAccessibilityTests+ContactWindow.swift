@@ -48,6 +48,15 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
+    /// The override editor at the largest Dynamic Type size: the same day-row
+    /// checks as the global editor, reached through the Contact Detail row.
+    @MainActor
+    func testContactWindowOverrideEditorAtAccessibility5() throws {
+        let app = launchToContactDetailFromContacts(dynamicTypeSize: "accessibility5")
+        openOverrideEditor(in: app)
+        try assertDayRowsStackedAtAccessibility5(in: app)
+    }
+
     /// Row state follows the override: "Default window" -> save -> "Custom window" ->
     /// "Use default window" -> "Default window".
     @MainActor

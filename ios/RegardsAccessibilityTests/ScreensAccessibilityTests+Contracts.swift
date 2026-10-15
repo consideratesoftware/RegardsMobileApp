@@ -199,14 +199,14 @@ extension ScreensAccessibilityTests {
             "The accessibility-sized channel action must stack below its summary."
         )
 
-        let cadenceValue = app.descendants(matching: .any)["contact-detail.detail-value-every"]
-        let cadenceChange = app.descendants(matching: .any)["contact-detail.cadence-change-unavailable"]
-        XCTAssertTrue(cadenceValue.waitForExistence(timeout: 10))
-        XCTAssertTrue(cadenceChange.waitForExistence(timeout: 10))
+        let windowValue = app.descendants(matching: .any)["contact-detail.detail-value-reminder-window"]
+        let windowChange = app.descendants(matching: .any)["contact-detail.window-change"]
+        XCTAssertTrue(windowValue.waitForExistence(timeout: 10))
+        XCTAssertTrue(windowChange.waitForExistence(timeout: 10))
         assertStacked(
-            cadenceChange,
-            below: cadenceValue,
-            "The cadence action must stack below its value at accessibility sizes."
+            windowChange,
+            below: windowValue,
+            "The Reminder window action must stack below its value at accessibility sizes."
         )
 
         navigate(
@@ -348,7 +348,6 @@ extension ScreensAccessibilityTests {
 
         let unavailableElements = [
             ("contact-detail.open-channel-unavailable", "Open WhatsApp, unavailable"),
-            ("contact-detail.cadence-change-unavailable", "Change, unavailable"),
             ("contact-detail.channel-change-unavailable", "Change, unavailable")
         ]
         for (identifier, expectedLabel) in unavailableElements {
@@ -358,6 +357,10 @@ extension ScreensAccessibilityTests {
                 in: app
             )
         }
+        XCTAssertFalse(
+            app.descendants(matching: .any)["contact-detail.cadence-change-unavailable"].exists,
+            "The Cadence card has no Change stub; only the Reminder window row has a Change control."
+        )
 
         // Caught up / Snooze / Log other are wired (§14 PR22): real,
         // hittable controls, not muted unavailable text.
@@ -368,9 +371,9 @@ extension ScreensAccessibilityTests {
         XCTAssertTrue(snooze.waitForExistence(timeout: 10))
         XCTAssertTrue(logOther.waitForExistence(timeout: 10))
         XCTAssertEqual(caughtUp.label, "Caught up")
-        // Spelled out, not the on-screen "1 wk" — VoiceOver reads that
-        // abbreviation literally. No contact name here, unlike Overdue and
-        // Upcoming's row buttons; see the label's own comment for why.
+        // The visible text is spelled out, so it is also the label. No contact
+        // name here, unlike Overdue and Upcoming's row buttons; see the
+        // button's own comment for why.
         XCTAssertEqual(snooze.label, "Snooze 1 week")
         XCTAssertEqual(logOther.label, "Log other")
         XCTAssertTrue(caughtUp.isEnabled)

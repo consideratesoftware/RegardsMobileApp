@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 import Testing
 @testable import Regards
 
@@ -223,11 +222,7 @@ struct ReminderWindowsViewModelOverrideTests {
     /// and 30, not 09:00 and 14.
     @Test("An override stored before v2 loads and re-saves as a valid window")
     func editorLoadsPreV2OverrideBlob() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let environment = ProductionRepositoryFactory.makeEnvironment(database: database)
-        try await environment.window.saveGlobal(Fixtures.storedGlobal)
         let contact = UpcomingFixtures.contact(systemRef: "pre-v2", displayName: "Pre v2", cadenceDays: 7)
-        try await environment.contacts.upsert(contact)
         var blob = try #require(
             JSONSerialization.jsonObject(with: JSONEncoder().encode(Self.saturdayMorning)) as? [String: Any]
         )
@@ -237,12 +232,9 @@ struct ReminderWindowsViewModelOverrideTests {
             data: JSONSerialization.data(withJSONObject: blob, options: [.sortedKeys]), encoding: .utf8
         ))
         #expect(!json.contains("occasionTime") && !json.contains("digestHorizonDays"))
-        try await database.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET reminderWindowOverride = ? WHERE id = ?",
-                arguments: [json, contact.id.uuidString]
-            )
-        }
+        let environment = try await RawOverrideStore.makeEnvironment(
+            global: Fixtures.storedGlobal, contact: contact, rawOverrideJSON: json
+        )
         let recorder = Fixtures.SaveRecorder()
         let editor = Fixtures.editor(
             .contact(contact.id), contacts: environment.contacts, window: environment.window, recorder: recorder
