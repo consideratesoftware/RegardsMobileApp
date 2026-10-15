@@ -114,7 +114,7 @@ extension ReminderWindowsScreen {
                         Hair(inset: 16)
                     }
                     Button {
-                        if let message = viewModel.addRange() { speak(message) }
+                        if let message = viewModel.addRange() { speak(message, focus: {}) }
                     } label: {
                         Text("+ Add range")
                             .font(.body.weight(.medium))
@@ -173,7 +173,7 @@ extension ReminderWindowsScreen {
     private func timeRangeRow(_ index: Int) -> some View {
         let number = index + 1
         let remove = Button {
-            if let message = viewModel.removeRange(at: index) { speak(message) }
+            if let message = viewModel.removeRange(at: index) { speak(message, focus: {}) }
         } label: {
             Text("Remove")
                 .font(.footnote)

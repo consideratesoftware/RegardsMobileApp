@@ -188,9 +188,13 @@ public final class ReminderWindowsViewModel {
 
     public var canAddRange: Bool { nextNewRange != nil }
 
-    /// Spoken as the disabled "Add range" button's hint.
-    public static let addRangeUnavailableReason =
-        "The last range already ends at 11:59 pm, so there's no time left after it."
+    /// Spoken as the disabled "Add range" button's hint. Computed, not stored,
+    /// so the time follows the locale's format ("11:59 PM", or "23:59" in a
+    /// 24-hour locale).
+    public static var addRangeUnavailableReason: String {
+        let lastMinute = TimeOfDay(hour: 23, minute: 59).displayLabel
+        return "The last range already ends at \(lastMinute), so there's no time left after it."
+    }
 
     public var canRemoveRange: Bool { draft.allowedTimeRanges.count > 1 }
 
