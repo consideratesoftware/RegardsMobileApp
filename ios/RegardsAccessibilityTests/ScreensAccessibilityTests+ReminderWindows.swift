@@ -131,11 +131,67 @@ extension ScreensAccessibilityTests {
         XCTAssertEqual(app.buttons["Tuesday"].value as? String, "not allowed")
         XCTAssertFalse(app.staticTexts["Weekends only."].exists, "Monday plus Saturday is not weekends only.")
         XCTAssertFalse(app.staticTexts["Any day."].exists)
+        // The summary names the chosen days.
+        let namesBoth = NSPredicate(format: "label CONTAINS 'Monday' AND label CONTAINS 'Saturday'")
+        XCTAssertTrue(
+            app.staticTexts.matching(namesBoth).firstMatch.exists,
+            "The summary should name Monday and Saturday."
+        )
 
         // Weekdays plus Saturday.
         toggle(["Tuesday", "Wednesday", "Thursday", "Friday"])
         XCTAssertEqual(app.buttons["Friday"].value as? String, "allowed")
         XCTAssertFalse(app.staticTexts["Any day."].exists, "Weekdays plus Saturday is not every day.")
         XCTAssertFalse(app.staticTexts["Weekends only."].exists)
+    }
+
+    /// At the largest Dynamic Type size each day is a full-width row, not a
+    /// circle: the rows must still be buttons with their allowed value, at
+    /// least 44pt tall, stacked top to bottom, and pass the audit.
+    @MainActor
+    func testReminderWindowsEditorAtAccessibility5() throws {
+        let app = openReminderWindows(extraLaunchEnvironment: ["REGARDS_UI_TEST_DYNAMIC_TYPE": "accessibility5"])
+        XCTAssertTrue(app.buttons["Sunday"].waitForExistence(timeout: 10))
+        let names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        let weekdays: Set<String> = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        for name in names {
+            let row = app.buttons[name]
+            XCTAssertTrue(row.exists, "\(name) should be a button.")
+            XCTAssertEqual(
+                row.value as? String, weekdays.contains(name) ? "allowed" : "not allowed",
+                "\(name) should expose its allowed state as its value."
+            )
+            XCTAssertGreaterThanOrEqual(row.frame.height.rounded(), 44, "\(name) needs a 44pt touch target.")
+        }
+        for (upper, lower) in zip(names, names.dropFirst()) {
+            assertStacked(app.buttons[lower], below: app.buttons[upper], "\(lower) should sit below \(upper).")
+        }
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    /// Save is in the toolbar, so the user is usually scrolled away from the
+    /// inline error when a refusal happens. The banner must be brought into
+    /// view and reachable, not left offscreen.
+    @MainActor
+    func testRefusalBannerIsHittableWhenScrolledAway() throws {
+        let app = openReminderWindows()
+        XCTAssertTrue(app.buttons["Monday"].waitForExistence(timeout: 10))
+        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] {
+            app.buttons[day].tap() // leaves no day selected, so a save is refused
+        }
+        let horizon = app.buttons["reminder-windows.horizon-30"]
+        for _ in 0..<6 where !horizon.isHittable {
+            app.descendants(matching: .any)["screen.reminder-windows"].swipeUp()
+        }
+        XCTAssertTrue(horizon.isHittable, "The editor should be scrolled to the bottom before saving.")
+
+        app.buttons["reminder-windows.save"].tap()
+
+        let banner = app.descendants(matching: .any)["reminder-windows.error"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 5), "A refused save should show the inline error.")
+        XCTAssertTrue(
+            waitUntilLiveAndHittable(banner, timeout: 5),
+            "The error banner should be scrolled into view and hittable."
+        )
     }
 }

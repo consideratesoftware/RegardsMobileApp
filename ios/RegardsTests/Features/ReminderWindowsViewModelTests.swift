@@ -229,7 +229,11 @@ struct ReminderWindowsViewModelTests {
 
     /// 2026-03-08 is the US spring-forward Sunday: 02:00 to 03:00 does not
     /// exist that day, but it does on every other Sunday, so the window has
-    /// capacity and must save.
+    /// capacity and must save. With the clock at 01:30 on the gap day the
+    /// next Sunday is still inside the search, so this does not discriminate
+    /// a one-search capacity check;
+    /// `sundayWindowSavesTheDayBeforeSpringForward` is the real 2-probe
+    /// discriminator.
     @Test("A Sunday 02:00 window saves on the spring-forward Sunday")
     func saveAllowedForSundayWindowOnSpringForwardDay() async throws {
         let newYork = ReminderWindow(

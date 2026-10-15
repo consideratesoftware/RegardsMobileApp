@@ -20,6 +20,7 @@ struct ReminderWindowPersistenceTests {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
             .appendingPathComponent("regards-window-relaunch-\(UUID().uuidString)", isDirectory: true)
+        // Best-effort cleanup of the temp directory; a leftover file cannot affect another test.
         defer { try? fileManager.removeItem(at: root) }
         let fileName = "relaunch.sqlite"
         let stored = ReminderWindowEditorFixtures.storedGlobal

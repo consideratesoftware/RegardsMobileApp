@@ -180,4 +180,52 @@ struct ReminderWindowsViewModelSaveTests {
         #expect(after.target?.reminderWindowOverride == nil)
         #expect(recorder.windows.isEmpty)
     }
+
+    @Test("Trying again after a failed load recovers, and the recovered editor saves")
+    func retryAfterFailedLoadRecovers() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        let flaky = FailFirstFetchWindowRepository(wrapped: world.environment.window, counter: CallCounter())
+        let editor = Fixtures.editor(.global, contacts: world.environment.contacts, window: flaky, recorder: recorder)
+
+        await editor.load()
+        #expect(editor.loadState == .failed)
+        #expect(editor.loadFailureMessage == "Couldn't load your reminder window.")
+
+        await editor.load()
+        #expect(editor.loadState == .loaded)
+        #expect(editor.draft == ReminderWindowsViewModel.Draft(Fixtures.storedGlobal))
+        editor.draft.allowedDays = .saturday
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(try await world.environment.window.fetchGlobal().allowedDays == .saturday)
+    }
+
+    /// "Unchanged" means unchanged from what the editor loaded. If the global
+    /// window moves while a contact's editor is open, an untouched Save must
+    /// still leave the contact on the default; comparing against a fresh
+    /// global would see a difference and create an override that freezes the
+    /// old global values.
+    @Test("An untouched contact save after the global window changed still creates no override")
+    func untouchedContactSaveAfterGlobalChangeCreatesNoOverride() async throws {
+        let world = try await Fixtures.makeWorld()
+        let contactEditor = await Self.loadedEditor(
+            .contact(world.target.id), world: world, recorder: Fixtures.SaveRecorder()
+        )
+        let globalEditor = await Self.loadedEditor(.global, world: world, recorder: Fixtures.SaveRecorder())
+        globalEditor.draft.digestHorizonDays = 7
+        #expect(await globalEditor.save())
+        let before = try await world.snapshot()
+        #expect(before.global.digestHorizonDays == 7)
+
+        let saved = await contactEditor.save()
+
+        #expect(saved)
+        #expect(!contactEditor.hasStoredOverride)
+        let after = try await world.snapshot()
+        #expect(after.target?.reminderWindowOverride == nil)
+        #expect(after == before)
+    }
 }

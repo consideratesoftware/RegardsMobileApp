@@ -177,6 +177,27 @@ struct ReminderWindowsViewModelOverrideTests {
         #expect(after.target == expectedTarget)
     }
 
+    @Test("A failed Use default window keeps the override, says why, and counts the failure")
+    func resetToDefaultFailureKeepsOverride() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Self.saturdayMorning)
+        // Reads work; every write (including the override clear) throws.
+        let failing = StubContactRepository.failingUpsert([world.target, world.bystander])
+        let editor = Fixtures.editor(
+            .contact(world.target.id), contacts: failing, window: world.environment.window,
+            recorder: Fixtures.SaveRecorder()
+        )
+        await editor.load()
+        #expect(editor.hasStoredOverride)
+
+        let cleared = await editor.resetToDefault()
+
+        #expect(!cleared)
+        #expect(editor.hasStoredOverride)
+        #expect(editor.validationMessage == "Couldn't switch back to the default window. Try again.")
+        #expect(editor.failureCount == 1)
+        #expect(try await failing.fetch(id: world.target.id)?.reminderWindowOverride == Self.saturdayMorning)
+    }
+
     @Test("A contact without an override opens on the global window; one with an override opens on it")
     func contactEditorLoadsEffectiveWindow() async throws {
         let withoutOverride = try await Fixtures.makeWorld()

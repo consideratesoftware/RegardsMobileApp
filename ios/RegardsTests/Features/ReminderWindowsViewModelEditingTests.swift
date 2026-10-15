@@ -150,6 +150,40 @@ struct ReminderWindowsViewModelEditingTests {
         #expect(editor.draft.allowedTimeRanges == [Self.range(14, 16)])
     }
 
+    /// The screen speaks what these return after a tap. Times use the same
+    /// locale-aware text the pickers show, so the expectation is built from
+    /// `displayLabel` and does not depend on the host's 12/24-hour setting.
+    @Test("addRange returns the announcement for the range it added, and nil when it adds nothing")
+    func addRangeReturnsItsAnnouncement() async throws {
+        let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
+
+        let message = editor.addRange()
+
+        #expect(message == "Range 3 added, \(Self.time(16).displayLabel) to \(Self.time(17).displayLabel)")
+        #expect(editor.draft.allowedTimeRanges.count == 3)
+
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: Self.time(23, 59))]
+        let before = editor.draft
+        #expect(editor.addRange() == nil)
+        #expect(editor.draft == before)
+    }
+
+    @Test("removeRange returns the announcement with the ranges left, and nil when it removes nothing")
+    func removeRangeReturnsItsAnnouncement() async throws {
+        let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
+        editor.addRange() // three ranges: 10-12, 14-16, 16-17
+
+        #expect(editor.removeRange(at: 0) == "Range 1 removed. 2 ranges left.")
+        #expect(editor.removeRange(at: 1) == "Range 2 removed. 1 range left.")
+        #expect(editor.draft.allowedTimeRanges == [Self.range(14, 16)])
+
+        let before = editor.draft
+        #expect(editor.removeRange(at: 0) == nil, "The last range cannot be removed.")
+        #expect(editor.draft == before)
+        editor.addRange()
+        #expect(editor.removeRange(at: 9) == nil, "A bad index removes nothing.")
+    }
+
     @Test("toggleDay flips one day and leaves the rest")
     func toggleDayFlipsOneDay() async throws {
         let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
