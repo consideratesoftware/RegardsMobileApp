@@ -21,6 +21,10 @@ final class AppLaunchCoordinator {
         /// across launches — see `MissingContactRefStore`'s doc comment for
         /// why in-memory-only state (rounds 9–10) wasn't enough.
         let missingContactRefStore: MissingContactRefStore
+        /// Permission state and notification actions (TF-06). Nil means no
+        /// Settings notifications section and no action consumer, which is
+        /// what every test that doesn't care about notifications gets.
+        let notifications: (any NotificationScheduling)?
 
         /// Explicit, not relying on the synthesized memberwise init to pick
         /// up `missingContactRefStore`'s default: it defaults to
@@ -28,17 +32,20 @@ final class AppLaunchCoordinator {
         /// existing `Dependencies(makeRuntime:contactsSource:clock:)` call
         /// site that doesn't care about cross-launch persistence keeps
         /// compiling unchanged; `production()` below passes
-        /// `.applicationSupport()` explicitly.
+        /// `.applicationSupport()` explicitly. `notifications` defaults to
+        /// nil for the same reason.
         init(
             makeRuntime: @escaping @Sendable () async throws -> AppRuntime,
             contactsSource: any ContactsSource,
             clock: @escaping @Sendable () -> Date,
-            missingContactRefStore: MissingContactRefStore = .ephemeral()
+            missingContactRefStore: MissingContactRefStore = .ephemeral(),
+            notifications: (any NotificationScheduling)? = nil
         ) {
             self.makeRuntime = makeRuntime
             self.contactsSource = contactsSource
             self.clock = clock
             self.missingContactRefStore = missingContactRefStore
+            self.notifications = notifications
         }
     }
 
@@ -84,6 +91,22 @@ final class AppLaunchCoordinator {
         reconciliationCounters.coalesces += 1
     }
 
+    /// Backing storage for `handledNotificationActionCount`, private for the
+    /// same reason as `ReconciliationCounters`: the Notifications split can
+    /// only advance it through `recordHandledNotificationAction()`.
+    private var handledNotificationActions = 0
+
+    /// Notification actions `handleNotificationAction` has finished with,
+    /// whether applied, ignored as ineligible, or dropped. Test-only signal:
+    /// tests await a specific count instead of yielding a guessed number of
+    /// times.
+    var handledNotificationActionCount: Int { handledNotificationActions }
+
+    /// Called only from `AppLaunchCoordinator+Notifications.swift`.
+    func recordHandledNotificationAction() {
+        handledNotificationActions += 1
+    }
+
     /// Set by `beginObservingContactStoreChanges` when a `CNContactStoreDidChange`
     /// notification arrives while `runtime` is `nil` (e.g. mid-`retry()`) — see
     /// that method's guard. `continue`-ing past it there would drop the
@@ -100,6 +123,12 @@ final class AppLaunchCoordinator {
     // the counters above, nothing outside the coordinator reads these, so
     // there's no external write-protection guarantee to restore.
     @ObservationIgnored let dependencies: Dependencies?
+    /// `dependencies.notifications`, or the DEBUG mock launch's fake, which
+    /// has no `Dependencies`. Settings reads it for permission state.
+    @ObservationIgnored let notifications: (any NotificationScheduling)?
+    /// The single consumer of `notifications.actions`, started once per
+    /// process (AppLaunchCoordinator+Notifications.swift).
+    @ObservationIgnored var notificationActionTask: Task<Void, Never>?
     @ObservationIgnored private var didStart = false
     @ObservationIgnored private var onboardingActionGeneration = 0
     @ObservationIgnored var changeObservationTask: Task<Void, Never>?
@@ -134,28 +163,32 @@ final class AppLaunchCoordinator {
     init(dependencies: Dependencies) {
         self.phase = .loading
         self.dependencies = dependencies
+        self.notifications = dependencies.notifications
     }
 
 #if DEBUG
     init(dependencies: Dependencies, testingPhase: Phase) {
         self.phase = testingPhase
         self.dependencies = dependencies
+        self.notifications = dependencies.notifications
         self.didStart = true
     }
 #endif
 
     /// Not `private`: `AppLaunchCoordinator+DebugLaunch.swift` calls this
     /// across the file split (see that file's header comment).
-    init(mockRuntime: AppRuntime) {
+    init(mockRuntime: AppRuntime, notifications: (any NotificationScheduling)?) {
         self.phase = .ready
         self.runtime = mockRuntime
         self.dependencies = nil
+        self.notifications = notifications
         self.didStart = true
     }
 
     deinit {
         changeObservationTask?.cancel()
         reconciliationTask?.cancel()
+        notificationActionTask?.cancel()
     }
 
     static func production() -> AppLaunchCoordinator {
@@ -177,7 +210,8 @@ final class AppLaunchCoordinator {
                 // launches this session" is far better than the app
                 // refusing to launch over it.
                 missingContactRefStore: (try? MissingContactRefStore.applicationSupport())
-                    ?? MissingContactRefStore.ephemeral()
+                    ?? MissingContactRefStore.ephemeral(),
+                notifications: UserNotificationsAdapter.shared
             )
         )
     }
@@ -186,8 +220,22 @@ final class AppLaunchCoordinator {
     // lives in AppLaunchCoordinator+DebugLaunch.swift.
 
     func start() async {
-        guard !didStart, let dependencies else { return }
+        guard !didStart, let dependencies else {
+            // No launch body runs here: the DEBUG mock launch, or a
+            // coordinator whose phase was set without one. Its phase is
+            // already decided (DEBUG `testingPhase: .loading` excepted) unless
+            // another `start()` is still loading, which starts the consumer
+            // itself when it finishes.
+            if phase != .loading { beginConsumingNotificationActions() }
+            return
+        }
         didStart = true
+        // Every exit below, the failure paths included, has decided `phase`
+        // by now, so the consumer judges a buffered action against it. An
+        // action that arrives on the launch-failure screen is dropped there,
+        // not applied after a later `retry()`. The `.ready` and `.onboarding`
+        // branches also start it early, before their long awaits.
+        defer { beginConsumingNotificationActions() }
         phase = .loading
         statusMessage = nil
         // Round 11: load before the first reconcile pass below, so it has
@@ -225,12 +273,14 @@ final class AppLaunchCoordinator {
                 // Flipping `phase` first still means the tab root appears
                 // immediately — neither of these delays that.
                 phase = .ready
+                beginConsumingNotificationActions()
                 beginObservingContactStoreChanges(dependencies: dependencies)
                 await reconcileNow(runtime: runtime, dependencies: dependencies)
                 return
             }
 
             phase = .onboarding
+            beginConsumingNotificationActions()
             let actionGeneration = onboardingActionGeneration
             let authorization = await dependencies.contactsSource.currentAuthorization()
             guard phase == .onboarding,

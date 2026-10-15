@@ -1,25 +1,41 @@
 import Foundation
 
 /// The DEBUG-only launch-argument factory (`--regards-mock-runtime` and the
-/// UI-test-only launch scenarios) plus its private fixture types. Split from
-/// `AppLaunchCoordinator.swift` to keep that file's primary type body under
-/// the lint length limit — this factory only calls `AppLaunchCoordinator`'s
-/// initializers, so nothing here needed to become less private except
-/// `init(mockRuntime:)` itself, which the file-split forced from `private`
-/// to plain `internal`.
+/// UI-test-only launch scenarios) plus its fixture types, which are private
+/// except `DebugNotificationScheduling`, because unit tests use it too. Split
+/// from `AppLaunchCoordinator.swift` to keep that file's primary type body
+/// under the lint length limit — this factory only calls
+/// `AppLaunchCoordinator`'s initializers, so nothing else here needed to
+/// become less private except `init(mockRuntime:)` itself, which the
+/// file-split forced from `private` to plain `internal`.
 extension AppLaunchCoordinator {
 #if DEBUG
     static func configuredForCurrentProcess() -> AppLaunchCoordinator {
         let environment = ProcessInfo.processInfo.environment
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--regards-mock-runtime") {
+            // `unavailable` passes no notification seam at all, so a UI test
+            // can check that Settings shows no Notifications section.
+            let notificationStatus = environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
             return AppLaunchCoordinator(
                 mockRuntime: .makeMock(
                     includeDuplicateFixture:
                         environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1",
                     seedCorruptRow:
                         environment["REGARDS_UI_TEST_SEED_CORRUPT_ROW"] == "1"
-                )
+                ),
+                // Never the real adapter here: a system permission alert
+                // would cover the accessibility audits this launch serves.
+                notifications: notificationStatus == "unavailable"
+                    ? nil
+                    : DebugNotificationScheduling(
+                        status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined,
+                        // `fail` makes the system request throw, so a UI test
+                        // can reach the Settings request-error line.
+                        requestOutcome: environment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] == "fail"
+                            ? .fail
+                            : .grant
+                    )
             )
         }
         if arguments.contains("--regards-launch-fails-once") {
@@ -70,6 +86,67 @@ extension AppLaunchCoordinator {
 }
 
 #if DEBUG
+/// Fake `NotificationScheduling` for the `--regards-mock-runtime` launch and
+/// unit tests. It never touches the system notification
+/// center, so it never raises the permission alert. The status is whatever
+/// the caller passes (the mock launch reads `REGARDS_UI_TEST_NOTIFICATION_STATUS`),
+/// a request from `.notDetermined` resolves to the scripted `requestOutcome`,
+/// and `send(_:)` delivers an action as if the user tapped it.
+///
+/// An actor because the status changes after a request and tests read
+/// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
+/// `AsyncStream` and its `Continuation` are `Sendable` and thread-safe.
+actor DebugNotificationScheduling: NotificationScheduling {
+    enum RequestOutcome: Sendable {
+        case grant
+        case deny
+        case fail
+    }
+
+    struct RequestFailed: Error {}
+
+    nonisolated let actions: AsyncStream<NotificationAction>
+    private nonisolated let continuation: AsyncStream<NotificationAction>.Continuation
+    private var status: NotificationAuthorizationStatus
+    private let requestOutcome: RequestOutcome
+    /// How many times `requestAuthorization()` ran, prompt or not.
+    private(set) var requestCount = 0
+
+    init(status: NotificationAuthorizationStatus = .notDetermined, requestOutcome: RequestOutcome = .grant) {
+        (actions, continuation) = AsyncStream.makeStream(of: NotificationAction.self, bufferingPolicy: .unbounded)
+        self.status = status
+        self.requestOutcome = requestOutcome
+    }
+
+    /// Mirrors iOS: only `.notDetermined` prompts. Once decided, a request
+    /// returns the existing decision without changing it.
+    func requestAuthorization() async throws -> Bool {
+        requestCount += 1
+        guard status == .notDetermined else { return status == .authorized }
+        switch requestOutcome {
+        case .grant:
+            status = .authorized
+            return true
+        case .deny:
+            status = .denied
+            return false
+        case .fail:
+            throw RequestFailed()
+        }
+    }
+
+    func authorizationStatus() async -> NotificationAuthorizationStatus { status }
+
+    /// Simulates the user changing the permission in iOS Settings.
+    func setStatus(_ newStatus: NotificationAuthorizationStatus) {
+        status = newStatus
+    }
+
+    nonisolated func send(_ action: NotificationAction) {
+        continuation.yield(action)
+    }
+}
+
 private enum FirstLaunchUITestContactsOutcome: String {
     case authorized
     case denied

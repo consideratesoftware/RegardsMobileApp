@@ -8,7 +8,19 @@ enum RegardsSettingsRoute: Hashable {
 }
 
 public struct SettingsScreen: View {
-    public init() {}
+    /// Nil hides the Notifications section: a launch with no notification
+    /// seam has nothing to show, and a row that did nothing would be inert.
+    private let notifications: NotificationPermissionViewModel?
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    @AccessibilityFocusState private var notificationRowFocused: Bool
+    /// Whether this screen is showing. The status can change while a pushed
+    /// screen covers it, and focus must not move on a screen the user isn't on.
+    @State private var isOnScreen = false
+
+    public init(notifications: NotificationPermissionViewModel?) {
+        self.notifications = notifications
+    }
 
     public var body: some View {
         ScrollView {
@@ -31,6 +43,105 @@ public struct SettingsScreen: View {
                             subtitle: "Virtual merges only.",
                             route: .mergeDuplicates
                         )
+                    }
+                }
+
+                if let notifications, let status = notifications.status {
+                    SectionHeader("Notifications")
+                    RegardsCard {
+                        // Copy describes the permission only. Nothing
+                        // schedules a notification until TF-07, so none of it
+                        // may promise reminders. Each state is written out:
+                        // they differ in button trait, icon, and VoiceOver
+                        // label.
+                        switch status {
+                        case .notDetermined:
+                            Button {
+                                Task { await notifications.requestAuthorization() }
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Turn on notifications")
+                                            .font(.body.weight(.medium))
+                                            .foregroundStyle(RegardsDS.ink)
+                                        Text("iOS will ask whether Regards can show alerts and play sounds.")
+                                            .font(.footnote)
+                                            .foregroundStyle(RegardsDS.muted)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityFocused($notificationRowFocused)
+                            .accessibilityIdentifier("settings.notifications")
+                            .accessibilityLabel("Turn on notifications")
+                            .accessibilityHint("iOS will ask whether Regards can show alerts and play sounds.")
+                        case .denied:
+                            Button {
+                                notifications.openNotificationSettings(using: openURL)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Open iOS Settings")
+                                            .font(.body.weight(.medium))
+                                            .foregroundStyle(RegardsDS.ink)
+                                        Text("Notifications are off for Regards.")
+                                            .font(.footnote)
+                                            .foregroundStyle(RegardsDS.muted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "arrow.up.forward.app")
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(RegardsDS.muted)
+                                        .accessibilityHidden(true)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityFocused($notificationRowFocused)
+                            .accessibilityIdentifier("settings.notifications")
+                            // The state is in the label, not only the hint, so
+                            // it is heard with hints turned off.
+                            .accessibilityLabel("Notifications off. Open iOS Settings")
+                            .accessibilityHint("Opens the notification settings for Regards in iOS.")
+                        case .authorized:
+                            // Plain text with no button trait: an authorized
+                            // permission has nothing left to do, so a control
+                            // here would be inert.
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Notifications on")
+                                        .font(.body.weight(.medium))
+                                        .foregroundStyle(RegardsDS.ink)
+                                    Text("Regards can show alerts and play sounds.")
+                                        .font(.footnote)
+                                        .foregroundStyle(RegardsDS.muted)
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .frame(minHeight: 44)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityFocused($notificationRowFocused)
+                            .accessibilityIdentifier("settings.notifications")
+                        }
+                    }
+                    if notifications.requestFailed {
+                        Text(NotificationPermissionViewModel.requestFailedMessage)
+                            .font(.footnote)
+                            .foregroundStyle(RegardsDS.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                            .accessibilityIdentifier("settings.notifications.error")
                     }
                 }
 
@@ -62,6 +173,26 @@ public struct SettingsScreen: View {
         .accessibilityIdentifier("screen.settings")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { isOnScreen = true }
+        .onDisappear { isOnScreen = false }
+        .task { await notifications?.load() }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task { await notifications?.refresh() }
+        }
+        // The row is replaced when the status changes (the button becomes
+        // status text, or another button), which drops VoiceOver focus from
+        // it. Move focus to the new row so the result is heard even if the
+        // announcement is cut off. The yield lets the new row reach the
+        // accessibility tree first. Not on the first read.
+        .onChange(of: notifications?.status) { oldStatus, newStatus in
+            guard isOnScreen, oldStatus != nil, newStatus != nil else { return }
+            notificationRowFocused = false
+            Task { @MainActor in
+                await Task.yield()
+                notificationRowFocused = true
+            }
+        }
     }
 
     private var header: some View {

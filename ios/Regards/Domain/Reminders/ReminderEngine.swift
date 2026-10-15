@@ -79,7 +79,7 @@ public struct MonthDay: Sendable, Equatable, Hashable {
 
 /// Pure-function reminder scheduler (ARCHITECTURE.md §9). Takes no dependency
 /// on Apple platform frameworks — the platform adapter calls `schedule(for:)`
-/// and translates the `Date` result into a `UNCalendarNotificationTrigger`
+/// and translates the `Date` result into a calendar trigger
 /// up-call.
 public struct ReminderEngine: Sendable {
 
