@@ -180,7 +180,7 @@ public final class ReminderWindowsViewModel {
     /// latest range already ends at 23:59, so nothing fits after it.
     public var nextNewRange: TimeRange? {
         guard let latestEnd = draft.allowedTimeRanges.map(\.end).max() else { return Self.newRange }
-        let lastMinute = 24 * 60 - 1
+        let lastMinute = TimeOfDay.endOfDay.minutesSinceMidnight
         guard latestEnd.minutesSinceMidnight < lastMinute else { return nil }
         let end = min(latestEnd.minutesSinceMidnight + 60, lastMinute)
         return TimeRange(start: latestEnd, end: TimeOfDay(minutesSinceMidnight: end))
@@ -192,8 +192,7 @@ public final class ReminderWindowsViewModel {
     /// so the time follows the locale's format ("11:59 PM", or "23:59" in a
     /// 24-hour locale).
     public static var addRangeUnavailableReason: String {
-        let lastMinute = TimeOfDay(hour: 23, minute: 59).displayLabel
-        return "The last range already ends at \(lastMinute), so there's no time left after it."
+        "The last range already ends at \(TimeOfDay.endOfDay.displayLabel), so there's no time left after it."
     }
 
     public var canRemoveRange: Bool { draft.allowedTimeRanges.count > 1 }
