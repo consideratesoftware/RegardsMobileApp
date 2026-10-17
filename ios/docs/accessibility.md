@@ -122,10 +122,10 @@ used by system-owned surfaces (`AccentColor` and `LaunchBackground`).
 | Accent Ink | Background | ~7.8:1 | ~8.6:1 | 4.5:1 | ✅ |
 | Background | Accent Ink | ~7.8:1 | ~8.6:1 | 4.5:1 | ✅ |
 | White | AccentColor | ~3.4:1 | ~3.1:1 | 3:1 (large/icon) | ✅ |
-| Danger | Background | ~4.79:1 | ~5.69:1 | 4.5:1 | ✅ |
+| Danger | Background | 4.79:1 | 5.69:1 | 4.5:1 | ✅ |
 | Danger | Surface | 5.08:1 | 5.15:1 | 4.5:1 | ✅ |
-| Muted | Surface | ~5.86:1 | ~6.54:1 | 4.5:1 | ✅ |
-| Accent Ink | Surface | ~8.26:1 | ~7.81:1 | 4.5:1 | ✅ |
+| Muted | Surface | 5.86:1 | 6.54:1 | 4.5:1 | ✅ |
+| Accent Ink | Surface | 8.26:1 | 7.81:1 | 4.5:1 | ✅ |
 
 PR2 adds `ColorContrastTests` so these ratios are asserted automatically; the
 table becomes the human-readable mirror of the test data.
