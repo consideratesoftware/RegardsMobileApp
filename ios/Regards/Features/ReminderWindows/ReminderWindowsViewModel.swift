@@ -192,7 +192,14 @@ public final class ReminderWindowsViewModel {
     /// so the time follows the locale's format ("11:59 PM", or "23:59" in a
     /// 24-hour locale).
     public static var addRangeUnavailableReason: String {
-        "The last range already ends at \(TimeOfDay.endOfDay.displayLabel), so there's no time left after it."
+        addRangeUnavailableReason(locale: .autoupdatingCurrent)
+    }
+
+    /// `addRangeUnavailableReason` in a given locale, so a test can pin en_GB
+    /// ("23:59") and en_US ("11:59 PM").
+    static func addRangeUnavailableReason(locale: Locale) -> String {
+        "The last range already ends at \(TimeOfDay.endOfDay.displayLabel(locale: locale)), "
+            + "so there's no time left after it."
     }
 
     public var canRemoveRange: Bool { draft.allowedTimeRanges.count > 1 }
