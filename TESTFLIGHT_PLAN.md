@@ -16,17 +16,19 @@ never pick up Android work.
 - Baseline: `main` at `3ebe90e` (merge of PR #64, the `TF-05` and `TF-06`
   fast-follow, merged 2026-10-17). `TF-05` merged as PR #63 (`a887ece`), and
   `TF-06` merged as PR #62 (`de33098`), both earlier.
-- Active work: two `TF-07` lanes, started 2026-10-17 by owner ruling while
-  `TF-03` is `OWNER`. `TF-07a` runs on branch `claude/tf-07a-engine`, and
-  `TF-07b` runs on branch `claude/tf-07b-schema-v3`. `TF-03` acceptance is
-  owner work (see `Owner gates`); its code is merged in PR #48.
-- Next ready work: none. `TF-03` is `OWNER`, and both `TF-07` and `TF-11` list
-  it as a dependency. Both become `READY` when `TF-03`'s owner gate passes.
+- Active work: `TF-07a` (PR #66, branch `claude/tf-07a-engine`) and `TF-07b`
+  (PR #65, branch `claude/tf-07b-schema-v3`) are in flight by owner ruling 7,
+  started 2026-10-17 while `TF-03` is `OWNER`. `TF-03` acceptance is owner work
+  (see `Owner gates`); its code is merged in PR #48.
+- Next ready work: none. `TF-03` is `OWNER`, and `TF-07c` through `TF-07g` and
+  `TF-11` list it as a dependency. They all become `READY` when `TF-03`'s owner
+  gate passes.
   `TF-06` shipped no notification scheduling, so resolving R57 (owner ruling
   2026-08-22, see its queue row) falls to `TF-07`.
-- Blocked: `TF-07` needs `TF-03`, and `TF-11` needs `TF-03`. `TF-03` stays
-  `OWNER` until its acceptance run passes, so both stay `BLOCKED`.
-- Open pull requests: #65 (`TF-07b`, schema v3 and observeSchedule). `TF-07a` has no PR yet.
+- Blocked: `TF-07c` through `TF-07g` and `TF-11` need `TF-03`. `TF-03` stays
+  `OWNER` until its acceptance run passes, so they stay `BLOCKED`.
+- Open pull requests: #65 (`TF-07b`, schema v3 and observeSchedule) and #66
+  (`TF-07a`).
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
