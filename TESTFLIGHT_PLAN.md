@@ -13,8 +13,9 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-10-17
-- Baseline: `main` at `a887ece` (merge of PR #63, `TF-05`, merged 2026-10-15).
-  `TF-06` merged earlier the same day as PR #62 (`de33098`).
+- Baseline: `main` at `3ebe90e` (merge of PR #64, the `TF-05` and `TF-06`
+  fast-follow, merged 2026-10-17). `TF-05` merged as PR #63 (`a887ece`), and
+  `TF-06` merged as PR #62 (`de33098`), both earlier.
 - Active work: two `TF-07` lanes, started 2026-10-17 by owner ruling while
   `TF-03` is `OWNER`. `TF-07a` runs on branch `claude/tf-07a-engine`, and
   `TF-07b` runs on branch `claude/tf-07b-schema-v3`. `TF-03` acceptance is
@@ -25,7 +26,7 @@ never pick up Android work.
   2026-08-22, see its queue row) falls to `TF-07`.
 - Blocked: `TF-07` needs `TF-03`, and `TF-11` needs `TF-03`. `TF-03` stays
   `OWNER` until its acceptance run passes, so both stay `BLOCKED`.
-- Open pull requests: none except the `TF-05` and `TF-06` fast-follow.
+- Open pull requests: none. `TF-07a` and `TF-07b` have no PRs yet.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
