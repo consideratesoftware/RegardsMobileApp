@@ -109,6 +109,23 @@ struct DatabaseMigratorV3Tests {
         #expect(try await storedSnoozedUntil(of: id, in: queue) == 1_800_000_400)
     }
 
+    /// A pending cadence row with a NULL floor is ordinary after v3: the pass
+    /// writes one for every contact that is overdue and not snoozed. A
+    /// backfill that ran again on a later launch would mark each as snoozed.
+    /// Production builds a fresh migrator on every launch, so this does too.
+    @Test("A second launch's migrate does not backfill a pending cadence row again")
+    func v3DoesNotRebackfillOnSecondMigrate() async throws {
+        let queue = try DatabaseQueue()
+        try RegardsSchema.migrator().migrate(queue)
+        let id = try await seedReminder(
+            in: queue, kind: .cadence, state: .pending, scheduledFor: 1_800_000_600)
+        #expect(try await storedSnoozedUntil(of: id, in: queue) == nil)
+
+        try RegardsSchema.migrator().migrate(queue)
+
+        #expect(try await storedSnoozedUntil(of: id, in: queue) == nil)
+    }
+
     @Test("Backfill changes only snoozedUntil and the repository reads it back")
     func v2ToV3PreservesRowAndReadsBackThroughRepository() async throws {
         let queue = try DatabaseQueue()

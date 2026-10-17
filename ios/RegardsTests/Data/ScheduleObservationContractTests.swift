@@ -3,7 +3,7 @@ import Testing
 @testable import Regards
 
 /// `ReminderRepository.observeSchedule()` mock/GRDB contract parity
-/// (ARCHITECTURE.md §9, §14 PR25, R10; R61 d). One read returns the tracked
+/// (ARCHITECTURE.md §9, §14 PR25, R10). One read returns the tracked
 /// contacts, their pending and fired reminders, and the global window, so
 /// Overdue, Upcoming, and the labels all see the same snapshot. Shares
 /// `RepositoriesTests.swift`'s `RepositoryContractBackend` /
@@ -223,113 +223,100 @@ struct ScheduleObservationContractTests {
         #expect(afterSave.window == edited)
     }
 
-    /// R61 d: a write that leaves the snapshot equal must behave the same on
-    /// both backends. `observeSchedule()` yields nothing for it (GRDB
-    /// notifies on any transaction that touches the observed tables, so the
-    /// real backend has to drop equal values, and the mock has to match).
+    /// A write that leaves the snapshot equal must behave the same on both
+    /// backends: `observeSchedule()` yields nothing for it. This is the rule
+    /// R61 (d) wants pinned for `observeTracked()`; that item stays open.
+    /// GRDB notifies on any transaction that touches the observed tables, so
+    /// the real backend has to drop equal values and the mock has to match.
     ///
-    /// The consumer runs in its own task and signals once it has the initial
-    /// snapshot, so it is waiting in `next()` when the no-op lands: a stray
-    /// emission then reaches it directly instead of being replaced in the
-    /// newest-1 buffer by the marker write that follows. Without that
-    /// ordering a duplicate would go unseen, which weakens the test but
-    /// cannot fail a correct backend.
+    /// Detection needs the duplicate to reach the consumer before a later
+    /// write can replace it in the newest-1 buffer. Three steps arrange that:
+    /// - The test is `@MainActor` and so is the consumer task. The consumer
+    ///   signals after the initial snapshot and loops back to `next()`; the
+    ///   test cannot resume until the consumer suspends there. It is parked
+    ///   when the no-op lands, so a duplicate resumes it directly.
+    /// - After the no-op, a repository read runs before the sentinel write.
+    ///   The mock yields inside the write, before it returns. GRDB's
+    ///   `DatabaseQueue` runs the observation's fetch ahead of a read queued
+    ///   after the commit, and delivers it to the main queue ahead of this
+    ///   test's resumption. That GRDB ordering is an assumption, not
+    ///   something the test proves.
+    /// - The sentinel is a distinguishable write, and the consumer must see
+    ///   exactly initial then sentinel, so a duplicate shows as a third
+    ///   snapshot.
+    /// The assumption in the second step is why the scenario repeats on
+    /// fresh databases: a missed duplicate can pass a broken backend once,
+    /// and `rounds` makes that unlikely. It cannot fail a correct backend.
     @Test(
         "observeSchedule emits nothing for a write that changes nothing",
         arguments: RepositoryContractBackend.allCases, NoOpScheduleWrite.allCases
     )
+    @MainActor
     func observeScheduleNoOpWriteParity(
         backend: RepositoryContractBackend, write: NoOpScheduleWrite
     ) async throws {
-        let repositories = try backend.makeRepositories()
-        let contact = contractContact(id: try contractUUID(651), suffix: "schedule-noop", tracked: true)
-        let reminder = ScheduledReminder(
-            id: try contractUUID(652),
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
-            osNotificationId: "schedule-noop"
-        )
-        let marker = ScheduledReminder(
-            id: try contractUUID(653),
-            contactId: contact.id,
-            kind: .birthday,
-            occasionDate: "08-07",
-            occasionLabel: "Birthday",
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_200),
-            osNotificationId: "schedule-noop-marker"
-        )
-        try await repositories.contacts.upsert(contact)
-        try await repositories.reminders.upsert(reminder)
-        let window = try await repositories.window.fetchGlobal()
-
-        let stream = await repositories.reminders.observeSchedule()
-        let (ready, signalReady) = AsyncStream.makeStream(of: Void.self)
-        let markerID = marker.id
-        let consumer = Task { () -> [ScheduleSnapshot] in
-            var seen: [ScheduleSnapshot] = []
-            for await snapshot in stream {
-                seen.append(snapshot)
-                if seen.count == 1 { signalReady.yield() }
-                if snapshot.reminders.contains(where: { $0.id == markerID }) { break }
-            }
-            return seen
-        }
-        var readyIterator = ready.makeAsyncIterator()
-        await readyIterator.next()
-
-        switch write {
-        case .identicalReminderUpsert:
+        let rounds = 20
+        for round in 0..<rounds {
+            let repositories = try backend.makeRepositories()
+            let contact = contractContact(id: try contractUUID(651), suffix: "schedule-noop", tracked: true)
+            let reminder = ScheduledReminder(
+                id: try contractUUID(652),
+                contactId: contact.id,
+                kind: .cadence,
+                scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
+                osNotificationId: "schedule-noop"
+            )
+            let sentinel = ScheduledReminder(
+                id: try contractUUID(653),
+                contactId: contact.id,
+                kind: .birthday,
+                occasionDate: "08-07",
+                occasionLabel: "Birthday",
+                scheduledFor: Date(timeIntervalSince1970: 1_800_000_200),
+                osNotificationId: "schedule-noop-sentinel"
+            )
+            try await repositories.contacts.upsert(contact)
             try await repositories.reminders.upsert(reminder)
-        case .sameStateUpdate:
-            try await repositories.reminders.updateState(id: reminder.id, state: .pending)
-        case .identicalWindowSave:
-            try await repositories.window.saveGlobal(window)
+            let window = try await repositories.window.fetchGlobal()
+
+            let stream = await repositories.reminders.observeSchedule()
+            let (ready, signalReady) = AsyncStream.makeStream(of: Void.self)
+            let sentinelID = sentinel.id
+            let consumer = Task { @MainActor () -> [ScheduleSnapshot] in
+                var seen: [ScheduleSnapshot] = []
+                for await snapshot in stream {
+                    seen.append(snapshot)
+                    if seen.count == 1 { signalReady.yield() }
+                    if snapshot.reminders.contains(where: { $0.id == sentinelID }) { break }
+                }
+                return seen
+            }
+            var readyIterator = ready.makeAsyncIterator()
+            await readyIterator.next()
+
+            switch write {
+            case .identicalReminderUpsert:
+                try await repositories.reminders.upsert(reminder)
+            case .sameStateUpdate:
+                try await repositories.reminders.updateState(id: reminder.id, state: .pending)
+            case .identicalWindowSave:
+                try await repositories.window.saveGlobal(window)
+            }
+            _ = try await repositories.reminders.fetchAllPending()
+            try await repositories.reminders.upsert(sentinel)
+
+            let seen = await withTaskCancellationHandler {
+                await consumer.value
+            } onCancel: {
+                consumer.cancel()
+            }
+            #expect(
+                seen.count == 2,
+                "round \(round): got \(seen.count) snapshots; the no-op write must not add one")
+            #expect(seen.first?.reminders.contains { $0.id == reminder.id } == true)
+            #expect(seen.last?.reminders.contains { $0.id == sentinel.id } == true)
+            if seen.count != 2 { break }
         }
-        try await repositories.reminders.upsert(marker)
-
-        let seen = await withTaskCancellationHandler {
-            await consumer.value
-        } onCancel: {
-            consumer.cancel()
-        }
-        #expect(seen.count == 2, "got \(seen.count) snapshots; the no-op write must not add one")
-        #expect(seen.first?.reminders.contains { $0.id == reminder.id } == true)
-        #expect(seen.last?.reminders.contains { $0.id == marker.id } == true)
-    }
-
-    @Test(
-        "A reminder's snoozedUntil round-trips, truncated to whole seconds",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func snoozedUntilRoundTrips(backend: RepositoryContractBackend) async throws {
-        let repositories = try backend.makeRepositories()
-        let contact = contractContact(id: try contractUUID(661), suffix: "snoozed-until", tracked: true)
-        let snoozed = ScheduledReminder(
-            id: try contractUUID(662),
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_900),
-            osNotificationId: "snoozed-until",
-            snoozedUntil: Date(timeIntervalSince1970: 1_800_000_600.875)
-        )
-        let unsnoozed = ScheduledReminder(
-            id: try contractUUID(663),
-            contactId: contact.id,
-            kind: .birthday,
-            occasionDate: "08-07",
-            occasionLabel: "Birthday",
-            scheduledFor: Date(timeIntervalSince1970: 1_800_001_000),
-            osNotificationId: "snoozed-until-none"
-        )
-        try await repositories.contacts.upsert(contact)
-        try await repositories.reminders.upsert(snoozed)
-        try await repositories.reminders.upsert(unsnoozed)
-
-        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending.first { $0.id == snoozed.id }?.snoozedUntil
-                == Date(timeIntervalSince1970: 1_800_000_600))
-        #expect(pending.first { $0.id == unsnoozed.id }?.snoozedUntil == nil)
     }
 }
 

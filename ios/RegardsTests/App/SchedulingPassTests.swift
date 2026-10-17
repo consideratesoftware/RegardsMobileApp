@@ -77,6 +77,7 @@ struct SchedulingPassTests {
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
         #expect(pending[0].scheduledFor == second.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].snoozedUntil == second.addingTimeInterval(7 * 86_400))
     }
 
     /// The blocker this pins: an earlier version read the existing pending
