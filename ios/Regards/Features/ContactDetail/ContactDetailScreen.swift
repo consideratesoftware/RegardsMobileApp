@@ -229,10 +229,9 @@ extension ContactDetailScreen {
                     }
                 }
             }
-            // No name in the label, unlike Overdue/Upcoming's "Snooze <name>
-            // 1 week": the name distinguishes rows there, while this screen
-            // is about one contact and its siblings are plain
-            // "Caught up"/"Log other".
+            // No name in the label, unlike Overdue's "Snooze <name> 1 week":
+            // the name distinguishes rows there, while this screen is about
+            // one contact and its siblings are plain "Caught up"/"Log other".
             .accessibilityHint("Pushes the next reminder out one week.")
         }
         secondaryAction("Log other", identifier: "contact-detail.log-other") {
@@ -340,14 +339,14 @@ extension ContactDetailScreen {
         }
     }
 
-    func stubAction(_ action: String, identifier: String? = nil) -> some View {
-        // TF-04/TF-08 wire these to real actions. Until then, muted text
-        // accurately communicates that the labels are unavailable.
+    func stubAction(_ action: String, identifier: String) -> some View {
+        // The channel card's Change waits on TF-08. Until then, muted text
+        // accurately communicates that the label is unavailable.
         Text(action)
             .font(.subheadline.weight(.medium))
             .foregroundStyle(RegardsDS.muted)
             .accessibilityLabel("\(action), unavailable")
-            .accessibilityIdentifier(identifier ?? "contact-detail.unavailable-action")
+            .accessibilityIdentifier(identifier)
     }
 
     func valueColor(isAccent: Bool, isDanger: Bool) -> Color {

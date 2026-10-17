@@ -142,14 +142,14 @@ public final class RowActionAnnouncer {
     func fire(
         _ message: String,
         effects: RowActionAccessibilityEffects,
-        focus: @escaping @MainActor () -> Void
+        focus: (@MainActor () -> Void)?
     ) {
         generation &+= 1
         let current = generation
         Task { @MainActor [weak self] in
             await effects.yieldControl()
             guard let self, self.generation == current else { return }
-            focus()
+            focus?()
             effects.didFocus()
             await effects.yieldControl()
             guard self.generation == current else { return }

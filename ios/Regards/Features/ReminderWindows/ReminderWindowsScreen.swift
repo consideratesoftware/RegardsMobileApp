@@ -87,7 +87,7 @@ public struct ReminderWindowsScreen: View {
 
     /// Speaks `message` through the injectable `announce` seam, after `focus`
     /// when the caller moves VoiceOver focus first.
-    func speak(_ message: String, focus: @escaping @MainActor () -> Void) {
+    func speak(_ message: String, focus: (@MainActor () -> Void)?) {
         announcer.fire(
             message,
             effects: RowActionAccessibilityEffects(announce: announce, didFocus: {}),
