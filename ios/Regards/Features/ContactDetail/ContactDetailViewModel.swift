@@ -302,10 +302,11 @@ public final class ContactDetailViewModel {
             // it catches something that precondition doesn't (an
             // archived-after-`load()` race), not because it's redundant
             // with it. This screen offers Snooze only for a contact that was
-            // `isCadenceEligible` at its last load, so `wrote` is false only
-            // when tracking or cadence changed since. Propagated rather than
-            // assumed, so that case and any future caller get an honest
-            // `false`.
+            // `isCadenceEligible` at its last load, so `wrote` is false when
+            // tracking or cadence changed since, the contact was archived
+            // after the check above, or `snooze`'s own fetch failed.
+            // Propagated rather than assumed, so those cases and any future
+            // caller get an honest `false`.
             let wrote = try await scheduler.snooze(contactId: contactId)
             if wrote { await load() }
             return wrote
