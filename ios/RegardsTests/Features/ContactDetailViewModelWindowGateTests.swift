@@ -3,8 +3,8 @@ import Testing
 @testable import Regards
 
 /// The Contact Detail "Reminder window" row and its Change button exist only
-/// for a contact that can have a cadence reminder: tracked, with a cadence,
-/// and not archived (the same gate Snooze uses). A window means nothing for
+/// for a contact that can have a cadence reminder: tracked, with a cadence of
+/// at least 1 day, and not archived (the same gate Snooze uses). A window means nothing for
 /// any other contact.
 ///
 /// The gate is `ContactDetailViewModel.canEditReminderWindow`, which the
@@ -18,18 +18,27 @@ struct ContactDetailViewModelWindowGateTests {
         case trackedWithCadence
         case untrackedWithCadence
         case trackedWithoutCadence
+        case trackedWithZeroCadence
         case archived
 
         var testDescription: String { rawValue }
 
         var canEdit: Bool { self == .trackedWithCadence }
 
+        private var cadenceDays: Int? {
+            switch self {
+            case .trackedWithoutCadence: nil
+            case .trackedWithZeroCadence: 0
+            default: 14
+            }
+        }
+
         func contact() -> Contact {
             Contact(
                 systemContactRef: "window-gate-\(rawValue)",
                 displayName: "Gate \(rawValue)",
                 tracked: self != .untrackedWithCadence,
-                cadenceDays: self == .trackedWithoutCadence ? nil : 14,
+                cadenceDays: cadenceDays,
                 lastInteractedAt: gateNow.addingTimeInterval(-86_400),
                 archivedAt: self == .archived ? gateNow.addingTimeInterval(-3_600) : nil
             )

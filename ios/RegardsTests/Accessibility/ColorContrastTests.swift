@@ -29,23 +29,32 @@ struct ColorContrastTests {
     }
 
     /// The generic test above passes for whatever the registry holds, so
-    /// removing a pair would go unnoticed. These are rendered pairs that were
-    /// once checked only by dedicated tests or not at all (the Settings
-    /// notification error line, muted and accent-ink text on cards).
-    @Test("The registry keeps the Danger, Muted-on-Surface and Accent-Ink-on-Surface pairs")
+    /// removing a pair, lowering its minimum, or pointing it at other colors
+    /// would go unnoticed. These are rendered pairs that were once checked only
+    /// by dedicated tests or not at all: the Settings notification error line,
+    /// the Cadence card's Status row, and muted and accent-ink text on cards.
+    /// All are body text.
+    @Test("The registry keeps the Danger, Muted and Accent Ink pairs on Background and Surface at 4.5")
     func registryKeepsDangerMutedAndAccentInkSurfacePairs() {
-        let required = [
-            "Danger on Background (light)", "Danger on Background (dark)",
-            "Muted on Surface (light)", "Muted on Surface (dark)",
-            "Accent Ink on Surface (light)", "Accent Ink on Surface (dark)",
+        typealias Colors = (foreground: RegardsPalette.SRGB, background: RegardsPalette.SRGB)
+        let required: [String: Colors] = [
+            "Danger on Background (light)": (RegardsPalette.dangerLight, RegardsPalette.backgroundLight),
+            "Danger on Background (dark)": (RegardsPalette.dangerDark, RegardsPalette.backgroundDark),
+            "Danger on Surface (light)": (RegardsPalette.dangerLight, RegardsPalette.surfaceLight),
+            "Danger on Surface (dark)": (RegardsPalette.dangerDark, RegardsPalette.surfaceDark),
+            "Muted on Surface (light)": (RegardsPalette.mutedLight, RegardsPalette.surfaceLight),
+            "Muted on Surface (dark)": (RegardsPalette.mutedDark, RegardsPalette.surfaceDark),
+            "Accent Ink on Surface (light)": (RegardsPalette.accentInkLight, RegardsPalette.surfaceLight),
+            "Accent Ink on Surface (dark)": (RegardsPalette.accentInkDark, RegardsPalette.surfaceDark),
         ]
-        let registered = Set(RegardsPalette.contrastPairs.map(\.name))
 
-        let missing = required.filter { !registered.contains($0) }
-
-        #expect(missing.isEmpty, "contrastPairs is missing: \(missing.joined(separator: ", "))")
-        for pair in RegardsPalette.contrastPairs where pair.name.hasPrefix("Danger on Background") {
-            #expect(pair.minimumRatio == 4.5, "\(pair.name) is body text and needs 4.5")
+        for (name, colors) in required {
+            let matches = RegardsPalette.contrastPairs.filter { $0.name == name }
+            #expect(matches.count == 1, "contrastPairs should list \(name) once, found \(matches.count)")
+            guard let pair = matches.first else { continue }
+            #expect(pair.minimumRatio == 4.5, "\(name) is body text and needs 4.5")
+            #expect(pair.foreground == colors.foreground, "\(name) has the wrong foreground")
+            #expect(pair.background == colors.background, "\(name) has the wrong background")
         }
     }
 

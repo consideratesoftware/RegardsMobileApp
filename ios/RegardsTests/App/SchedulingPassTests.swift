@@ -248,6 +248,29 @@ struct SchedulingPassTests {
     }
 
     @Test(
+        "A tracked contact with a cadence of 0 days is ineligible for Snooze",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func zeroCadenceIsIneligible(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        var contact = contractContact(id: try contractUUID(534), suffix: "snooze-zero-cadence", tracked: true)
+        contact.cadenceDays = 0 // `!= nil` passes; only a positive cadence is a schedule
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        let wrote = try await scheduler.snooze(contactId: contact.id)
+
+        #expect(wrote == false)
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+    }
+
+    @Test(
         "R54: snooze rejects an archived contact even when tracked with a cadence set",
         arguments: RepositoryContractBackend.allCases
     )

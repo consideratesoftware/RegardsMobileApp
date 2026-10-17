@@ -108,6 +108,129 @@ struct AnnualRecurrenceTests {
         #expect(next == Self.date("2028-02-29 09:00"))
     }
 
+    // MARK: - Quiet hours (R5, §9 contract 4)
+
+    private static let newYork = "America/New_York"
+    private static let quietNightWindow = EngineFixtures.allDaysWindow(
+        [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))],
+        tz: newYork,
+        quiet: TimeRange(start: TimeOfDay(hour: 22, minute: 30), end: TimeOfDay(hour: 7, minute: 30)))
+
+    /// The instant an occasion on Jun 14 fires for `now`, through both steps
+    /// SchedulingPass runs: the next occurrence, then the quiet-hours rule.
+    private static func fireDate(
+        now: Date, window: ReminderWindow, occasionTime: TimeOfDay = TimeOfDay(hour: 7)
+    ) -> Date? {
+        let engine = ReminderEngine(occasionNotificationTime: occasionTime, clock: { now })
+        let occurrence = engine.nextOccasionOccurrence(
+            monthDay: MonthDay(month: 6, day: 14), timezone: window.timeZone)
+        return engine.occasionFireDate(for: occurrence, in: window)
+    }
+
+    @Test("An occasion time inside quiet hours fires at the quiet end the same day (R5)")
+    func occasionFireDateRespectsQuietHours() {
+        // 07:00 is inside quiet hours 22:30-07:30, so it waits until 07:30.
+        let now = EngineFixtures.date("2026-06-13 12:00", tz: Self.newYork)
+
+        let fire = Self.fireDate(now: now, window: Self.quietNightWindow)
+
+        #expect(fire == EngineFixtures.date("2026-06-14 07:30", tz: Self.newYork))
+    }
+
+    @Test("A same-day-late occasion inside quiet hours that run past midnight gets no notification (R5)")
+    func sameDayLateOccasionInQuietHoursIsDropped() {
+        // Installed at 23:00 on the birthday: the occurrence is now, quiet hours
+        // run until 07:30 tomorrow, and the occasion's day is over by then.
+        let now = EngineFixtures.date("2026-06-14 23:00", tz: Self.newYork)
+
+        let fire = Self.fireDate(now: now, window: Self.quietNightWindow)
+
+        #expect(fire == nil)
+    }
+
+    @Test("An occasion after midnight but before the quiet end fires at the quiet end the same day (R5)")
+    func sameDayEarlyMorningOccasionWaitsForQuietEnd() {
+        let now = EngineFixtures.date("2026-06-14 00:15", tz: Self.newYork)
+
+        let fire = Self.fireDate(now: now, window: Self.quietNightWindow)
+
+        #expect(fire == EngineFixtures.date("2026-06-14 07:30", tz: Self.newYork))
+    }
+
+    @Test("A same-day-late occasion outside quiet hours still fires now (R5)")
+    func sameDayLateOccasionOutsideQuietHoursFiresNow() {
+        let now = EngineFixtures.date("2026-06-14 10:00", tz: Self.newYork)
+
+        let fire = Self.fireDate(now: now, window: Self.quietNightWindow)
+
+        #expect(fire == now)
+    }
+
+    @Test("Occasion times at the edges of quiet hours: the end fires as is, the start is dropped (R5)")
+    func occasionFireDateAtQuietHoursEdges() {
+        let atEnd = EngineFixtures.date("2026-06-14 07:30", tz: Self.newYork)
+        let atStart = EngineFixtures.date("2026-06-14 22:30", tz: Self.newYork)
+        let engine = ReminderEngine(clock: { atEnd })
+
+        #expect(engine.occasionFireDate(for: atEnd, in: Self.quietNightWindow) == atEnd)
+        #expect(engine.occasionFireDate(for: atStart, in: Self.quietNightWindow) == nil)
+    }
+
+    @Test("A window without quiet hours leaves the occurrence alone (R5)")
+    func occasionFireDateWithoutQuietHoursIsUnchanged() {
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))], tz: Self.newYork)
+        let occurrence = EngineFixtures.date("2026-06-14 03:00", tz: Self.newYork)
+
+        #expect(ReminderEngine(clock: { occurrence }).occasionFireDate(for: occurrence, in: window) == occurrence)
+    }
+
+    @Test("A quiet range that does not wrap midnight moves the occasion to its end (R5)")
+    func occasionFireDateWithDaytimeQuietHours() {
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))],
+            tz: Self.newYork,
+            quiet: TimeRange(start: TimeOfDay(hour: 6), end: TimeOfDay(hour: 8)))
+        let now = EngineFixtures.date("2026-06-13 12:00", tz: Self.newYork)
+
+        let fire = Self.fireDate(now: now, window: window)
+
+        #expect(fire == EngineFixtures.date("2026-06-14 08:00", tz: Self.newYork))
+    }
+
+    @Test("A quiet end inside the spring-forward gap fires at the gap end (R5)")
+    func occasionFireDateQuietEndInSpringForwardGap() {
+        // Sun Mar 8 2026 in Los Angeles: 02:00 -> 03:00. Quiet 01:30-02:30 ends
+        // at a time that does not exist that day.
+        let zone = "America/Los_Angeles"
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))],
+            tz: zone,
+            quiet: TimeRange(start: TimeOfDay(hour: 1, minute: 30), end: TimeOfDay(hour: 2, minute: 30)))
+        let occurrence = EngineFixtures.date("2026-03-08T01:45:00-08:00")
+
+        let fire = ReminderEngine(clock: { occurrence }).occasionFireDate(for: occurrence, in: window)
+
+        #expect(fire == EngineFixtures.date("2026-03-08T03:00:00-07:00"))
+    }
+
+    @Test("A quiet end in the fall-back repeated hour fires at the later occurrence (R5)")
+    func occasionFireDateQuietEndInFallBackRepeatedHour() {
+        // Sun Nov 1 2026 in Los Angeles: 01:00-02:00 happens twice. Quiet
+        // 00:30-01:30 covers 01:00-01:30 again after the clock falls back, so
+        // it ends at the second 01:30, not the first.
+        let zone = "America/Los_Angeles"
+        let window = EngineFixtures.allDaysWindow(
+            [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))],
+            tz: zone,
+            quiet: TimeRange(start: TimeOfDay(hour: 0, minute: 30), end: TimeOfDay(hour: 1, minute: 30)))
+        let occurrence = EngineFixtures.date("2026-11-01T00:45:00-07:00")
+
+        let fire = ReminderEngine(clock: { occurrence }).occasionFireDate(for: occurrence, in: window)
+
+        #expect(fire == EngineFixtures.date("2026-11-01T01:30:00-08:00"))
+    }
+
     @Test("MonthDay encodes to and from the ISO MM-DD form")
     func monthDayIsoRoundtrip() {
         #expect(MonthDay(month: 2, day: 29).isoString == "02-29")

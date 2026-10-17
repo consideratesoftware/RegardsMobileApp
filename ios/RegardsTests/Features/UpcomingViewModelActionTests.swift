@@ -152,7 +152,7 @@ struct UpcomingViewModelActionTests {
         // what this test asserts.
         let window = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: UpcomingFixtures.utc.identifier,
             digestHorizonDays: 5
         )
@@ -205,7 +205,7 @@ struct UpcomingViewModelActionTests {
     static func eightAMWindow(digestHorizonDays: Int = ReminderWindow.defaultDigestHorizonDays) -> ReminderWindow {
         ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: UpcomingFixtures.utc.identifier,
             digestHorizonDays: digestHorizonDays
         )

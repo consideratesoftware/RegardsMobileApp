@@ -136,13 +136,13 @@ struct UpcomingViewModelWindowTests {
     func overrideNeverChangesHorizonTimezoneOrHeaders() async throws {
         let global = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: "Etc/UTC",
             digestHorizonDays: 7
         )
         let allDayKiritimati = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: "Pacific/Kiritimati",
             digestHorizonDays: 30
         )

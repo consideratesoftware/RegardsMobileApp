@@ -109,17 +109,17 @@ struct ReminderWindowsViewModelEditingTests {
 
         editor.draft.allowedTimeRanges = [Self.range(14, 16), Self.range(20, 23)]
         editor.addRange()
-        #expect(editor.draft.allowedTimeRanges.last == TimeRange(start: Self.time(23), end: Self.time(23, 59)))
+        #expect(editor.draft.allowedTimeRanges.last == TimeRange(start: Self.time(23), end: TimeOfDay.endOfDay))
 
         editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: Self.time(23, 30))]
         editor.addRange()
-        #expect(editor.draft.allowedTimeRanges.last == TimeRange(start: Self.time(23, 30), end: Self.time(23, 59)))
+        #expect(editor.draft.allowedTimeRanges.last == TimeRange(start: Self.time(23, 30), end: TimeOfDay.endOfDay))
     }
 
     @Test("addRange is unavailable and does nothing when the last range already ends at 23:59")
     func addRangeUnavailableWhenTheDayIsFull() async throws {
         let editor = await Self.loadedEditor(world: try await Fixtures.makeWorld())
-        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: Self.time(23, 59))]
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: TimeOfDay.endOfDay)]
         #expect(!editor.canAddRange)
         #expect(editor.nextNewRange == nil)
         let before = editor.draft
@@ -129,7 +129,7 @@ struct ReminderWindowsViewModelEditingTests {
         #expect(editor.draft == before)
         // Built from the same locale-aware label the pickers show, so a 24-hour
         // host expects "23:59" and a 12-hour host "11:59 PM".
-        let lastMinute = Self.time(23, 59).displayLabel
+        let lastMinute = TimeOfDay.endOfDay.displayLabel
         #expect(
             ReminderWindowsViewModel.addRangeUnavailableReason
                 == "The last range already ends at \(lastMinute), so there's no time left after it."
@@ -168,7 +168,7 @@ struct ReminderWindowsViewModelEditingTests {
         #expect(message == "Range 3 added, \(Self.time(16).displayLabel) to \(Self.time(17).displayLabel)")
         #expect(editor.draft.allowedTimeRanges.count == 3)
 
-        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: Self.time(23, 59))]
+        editor.draft.allowedTimeRanges = [Self.range(14, 16), TimeRange(start: Self.time(20), end: TimeOfDay.endOfDay)]
         let before = editor.draft
         #expect(editor.addRange() == nil)
         #expect(editor.draft == before)

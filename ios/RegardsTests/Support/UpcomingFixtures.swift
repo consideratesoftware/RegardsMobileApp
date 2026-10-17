@@ -49,7 +49,7 @@ extension ReminderWindow {
         ReminderWindow(
             allowedDays: .allDays,
             allowedTimeRanges: [
-                TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59)),
+                TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay.endOfDay),
             ],
             timezoneIdentifier: timezone.identifier,
             digestHorizonDays: digestHorizonDays
