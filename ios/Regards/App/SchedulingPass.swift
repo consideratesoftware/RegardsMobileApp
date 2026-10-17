@@ -21,7 +21,7 @@ import Foundation
 /// and that precondition has to live here, not only at the callers that
 /// happen to exist today. `OverdueViewModel.snooze` offers
 /// Snooze only for a row already computed as overdue, which requires
-/// `tracked && cadenceDays != nil` by construction.
+/// `isCadenceEligible` by construction.
 /// `ContactDetailViewModel.snooze` does **not**: that screen gates its
 /// Snooze button on `isCadenceEligible` for the contact it last loaded,
 /// which can be stale, and says nothing about overdue-ness, so the

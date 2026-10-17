@@ -358,7 +358,7 @@ public final class OverdueViewModel {
         do {
             // `wrote` should always be `true` here today — this screen only
             // ever offers Snooze for a row already computed as overdue,
-            // which requires tracked + cadenceDays by construction — but
+            // which requires `isCadenceEligible` by construction — but
             // treated the same as a thrown failure when it isn't: the
             // optimistic removal above needs undoing either way, not just
             // on a genuine write error.
@@ -416,7 +416,7 @@ public final class OverdueViewModel {
                                now: Date,
                                calendar: Calendar,
                                snoozedUntil: Date? = nil) -> OverdueRowState? {
-        guard contact.tracked, let cadenceDays = contact.cadenceDays else { return nil }
+        guard contact.isCadenceEligible, let cadenceDays = contact.cadenceDays else { return nil }
         if let snoozedUntil, snoozedUntil > now { return nil }
         let last = contact.lastInteractedAt ?? contact.createdAt
         let overdueAt = last.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)

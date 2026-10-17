@@ -301,12 +301,11 @@ public final class ContactDetailViewModel {
             // precondition (R54) — the `isActive` guard above stays because
             // it catches something that precondition doesn't (an
             // archived-after-`load()` race), not because it's redundant
-            // with it. `wrote` should always be `true` here today: this
-            // screen only ever offers Snooze for a contact whose row is
-            // already computed as overdue, which requires tracked +
-            // cadenceDays by construction. Propagated rather than assumed,
-            // so a future caller that reaches this method some other way
-            // gets an honest `false`, not a lie.
+            // with it. This screen offers Snooze only for a contact that was
+            // `isCadenceEligible` at its last load, so `wrote` is false only
+            // when tracking or cadence changed since. Propagated rather than
+            // assumed, so that case and any future caller get an honest
+            // `false`.
             let wrote = try await scheduler.snooze(contactId: contactId)
             if wrote { await load() }
             return wrote
@@ -391,13 +390,9 @@ public final class ContactDetailViewModel {
     /// property's own doc comment for why this didn't need TF-07/PR25's
     /// full `ReminderRepository` wiring after all.
     public var overdueSummary: (days: Int, isOverdue: Bool) {
-        // `c.tracked &&`, not `cadenceDays` alone (nit, staged review round
-        // 9): `OverdueViewModel.makeOverdueRow` and this screen's own Snooze
-        // button (`secondaryItems`) both gate on `tracked && cadenceDays !=
-        // nil` — a fourth, narrower spelling of the same predicate here
-        // wasn't wrong (an untracked contact can't currently carry a
-        // `cadenceDays`), just inconsistent with the other two.
-        guard let c = contact, c.tracked, let cadence = c.cadenceDays else {
+        // Same gate as `OverdueViewModel.makeOverdueRow` and this screen's
+        // Snooze button, so a 0-day cadence never reads as overdue.
+        guard let c = contact, c.isCadenceEligible, let cadence = c.cadenceDays else {
             return (0, false)
         }
         // Mirrors `OverdueViewModel.makeOverdueRow`'s `if let snoozedUntil,
