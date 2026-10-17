@@ -45,13 +45,8 @@ public struct MonthDay: Sendable, Equatable, Hashable {
     }
 
     /// Validate by round-tripping `(month, day)` through a Gregorian calendar
-    /// anchored in a leap year (so Feb 29 passes). If Calendar has to roll the
-    /// components forward — e.g. Nov 31 → Dec 1, Feb 30 → Mar 2, month 13 →
-    /// year + 1 — the normalized components won't match the input and we
-    /// reject. Delegates "which days exist in each month" to Foundation so
-    /// the check stays correct if Foundation's calendar arithmetic ever
-    /// changes (it won't, but the delegation is cleaner than a hand-rolled
-    /// table).
+    /// in a leap year (so Feb 29 passes). A rolled-forward result (Nov 31 →
+    /// Dec 1, month 13 → next year) doesn't match the input and is rejected.
     private static func isValid(month: Int, day: Int) -> Bool {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
@@ -265,10 +260,11 @@ public struct ReminderEngine: Sendable {
 
                 futureSlotStarts.append(contentsOf: candidateStarts.filter { candidate in
                     guard candidate >= date else { return false }
-                    // Re-validate a materialized spring-gap boundary. If the
-                    // next existing instant reads past the slot end, the slot
-                    // has no real instant on this day (§9 contract 1).
-                    return wallClock(of: candidate, calendar: calendar) < slot.end
+                    // Re-validate against the slot (§9 contract 1): past the
+                    // end there's no real instant this day; before the start,
+                    // Foundation gave the gap end for a real time (Lord Howe).
+                    let time = wallClock(of: candidate, calendar: calendar)
+                    return slot.start <= time && time < slot.end
                 })
             }
             if let activeSlotStart = activeSlotStarts.max() { return activeSlotStart }
@@ -449,25 +445,32 @@ public struct ReminderEngine: Sendable {
         // Inside a wrapping range at or after its start means quiet hours
         // end tomorrow, past the occasion's day.
         if quiet.wrapsMidnight, time >= quiet.start { return nil }
-        guard let end = materialize(
-            quiet.end,
-            onDay: calendar.startOfDay(for: occurrence),
-            calendar: calendar,
-            repeatedTimePolicy: .last
-        ) else { return nil }
-        if end >= occurrence { return end }
-        // Foundation ignores `.last` for a 30-minute fold (Lord Howe,
-        // 2026-04-05) and returns the first 01:45 for an occurrence in the
-        // second pass. Shift by the fold length and accept the result only if
-        // it still reads the quiet end on the same day; an earlier instant
-        // would fire inside quiet hours (§9 contracts 1 and 4).
-        let foldLength = timeZone.daylightSavingTimeOffset(for: end)
-            - timeZone.daylightSavingTimeOffset(for: occurrence)
-        let secondEnd = end.addingTimeInterval(foldLength)
-        guard secondEnd >= occurrence,
-              calendar.isDate(secondEnd, inSameDayAs: occurrence),
-              wallClock(of: secondEnd, calendar: calendar) == quiet.end else { return nil }
-        return secondEnd
+
+        // Foundation's `.last` is wrong on some Lord Howe DST days, so try
+        // `.first` too. Keep a candidate that reads the quiet end, or is the
+        // gap end standing in for a quiet end inside that day's gap.
+        let dayStart = calendar.startOfDay(for: occurrence)
+        let transition = timeZone.nextDaylightSavingTimeTransition(after: dayStart.addingTimeInterval(-1))
+            .flatMap { calendar.isDate($0, inSameDayAs: dayStart) ? $0 : nil }
+        func readsQuietEnd(_ candidate: Date) -> Bool {
+            if wallClock(of: candidate, calendar: calendar) == quiet.end { return true }
+            guard let transition, candidate == transition else { return false }
+            return wallClock(of: transition.addingTimeInterval(-1), calendar: calendar) < quiet.end
+                && quiet.end < wallClock(of: transition, calendar: calendar)
+        }
+        let candidates = [Calendar.RepeatedTimePolicy.last, .first].compactMap {
+            materialize(quiet.end, onDay: dayStart, calendar: calendar, repeatedTimePolicy: $0)
+        }
+        guard var end = candidates.first(where: readsQuietEnd) else { return nil }
+        // An occurrence in a fold's second pass needs the second quiet end,
+        // one fold length later (Lord Howe's 30-minute fold, 2026-04-05).
+        if end < occurrence {
+            end += timeZone.daylightSavingTimeOffset(for: end) - timeZone.daylightSavingTimeOffset(for: occurrence)
+        }
+        // On the occurrence's day, not before it, outside quiet hours (§9).
+        guard end >= occurrence, calendar.isDate(end, inSameDayAs: occurrence),
+              !quiet.contains(wallClock(of: end, calendar: calendar)) else { return nil }
+        return end
     }
 
     /// Returns the effective day for the occurrence — Feb 29 in a non-leap
