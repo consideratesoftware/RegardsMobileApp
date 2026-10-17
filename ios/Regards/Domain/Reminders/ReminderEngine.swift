@@ -383,9 +383,9 @@ public struct ReminderEngine: Sendable {
     /// - occasion already fully passed this year → next year.
     ///
     /// Occasions ignore allowed-day/range gating by design (they're morning-of
-    /// events). Quiet-hours suppression for a same-day-late occasion is applied
-    /// by SchedulingPass, which owns the effective window; the pure engine
-    /// returns the earliest today instant.
+    /// events). This returns the earliest instant ignoring quiet hours too;
+    /// `occasionFireDate(for:in:)` applies them, and SchedulingPass, which
+    /// owns the effective window, calls it with this result.
     public func nextOccasionOccurrence(
         monthDay: MonthDay,
         timezone: TimeZone
@@ -417,6 +417,39 @@ public struct ReminderEngine: Sendable {
         }
         // Already fully passed this year — roll forward.
         return resolve(year: thisYear + 1) ?? now
+    }
+
+    /// When an occasion occurrence may fire, given the window's quiet hours
+    /// (§9 contract 4, R5): `occurrence` itself when it is outside quiet
+    /// hours, the end of quiet hours on the same local day when it is inside
+    /// them, and nil when quiet hours run past the end of that day, so the
+    /// occasion gets no notification. Occasions ignore allowed days and
+    /// ranges, so only quiet hours apply.
+    ///
+    /// Example with quiet hours 22:30-07:30: a 07:00 occurrence fires at
+    /// 07:30, and a 23:00 same-day-late occurrence returns nil, because quiet
+    /// hours end on the next day.
+    ///
+    /// The quiet end is materialized with wall-clock APIs (§9 contract 1). On
+    /// a fall-back day it takes the later of a repeated quiet end, since the
+    /// clock re-enters quiet hours after the earlier one. On a spring-forward
+    /// day a quiet end inside the gap becomes the gap end.
+    public func occasionFireDate(for occurrence: Date, in window: ReminderWindow) -> Date? {
+        guard let quiet = window.quietHours else { return occurrence }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = window.timeZone
+
+        let time = wallClock(of: occurrence, calendar: calendar)
+        guard quiet.contains(time) else { return occurrence }
+        // Inside a wrapping range at or after its start means quiet hours
+        // end tomorrow, past the occasion's day.
+        if quiet.wrapsMidnight, time >= quiet.start { return nil }
+        return materialize(
+            quiet.end,
+            onDay: calendar.startOfDay(for: occurrence),
+            calendar: calendar,
+            repeatedTimePolicy: .last
+        )
     }
 
     /// Returns the effective day for the occurrence — Feb 29 in a non-leap
