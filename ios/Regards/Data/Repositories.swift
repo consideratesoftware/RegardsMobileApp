@@ -255,11 +255,16 @@ public protocol ReminderRepository: Sendable {
     @discardableResult
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool
     func delete(id: UUID) async throws
-    /// Live `ScheduleSnapshot` (R10): yields the current snapshot on
-    /// subscribe, then again after any write that changes it. A write that
-    /// leaves it equal yields nothing. A read error finishes the stream. Rows
-    /// that fail to decode are dropped, as in `observeTracked()`. No default
-    /// implementation: a missing implementation must fail to compile.
+    /// Live `ScheduleSnapshot` (R10): the current snapshot on subscribe, then
+    /// one per write that changes it; an equal result yields nothing. Treat
+    /// each emission as current state and never count them: the first may
+    /// already hold writes made after subscribing (GRDB starts async, the
+    /// mock yields at once). A read error finishes the stream with no value;
+    /// slice f decides whether the consumer needs the error for a retry
+    /// state (R9a). GRDB drops an undecodable contact with its rows, and an
+    /// undecodable reminder row, where `fetchPending` throws; TF-07c sets the
+    /// shared policy. The mock can't fail to decode, so parity covers healthy
+    /// rows only. No default: a missing implementation must fail to compile.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot>
 }
 

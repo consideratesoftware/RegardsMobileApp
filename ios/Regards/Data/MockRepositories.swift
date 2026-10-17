@@ -94,8 +94,8 @@ actor MockStore {
     /// Subscribers of `observeTracked()`, keyed per subscription so termination removes exactly one. Mirrors
     /// `GRDBContactRepository.observeTracked()`: nothing on subscribe, only the tracked set after a later write.
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
-    /// Subscribers of `observeSchedule()`, and the snapshot they last saw. Every write calls
-    /// `broadcastScheduleChange()`, so while anyone subscribes, `lastSchedule` is the current snapshot.
+    /// Subscribers of `observeSchedule()`, and the snapshot they last saw. Every write that can change a snapshot
+    /// input calls `broadcastScheduleChange()`, so while anyone subscribes, `lastSchedule` is the current snapshot.
     private var scheduleObservers: [UUID: AsyncStream<ScheduleSnapshot>.Continuation] = [:]
     private var lastSchedule: ScheduleSnapshot?
 
