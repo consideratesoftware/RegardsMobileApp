@@ -30,6 +30,9 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     public var scheduledFor: Date
     public var osNotificationId: String
     public var state: ReminderState
+    /// The raw floor Snooze set (§7 v3, §9): `scheduledFor` is that floor
+    /// resolved into a window slot. Non-nil only on a pending cadence row.
+    public var snoozedUntil: Date?
 
     public init(
         id: UUID = UUID(),
@@ -39,7 +42,8 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
         occasionLabel: String? = nil,
         scheduledFor: Date,
         osNotificationId: String,
-        state: ReminderState = .pending
+        state: ReminderState = .pending,
+        snoozedUntil: Date? = nil
     ) {
         self.id = id
         self.contactId = contactId
@@ -49,5 +53,7 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
         self.scheduledFor = scheduledFor
         self.osNotificationId = osNotificationId
         self.state = state
+        self.snoozedUntil = snoozedUntil
     }
 }
+

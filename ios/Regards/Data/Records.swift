@@ -128,6 +128,7 @@ struct ScheduledReminderRecord: Codable, FetchableRecord, PersistableRecord {
     var scheduledFor: Int
     var osNotificationId: String
     var state: String
+    var snoozedUntil: Int?
 
     init(from r: ScheduledReminder) {
         self.id = r.id.uuidString
@@ -138,6 +139,7 @@ struct ScheduledReminderRecord: Codable, FetchableRecord, PersistableRecord {
         self.scheduledFor = Int(r.scheduledFor.timeIntervalSince1970)
         self.osNotificationId = r.osNotificationId
         self.state = r.state.rawValue
+        self.snoozedUntil = r.snoozedUntil.map { Int($0.timeIntervalSince1970) }
     }
 
     func toDomain() throws -> ScheduledReminder {
@@ -157,7 +159,8 @@ struct ScheduledReminderRecord: Codable, FetchableRecord, PersistableRecord {
             occasionLabel: occasionLabel,
             scheduledFor: Date(timeIntervalSince1970: TimeInterval(scheduledFor)),
             osNotificationId: osNotificationId,
-            state: state
+            state: state,
+            snoozedUntil: snoozedUntil.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         )
     }
 }
