@@ -15,11 +15,10 @@ never pick up Android work.
 - Updated: 2026-10-17
 - Baseline: `main` at `a887ece` (merge of PR #63, `TF-05`, merged 2026-10-15).
   `TF-06` merged earlier the same day as PR #62 (`de33098`).
-- Active work: the `TF-05` and `TF-06` fast-follow is the only TF work in
-  progress (branch `claude/tf-05-06-fast-follow`, worktree
-  `../RegardsMobileApp-TF05`). It edits this file, the accessibility docs, and
-  the R11 register entry. `TF-03` acceptance is owner work (see `Owner gates`);
-  its code is merged in PR #48.
+- Active work: two `TF-07` lanes, started 2026-10-17 by owner ruling while
+  `TF-03` is `OWNER`. `TF-07a` runs on branch `claude/tf-07a-engine`, and
+  `TF-07b` runs on branch `claude/tf-07b-schema-v3`. `TF-03` acceptance is
+  owner work (see `Owner gates`); its code is merged in PR #48.
 - Next ready work: none. `TF-03` is `OWNER`, and both `TF-07` and `TF-11` list
   it as a dependency. Both become `READY` when `TF-03`'s owner gate passes.
   `TF-06` shipped no notification scheduling, so resolving R57 (owner ruling
