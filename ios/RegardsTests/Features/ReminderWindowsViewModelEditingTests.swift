@@ -127,13 +127,24 @@ struct ReminderWindowsViewModelEditingTests {
         editor.addRange()
 
         #expect(editor.draft == before)
-        // Built from the same locale-aware label the pickers show, so a 24-hour
-        // host expects "23:59" and a 12-hour host "11:59 PM".
-        let lastMinute = TimeOfDay.endOfDay.displayLabel
-        #expect(
-            ReminderWindowsViewModel.addRangeUnavailableReason
-                == "The last range already ends at \(lastMinute), so there's no time left after it."
-        )
+    }
+
+    /// Literal expectations, not built from `displayLabel`, so a change to the
+    /// label's format shows up here. Recent OS versions put a narrow no-break
+    /// space before "PM"; the comparison treats it as a plain space.
+    @Test(
+        "The Add range hint names the last minute of the day in the reader's clock",
+        arguments: [
+            ("en_GB", "The last range already ends at 23:59, so there's no time left after it."),
+            ("en_US", "The last range already ends at 11:59 PM, so there's no time left after it."),
+        ]
+    )
+    func addRangeUnavailableReasonFollowsTheLocale(identifier: String, expected: String) {
+        let reason = ReminderWindowsViewModel.addRangeUnavailableReason(locale: Locale(identifier: identifier))
+            .replacingOccurrences(of: "\u{202F}", with: " ")
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+
+        #expect(reason == expected)
     }
 
     @Test("removeRange removes the chosen range but refuses the last one, and canRemoveRange agrees")

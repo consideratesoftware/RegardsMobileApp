@@ -80,4 +80,13 @@ struct ContactDetailViewModelWindowGateTests {
 
         #expect(!viewModel.canEditReminderWindow)
     }
+
+    @Test("A tracked contact with a cadence of 0 days is never summarized as overdue")
+    func zeroCadenceContactIsNotOverdue() async {
+        let contact = Case.trackedWithZeroCadence.contact()
+        let viewModel = await Self.loadedViewModel(for: contact)
+
+        #expect(viewModel.overdueSummary.isOverdue == false)
+        #expect(viewModel.overdueSummary.days == 0)
+    }
 }
