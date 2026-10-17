@@ -12,7 +12,7 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-15
+- Updated: 2026-10-17
 - Baseline: `main` at `a887ece` (merge of PR #63, `TF-05`, merged 2026-10-15).
   `TF-06` merged earlier the same day as PR #62 (`de33098`).
 - Active work: the `TF-05` and `TF-06` fast-follow is the only TF work in
@@ -39,9 +39,9 @@ never pick up Android work.
   against the old 75-minute limit. Two runs failed at the 10-minute boot step
   limit. On 2026-10-09, `bootstatus` took 8.7 minutes, and the status-bar setup
   after it pushed the step past 10 minutes.
-- Green CI on `a887ece`: Lint (`38789306794`) and Guards (`38789306705`)
-  passed. iOS CI (`38789306696`) was still in progress when checked on
-  2026-10-15, so confirm it before relying on `a887ece` as green.
+- Green CI on `a887ece`: Lint (`38789306794`), Guards (`38789306705`), and
+  iOS CI (`38789306696`) all passed. iOS CI's conclusion was checked with
+  `gh run view` on 2026-10-17.
 - Owner action needed: TF-03 acceptance. See `Owner gates`.
 
 - Internal TestFlight gate: after both `TF-08` and `TF-11`
