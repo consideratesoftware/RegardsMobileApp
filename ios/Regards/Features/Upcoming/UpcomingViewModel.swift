@@ -369,7 +369,7 @@ public final class UpcomingViewModel {
         }
 
         for contact in contacts {
-            if let cadence = contact.cadenceDays {
+            if contact.isCadenceEligible, let cadence = contact.cadenceDays {
                 let last = contact.lastInteractedAt ?? contact.createdAt
                 let overdueAt = last.addingTimeInterval(TimeInterval(cadence) * 86_400)
                 // A pending snooze folds into the same `target`/

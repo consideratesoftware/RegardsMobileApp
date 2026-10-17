@@ -74,7 +74,7 @@ struct NeverContactedAnchorParityTests {
         // date as `now + 14d`, not resolve to "already due" at all.
         let window = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: "UTC"
         )
         let reminders = StubReminderRepository()

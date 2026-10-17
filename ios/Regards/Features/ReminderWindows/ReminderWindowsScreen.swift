@@ -2,8 +2,8 @@ import SwiftUI
 
 /// The live reminder-window editor (ARCHITECTURE.md §10 screen 9). The same
 /// screen edits the global window and, from Contact Detail, one contact's
-/// override; an override shows days, ranges, and quiet hours only. Occasion
-/// time and horizon stay global.
+/// override; an override shows days, ranges, and quiet hours only.
+/// Morning-of time and the Upcoming horizon stay global.
 public struct ReminderWindowsScreen: View {
     /// `@State`, not a plain property: the Settings destination closure runs
     /// again on every root re-render and hands over a fresh view model each
@@ -13,6 +13,9 @@ public struct ReminderWindowsScreen: View {
     private let announce: @MainActor (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @AccessibilityFocusState private var errorFocused: Bool
+    /// Where VoiceOver lands after Remove range takes the focused button away.
+    /// Internal, not private: `+Sections` sets it.
+    @AccessibilityFocusState var addRangeFocused: Bool
     @State private var announcer = RowActionAnnouncer()
     @ScaledMetric(relativeTo: .subheadline) var pillSize: CGFloat = 36
 

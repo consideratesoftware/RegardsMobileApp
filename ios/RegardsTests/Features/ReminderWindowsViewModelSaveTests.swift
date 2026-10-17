@@ -163,6 +163,37 @@ struct ReminderWindowsViewModelSaveTests {
         #expect(stored.timezoneIdentifier == "America/New_York")
     }
 
+    /// Sunday Mar 1 2026, 03:00 EST. The only allowed time is Sunday 02:00 to
+    /// 02:30, and Sunday Mar 8 has no 02:00 (spring forward), so the first slot
+    /// is Sunday Mar 15, 14 days out. A save probes for capacity from the clock
+    /// once; the engine's search has to reach that far on its own (R62).
+    @Test("A window whose only slot is skipped by the spring-forward gap saves after one probe")
+    func gapOnlyWindowSavesWithSingleProbe() async throws {
+        let newYork = ReminderWindow(
+            allowedDays: .weekdays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 18), end: TimeOfDay(hour: 22))],
+            timezoneIdentifier: "America/New_York",
+            occasionTime: TimeOfDay(hour: 7, minute: 15),
+            digestHorizonDays: 30
+        )
+        let world = try await Fixtures.makeWorld(global: newYork)
+        let recorder = Fixtures.SaveRecorder()
+        let sundayEarlyMorning = try #require(ISO8601DateFormatter().date(from: "2026-03-01T08:00:00Z")) // 03:00 EST
+        let editor = await Self.loadedEditor(.global, world: world, recorder: recorder, now: sundayEarlyMorning)
+        let gapRange = TimeRange(start: TimeOfDay(hour: 2), end: TimeOfDay(hour: 2, minute: 30))
+        editor.draft.allowedDays = .sunday
+        editor.draft.allowedTimeRanges = [gapRange]
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(editor.validationMessage == nil)
+        let stored = try await world.environment.window.fetchGlobal()
+        #expect(stored.allowedDays == .sunday)
+        #expect(stored.allowedTimeRanges == [gapRange])
+        #expect(recorder.windows == [stored])
+    }
+
     @Test("A contact with no override that saves an unchanged draft writes nothing and stays on the default")
     func unchangedContactSaveWritesNothing() async throws {
         let world = try await Fixtures.makeWorld()
