@@ -58,7 +58,7 @@ extension AppLaunchCoordinator {
             // The eligibility check comes first because neither later step has it:
             // `caughtUp` has no precondition by design, and `InteractionLogging`
             // checks only `isActive`. A notification can outlive the contact's
-            // tracking, so an untracked or no-cadence contact must write nothing.
+            // tracking, so an ineligible contact must write nothing.
             // The check is best-effort. `markCaughtUp` re-checks `isActive` and
             // throws for an inactive contact, and the handler restores a snooze
             // it cleared. R60 covers the restore race: a restore after a failed

@@ -176,8 +176,8 @@ extension ReminderWindowsScreen {
         let number = index + 1
         let remove = Button {
             // This button disappears with its row, so focus moves to
-            // "+ Add range", the one control below the list that always
-            // exists, before the announcement says what changed.
+            // "+ Add range", the control at the end of this section that
+            // always exists, before the announcement says what changed.
             // "+ Add range" can be disabled when the remaining ranges end at
             // 23:59; VoiceOver still lands on a dimmed button and reads its
             // hint.

@@ -157,13 +157,14 @@ public actor SchedulingPass {
     /// invalidated.
     ///
     /// Returns whether it actually wrote (R54): `false` for a contact that
-    /// isn't `isCadenceEligible` (archived, untracked, or a cadence under 1
-    /// day) — a rejection, not a silent no-op a caller could mistake for
-    /// success, the same shape as `ContactRepository.updateLastInteractedAt`'s
-    /// own `Bool` return for its own precondition failure. A failed contact
-    /// read is treated as ineligible, the same conservative default
-    /// `ContactDetailViewModel.snooze()`'s own fresh-fetch guard already uses
-    /// for the identical situation.
+    /// isn't `isCadenceEligible` (archived, untracked, no cadence, or a
+    /// cadence under 1 day) — a rejection, not a silent no-op a caller could
+    /// mistake for success, the same shape as
+    /// `ContactRepository.updateLastInteractedAt`'s own `Bool` return for its
+    /// own precondition failure. A failed contact read is treated as
+    /// ineligible, the same conservative default `ContactDetailViewModel
+    /// .snooze()`'s own fresh-fetch guard already uses for the identical
+    /// situation.
     ///
     /// `isActive` is part of the check, slightly wider than R54's own wording
     /// ("the tracked/cadence precondition"), because the contact is already

@@ -28,8 +28,8 @@ extension ContactDetailScreen {
                         valueFocus: $isStatusFocused
                     )
                     // Same gate as Snooze: an ineligible contact (archived,
-                    // untracked, or a cadence under 1 day) never gets a cadence
-                    // reminder, so a window means nothing.
+                    // untracked, no cadence, or a cadence under 1 day) never
+                    // gets a cadence reminder, so a window means nothing.
                     if viewModel.canEditReminderWindow {
                         Hair(inset: 16)
                         reminderWindowRow(contact: contact)
