@@ -258,7 +258,8 @@ public protocol ReminderRepository: Sendable {
     /// Live `ScheduleSnapshot` (R10): yields the current snapshot on
     /// subscribe, then again after any write that changes it. A write that
     /// leaves it equal yields nothing. A read error finishes the stream. Rows
-    /// that fail to decode are dropped, as in `observeTracked()`.
+    /// that fail to decode are dropped, as in `observeTracked()`. No default
+    /// implementation: a missing implementation must fail to compile.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot>
 }
 

@@ -191,7 +191,11 @@ public actor SchedulingPass {
             kind: .cadence,
             scheduledFor: scheduledFor,
             osNotificationId: Self.cadenceNotificationId(contactId: contactId),
-            state: .pending
+            state: .pending,
+            // The v3 floor (§7). Until TF-07c resolves `scheduledFor` into a
+            // window slot the two are equal, and the v3 backfill can't run
+            // again, so a row written now must carry its floor itself.
+            snoozedUntil: scheduledFor
         )
         // A plain upsert again, deliberately. Rounds 14–16 made this a
         // compare-and-set against state observed before the suspension
