@@ -7,7 +7,7 @@ import Observation
 /// **What a saved window guarantees.** Every window this type writes passes
 /// `validate()`, has no overlapping allowed ranges, has a quiet-hours start
 /// that differs from its end, and can fire at least once
-/// (`ReminderEngine.nextAllowedSlot` is non-nil now or 8 days from now). All
+/// (`ReminderEngine.nextAllowedSlot` from now is non-nil). All
 /// of it is checked in `save()` and nowhere else: `validate()` also runs when
 /// stored data decodes, so a stricter rule there would make already-stored
 /// windows fail at launch. A failed check writes nothing and sets
@@ -349,15 +349,11 @@ public final class ReminderWindowsViewModel {
         return nil
     }
 
-    /// One search covers 8 days, and a DST gap can empty a single day's slot.
-    /// The window has no capacity only if both searches, now and 8 days on,
-    /// find nothing.
+    /// One probe is enough: the engine's 15-day search reaches the next
+    /// occurrence after a DST gap empties a single day's slot (R62), so nil
+    /// means the window can never fire.
     private func canFire(_ candidate: ReminderWindow) -> Bool {
-        let engine = ReminderEngine()
-        let now = clock()
-        if engine.nextAllowedSlot(from: now, in: candidate) != nil { return true }
-        let later = now.addingTimeInterval(8 * 86_400)
-        return engine.nextAllowedSlot(from: later, in: candidate) != nil
+        ReminderEngine().nextAllowedSlot(from: clock(), in: candidate) != nil
     }
 
     private static func message(for error: ReminderWindow.ValidationError) -> String {

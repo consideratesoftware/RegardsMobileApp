@@ -196,10 +196,14 @@ public struct ReminderEngine: Sendable {
         let slots = daySlots(for: window)
         guard !slots.isEmpty else { return nil }
 
-        // 8 days guarantees we reach the next occurrence of every weekday even
-        // when today's slots are all in the past.
+        // 15 days reaches the next 2 occurrences of every weekday, even when
+        // today's slots are all in the past. A single-day window whose only
+        // slot falls in a spring-forward gap has no instant that week, and a
+        // gap day never recurs a week later, so the second occurrence always
+        // has one (R62). 8 days returned nil there, which reads as zero
+        // capacity.
         let searchDayStart = calendar.startOfDay(for: date)
-        for dayOffset in 0..<8 {
+        for dayOffset in 0..<15 {
             guard let dayStart = calendar.date(byAdding: .day, value: dayOffset, to: searchDayStart) else { continue }
             let weekday = calendar.component(.weekday, from: dayStart)
             guard window.allowedDays.contains(calendarWeekday: weekday) else { continue }
