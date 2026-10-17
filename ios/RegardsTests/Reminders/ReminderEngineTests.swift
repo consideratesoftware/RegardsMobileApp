@@ -50,6 +50,13 @@ enum EngineFixtures {
                        quietHours: quiet, timezoneIdentifier: tz)
     }
 
+    /// Every hourly instant in `[first, last]`, so a search that fails from any
+    /// starting point in a week shows up, not only from the one the author
+    /// thought of.
+    static func hourlyInstants(from first: Date, through last: Date) -> [Date] {
+        Array(stride(from: first, through: last, by: 3_600))
+    }
+
     static func engine(now: Date) -> ReminderEngine {
         ReminderEngine(clock: { now })
     }

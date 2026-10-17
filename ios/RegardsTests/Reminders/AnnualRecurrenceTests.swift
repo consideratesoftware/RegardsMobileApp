@@ -124,7 +124,7 @@ struct AnnualRecurrenceTests {
         let engine = ReminderEngine(occasionNotificationTime: occasionTime, clock: { now })
         let occurrence = engine.nextOccasionOccurrence(
             monthDay: MonthDay(month: 6, day: 14), timezone: window.timeZone)
-        return engine.occasionFireDate(for: occurrence, in: window)
+        return engine.occasionFireDate(for: occurrence, in: window, timeZone: window.timeZone)
     }
 
     @Test("An occasion time inside quiet hours fires at the quiet end the same day (R5)")
@@ -172,8 +172,10 @@ struct AnnualRecurrenceTests {
         let atStart = EngineFixtures.date("2026-06-14 22:30", tz: Self.newYork)
         let engine = ReminderEngine(clock: { atEnd })
 
-        #expect(engine.occasionFireDate(for: atEnd, in: Self.quietNightWindow) == atEnd)
-        #expect(engine.occasionFireDate(for: atStart, in: Self.quietNightWindow) == nil)
+        #expect(engine.occasionFireDate(
+            for: atEnd, in: Self.quietNightWindow, timeZone: Self.quietNightWindow.timeZone) == atEnd)
+        #expect(engine.occasionFireDate(
+            for: atStart, in: Self.quietNightWindow, timeZone: Self.quietNightWindow.timeZone) == nil)
     }
 
     @Test("A window without quiet hours leaves the occurrence alone (R5)")
@@ -182,7 +184,8 @@ struct AnnualRecurrenceTests {
             [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))], tz: Self.newYork)
         let occurrence = EngineFixtures.date("2026-06-14 03:00", tz: Self.newYork)
 
-        #expect(ReminderEngine(clock: { occurrence }).occasionFireDate(for: occurrence, in: window) == occurrence)
+        let engine = ReminderEngine(clock: { occurrence })
+        #expect(engine.occasionFireDate(for: occurrence, in: window, timeZone: window.timeZone) == occurrence)
     }
 
     @Test("A quiet range that does not wrap midnight moves the occasion to its end (R5)")
@@ -209,7 +212,8 @@ struct AnnualRecurrenceTests {
             quiet: TimeRange(start: TimeOfDay(hour: 1, minute: 30), end: TimeOfDay(hour: 2, minute: 30)))
         let occurrence = EngineFixtures.date("2026-03-08T01:45:00-08:00")
 
-        let fire = ReminderEngine(clock: { occurrence }).occasionFireDate(for: occurrence, in: window)
+        let engine = ReminderEngine(clock: { occurrence })
+        let fire = engine.occasionFireDate(for: occurrence, in: window, timeZone: window.timeZone)
 
         #expect(fire == EngineFixtures.date("2026-03-08T03:00:00-07:00"))
     }
@@ -226,7 +230,8 @@ struct AnnualRecurrenceTests {
             quiet: TimeRange(start: TimeOfDay(hour: 0, minute: 30), end: TimeOfDay(hour: 1, minute: 30)))
         let occurrence = EngineFixtures.date("2026-11-01T00:45:00-07:00")
 
-        let fire = ReminderEngine(clock: { occurrence }).occasionFireDate(for: occurrence, in: window)
+        let engine = ReminderEngine(clock: { occurrence })
+        let fire = engine.occasionFireDate(for: occurrence, in: window, timeZone: window.timeZone)
 
         #expect(fire == EngineFixtures.date("2026-11-01T01:30:00-08:00"))
     }

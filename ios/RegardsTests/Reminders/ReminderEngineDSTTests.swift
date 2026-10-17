@@ -223,13 +223,6 @@ struct ReminderEngineDSTTests {
 
     // MARK: - Gap-only days (R62)
 
-    /// Every hourly instant in `[first, last]`, so a search that fails from any
-    /// starting point in a week shows up, not only from the one the author
-    /// thought of.
-    private static func hourlyInstants(from first: Date, through last: Date) -> [Date] {
-        Array(stride(from: first, through: last, by: 3_600))
-    }
-
     @Test(
         "A Sunday-only window emptied by the New York spring-forward gap reaches the next Sunday (R62)",
         arguments: [true, false]
@@ -243,7 +236,7 @@ struct ReminderEngineDSTTests {
             allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 2), end: TimeOfDay(hour: 2, minute: 30))],
             quietHours: nil, timezoneIdentifier: "America/New_York")
         let expected = EngineFixtures.date("2026-03-15 02:00", tz: "America/New_York")
-        let probes = Self.hourlyInstants(
+        let probes = EngineFixtures.hourlyInstants(
             from: EngineFixtures.date("2026-03-01 03:00", tz: "America/New_York"),
             through: EngineFixtures.date("2026-03-08 01:00", tz: "America/New_York"))
         #expect(probes.count > 160)
@@ -256,8 +249,11 @@ struct ReminderEngineDSTTests {
         #expect(misses.isEmpty, "\(misses.count) of \(probes.count) probes missed, first at \(misses.first as Any)")
     }
 
-    @Test("A Sunday-only window emptied by the Lord Howe 30-minute gap reaches the next Sunday (R62)")
-    func nextAllowedSlotReachesOccurrenceAfterLordHoweGapOnlySunday() {
+    @Test(
+        "A Sunday-only window emptied by the Lord Howe 30-minute gap reaches the next Sunday (R62)",
+        arguments: [true, false]
+    )
+    func nextAllowedSlotReachesOccurrenceAfterLordHoweGapOnlySunday(includingContainingSlot: Bool) {
         // Sun Oct 4 2026: clocks jump 02:00 -> 02:30, so [02:00, 02:30) has no
         // real instant that day. The next Sunday is Oct 11.
         let window = ReminderWindow(
@@ -265,13 +261,14 @@ struct ReminderEngineDSTTests {
             allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 2), end: TimeOfDay(hour: 2, minute: 30))],
             quietHours: nil, timezoneIdentifier: "Australia/Lord_Howe")
         let expected = EngineFixtures.date("2026-10-11 02:00", tz: "Australia/Lord_Howe")
-        let probes = Self.hourlyInstants(
+        let probes = EngineFixtures.hourlyInstants(
             from: EngineFixtures.date("2026-09-27 03:00", tz: "Australia/Lord_Howe"),
             through: EngineFixtures.date("2026-10-04 01:00", tz: "Australia/Lord_Howe"))
         #expect(probes.count > 160)
 
         let misses = probes.filter { probe in
-            EngineFixtures.engine(now: probe).nextAllowedSlot(from: probe, in: window) != expected
+            EngineFixtures.engine(now: probe).nextAllowedSlot(
+                from: probe, in: window, includingContainingSlot: includingContainingSlot) != expected
         }
 
         #expect(misses.isEmpty, "\(misses.count) of \(probes.count) probes missed, first at \(misses.first as Any)")

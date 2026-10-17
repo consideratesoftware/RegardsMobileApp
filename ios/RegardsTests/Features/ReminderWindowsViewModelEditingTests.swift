@@ -127,6 +127,11 @@ struct ReminderWindowsViewModelEditingTests {
         editor.addRange()
 
         #expect(editor.draft == before)
+        // The hint the screen reads follows the current locale.
+        #expect(
+            ReminderWindowsViewModel.addRangeUnavailableReason
+                == ReminderWindowsViewModel.addRangeUnavailableReason(locale: .autoupdatingCurrent)
+        )
     }
 
     /// Literal expectations, not built from `displayLabel`, so a change to the

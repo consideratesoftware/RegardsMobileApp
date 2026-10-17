@@ -4,8 +4,8 @@ import Testing
 
 /// The Contact Detail "Reminder window" row and its Change button exist only
 /// for a contact that can have a cadence reminder: tracked, with a cadence of
-/// at least 1 day, and not archived (the same gate Snooze uses). A window means nothing for
-/// any other contact.
+/// at least 1 day, and not archived (the same gate Snooze uses). A window
+/// means nothing for any other contact.
 ///
 /// The gate is `ContactDetailViewModel.canEditReminderWindow`, which the
 /// Contact Detail screen reads to show the row.
