@@ -31,6 +31,33 @@ struct SchedulingPassTests {
         #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
     }
 
+    /// v3 (§7): a snooze row carries its raw floor. Until the pass resolves
+    /// `scheduledFor` into a window slot the two are equal, and the v3
+    /// backfill never runs again, so the write itself has to set it. Without
+    /// it a snoozed contact looks un-snoozed to every reader of the floor.
+    @Test(
+        "Snooze writes snoozedUntil equal to scheduledFor",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func stubSnoozeWritesFloor(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(510), suffix: "snooze-floor", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        try await scheduler.snooze(contactId: contact.id)
+
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.count == 1)
+        #expect(pending[0].snoozedUntil == now.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].snoozedUntil == pending[0].scheduledFor)
+    }
+
     @Test(
         "A second snooze replaces the pending row rather than duplicating it",
         arguments: RepositoryContractBackend.allCases
@@ -50,6 +77,7 @@ struct SchedulingPassTests {
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
         #expect(pending[0].scheduledFor == second.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].snoozedUntil == second.addingTimeInterval(7 * 86_400))
     }
 
     /// The blocker this pins: an earlier version read the existing pending

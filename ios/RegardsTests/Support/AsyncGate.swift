@@ -117,6 +117,7 @@ struct GatedTransitionStateReminderRepository: ReminderRepository {
         return try await wrapped.transitionState(id: id, from: from, to: to)
     }
     func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
+    func observeSchedule() async -> AsyncStream<ScheduleSnapshot> { await wrapped.observeSchedule() }
 }
 
 /// Counts calls so a fake can treat the first one differently.
@@ -197,6 +198,7 @@ struct GatedUpsertReminderRepository: ReminderRepository {
         try await wrapped.transitionState(id: id, from: from, to: to)
     }
     func delete(id: UUID) async throws { try await wrapped.delete(id: id) }
+    func observeSchedule() async -> AsyncStream<ScheduleSnapshot> { await wrapped.observeSchedule() }
 }
 
 /// Holds `fetch(id:)` open. `GatedFetchTrackedContactRepository` above gates

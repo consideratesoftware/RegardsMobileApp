@@ -176,4 +176,70 @@ struct ReminderRepositoryContractTests {
         #expect(matched)
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
+
+    @Test(
+        "A reminder's snoozedUntil round-trips, truncated to whole seconds",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozedUntilRoundTrips(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(661), suffix: "snoozed-until", tracked: true)
+        let snoozed = ScheduledReminder(
+            id: try contractUUID(662),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_900),
+            osNotificationId: "snoozed-until",
+            snoozedUntil: Date(timeIntervalSince1970: 1_800_000_600.875)
+        )
+        let unsnoozed = ScheduledReminder(
+            id: try contractUUID(663),
+            contactId: contact.id,
+            kind: .birthday,
+            occasionDate: "08-07",
+            occasionLabel: "Birthday",
+            scheduledFor: Date(timeIntervalSince1970: 1_800_001_000),
+            osNotificationId: "snoozed-until-none"
+        )
+        try await repositories.contacts.upsert(contact)
+        try await repositories.reminders.upsert(snoozed)
+        try await repositories.reminders.upsert(unsnoozed)
+
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending == [contractStored(snoozed), contractStored(unsnoozed)])
+        #expect(pending.first { $0.id == snoozed.id }?.snoozedUntil
+                == Date(timeIntervalSince1970: 1_800_000_600))
+    }
+
+    /// `transitionState` is a compare-and-set on `state` alone. A Snooze row
+    /// that is caught up and then restored by
+    /// `restorePendingAfterFailedCaughtUp` must come back with the floor it
+    /// had, or the contact reads as un-snoozed. Read back through
+    /// `fetchPending`, the only read that returns the restored row.
+    @Test(
+        "transitionState leaves snoozedUntil untouched when a row leaves pending and comes back",
+        arguments: RepositoryContractBackend.allCases, [ReminderState.userCaughtUp, .fired]
+    )
+    func transitionStatePreservesSnoozedUntil(
+        backend: RepositoryContractBackend, via: ReminderState
+    ) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(664), suffix: "transition-floor", tracked: true)
+        let snoozed = ScheduledReminder(
+            id: try contractUUID(665),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_900),
+            osNotificationId: "transition-floor",
+            snoozedUntil: Date(timeIntervalSince1970: 1_800_000_600)
+        )
+        try await repositories.contacts.upsert(contact)
+        try await repositories.reminders.upsert(snoozed)
+
+        #expect(try await repositories.reminders.transitionState(id: snoozed.id, from: .pending, to: via))
+        #expect(try await repositories.reminders.transitionState(id: snoozed.id, from: via, to: .pending))
+
+        let restored = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(restored == [contractStored(snoozed)])
+    }
 }

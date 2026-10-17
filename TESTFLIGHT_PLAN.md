@@ -13,20 +13,22 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-10-17
-- Baseline: `main` at `a887ece` (merge of PR #63, `TF-05`, merged 2026-10-15).
-  `TF-06` merged earlier the same day as PR #62 (`de33098`).
-- Active work: the `TF-05` and `TF-06` fast-follow is the only TF work in
-  progress (branch `claude/tf-05-06-fast-follow`, worktree
-  `../RegardsMobileApp-TF05`). It edits this file, the accessibility docs, and
-  the R11 register entry. `TF-03` acceptance is owner work (see `Owner gates`);
-  its code is merged in PR #48.
-- Next ready work: none. `TF-03` is `OWNER`, and both `TF-07` and `TF-11` list
-  it as a dependency. Both become `READY` when `TF-03`'s owner gate passes.
+- Baseline: `main` at `3ebe90e` (merge of PR #64, the `TF-05` and `TF-06`
+  fast-follow, merged 2026-10-17). `TF-05` merged as PR #63 (`a887ece`), and
+  `TF-06` merged as PR #62 (`de33098`), both earlier.
+- Active work: `TF-07a` (PR #66, branch `claude/tf-07a-engine`) and `TF-07b`
+  (PR #65, branch `claude/tf-07b-schema-v3`) are in flight by owner ruling 7,
+  started 2026-10-17 while `TF-03` is `OWNER`. `TF-03` acceptance is owner work
+  (see `Owner gates`); its code is merged in PR #48.
+- Next ready work: none. `TF-03` is `OWNER`, and `TF-07c` through `TF-07g` and
+  `TF-11` list it as a dependency. They all become `READY` when `TF-03`'s owner
+  gate passes.
   `TF-06` shipped no notification scheduling, so resolving R57 (owner ruling
   2026-08-22, see its queue row) falls to `TF-07`.
-- Blocked: `TF-07` needs `TF-03`, and `TF-11` needs `TF-03`. `TF-03` stays
-  `OWNER` until its acceptance run passes, so both stay `BLOCKED`.
-- Open pull requests: none except the `TF-05` and `TF-06` fast-follow.
+- Blocked: `TF-07c` through `TF-07g` and `TF-11` need `TF-03`. `TF-03` stays
+  `OWNER` until its acceptance run passes, so they stay `BLOCKED`.
+- Open pull requests: #65 (`TF-07b`, schema v3 and observeSchedule) and #66
+  (`TF-07a`).
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
