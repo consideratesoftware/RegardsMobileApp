@@ -353,6 +353,13 @@ actor StubReminderRepository: ReminderRepository {
         try requireSuccess()
         reminders.removeAll { $0.id == id }
     }
+
+    /// This fake holds no contacts or window to build a `ScheduleSnapshot`
+    /// from, so the stream finishes at once. A test that needs live
+    /// snapshots uses `MockRepositories` or an in-memory GRDB store.
+    func observeSchedule() async -> AsyncStream<ScheduleSnapshot> {
+        AsyncStream { $0.finish() }
+    }
 }
 
 actor StubInteractionRepository: InteractionRepository {

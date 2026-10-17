@@ -15,6 +15,9 @@ public enum RegardsSchema {
         m.registerMigration("v2") { db in
             try migrateToV2(db)
         }
+        m.registerMigration("v3") { db in
+            try migrateToV3(db)
+        }
         return m
     }
 
@@ -40,6 +43,26 @@ public enum RegardsSchema {
             UPDATE ReminderWindow
             SET quietHoursJson = NULL
             WHERE quietHoursJson = 'null'
+            """)
+    }
+
+    // MARK: - v3 columns
+
+    /// TF-07: `ScheduledReminder.snoozedUntil` keeps Snooze's raw floor apart
+    /// from `scheduledFor`, which SchedulingPass resolves into a window slot
+    /// (§9). Before v3, only Snooze wrote pending cadence rows, so each one's
+    /// `scheduledFor` is the floor it set. Every other row stays NULL: an
+    /// occasion row was never a snooze, and a fired, cancelled, or caught-up
+    /// row no longer is. The stored strings are literal, so a later rename
+    /// of `ReminderKind` or `ReminderState` can't change what v3 does.
+    private static func migrateToV3(_ db: Database) throws {
+        try db.alter(table: "ScheduledReminder") { t in
+            t.add(column: "snoozedUntil", .integer)
+        }
+        try db.execute(sql: """
+            UPDATE ScheduledReminder
+            SET snoozedUntil = scheduledFor
+            WHERE kind = 'cadence' AND state = 'pending'
             """)
     }
 
