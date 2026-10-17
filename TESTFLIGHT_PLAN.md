@@ -26,7 +26,7 @@ never pick up Android work.
   2026-08-22, see its queue row) falls to `TF-07`.
 - Blocked: `TF-07` needs `TF-03`, and `TF-11` needs `TF-03`. `TF-03` stays
   `OWNER` until its acceptance run passes, so both stay `BLOCKED`.
-- Open pull requests: none. `TF-07a` and `TF-07b` have no PRs yet.
+- Open pull requests: #65 (`TF-07b`, schema v3 and observeSchedule). `TF-07a` has no PR yet.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
