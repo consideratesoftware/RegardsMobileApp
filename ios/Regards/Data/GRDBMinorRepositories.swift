@@ -89,6 +89,51 @@ struct GRDBReminderRepository: ReminderRepository {
             _ = try ScheduledReminderRecord.deleteOne(db, key: id.uuidString)
         }
     }
+
+    /// One `ValueObservation`, so the contacts, rows and window all come from
+    /// the same transaction. GRDB re-runs the read after any write to those
+    /// three tables; `removeDuplicates()` drops a result equal to the last
+    /// one, which is the mock's rule too. `GRDBContactRepository
+    /// .observeTracked()` explains the `CancellableBox` and the buffering.
+    func observeSchedule() async -> AsyncStream<ScheduleSnapshot> {
+        let observation = ValueObservation
+            .tracking { db in try Self.readSchedule(db) }
+            .removeDuplicates()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let box = CancellableBox()
+            continuation.onTermination = { _ in box.cancel() }
+            let cancellable = observation.start(
+                in: dbQueue,
+                onError: { _ in continuation.finish() },
+                onChange: { snapshot in continuation.yield(snapshot) }
+            )
+            box.set(cancellable)
+        }
+    }
+
+    private static func readSchedule(_ db: Database) throws -> ScheduleSnapshot {
+        // `try?` drops only a row that fails to decode, the per-row tolerance
+        // `observeTracked()` has (R50); the error itself has nowhere to go
+        // that a screen could show. The id filter then drops that contact's
+        // rows too, so no row outlives its contact in the snapshot.
+        let contacts = try ContactRecord
+            .filter(Column("tracked") == true && Column("archivedAt") == nil)
+            .order(Column("id"))
+            .fetchAll(db)
+            .compactMap { try? $0.toDomain() }
+        let contactIds = Set(contacts.map(\.id))
+        let states = [ReminderState.pending.rawValue, ReminderState.fired.rawValue]
+        let reminders = try ScheduledReminderRecord
+            .filter(states.contains(Column("state")))
+            .order(Column("scheduledFor"), Column("id"))
+            .fetchAll(db)
+            .compactMap { try? $0.toDomain() }
+            .filter { contactIds.contains($0.contactId) }
+        guard let window = try ReminderWindowRecord.fetchOne(db, key: 1) else {
+            throw DataError.notFound
+        }
+        return ScheduleSnapshot(contacts: contacts, reminders: reminders, window: try window.toDomain())
+    }
 }
 
 struct GRDBInteractionRepository: InteractionRepository {

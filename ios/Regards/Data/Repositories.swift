@@ -255,6 +255,11 @@ public protocol ReminderRepository: Sendable {
     @discardableResult
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool
     func delete(id: UUID) async throws
+    /// Live `ScheduleSnapshot` (R10): yields the current snapshot on
+    /// subscribe, then again after any write that changes it. A write that
+    /// leaves it equal yields nothing. A read error finishes the stream. Rows
+    /// that fail to decode are dropped, as in `observeTracked()`.
+    func observeSchedule() async -> AsyncStream<ScheduleSnapshot>
 }
 
 public protocol InteractionRepository: Sendable {

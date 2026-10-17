@@ -94,6 +94,10 @@ actor MockStore {
     /// Subscribers of `observeTracked()`, keyed per subscription so termination removes exactly one. Mirrors
     /// `GRDBContactRepository.observeTracked()`: nothing on subscribe, only the tracked set after a later write.
     private var trackedObservers: [UUID: AsyncStream<[Contact]>.Continuation] = [:]
+    /// Subscribers of `observeSchedule()`, and the snapshot they last saw. Every write calls
+    /// `broadcastScheduleChange()`, so while anyone subscribes, `lastSchedule` is the current snapshot.
+    private var scheduleObservers: [UUID: AsyncStream<ScheduleSnapshot>.Continuation] = [:]
+    private var lastSchedule: ScheduleSnapshot?
 
     init(now: Date, window: ReminderWindow, includeDuplicateFixture: Bool, seedCorruptRow: Bool = false) {
         self.window = window
@@ -281,12 +285,14 @@ extension MockStore {
         }
         contacts[c.id] = try mockStoredContact(c)
         broadcastTrackedChange()
+        broadcastScheduleChange()
     }
     func archiveContact(id: UUID, at: Date) {
         guard var c = contacts[id] else { return }
         c.archivedAt = mockStoredDate(at)
         contacts[id] = c
         broadcastTrackedChange()
+        broadcastScheduleChange()
     }
 
     // MARK: - Live observation
@@ -317,6 +323,47 @@ extension MockStore {
         }
     }
 
+    /// Mirrors `GRDBReminderRepository.observeSchedule()`: the current snapshot on subscribe, then one per
+    /// write that changes it. A write that leaves it equal yields nothing, like GRDB's `removeDuplicates()`.
+    func observeSchedule() -> AsyncStream<ScheduleSnapshot> {
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: ScheduleSnapshot.self, bufferingPolicy: .bufferingNewest(1))
+        let token = UUID()
+        scheduleObservers[token] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeScheduleObserver(token) }
+        }
+        let current = scheduleSnapshot()
+        lastSchedule = current
+        continuation.yield(current)
+        return stream
+    }
+
+    private func removeScheduleObserver(_ token: UUID) {
+        scheduleObservers.removeValue(forKey: token)
+    }
+
+    private func broadcastScheduleChange() {
+        guard !scheduleObservers.isEmpty else { return }
+        let current = scheduleSnapshot()
+        guard current != lastSchedule else { return }
+        lastSchedule = current
+        for continuation in scheduleObservers.values {
+            continuation.yield(current)
+        }
+    }
+
+    /// Same rows and order as `GRDBReminderRepository.readSchedule`: contacts by id string, rows by
+    /// `scheduledFor` then id, and only rows whose contact is in the snapshot.
+    private func scheduleSnapshot() -> ScheduleSnapshot {
+        let contacts = tracked().sorted { $0.id.uuidString < $1.id.uuidString }
+        let contactIds = Set(contacts.map(\.id))
+        let rows = reminders.values
+            .filter { ($0.state == .pending || $0.state == .fired) && contactIds.contains($0.contactId) }
+            .sorted(by: mockReminderPrecedes)
+        return ScheduleSnapshot(contacts: contacts, reminders: rows, window: window)
+    }
+
     /// Mirrors `GRDBContactRepository.updateReconciledFields`: reads the *current* entry (actor-isolated, so no
     /// stale snapshot) and overwrites only these five fields — parity for `ContactsReconciler` across backends.
     /// `broadcastTrackedChange()` at the end is the same R23 parity `deleteGroup` below needs it for — see its
@@ -330,6 +377,7 @@ extension MockStore {
         c.archivedAt = fields.archivedAt.map(mockStoredDate)
         contacts[id] = c
         broadcastTrackedChange()
+        broadcastScheduleChange()
     }
 
     /// Mirrors `GRDBContactRepository.updateLastInteractedAt`: writes exactly this one field,
@@ -342,6 +390,7 @@ extension MockStore {
         c.lastInteractedAt = mockStoredDate(date)
         contacts[id] = c
         broadcastTrackedChange()
+        broadcastScheduleChange()
         return true
     }
 
@@ -355,6 +404,7 @@ extension MockStore {
         c.reminderWindowOverride = window
         contacts[id] = try mockStoredContact(c)
         broadcastTrackedChange()
+        broadcastScheduleChange()
         return true
     }
 
@@ -374,6 +424,7 @@ extension MockStore {
         // the mock silently drifted from that: a group delete never broadcast here, so a subscriber-driven parity
         // test comparing the two backends would see GRDB emit and the mock stay silent.
         broadcastTrackedChange()
+        broadcastScheduleChange()
     }
 
     func pendingReminders() -> [ScheduledReminder] {
@@ -387,11 +438,13 @@ extension MockStore {
     func upsertReminder(_ r: ScheduledReminder) throws {
         guard contacts[r.contactId] != nil else { throw MockRepositoryWriteError.missingContact }
         reminders[r.id] = try mockStoredReminder(r)
+        broadcastScheduleChange()
     }
     func updateReminderState(id: UUID, state: ReminderState) {
         guard var r = reminders[id] else { return }
         r.state = state
         reminders[id] = r
+        broadcastScheduleChange()
     }
     /// Compare-and-set counterpart to `updateReminderState` — see
     /// `ReminderRepository.transitionState`'s doc comment. Safe from the mock
@@ -404,9 +457,13 @@ extension MockStore {
         guard var r = reminders[id], r.state == from else { return false }
         r.state = to
         reminders[id] = r
+        broadcastScheduleChange()
         return true
     }
-    func deleteReminder(id: UUID) { reminders.removeValue(forKey: id) }
+    func deleteReminder(id: UUID) {
+        reminders.removeValue(forKey: id)
+        broadcastScheduleChange()
+    }
 
     func recentInteractions(forContact id: UUID, limit: Int) -> [InteractionLog] {
         guard limit > 0 else { return [] }
@@ -431,6 +488,7 @@ extension MockStore {
     func setWindow(_ w: ReminderWindow) throws {
         try w.validate()
         window = w
+        broadcastScheduleChange()
     }
     func getProfile() -> UserProfile { profile }
     func setProfile(_ p: UserProfile) { profile = mockStoredProfile(p) }
