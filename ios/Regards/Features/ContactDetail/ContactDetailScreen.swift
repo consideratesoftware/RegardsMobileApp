@@ -340,17 +340,14 @@ extension ContactDetailScreen {
         }
     }
 
-    @ViewBuilder
-    func stubAction(_ action: String?, identifier: String? = nil) -> some View {
+    func stubAction(_ action: String, identifier: String? = nil) -> some View {
         // TF-04/TF-08 wire these to real actions. Until then, muted text
         // accurately communicates that the labels are unavailable.
-        if let action {
-            Text(action)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(RegardsDS.muted)
-                .accessibilityLabel("\(action), unavailable")
-                .accessibilityIdentifier(identifier ?? "contact-detail.unavailable-action")
-        }
+        Text(action)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(RegardsDS.muted)
+            .accessibilityLabel("\(action), unavailable")
+            .accessibilityIdentifier(identifier ?? "contact-detail.unavailable-action")
     }
 
     func valueColor(isAccent: Bool, isDanger: Bool) -> Color {

@@ -61,9 +61,11 @@ extension AppLaunchCoordinator {
             // tracking, so an untracked or no-cadence contact must write nothing.
             // The check is best-effort. `markCaughtUp` re-checks `isActive` and
             // throws for an inactive contact, and the handler restores a snooze
-            // it cleared. A contact untracked between this fetch and the write
-            // still gets the interaction logged, the same as the in-app Caught
-            // up with a stale row; TF-07's reconciliation owns tightening it.
+            // it cleared. R60 covers the restore race: a restore after a failed
+            // `markCaughtUp` can set `.pending` over a newer catch-up. A contact
+            // untracked between this fetch and the write still gets the
+            // interaction logged, the same as the in-app Caught up with a stale
+            // row; TF-07's queue row records tightening that case.
             let contacts = runtime.environment.contacts
             do {
                 guard let contact = try await contacts.fetch(id: contactId),
