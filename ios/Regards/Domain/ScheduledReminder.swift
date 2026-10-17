@@ -31,7 +31,9 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     public var osNotificationId: String
     public var state: ReminderState
     /// The raw floor Snooze set (§7 v3, §9): `scheduledFor` is that floor
-    /// resolved into a window slot. Non-nil only on a pending cadence row.
+    /// resolved into a window slot. SchedulingPass reads it only from a
+    /// pending cadence row. A row in another state may still carry a stale
+    /// floor until the reschedule rewrites the row (TF-07c).
     public var snoozedUntil: Date?
 
     public init(
