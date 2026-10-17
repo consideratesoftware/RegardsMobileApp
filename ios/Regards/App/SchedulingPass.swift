@@ -23,8 +23,9 @@ import Foundation
 /// Snooze only for a row already computed as overdue, which requires
 /// `tracked && cadenceDays != nil` by construction.
 /// `ContactDetailViewModel.snooze` does **not**: that screen gates its
-/// Snooze button on `tracked && cadenceDays != nil` directly and says
-/// nothing about overdue-ness, so the precondition is reachable there and is
+/// Snooze button on `isCadenceEligible` for the contact it last loaded,
+/// which can be stale, and says nothing about overdue-ness, so the
+/// precondition is reachable there and is
 /// not the dead code an earlier version of this comment claimed (staged
 /// review round 14 — the claim was load-bearing for R54's stated rationale,
 /// so it is corrected rather than dropped). Separately,
@@ -178,8 +179,7 @@ public actor SchedulingPass {
     public func snooze(contactId: UUID) async throws -> Bool {
         await lock(contactId)
         defer { unlock(contactId) }
-        guard let contact = try? await contacts.fetch(id: contactId),
-              contact.isActive, contact.tracked, contact.cadenceDays != nil else {
+        guard let contact = try? await contacts.fetch(id: contactId), contact.isCadenceEligible else {
             return false
         }
         let now = clock()

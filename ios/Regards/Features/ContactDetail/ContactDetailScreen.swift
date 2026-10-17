@@ -213,9 +213,9 @@ extension ContactDetailScreen {
             }
         }
         .accessibilityHint("Logs an interaction now and updates status.")
-        // Overdue/Upcoming gate a cadence row on `tracked && cadenceDays !=
-        // nil`; an untracked/no-cadence contact has no `ScheduledReminder`.
-        if contact.tracked, contact.cadenceDays != nil {
+        // `SchedulingPass.snooze` refuses anyone else, so the button would
+        // only ever fail for them.
+        if contact.isCadenceEligible {
             secondaryAction("Snooze 1 week", identifier: "contact-detail.snooze") {
                 Task {
                     let succeeded = await viewModel.snooze()

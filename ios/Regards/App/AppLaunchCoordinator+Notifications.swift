@@ -68,8 +68,7 @@ extension AppLaunchCoordinator {
             // row; TF-07's queue row records tightening that case.
             let contacts = runtime.environment.contacts
             do {
-                guard let contact = try await contacts.fetch(id: contactId),
-                      contact.isActive, contact.tracked, contact.cadenceDays != nil else {
+                guard let contact = try await contacts.fetch(id: contactId), contact.isCadenceEligible else {
                     Self.notificationLog.info("ignored Caught up from a notification for an ineligible contact")
                     return
                 }
