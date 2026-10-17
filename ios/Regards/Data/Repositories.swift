@@ -260,7 +260,7 @@ public protocol ReminderRepository: Sendable {
     /// each emission as current state and never count them: the first may
     /// already hold writes made after subscribing (GRDB starts async, the
     /// mock yields at once). A read error finishes the stream with no value;
-    /// slice f decides whether the consumer needs the error for a retry
+    /// TF-07f decides whether the consumer needs the error for a retry
     /// state (R9a). GRDB drops an undecodable contact with its rows, and an
     /// undecodable reminder row, where `fetchPending` throws; TF-07c sets the
     /// shared policy. The mock can't fail to decode, so parity covers healthy

@@ -93,8 +93,9 @@ struct GRDBReminderRepository: ReminderRepository {
     /// One `ValueObservation`, so the contacts, rows and window all come from
     /// the same transaction. GRDB re-runs the read after any write to those
     /// three tables; `removeDuplicates()` drops a result equal to the last
-    /// one, which is the mock's rule too. `GRDBContactRepository
-    /// .observeTracked()` explains the `CancellableBox` and the buffering.
+    /// one, which is the mock's rule too.
+    /// `GRDBContactRepository.observeTracked()` explains the `CancellableBox`
+    /// and the buffering.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot> {
         let observation = ValueObservation
             .tracking { db in try Self.readSchedule(db) }
