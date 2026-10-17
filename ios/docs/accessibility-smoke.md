@@ -133,11 +133,12 @@ Reminder window row.
 - [ ] Activate "+ Add range". VoiceOver announces "Range N added, <start> to
       <end>", for example "Range 2 added, 10:00 PM to 11:00 PM".
 - [ ] Activate Remove on a range (it is absent when only one range is left).
-      VoiceOver says "Add range, button" as focus lands, then "Range N removed.
-      M ranges left." Both are heard in that order, and focus is not stuck at
-      the top of the screen. With the remaining range ending at 11:59 PM (23:59
-      in a 24-hour region), VoiceOver lands on "Add range, dimmed" and reads the
-      hint.
+      Focus lands on "Add range, button", then VoiceOver announces "Range N
+      removed. M range(s) left." (for example, "Range 2 removed. 1 range
+      left."). Confirm the order VoiceOver speaks these in, and that focus is
+      not stuck at the top of the screen. With the remaining range ending at
+      11:59 PM (23:59 in a 24-hour region), focus lands on "Add range, dimmed,
+      button", and VoiceOver reads the hint.
 - [ ] The "Quiet hours" section header reads "Quiet hours". With quiet hours
       off, the toggle speaks "Quiet hours" and then "off". With quiet hours on,
       it speaks "Never between, <start> to <end>" and then "on". Check it in
