@@ -120,6 +120,63 @@ struct ScheduleObservationSnapshotContractTests {
         #expect(afterRetrack.reminders.map(\.id).contains(reminder.id))
     }
 
+    @Test(
+        "observeSchedule drops a contact and its rows after contacts.archive",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeScheduleDropsContactAndRowsAfterArchiveCall(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contactID = try contractUUID(761)
+        let reminder = ScheduledReminder(
+            id: try contractUUID(762),
+            contactId: contactID,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
+            osNotificationId: "schedule-archive-call"
+        )
+        try await repositories.contacts.upsert(
+            contractContact(id: contactID, suffix: "schedule-archive-call", tracked: true))
+        try await repositories.reminders.upsert(reminder)
+        let stream = await repositories.reminders.observeSchedule()
+        var iterator = stream.makeAsyncIterator()
+        let initial = try #require(await iterator.next())
+        #expect(initial.contacts.map(\.id).contains(contactID))
+        #expect(initial.reminders.map(\.id).contains(reminder.id))
+
+        try await repositories.contacts.archive(id: contactID, at: Date(timeIntervalSince1970: 1_800_000_200))
+
+        let afterArchive = try #require(await iterator.next())
+        #expect(!afterArchive.contacts.map(\.id).contains(contactID))
+        #expect(!afterArchive.reminders.map(\.contactId).contains(contactID))
+    }
+
+    @Test(
+        "observeSchedule carries a reminder's snoozedUntil through the snapshot read",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeScheduleCarriesSnoozedUntil(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contactID = try contractUUID(771)
+        let snoozed = ScheduledReminder(
+            id: try contractUUID(772),
+            contactId: contactID,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
+            osNotificationId: "schedule-snoozed",
+            snoozedUntil: Date(timeIntervalSince1970: 1_800_000_050)
+        )
+        try await repositories.contacts.upsert(
+            contractContact(id: contactID, suffix: "schedule-snoozed", tracked: true))
+        try await repositories.reminders.upsert(snoozed)
+
+        let stream = await repositories.reminders.observeSchedule()
+        var iterator = stream.makeAsyncIterator()
+        let snapshot = try #require(await iterator.next())
+
+        #expect(snapshot.reminders.first { $0.id == snoozed.id }?.snoozedUntil
+                == Date(timeIntervalSince1970: 1_800_000_050))
+    }
+
     // MARK: - Ordering
 
     @Test(
@@ -138,13 +195,13 @@ struct ScheduleObservationSnapshotContractTests {
             try await repositories.contacts.upsert(contractContact(id: id, suffix: suffix, tracked: true))
         }
         let base = Date(timeIntervalSince1970: 1_800_000_000)
-        func reminder(_ suffix: Int, contact: UUID, offset: TimeInterval) throws -> ScheduledReminder {
+        func reminder(_ seed: Int, contact: UUID, offset: TimeInterval) throws -> ScheduledReminder {
             ScheduledReminder(
-                id: try contractUUID(suffix),
+                id: try contractUUID(seed),
                 contactId: contact,
                 kind: .cadence,
                 scheduledFor: base.addingTimeInterval(offset),
-                osNotificationId: "order-\(suffix)"
+                osNotificationId: "order-\(seed)"
             )
         }
         let late = try reminder(731, contact: first, offset: 10)

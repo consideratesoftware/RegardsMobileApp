@@ -14,6 +14,8 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct ScheduleObservationContractTests {
 
+    // MARK: - Subscribe and re-emission
+
     @Test(
         "observeSchedule emits the current snapshot on subscribe, then again after a reminder write",
         arguments: RepositoryContractBackend.allCases
@@ -53,6 +55,77 @@ struct ScheduleObservationContractTests {
         let afterWrite = try #require(await iterator.next())
         #expect(Set(afterWrite.reminders.map(\.id)).isSuperset(of: [first.id, second.id]))
     }
+
+    @Test(
+        "observeSchedule emits after each kind of reminder write",
+        arguments: RepositoryContractBackend.allCases, ReminderRowWrite.allCases
+    )
+    func observeScheduleEmitsAfterEachReminderWrite(
+        backend: RepositoryContractBackend, write: ReminderRowWrite
+    ) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(671), suffix: "schedule-writes", tracked: true)
+        let reminder = ScheduledReminder(
+            id: try contractUUID(672),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
+            osNotificationId: "schedule-writes"
+        )
+        try await repositories.contacts.upsert(contact)
+        try await repositories.reminders.upsert(reminder)
+        let stream = await repositories.reminders.observeSchedule()
+        var iterator = stream.makeAsyncIterator()
+        let initial = try #require(await iterator.next())
+        #expect(initial.reminders.first { $0.id == reminder.id }?.state == .pending)
+
+        switch write {
+        case .markFired:
+            try await repositories.reminders.updateState(id: reminder.id, state: .fired)
+        case .transitionToCaughtUp:
+            try await repositories.reminders.transitionState(
+                id: reminder.id, from: .pending, to: .userCaughtUp)
+        case .delete:
+            try await repositories.reminders.delete(id: reminder.id)
+        }
+
+        let afterWrite = try #require(await iterator.next())
+        let row = afterWrite.reminders.first { $0.id == reminder.id }
+        switch write {
+        case .markFired:
+            #expect(row?.state == .fired)
+        case .transitionToCaughtUp, .delete:
+            #expect(row == nil)
+        }
+    }
+
+    @Test(
+        "observeSchedule emits after the global window is saved",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeScheduleEmitsAfterGlobalWindowSave(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let current = try await repositories.window.fetchGlobal()
+        let edited = ReminderWindow(
+            allowedDays: current.allowedDays,
+            allowedTimeRanges: current.allowedTimeRanges,
+            quietHours: current.quietHours,
+            timezoneIdentifier: current.timezoneIdentifier,
+            occasionTime: current.occasionTime,
+            digestHorizonDays: current.digestHorizonDays == 30 ? 7 : 30
+        )
+        let stream = await repositories.reminders.observeSchedule()
+        var iterator = stream.makeAsyncIterator()
+        let initial = try #require(await iterator.next())
+        #expect(initial.window == current)
+
+        try await repositories.window.saveGlobal(edited)
+
+        let afterSave = try #require(await iterator.next())
+        #expect(afterSave.window == edited)
+    }
+
+    // MARK: - What the snapshot holds
 
     @Test(
         "observeSchedule drops a contact and its reminder rows together when the contact is untracked",
@@ -154,74 +227,7 @@ struct ScheduleObservationContractTests {
         #expect(!ids.contains(try #require(rows[.userCaughtUp]).id))
     }
 
-    @Test(
-        "observeSchedule emits after each kind of reminder write",
-        arguments: RepositoryContractBackend.allCases, ReminderRowWrite.allCases
-    )
-    func observeScheduleEmitsAfterEachReminderWrite(
-        backend: RepositoryContractBackend, write: ReminderRowWrite
-    ) async throws {
-        let repositories = try backend.makeRepositories()
-        let contact = contractContact(id: try contractUUID(671), suffix: "schedule-writes", tracked: true)
-        let reminder = ScheduledReminder(
-            id: try contractUUID(672),
-            contactId: contact.id,
-            kind: .cadence,
-            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
-            osNotificationId: "schedule-writes"
-        )
-        try await repositories.contacts.upsert(contact)
-        try await repositories.reminders.upsert(reminder)
-        let stream = await repositories.reminders.observeSchedule()
-        var iterator = stream.makeAsyncIterator()
-        let initial = try #require(await iterator.next())
-        #expect(initial.reminders.first { $0.id == reminder.id }?.state == .pending)
-
-        switch write {
-        case .markFired:
-            try await repositories.reminders.updateState(id: reminder.id, state: .fired)
-        case .transitionToCaughtUp:
-            try await repositories.reminders.transitionState(
-                id: reminder.id, from: .pending, to: .userCaughtUp)
-        case .delete:
-            try await repositories.reminders.delete(id: reminder.id)
-        }
-
-        let afterWrite = try #require(await iterator.next())
-        let row = afterWrite.reminders.first { $0.id == reminder.id }
-        switch write {
-        case .markFired:
-            #expect(row?.state == .fired)
-        case .transitionToCaughtUp, .delete:
-            #expect(row == nil)
-        }
-    }
-
-    @Test(
-        "observeSchedule emits after the global window is saved",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func observeScheduleEmitsAfterGlobalWindowSave(backend: RepositoryContractBackend) async throws {
-        let repositories = try backend.makeRepositories()
-        let current = try await repositories.window.fetchGlobal()
-        let edited = ReminderWindow(
-            allowedDays: current.allowedDays,
-            allowedTimeRanges: current.allowedTimeRanges,
-            quietHours: current.quietHours,
-            timezoneIdentifier: current.timezoneIdentifier,
-            occasionTime: current.occasionTime,
-            digestHorizonDays: current.digestHorizonDays == 30 ? 7 : 30
-        )
-        let stream = await repositories.reminders.observeSchedule()
-        var iterator = stream.makeAsyncIterator()
-        let initial = try #require(await iterator.next())
-        #expect(initial.window == current)
-
-        try await repositories.window.saveGlobal(edited)
-
-        let afterSave = try #require(await iterator.next())
-        #expect(afterSave.window == edited)
-    }
+    // MARK: - Equal snapshots
 
     /// A write that leaves the snapshot equal must behave the same on both
     /// backends: `observeSchedule()` yields nothing for it. This is the rule
