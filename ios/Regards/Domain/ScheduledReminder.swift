@@ -31,9 +31,9 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     public var osNotificationId: String
     public var state: ReminderState
     /// The raw floor Snooze set (§7 v3, §9): `scheduledFor` is that floor
-    /// resolved into a window slot. SchedulingPass reads it only from a
-    /// pending cadence row. A row in another state may still carry a stale
-    /// floor until the reschedule rewrites the row (TF-07c).
+    /// resolved into a window slot. SchedulingPass will read it only from
+    /// a pending cadence row (TF-07c). A row in another state may still carry
+    /// a stale floor until the reschedule rewrites the row.
     public var snoozedUntil: Date?
 
     public init(
@@ -56,25 +56,5 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
         self.osNotificationId = osNotificationId
         self.state = state
         self.snoozedUntil = snoozedUntil
-    }
-}
-
-/// One consistent read of everything the reminder screens need (R10,
-/// decision #36), from `ReminderRepository.observeSchedule()`. Every value
-/// comes from the same transaction, so a row never refers to a contact the
-/// snapshot doesn't hold.
-public struct ScheduleSnapshot: Sendable, Equatable {
-    /// Tracked, active contacts, ordered by `id`.
-    public let contacts: [Contact]
-    /// Pending and fired rows whose contact is in `contacts`, ordered by
-    /// `scheduledFor`, then `id`.
-    public let reminders: [ScheduledReminder]
-    /// The global window. Per-contact overrides travel on each `Contact`.
-    public let window: ReminderWindow
-
-    public init(contacts: [Contact], reminders: [ScheduledReminder], window: ReminderWindow) {
-        self.contacts = contacts
-        self.reminders = reminders
-        self.window = window
     }
 }
