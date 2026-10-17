@@ -371,9 +371,10 @@ extension ScreensAccessibilityTests {
         XCTAssertTrue(snooze.waitForExistence(timeout: 10))
         XCTAssertTrue(logOther.waitForExistence(timeout: 10))
         XCTAssertEqual(caughtUp.label, "Caught up")
-        // The visible text is spelled out, so it is also the label. No contact
-        // name here, unlike Overdue and Upcoming's row buttons; see the
-        // button's own comment for why.
+        // The button has no explicit label, so this is its visible text.
+        // XCUITest can't read the Text inside a plain-style Button separately.
+        // No contact name here, unlike Overdue and Upcoming's row buttons; see
+        // the button's own comment for why.
         XCTAssertEqual(snooze.label, "Snooze 1 week")
         XCTAssertEqual(logOther.label, "Log other")
         XCTAssertTrue(caughtUp.isEnabled)

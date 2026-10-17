@@ -45,6 +45,10 @@ extension ScreensAccessibilityTests {
             app.buttons["reminder-windows.use-default"].exists,
             "A contact with no stored override has nothing to clear."
         )
+        XCTAssertTrue(
+            app.staticTexts["Morning-of time and the Upcoming horizon follow the default window."].exists,
+            "The override editor should say what it leaves to the default window."
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
