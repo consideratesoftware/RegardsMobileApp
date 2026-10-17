@@ -384,8 +384,8 @@ public struct ReminderEngine: Sendable {
     ///
     /// Occasions ignore allowed-day/range gating by design (they're morning-of
     /// events). This returns the earliest instant ignoring quiet hours too;
-    /// `occasionFireDate(for:in:)` applies them, and SchedulingPass, which
-    /// owns the effective window, calls it with this result.
+    /// `occasionFireDate(for:in:timeZone:)` applies them. Nothing in
+    /// production calls that yet; TF-07c wires it into SchedulingPass.
     public func nextOccasionOccurrence(
         monthDay: MonthDay,
         timezone: TimeZone
@@ -419,37 +419,55 @@ public struct ReminderEngine: Sendable {
         return resolve(year: thisYear + 1) ?? now
     }
 
-    /// When an occasion occurrence may fire, given the window's quiet hours
-    /// (§9 contract 4, R5): `occurrence` itself when it is outside quiet
-    /// hours, the end of quiet hours on the same local day when it is inside
-    /// them, and nil when quiet hours run past the end of that day, so the
-    /// occasion gets no notification. Occasions ignore allowed days and
-    /// ranges, so only quiet hours apply.
+    /// When an occasion occurrence may fire (§9 contract 4, R5). Only quiet
+    /// hours apply, since occasions ignore allowed days and ranges: returns
+    /// `occurrence` outside quiet hours, the quiet end on the same local day
+    /// inside them, and nil when quiet hours run past that day. With quiet
+    /// hours 22:30-07:30, a 07:00 occurrence fires at 07:30 and a 23:00 one
+    /// returns nil.
     ///
-    /// Example with quiet hours 22:30-07:30: a 07:00 occurrence fires at
-    /// 07:30, and a 23:00 same-day-late occurrence returns nil, because quiet
-    /// hours end on the next day.
+    /// The quiet end is materialized with wall-clock APIs (§9 contract 1):
+    /// the later of a repeated quiet end on a fall-back day, never before
+    /// `occurrence`, and the gap end on a spring-forward day.
     ///
-    /// The quiet end is materialized with wall-clock APIs (§9 contract 1). On
-    /// a fall-back day it takes the later of a repeated quiet end, since the
-    /// clock re-enters quiet hours after the earlier one. On a spring-forward
-    /// day a quiet end inside the gap becomes the gap end.
-    public func occasionFireDate(for occurrence: Date, in window: ReminderWindow) -> Date? {
+    /// Only `quietHours` is read from `window`. `timeZone` is the global
+    /// window's zone, the one `nextOccasionOccurrence` used (§9 contract 4).
+    /// The caller builds it with `TimeZone(identifier:)` and skips the
+    /// occasion on nil, as `nextAllowedSlot` does, with no device-zone
+    /// fallback.
+    public func occasionFireDate(
+        for occurrence: Date,
+        in window: ReminderWindow,
+        timeZone: TimeZone
+    ) -> Date? {
         guard let quiet = window.quietHours else { return occurrence }
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = window.timeZone
+        calendar.timeZone = timeZone
 
         let time = wallClock(of: occurrence, calendar: calendar)
         guard quiet.contains(time) else { return occurrence }
         // Inside a wrapping range at or after its start means quiet hours
         // end tomorrow, past the occasion's day.
         if quiet.wrapsMidnight, time >= quiet.start { return nil }
-        return materialize(
+        guard let end = materialize(
             quiet.end,
             onDay: calendar.startOfDay(for: occurrence),
             calendar: calendar,
             repeatedTimePolicy: .last
-        )
+        ) else { return nil }
+        if end >= occurrence { return end }
+        // Foundation ignores `.last` for a 30-minute fold (Lord Howe,
+        // 2026-04-05) and returns the first 01:45 for an occurrence in the
+        // second pass. Shift by the fold length and accept the result only if
+        // it still reads the quiet end on the same day; an earlier instant
+        // would fire inside quiet hours (§9 contracts 1 and 4).
+        let foldLength = timeZone.daylightSavingTimeOffset(for: end)
+            - timeZone.daylightSavingTimeOffset(for: occurrence)
+        let secondEnd = end.addingTimeInterval(foldLength)
+        guard secondEnd >= occurrence,
+              calendar.isDate(secondEnd, inSameDayAs: occurrence),
+              wallClock(of: secondEnd, calendar: calendar) == quiet.end else { return nil }
+        return secondEnd
     }
 
     /// Returns the effective day for the occurrence — Feb 29 in a non-leap
