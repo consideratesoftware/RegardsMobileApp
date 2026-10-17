@@ -279,7 +279,7 @@ ScheduledReminder
   state: TEXT                       -- pending | fired | cancelled | user_caught_up
   snoozedUntil: INTEGER?            -- v3. epoch seconds. The raw snooze floor: anchor + 7 calendar days.
                                      -- scheduledFor is that floor resolved into a window slot (§9).
-                                     -- SchedulingPass reads it only from a pending cadence row. A caught-up
+                                     -- TF-07c's SchedulingPass will read it only from a pending cadence row. A caught-up
                                      -- or fired row may still carry it until the reschedule rewrites that row (TF-07c).
 
   -- We do NOT persist birthdays/anniversaries ourselves. They are re-read from
