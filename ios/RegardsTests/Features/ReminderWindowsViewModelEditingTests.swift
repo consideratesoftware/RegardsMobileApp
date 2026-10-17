@@ -127,7 +127,13 @@ struct ReminderWindowsViewModelEditingTests {
         editor.addRange()
 
         #expect(editor.draft == before)
-        #expect(ReminderWindowsViewModel.addRangeUnavailableReason.contains("11:59 pm"))
+        // Built from the same locale-aware label the pickers show, so a 24-hour
+        // host expects "23:59" and a 12-hour host "11:59 PM".
+        let lastMinute = Self.time(23, 59).displayLabel
+        #expect(
+            ReminderWindowsViewModel.addRangeUnavailableReason
+                == "The last range already ends at \(lastMinute), so there's no time left after it."
+        )
     }
 
     @Test("removeRange removes the chosen range but refuses the last one, and canRemoveRange agrees")
@@ -181,7 +187,9 @@ struct ReminderWindowsViewModelEditingTests {
         #expect(editor.removeRange(at: 0) == nil, "The last range cannot be removed.")
         #expect(editor.draft == before)
         editor.addRange()
+        let beforeBadIndex = editor.draft
         #expect(editor.removeRange(at: 9) == nil, "A bad index removes nothing.")
+        #expect(editor.draft == beforeBadIndex)
     }
 
     @Test("toggleDay flips one day and leaves the rest")

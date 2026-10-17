@@ -82,8 +82,8 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
-    func launchToContactDetailFromContacts() -> XCUIApplication {
-        let app = launchToOverdue()
+    func launchToContactDetailFromContacts(dynamicTypeSize: String? = nil) -> XCUIApplication {
+        let app = launchToOverdue(dynamicTypeSize: dynamicTypeSize)
         navigateToTab(
             named: "Contacts",
             from: "screen.overdue",

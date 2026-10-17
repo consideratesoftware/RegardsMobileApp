@@ -193,7 +193,7 @@ public extension ContactRepository {
 
     /// Fallback mirroring `updateReconciledFields`' own: fetch, move the one
     /// field, upsert. `GRDBContactRepository` and `MockContactRepository`
-    /// override this with a write that never reads the row first.
+    /// override this with one write and no fetch-then-upsert.
     ///
     /// Excludes an archived contact the same way as "the row doesn't exist"
     /// (staged review round 8): `InteractionLogging.record()`'s `guard
@@ -215,7 +215,7 @@ public extension ContactRepository {
     /// Same fallback shape as `updateLastInteractedAt` above, for in-memory
     /// test fakes. Validates before the fetch because a fake's `upsert` may
     /// not. `GRDBContactRepository` and `MockContactRepository` override this
-    /// with a write that never reads the row first.
+    /// with one write and no fetch-then-upsert.
     @discardableResult
     func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
         try window?.validate()
@@ -449,7 +449,7 @@ struct GRDBContactRepository: ContactRepository {
     }
 
     /// Real field-scoped `UPDATE`, same shape as `updateLastInteractedAt`
-    /// above: never reads the row, matches only an active contact, and
+    /// above: one `UPDATE` with no fetch, matches only an active contact, and
     /// reports the match from `db.changesCount`. A `nil` window binds a Swift
     /// `nil`, which GRDB writes as SQL NULL (R39).
     @discardableResult

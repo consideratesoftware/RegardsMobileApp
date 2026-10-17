@@ -45,7 +45,20 @@ extension ScreensAccessibilityTests {
             app.buttons["reminder-windows.use-default"].exists,
             "A contact with no stored override has nothing to clear."
         )
+        XCTAssertTrue(
+            app.staticTexts["Morning-of time and the Upcoming horizon follow the default window."].exists,
+            "The override editor should say what it leaves to the default window."
+        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    /// The override editor at the largest Dynamic Type size: the same day-row
+    /// checks as the global editor, reached through the Contact Detail row.
+    @MainActor
+    func testContactWindowOverrideEditorAtAccessibility5() throws {
+        let app = launchToContactDetailFromContacts(dynamicTypeSize: "accessibility5")
+        openOverrideEditor(in: app)
+        try assertDayRowsStackedAtAccessibility5(in: app)
     }
 
     /// Row state follows the override: "Default window" -> save -> "Custom window" ->

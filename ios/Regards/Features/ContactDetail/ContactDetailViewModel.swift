@@ -247,7 +247,7 @@ public final class ContactDetailViewModel {
         }
     }
 
-    /// "Snooze 1 wk": pushes the contact's cadence reminder out 7 days
+    /// "Snooze 1 week": pushes the contact's cadence reminder out 7 days
     /// through `SchedulingPass` (§14 PR22's DB-only stub). No interaction is
     /// logged and `lastInteractedAt` is untouched (decision #31).
     ///

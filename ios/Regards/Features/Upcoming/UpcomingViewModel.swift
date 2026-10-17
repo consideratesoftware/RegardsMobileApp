@@ -129,7 +129,8 @@ public final class UpcomingViewModel {
     }
 
     /// Swaps in a newly saved global window and reloads, so the rows and the
-    /// horizon follow it at once. The generation bump in `performLoad()` drops any in-flight load built on the old one.
+    /// horizon follow it at once. The generation bump in `performLoad()` drops
+    /// any in-flight load built on the old one.
     public func updateWindow(_ window: ReminderWindow) async {
         self.window = window
         await performLoad()

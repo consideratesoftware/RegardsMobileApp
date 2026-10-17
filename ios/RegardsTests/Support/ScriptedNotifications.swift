@@ -20,7 +20,7 @@ actor ScriptedNotifications: NotificationScheduling {
     private var steps: [ScriptedRequestStep]
     private(set) var requestCount = 0
     private var immediateReads: Int
-    private var holdableReads: Int
+    private var holdsRemaining: Int
     private var heldReads: [CheckedContinuation<NotificationAuthorizationStatus, Never>] = []
 
     init(
@@ -32,7 +32,7 @@ actor ScriptedNotifications: NotificationScheduling {
         self.status = status
         self.steps = requests
         self.immediateReads = immediateReads
-        self.holdableReads = heldReads
+        self.holdsRemaining = heldReads
     }
 
     nonisolated var actions: AsyncStream<NotificationAction> {
@@ -56,8 +56,8 @@ actor ScriptedNotifications: NotificationScheduling {
             immediateReads -= 1
             return status
         }
-        guard holdableReads > 0 else { return status }
-        holdableReads -= 1
+        guard holdsRemaining > 0 else { return status }
+        holdsRemaining -= 1
         return await withCheckedContinuation { heldReads.append($0) }
     }
 

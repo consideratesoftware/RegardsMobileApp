@@ -1,12 +1,12 @@
 import XCTest
 
-/// The Settings notifications row in each permission state (§10 item 7). The
-/// mock launch never uses the real notification center: it uses
+/// The Settings notifications row in each permission state (§10 item 7).
+/// The mock launch never uses the real notification center: it uses
 /// `DebugNotificationScheduling`, with its status set from
-/// `REGARDS_UI_TEST_NOTIFICATION_STATUS` (or no seam at all for `unavailable`),
-/// so no system permission alert can cover an audit. Each test also pins what must not be there: a decided
-/// state has no "Turn on" control, and the authorized state has no button at
-/// all.
+/// `REGARDS_UI_TEST_NOTIFICATION_STATUS` (or no seam at all for
+/// `unavailable`), so no system permission alert can cover an audit. Each test
+/// also pins what must not be there: a decided state has no "Turn on"
+/// control, and the authorized state has no button at all.
 extension ScreensAccessibilityTests {
     private static let notificationsRowID = "settings.notifications"
 

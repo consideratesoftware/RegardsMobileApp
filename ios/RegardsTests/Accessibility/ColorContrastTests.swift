@@ -28,23 +28,25 @@ struct ColorContrastTests {
         #expect(abs(WCAGContrast.ratio(foreground: white, background: white) - 1.0) < 0.0001)
     }
 
-    /// The Settings notification error line is `RegardsDS.danger` footnote text
-    /// directly on the page background, so it needs the 4.5 body-text ratio in
-    /// both appearances. `RegardsPalette.contrastPairs` has no danger pair, so
-    /// the check lives here until one is registered there.
-    @Test(
-        "Danger text on Background meets AA body contrast in light and dark",
-        arguments: [
-            ("light", RegardsPalette.dangerLight, RegardsPalette.backgroundLight),
-            ("dark", RegardsPalette.dangerDark, RegardsPalette.backgroundDark),
+    /// The generic test above passes for whatever the registry holds, so
+    /// removing a pair would go unnoticed. These are rendered pairs that were
+    /// once checked only by dedicated tests or not at all (the Settings
+    /// notification error line, muted and accent-ink text on cards).
+    @Test("The registry keeps the Danger, Muted-on-Surface and Accent-Ink-on-Surface pairs")
+    func registryKeepsDangerMutedAndAccentInkSurfacePairs() {
+        let required = [
+            "Danger on Background (light)", "Danger on Background (dark)",
+            "Muted on Surface (light)", "Muted on Surface (dark)",
+            "Accent Ink on Surface (light)", "Accent Ink on Surface (dark)",
         ]
-    )
-    func dangerOnBackgroundMeetsBodyContrast(
-        appearance: String, danger: RegardsPalette.SRGB, background: RegardsPalette.SRGB
-    ) {
-        let ratio = WCAGContrast.ratio(foreground: danger.tuple, background: background.tuple)
+        let registered = Set(RegardsPalette.contrastPairs.map(\.name))
 
-        #expect(ratio >= 4.5, "danger on background (\(appearance)): \(String(format: "%.2f", ratio))")
+        let missing = required.filter { !registered.contains($0) }
+
+        #expect(missing.isEmpty, "contrastPairs is missing: \(missing.joined(separator: ", "))")
+        for pair in RegardsPalette.contrastPairs where pair.name.hasPrefix("Danger on Background") {
+            #expect(pair.minimumRatio == 4.5, "\(pair.name) is body text and needs 4.5")
+        }
     }
 
     @Test("Muted light vs Background light is comfortably above AA body threshold")

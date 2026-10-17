@@ -151,6 +151,14 @@ extension ScreensAccessibilityTests {
     @MainActor
     func testReminderWindowsEditorAtAccessibility5() throws {
         let app = openReminderWindows(extraLaunchEnvironment: ["REGARDS_UI_TEST_DYNAMIC_TYPE": "accessibility5"])
+        try assertDayRowsStackedAtAccessibility5(in: app)
+    }
+
+    /// The day rows on the open editor, global or override. Shared by the
+    /// global and contact-override accessibility5 tests so both targets get
+    /// the same checks.
+    @MainActor
+    func assertDayRowsStackedAtAccessibility5(in app: XCUIApplication) throws {
         XCTAssertTrue(app.buttons["Sunday"].waitForExistence(timeout: 10))
         let names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         let weekdays: Set<String> = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]

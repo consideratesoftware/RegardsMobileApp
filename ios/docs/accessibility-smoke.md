@@ -67,18 +67,20 @@ step.
       `REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME=fail`. The XCUI test
       `testSettingsNotificationRequestFailureShowsErrorLine` covers the visible
       line. This step checks only what VoiceOver says.
-- [ ] Focus does not jump from a covered screen (negative check): from
-      Settings, push Transparency. Change notifications for Regards in iOS
-      Settings, then return to Regards. VoiceOver focus stays on Transparency
-      and does not move to the notifications status line. Go back to Settings
-      afterwards.
+- [ ] Focus does not jump from a pushed screen (negative check): start from
+      the granted state. From Settings, push Transparency. Turn notifications
+      off for Regards in iOS Settings, then return to Regards. The announcement
+      still plays; only focus must stay put. VoiceOver focus stays on
+      Transparency and does not move to the notifications status line. Go back
+      to Settings afterwards.
 - [ ] First Settings open after launch (owner ruling 11, [PR #62 comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/62#issuecomment-6175786339)):
       note whether the notifications row pops in and pushes Privacy and Help
       down. Record the answer in the smoke record. Reserve the row's height only
       if the shift is visible.
 - [ ] Return from iOS Settings after a change: VoiceOver announces the new
-      state. This step needs a denied state first. From denied, turn
-      notifications on for Regards in iOS Settings, then return. The row then
+      state. This step continues from the denied state that the negative check
+      above leaves behind. Turn notifications on for Regards in iOS Settings,
+      then return. The row then
       reads "Notifications on" as text with no button.
 
 ## Screen checklist
@@ -123,9 +125,11 @@ Reminder window row.
       "Weekdays only. Weekends are yours.", "Weekends only.", "Any day.", or a
       list of the selected day names.
 - [ ] "+ Add range" is labelled "Add range" and adds a one-hour range that
-      starts at the latest range end, clamped to 11:59 pm. When the latest range
-      already ends at 11:59 pm, the button is disabled, and its hint says "The
-      last range already ends at 11:59 pm, so there's no time left after it."
+      starts at the latest range end, clamped to 23:59. When the latest range
+      already ends at 23:59, the button is disabled. Its hint shows that time in
+      the locale's format: "11:59 PM" in en_US, "23:59" in a 24-hour locale.
+      Example (en_US): "The last range already ends at 11:59 PM, so there's no
+      time left after it."
 - [ ] Activate "+ Add range". VoiceOver announces "Range N added, <start> to
       <end>", for example "Range 2 added, 10:00 PM to 11:00 PM".
 - [ ] Activate the Remove button on a range (it is absent when only one range
@@ -136,8 +140,9 @@ Reminder window row.
       it speaks "Never between, <start> to <end>" and then "on". Check it in
       both modes.
 - [ ] Global editor only: the morning-of caption and its hint both read
-      "Birthdays and anniversaries, separate from cadence." The footer reads "All times local ·
-      <zone name>. Daylight saving time is handled automatically."
+      "Birthdays and anniversaries, separate from cadence." The footer reads
+      "All times local · <zone name>. Daylight saving time is handled
+      automatically."
 - [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
       the new "Next N days" label.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is

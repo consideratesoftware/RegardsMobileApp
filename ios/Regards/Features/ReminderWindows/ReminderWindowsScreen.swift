@@ -29,8 +29,8 @@ public struct ReminderWindowsScreen: View {
         return false
     }
 
-    /// Scroll target for the inline error banner (the banner's accessibility
-    /// identifier is `reminder-windows.error`).
+    /// Scroll id for the inline error banner. It is not an accessibility
+    /// identifier: `reminder-windows.error` is on the banner's message `Text`.
     private static let errorBannerID = "reminder-windows.error-banner"
 
     public var body: some View {
@@ -87,7 +87,7 @@ public struct ReminderWindowsScreen: View {
 
     /// Speaks `message` through the injectable `announce` seam, after `focus`
     /// when the caller moves VoiceOver focus first.
-    func speak(_ message: String, focus: @escaping @MainActor () -> Void = {}) {
+    func speak(_ message: String, focus: (@MainActor () -> Void)?) {
         announcer.fire(
             message,
             effects: RowActionAccessibilityEffects(announce: announce, didFocus: {}),
@@ -179,7 +179,7 @@ public struct ReminderWindowsScreen: View {
     // MARK: - Override extras
 
     private var overrideNote: some View {
-        Text("Occasion time and the Upcoming horizon follow the default window.")
+        Text("Morning-of time and the Upcoming horizon follow the default window.")
             .font(.footnote)
             .foregroundStyle(RegardsDS.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
