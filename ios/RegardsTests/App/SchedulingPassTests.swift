@@ -159,8 +159,8 @@ struct SchedulingPassTests {
     /// It now proves the fix: `snooze` reads the contact first and rejects
     /// rather than writing. Not reachable through either shipped caller
     /// today (Overdue/Contact Detail's Snooze only ever appear for a row
-    /// already computed as overdue, which requires `tracked && cadenceDays
-    /// != nil` by construction) — this test exists for the caller that
+    /// already computed as overdue, which requires `isCadenceEligible` by
+    /// construction) — this test exists for the caller that
     /// isn't either of those yet. `tracked: false` alone covers both
     /// halves of the precondition at once — `contractContact`'s own
     /// fixture ties `cadenceDays` to `tracked`.
@@ -197,7 +197,8 @@ struct SchedulingPassTests {
     /// wouldn't fail anything through them either — the guard had moved
     /// somewhere safer that nothing actually proved was there. This test
     /// and the two below decouple all three conditions the guard checks
-    /// (`isActive`, `tracked`, `cadenceDays != nil`) so each one is provably
+    /// (`isActive`, `tracked`, `cadenceDays > 0`, the parts of
+    /// `isCadenceEligible`) so each one is provably
     /// load-bearing on its own, calling `scheduler.snooze` directly rather
     /// than through either view model. Verified by deleting the guard
     /// locally and confirming all three fail, not assumed.
