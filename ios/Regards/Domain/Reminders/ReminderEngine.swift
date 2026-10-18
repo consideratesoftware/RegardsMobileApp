@@ -204,8 +204,12 @@ public struct ReminderEngine: Sendable {
                 let containsDate = calendar.isDate(date, inSameDayAs: dayStart)
                     && slot.start <= dateWallClock
                     && dateWallClock < slot.end
+                // The same half-open re-validation as the future branch below.
                 if includingContainingSlot, containsDate,
-                   let activeSlotStart = candidateStarts.filter({ $0 <= date }).max() {
+                   let activeSlotStart = candidateStarts.filter({ candidate in
+                       let time = wallClock(of: candidate, calendar: calendar)
+                       return candidate <= date && slot.start <= time && time < slot.end
+                   }).max() {
                     activeSlotStarts.append(activeSlotStart)
                 }
 
