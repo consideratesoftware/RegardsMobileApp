@@ -139,10 +139,11 @@ struct NotificationActionHandlingTests {
         case archived
         case untrackedWithCadence
         case trackedWithoutCadence
+        case trackedWithZeroCadence
     }
 
     @Test(
-        "Actions for a contact that is archived, untracked, or without a cadence write nothing",
+        "Actions for a contact that is archived, untracked, or without a positive cadence write nothing",
         arguments: RepositoryContractBackend.allCases, IneligibleContact.allCases
     )
     func actionForIneligibleContactWritesNothing(
@@ -156,6 +157,8 @@ struct NotificationActionHandlingTests {
             try await Self.seed(harness, id: 608, suffix: "untracked", tracked: false, cadenceDays: 14)
         case .trackedWithoutCadence:
             try await Self.seed(harness, id: 609, suffix: "no-cadence", cadenceDays: nil)
+        case .trackedWithZeroCadence:
+            try await Self.seed(harness, id: 627, suffix: "zero-cadence", cadenceDays: 0)
         }
         let bystander = try await Self.seed(harness, id: 616, suffix: "bystander")
         let barrier = try await Self.seed(harness, id: 617, suffix: "ineligible-barrier")

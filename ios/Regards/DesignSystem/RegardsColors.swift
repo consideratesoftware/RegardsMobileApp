@@ -107,6 +107,11 @@ public enum RegardsPalette {
               foreground: dangerLight, background: backgroundLight, minimumRatio: 4.5),
         .init(name: "Danger on Background (dark)",
               foreground: dangerDark, background: backgroundDark, minimumRatio: 4.5),
+        // Contact Detail's Cadence card Status row when overdue.
+        .init(name: "Danger on Surface (light)",
+              foreground: dangerLight, background: surfaceLight, minimumRatio: 4.5),
+        .init(name: "Danger on Surface (dark)",
+              foreground: dangerDark, background: surfaceDark, minimumRatio: 4.5),
         .init(name: "White on Accent (light)",
               foreground: SRGB(1, 1, 1), background: accentLight,  minimumRatio: 3.0),
         .init(name: "White on Accent (dark)",

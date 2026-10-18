@@ -58,6 +58,29 @@ struct RowActionAccessibilityEffectsTests {
         #expect(recorder.focusCalls == 1)
     }
 
+    /// The Reminder Windows editor speaks "Range 3 added" without moving
+    /// focus, so it passes no focus closure. The announcement must still land,
+    /// once.
+    @Test("A row action with no focus move still announces once")
+    func fireWithNilFocusStillAnnouncesOnce() async {
+        let recorder = RowActionEffectsRecorder()
+        let announcer = RowActionAnnouncer()
+
+        announcer.fire(
+            "Range 3 added, 4:00 PM to 5:00 PM",
+            effects: RowActionAccessibilityEffects(
+                announce: { recorder.announcements.append($0) },
+                didFocus: {}
+            ),
+            focus: nil
+        )
+
+        let settled = await waitUntil { recorder.announcements.count == 1 }
+        #expect(settled)
+        await Task.yield()
+        #expect(recorder.announcements == ["Range 3 added, 4:00 PM to 5:00 PM"])
+    }
+
     /// Pins the correctness-review fix at the call-site level: both screens
     /// now call `fire(...)` only after `viewModel.markCaughtUp`/`snooze`
     /// returns `true` (see `OverdueScreen.rowStack` and

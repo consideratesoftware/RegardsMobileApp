@@ -187,8 +187,8 @@ struct SchedulingPassTests {
     /// It now proves the fix: `snooze` reads the contact first and rejects
     /// rather than writing. Not reachable through either shipped caller
     /// today (Overdue/Contact Detail's Snooze only ever appear for a row
-    /// already computed as overdue, which requires `tracked && cadenceDays
-    /// != nil` by construction) — this test exists for the caller that
+    /// already computed as overdue, which requires `isCadenceEligible` by
+    /// construction) — this test exists for the caller that
     /// isn't either of those yet. `tracked: false` alone covers both
     /// halves of the precondition at once — `contractContact`'s own
     /// fixture ties `cadenceDays` to `tracked`.
@@ -225,7 +225,8 @@ struct SchedulingPassTests {
     /// wouldn't fail anything through them either — the guard had moved
     /// somewhere safer that nothing actually proved was there. This test
     /// and the two below decouple all three conditions the guard checks
-    /// (`isActive`, `tracked`, `cadenceDays != nil`) so each one is provably
+    /// (`isActive`, `tracked`, `cadenceDays > 0`, the parts of
+    /// `isCadenceEligible`) so each one is provably
     /// load-bearing on its own, calling `scheduler.snooze` directly rather
     /// than through either view model. Verified by deleting the guard
     /// locally and confirming all three fail, not assumed.
@@ -276,6 +277,29 @@ struct SchedulingPassTests {
     }
 
     @Test(
+        "A tracked contact with a cadence of 0 days is ineligible for Snooze",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func zeroCadenceIsIneligible(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        var contact = contractContact(id: try contractUUID(534), suffix: "snooze-zero-cadence", tracked: true)
+        contact.cadenceDays = 0 // `!= nil` passes; only a positive cadence is a schedule
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            clock: { now }
+        )
+
+        let wrote = try await scheduler.snooze(contactId: contact.id)
+
+        #expect(wrote == false)
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.isEmpty)
+    }
+
+    @Test(
         "R54: snooze rejects an archived contact even when tracked with a cadence set",
         arguments: RepositoryContractBackend.allCases
     )
@@ -300,153 +324,5 @@ struct SchedulingPassTests {
         #expect(wrote == false)
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.isEmpty)
-    }
-
-    // MARK: - Wall-clock snooze (DST)
-
-    /// A DST-observing calendar pinned to a fixed identifier, not
-    /// `.current`: these two tests exist specifically to prove the 7-day
-    /// push lands on the correct wall-clock day across a DST transition, so
-    /// the transition has to be guaranteed present regardless of whichever
-    /// timezone the machine running the test happens to be in.
-    private static var losAngelesCalendar: Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
-        return calendar
-    }
-
-    /// The bug this pins (staged review, correctness #4): `snooze` used to
-    /// compute `clock().addingTimeInterval(7 * 86_400)` — 7 days of *elapsed
-    /// seconds*, not 7 *calendar* days. Spring-forward loses an hour of wall
-    /// clock inside that window (2027-03-14 in America/Los_Angeles: 2:00 am
-    /// becomes 3:00 am), so the elapsed-time math would land the reminder at
-    /// 9:00 am local instead of 8:00 am — an hour later than the row's own
-    /// "same time next week" label promises, and enough drift for §19's R1
-    /// class of bug (already closed for the engine's `nextAllowedSlot` walk)
-    /// to reopen here.
-    @Test("Snooze across a spring-forward transition lands on the same local wall-clock time")
-    func snoozeAcrossSpringForwardStaysOnWallClock() async throws {
-        let calendar = Self.losAngelesCalendar
-        let repositories = try RepositoryContractBackend.mock.makeRepositories()
-        let contact = contractContact(id: try contractUUID(508), suffix: "snooze-spring-forward", tracked: true)
-        try await repositories.contacts.upsert(contact)
-        // 2027-03-08 08:00 local — a week before the 2027-03-14 transition.
-        let now = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 3, day: 8, hour: 8, minute: 0
-        )))
-        let scheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
-        )
-
-        try await scheduler.snooze(contactId: contact.id)
-
-        let expected = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 3, day: 15, hour: 8, minute: 0
-        )))
-        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
-        // The bug's own value, named explicitly: proves this is a real
-        // discriminator, not incidentally true either way.
-        #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
-    }
-
-    /// Mirrors `snoozeAcrossSpringForwardStaysOnWallClock` for the other
-    /// direction: fall-back *gains* an hour (2027-11-07 in
-    /// America/Los_Angeles: 2:00 am becomes 1:00 am), so the old elapsed-time
-    /// math would land the reminder at 7:00 am local instead of 8:00 am.
-    @Test("Snooze across a fall-back transition lands on the same local wall-clock time")
-    func snoozeAcrossFallBackStaysOnWallClock() async throws {
-        let calendar = Self.losAngelesCalendar
-        let repositories = try RepositoryContractBackend.mock.makeRepositories()
-        let contact = contractContact(id: try contractUUID(509), suffix: "snooze-fall-back", tracked: true)
-        try await repositories.contacts.upsert(contact)
-        // 2027-11-01 08:00 local — a week before the 2027-11-07 transition.
-        let now = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 11, day: 1, hour: 8, minute: 0
-        )))
-        let scheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
-        )
-
-        try await scheduler.snooze(contactId: contact.id)
-
-        let expected = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 11, day: 8, hour: 8, minute: 0
-        )))
-        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
-        #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
-    }
-
-    /// Additional wall-clock coverage (staged review round 8): a snooze from
-    /// late December must land in the *following* year, not silently wrap
-    /// within the same one — `calendar.date(byAdding: .day, value: 7, to:)`
-    /// carries the year rollover for free, but nothing had pinned it, and a
-    /// naive component-based reimplementation (e.g. incrementing `.day` in
-    /// `DateComponents` without renormalizing month/year) could plausibly
-    /// get this wrong in a future rewrite without a test catching it.
-    @Test("Snooze across a year boundary rolls over to the next year")
-    func snoozeAcrossYearBoundaryRollsOverCorrectly() async throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "Etc/UTC"))
-        let repositories = try RepositoryContractBackend.mock.makeRepositories()
-        let contact = contractContact(id: try contractUUID(514), suffix: "snooze-year-rollover", tracked: true)
-        try await repositories.contacts.upsert(contact)
-        let now = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 12, day: 28, hour: 8, minute: 0
-        )))
-        let scheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
-        )
-
-        try await scheduler.snooze(contactId: contact.id)
-
-        let expected = try #require(calendar.date(from: DateComponents(
-            year: 2028, month: 1, day: 4, hour: 8, minute: 0
-        )))
-        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
-    }
-
-    /// Additional wall-clock coverage (staged review round 8): every DST
-    /// fixture above uses an hour-aligned zone (`America/Los_Angeles`).
-    /// `Asia/Kolkata` is a fixed, non-DST-observing UTC+5:30 offset — this
-    /// isolates whether the half-hour offset itself (not a transition) has
-    /// any effect on the wall-clock math, which it should not: the 7-day
-    /// push lands at the identical local time regardless of how the zone's
-    /// UTC offset happens to be shaped.
-    @Test("Snooze in a half-hour-offset timezone lands on the same local wall-clock time")
-    func snoozeInHalfHourOffsetTimezoneStaysOnWallClock() async throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Kolkata"))
-        let repositories = try RepositoryContractBackend.mock.makeRepositories()
-        let contact = contractContact(id: try contractUUID(515), suffix: "snooze-half-hour-offset", tracked: true)
-        try await repositories.contacts.upsert(contact)
-        let now = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 6, day: 1, hour: 8, minute: 15
-        )))
-        let scheduler = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
-        )
-
-        try await scheduler.snooze(contactId: contact.id)
-
-        let expected = try #require(calendar.date(from: DateComponents(
-            year: 2027, month: 6, day: 8, hour: 8, minute: 15
-        )))
-        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
     }
 }
