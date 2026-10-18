@@ -87,6 +87,11 @@ struct ReminderEngineLordHoweTests {
         let start: String
         let end: String
         let slots: [TimeRange]
+        /// How many 5-minute probes read a wall clock inside one of `slots`,
+        /// summed over all slots. A wall-clock minute that happens twice (a
+        /// fold) is probed twice, and one that is skipped (a gap) not at all,
+        /// so these differ from slot widths / 5. Fixed by the tz database.
+        let inSlotProbes: Int
 
         var testDescription: String { name }
     }
@@ -101,17 +106,20 @@ struct ReminderEngineLordHoweTests {
             name: "Lord Howe spring-forward", zone: "Australia/Lord_Howe",
             start: "2026-10-04T00:00:00+10:30", end: "2026-10-05T00:00:00+11:00",
             slots: [slot(1, 0, 2, 15), slot(1, 45, 3, 0), slot(2, 0, 2, 40), slot(2, 15, 2, 45),
-                    slot(2, 30, 3, 0), slot(2, 45, 3, 30), slot(0, 0, 4, 0)]),
+                    slot(2, 30, 3, 0), slot(2, 45, 3, 30), slot(0, 0, 4, 0)],
+            inSlotProbes: 84),
         TransitionDay(
             name: "Lord Howe fall-back", zone: "Australia/Lord_Howe",
             start: "2026-04-05T00:00:00+11:00", end: "2026-04-06T00:00:00+10:30",
             slots: [slot(1, 0, 1, 20), slot(1, 0, 1, 45), slot(1, 15, 2, 15), slot(1, 30, 2, 0),
-                    slot(1, 45, 2, 30), slot(1, 30, 3, 0), slot(0, 0, 4, 0)]),
+                    slot(1, 45, 2, 30), slot(1, 30, 3, 0), slot(0, 0, 4, 0)],
+            inSlotProbes: 137),
         TransitionDay(
             name: "New York fall-back", zone: "America/New_York",
             start: "2026-11-01T00:00:00-04:00", end: "2026-11-02T00:00:00-05:00",
             slots: [slot(0, 30, 1, 30), slot(1, 0, 2, 0), slot(1, 15, 1, 45), slot(1, 30, 2, 30),
-                    slot(1, 45, 3, 0), slot(0, 0, 4, 0)]),
+                    slot(1, 45, 3, 0), slot(0, 0, 4, 0)],
+            inSlotProbes: 151),
     ]
 
     @Test(
@@ -129,6 +137,7 @@ struct ReminderEngineLordHoweTests {
         let probes = Array(stride(
             from: EngineFixtures.date(day.start), through: EngineFixtures.date(day.end), by: 300))
         var insideProbes = 0
+        var nilCount = 0
         var violations: [String] = []
 
         for slot in day.slots {
@@ -138,7 +147,10 @@ struct ReminderEngineLordHoweTests {
                 guard slot.start <= probeWall, probeWall < slot.end else { continue }
                 insideProbes += 1
                 guard let result = EngineFixtures.engine(now: probe).nextAllowedSlot(
-                    from: probe, in: window, includingContainingSlot: true) else { continue }
+                    from: probe, in: window, includingContainingSlot: true) else {
+                    nilCount += 1
+                    continue
+                }
                 let resultWall = wallClock(result)
                 if resultWall < slot.start || resultWall >= slot.end {
                     violations.append("slot \(slot.start)-\(slot.end), probe \(probe) -> \(result) reads \(resultWall)")
@@ -146,7 +158,8 @@ struct ReminderEngineLordHoweTests {
             }
         }
 
-        #expect(insideProbes > 80, "the sweep should visit many in-slot probes, saw \(insideProbes)")
+        #expect(insideProbes == day.inSlotProbes, "the sweep visited \(insideProbes) in-slot probes")
+        #expect(nilCount == 0, "a probe inside a slot always has a slot to return, \(nilCount) returned nil")
         #expect(violations.isEmpty, "\(violations.count) violations, first: \(violations.first ?? "")")
     }
 }
