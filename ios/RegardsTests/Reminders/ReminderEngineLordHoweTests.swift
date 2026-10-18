@@ -79,4 +79,74 @@ struct ReminderEngineLordHoweTests {
 
         #expect(outside.isEmpty, "\(outside.count) slot starts outside their slot, first: \(outside.first ?? "")")
     }
+
+    struct TransitionDay: Sendable, CustomTestStringConvertible {
+        let name: String
+        let zone: String
+        /// Midnight starting the transition day, and the next midnight, as ISO instants.
+        let start: String
+        let end: String
+        let slots: [TimeRange]
+
+        var testDescription: String { name }
+    }
+
+    private static func slot(_ startHour: Int, _ startMinute: Int, _ endHour: Int, _ endMinute: Int) -> TimeRange {
+        TimeRange(start: TimeOfDay(hour: startHour, minute: startMinute),
+                  end: TimeOfDay(hour: endHour, minute: endMinute))
+    }
+
+    static let transitionDays = [
+        TransitionDay(
+            name: "Lord Howe spring-forward", zone: "Australia/Lord_Howe",
+            start: "2026-10-04T00:00:00+10:30", end: "2026-10-05T00:00:00+11:00",
+            slots: [slot(1, 0, 2, 15), slot(1, 45, 3, 0), slot(2, 0, 2, 40), slot(2, 15, 2, 45),
+                    slot(2, 30, 3, 0), slot(2, 45, 3, 30), slot(0, 0, 4, 0)]),
+        TransitionDay(
+            name: "Lord Howe fall-back", zone: "Australia/Lord_Howe",
+            start: "2026-04-05T00:00:00+11:00", end: "2026-04-06T00:00:00+10:30",
+            slots: [slot(1, 0, 1, 20), slot(1, 0, 1, 45), slot(1, 15, 2, 15), slot(1, 30, 2, 0),
+                    slot(1, 45, 2, 30), slot(1, 30, 3, 0), slot(0, 0, 4, 0)]),
+        TransitionDay(
+            name: "New York fall-back", zone: "America/New_York",
+            start: "2026-11-01T00:00:00-04:00", end: "2026-11-02T00:00:00-05:00",
+            slots: [slot(0, 30, 1, 30), slot(1, 0, 2, 0), slot(1, 15, 1, 45), slot(1, 30, 2, 30),
+                    slot(1, 45, 3, 0), slot(0, 0, 4, 0)]),
+    ]
+
+    @Test(
+        "A probe inside a slot on a transition day never returns an instant outside that slot's wall-clock range",
+        arguments: transitionDays
+    )
+    func probeInsideASlotReturnsAnInstantInsideIt(day: TransitionDay) throws {
+        let timeZone = try #require(TimeZone(identifier: day.zone))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        func wallClock(_ date: Date) -> TimeOfDay {
+            let parts = calendar.dateComponents([.hour, .minute], from: date)
+            return TimeOfDay(hour: parts.hour ?? 0, minute: parts.minute ?? 0)
+        }
+        let probes = Array(stride(
+            from: EngineFixtures.date(day.start), through: EngineFixtures.date(day.end), by: 300))
+        var insideProbes = 0
+        var violations: [String] = []
+
+        for slot in day.slots {
+            let window = EngineFixtures.allDaysWindow([slot], tz: day.zone)
+            for probe in probes {
+                let probeWall = wallClock(probe)
+                guard slot.start <= probeWall, probeWall < slot.end else { continue }
+                insideProbes += 1
+                guard let result = EngineFixtures.engine(now: probe).nextAllowedSlot(
+                    from: probe, in: window, includingContainingSlot: true) else { continue }
+                let resultWall = wallClock(result)
+                if resultWall < slot.start || resultWall >= slot.end {
+                    violations.append("slot \(slot.start)-\(slot.end), probe \(probe) -> \(result) reads \(resultWall)")
+                }
+            }
+        }
+
+        #expect(insideProbes > 80, "the sweep should visit many in-slot probes, saw \(insideProbes)")
+        #expect(violations.isEmpty, "\(violations.count) violations, first: \(violations.first ?? "")")
+    }
 }
