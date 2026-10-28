@@ -21,6 +21,12 @@ extension ScreensAccessibilityTests {
     private func openOverrideEditor(in app: XCUIApplication) {
         let change = app.buttons[Self.changeWindowIdentifier]
         XCTAssertTrue(change.waitForExistence(timeout: 10), "Contact Detail should offer a reminder-window row.")
+        // At accessibility Dynamic Type sizes the row sits below the fold, so a
+        // tap on the not-yet-visible button misses it.
+        for _ in 0..<6 where !change.isHittable {
+            app.descendants(matching: .any)["screen.contact-detail"].swipeUp()
+        }
+        XCTAssertTrue(change.isHittable, "The reminder-window Change button should be scrolled into view.")
         change.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["screen.reminder-windows"].waitForExistence(timeout: 10),

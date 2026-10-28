@@ -17,18 +17,18 @@ import Foundation
 ///
 /// Does read `ContactRepository`, despite the "DB-only, `ReminderRepository`
 /// only" framing above (R54, staged review): `snooze(contactId:)` needs to
-/// know a contact is `tracked` with a `cadenceDays` set before it writes,
-/// and that precondition has to live here, not only at the callers that
-/// happen to exist today. `OverdueViewModel.snooze` offers
-/// Snooze only for a row already computed as overdue, which requires
-/// `tracked && cadenceDays != nil` by construction.
-/// `ContactDetailViewModel.snooze` does **not**: that screen gates its
-/// Snooze button on `tracked && cadenceDays != nil` directly and says
-/// nothing about overdue-ness, so the precondition is reachable there and is
-/// not the dead code an earlier version of this comment claimed (staged
-/// review round 14 — the claim was load-bearing for R54's stated rationale,
-/// so it is corrected rather than dropped). Separately,
-/// `ContactDetailViewModel.snooze()` is `public` and ungated beyond an
+/// know a contact `isCadenceEligible` before it writes, and that
+/// precondition has to live here, not only at the callers that happen to
+/// exist today. `OverdueViewModel.snooze` offers Snooze only for a row
+/// already computed as overdue, which requires `isCadenceEligible` by
+/// construction. `ContactDetailViewModel.snooze` does **not**: that screen
+/// gates its Snooze button on `isCadenceEligible` for the contact it last
+/// loaded, which can be stale, and says nothing about overdue-ness, so the
+/// precondition is reachable there and is not the dead code an earlier
+/// version of this comment claimed (staged review round 14 — the claim was
+/// load-bearing for R54's stated rationale, so it is corrected rather than
+/// dropped). Separately, `ContactDetailViewModel.snooze()` is `public` and
+/// ungated beyond an
 /// `isActive` check; a future caller reaching it some other way (a
 /// notification action invoking the view model directly, say) would still
 /// write an orphaned pending reminder no `fetchTracked()`-backed screen
@@ -156,30 +156,30 @@ public actor SchedulingPass {
     /// write, so the write cannot apply a decision someone else has since
     /// invalidated.
     ///
-    /// Returns whether it actually wrote (R54): `false` for an untracked or
-    /// no-cadence contact — a rejection, not a silent no-op a caller could
+    /// Returns whether it actually wrote (R54): `false` for a contact that
+    /// isn't `isCadenceEligible` (archived, untracked, no cadence, or a
+    /// cadence under 1 day) — a rejection, not a silent no-op a caller could
     /// mistake for success, the same shape as
-    /// `ContactRepository.updateLastInteractedAt`'s own `Bool` return for
-    /// its own precondition failure. A failed contact read is treated as
+    /// `ContactRepository.updateLastInteractedAt`'s own `Bool` return for its
+    /// own precondition failure. A failed contact read is treated as
     /// ineligible, the same conservative default `ContactDetailViewModel
     /// .snooze()`'s own fresh-fetch guard already uses for the identical
     /// situation.
     ///
-    /// `contact.isActive` is checked here too, not only tracked/cadence —
-    /// slightly wider than R54's own wording ("the tracked/cadence
-    /// precondition"), added because the contact is already in hand at
-    /// this point and the cost of checking one more field on it is zero.
-    /// Both shipped callers already re-fetch and check `isActive`
-    /// themselves before ever reaching this write, so this is a genuine
-    /// no-op for them today — it only matters for the same class of future
-    /// caller R54 is about, which this write-site guard exists to not have
-    /// to trust.
+    /// `isActive` is part of the check, slightly wider than R54's own wording
+    /// ("the tracked/cadence precondition"), because the contact is already
+    /// in hand here and checking one more field costs nothing. Both shipped
+    /// callers already re-fetch and check `isActive` themselves before
+    /// reaching this write, so it is a no-op for them today; it matters for
+    /// the same class of future caller R54 is about, which this write-site
+    /// guard exists to not have to trust.
     @discardableResult
     public func snooze(contactId: UUID) async throws -> Bool {
         await lock(contactId)
         defer { unlock(contactId) }
-        guard let contact = try? await contacts.fetch(id: contactId),
-              contact.isActive, contact.tracked, contact.cadenceDays != nil else {
+        // `try?`: a failed read refuses like an ineligible contact, and the
+        // caller learns it from the `false` return.
+        guard let contact = try? await contacts.fetch(id: contactId), contact.isCadenceEligible else {
             return false
         }
         let now = clock()

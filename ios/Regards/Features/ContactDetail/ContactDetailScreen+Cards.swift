@@ -27,8 +27,9 @@ extension ContactDetailScreen {
                         isDanger: viewModel.overdueSummary.isOverdue,
                         valueFocus: $isStatusFocused
                     )
-                    // Same gate as Snooze: an untracked or no-cadence contact
-                    // never gets a cadence reminder, so a window means nothing.
+                    // Same gate as Snooze: an ineligible contact (archived,
+                    // untracked, no cadence, or a cadence under 1 day) never
+                    // gets a cadence reminder, so a window means nothing.
                     if viewModel.canEditReminderWindow {
                         Hair(inset: 16)
                         reminderWindowRow(contact: contact)

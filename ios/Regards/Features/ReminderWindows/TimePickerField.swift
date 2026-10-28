@@ -53,8 +53,11 @@ extension TimeOfDay {
 
     /// The same locale-aware text the picker shows ("10:30 PM", or "22:30" in
     /// a 24-hour locale), for labels that sit beside a picker.
-    var displayLabel: String {
-        pickerDate.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: .gmt))
+    var displayLabel: String { displayLabel(locale: .autoupdatingCurrent) }
+
+    /// `displayLabel` in a given locale, so a test can pin en_GB and en_US.
+    func displayLabel(locale: Locale) -> String {
+        pickerDate.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, timeZone: .gmt))
     }
 
     /// Reads the hour and minute the picker shows, which are UTC components

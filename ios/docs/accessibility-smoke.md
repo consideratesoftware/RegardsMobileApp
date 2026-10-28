@@ -132,9 +132,13 @@ Reminder window row.
       time left after it."
 - [ ] Activate "+ Add range". VoiceOver announces "Range N added, <start> to
       <end>", for example "Range 2 added, 10:00 PM to 11:00 PM".
-- [ ] Activate the Remove button on a range (it is absent when only one range
-      is left). VoiceOver announces "Range N removed. X range(s) left.", for
-      example "Range 2 removed. 1 range left."
+- [ ] Activate Remove on a range (it is absent when only one range is left).
+      Focus lands on "Add range, button", then VoiceOver announces "Range N
+      removed. M range(s) left." (for example, "Range 2 removed. 1 range
+      left."). Confirm the order VoiceOver speaks these in, and that focus is
+      not stuck at the top of the screen. With the remaining range ending at
+      11:59 PM (23:59 in a 24-hour region), focus lands on "Add range, dimmed,
+      button", and VoiceOver reads the hint.
 - [ ] The "Quiet hours" section header reads "Quiet hours". With quiet hours
       off, the toggle speaks "Quiet hours" and then "off". With quiet hours on,
       it speaks "Never between, <start> to <end>" and then "on". Check it in
@@ -153,6 +157,8 @@ Reminder window row.
       the row reads "Custom window".
 - [ ] In that override editor, activate "Use default window". The editor
       dismisses, and the row reads "Default window".
+- [ ] The override editor shows the note "Morning-of time and the Upcoming
+      horizon follow the default window." The global editor does not show it.
 - [ ] At Dynamic Type `accessibility5`, the day pills, time ranges, Save, and
       "Use default window" fit without clipping and stay tappable.
 - [ ] Open the editor for a contact on the default window, change nothing, and

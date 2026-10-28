@@ -257,7 +257,7 @@ struct ReminderWindowsViewModelOverrideTests {
     func overrideSaveMovesUpcomingRowLive() async throws {
         let global = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: "Etc/UTC",
             occasionTime: TimeOfDay(hour: 7, minute: 15),
             digestHorizonDays: 30

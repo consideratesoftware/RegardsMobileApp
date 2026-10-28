@@ -236,7 +236,7 @@ struct ContactDetailViewModelSnoozeTests {
         // check instead.
         let window = ReminderWindow(
             allowedDays: .allDays,
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay(hour: 23, minute: 59))],
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 8), end: TimeOfDay.endOfDay)],
             timezoneIdentifier: UpcomingFixtures.utc.identifier
         )
         let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))

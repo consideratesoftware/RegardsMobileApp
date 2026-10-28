@@ -3,9 +3,9 @@ import GRDB
 @testable import Regards
 
 /// A real GRDB store whose override column holds text the repositories cannot
-/// write, such as a blob stored by an older version. Raw SQL stays here, in
-/// `Data/`, so feature tests drive the result through the repository protocols
-/// only (ARCHITECTURE.md §12).
+/// write, such as a blob stored by an older version. The raw SQL is confined
+/// to this helper, so the tests that use it read the result through the
+/// repository protocols only.
 enum RawOverrideStore {
 
     /// A fresh in-memory store with `global` as the global window and `contact`

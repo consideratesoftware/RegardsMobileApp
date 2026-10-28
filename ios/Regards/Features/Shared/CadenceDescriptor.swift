@@ -8,6 +8,10 @@ public enum CadenceDescriptor {
 
     public static func describe(days: Int) -> String {
         switch days {
+        // A 0 or negative cadence (corrupt data) gets no reminders
+        // (`isCadenceEligible`), so it reads as Contact Detail's no-cadence
+        // label rather than "every 0 weeks".
+        case ..<1:            return "not tracked"
         case 1:               return "daily"
         case 7:               return "weekly"
         case 14:              return "every 2 weeks"

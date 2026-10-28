@@ -61,6 +61,12 @@ public struct Contact: Sendable, Codable, Equatable, Hashable, Identifiable {
     }
 
     public var isActive: Bool { archivedAt == nil }
+
+    /// Whether this contact gets cadence reminders: active, tracked, and a
+    /// cadence of at least 1 day. `> 0`, not `!= nil`, so a 0 or negative
+    /// cadence from corrupt data is ineligible too, as the engine's
+    /// `.missingCadence` skip already treats it.
+    public var isCadenceEligible: Bool { isActive && tracked && (cadenceDays ?? 0) > 0 }
 }
 
 /// Virtual-merge target (ARCHITECTURE.md §7 `ContactGroup`). We never modify

@@ -274,6 +274,32 @@ struct UpcomingViewModelStateTests {
         #expect(reminderIDs == (state == .pending ? [reminder.id] : []))
     }
 
+    // MARK: - Zero cadence
+
+    @Test("A tracked contact with a cadence of 0 days gets no cadence row")
+    func zeroCadenceContactProducesNoCadenceRow() async throws {
+        let zeroCadence = UpcomingFixtures.contact(systemRef: "zero-cadence", cadenceDays: 0)
+        let weekly = UpcomingFixtures.contact(systemRef: "weekly", displayName: "Weekly Contact", cadenceDays: 7)
+        let contacts = StubContactRepository([zeroCadence, weekly])
+        let viewModel = UpcomingViewModel(
+            contacts: contacts,
+            reminders: StubReminderRepository(),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                clock: { UpcomingFixtures.now }
+            ),
+            interactions: StubInteractionRepository(),
+            window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
+            clock: { UpcomingFixtures.now }
+        )
+
+        await viewModel.load()
+
+        let rows = viewModel.groups.flatMap(\.rows)
+        #expect(rows.map(\.contactId) == [weekly.id])
+    }
+
     // MARK: - Archived contacts
 
     @Test("An archived but still tracked contact produces no rows")
