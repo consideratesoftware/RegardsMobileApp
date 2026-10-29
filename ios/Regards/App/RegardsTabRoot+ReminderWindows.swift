@@ -6,12 +6,11 @@ extension RegardsTabRoot {
     /// composition through this seam). It lives in its own file because
     /// `RegardsApp.swift` is near SwiftLint's 500-line limit.
     ///
-    /// `onSaved` is how a global save reaches the live Upcoming view model
-    /// (so Upcoming's horizon and rows follow a saved window); without it the
-    /// tab keeps the launch window until relaunch. The editor writes through
-    /// the repositories, never `runtime.window`, which stays the launch
-    /// snapshot (R55 ruling: the editor cannot change a timezone, so the
-    /// scheduler calendar cannot go stale).
+    /// `onSaved` reschedules every contact through the runtime's one
+    /// `SchedulingPass` (§9 "Global window change"), then hands the window to
+    /// the live Upcoming view model, which reads the snoozes the pass just
+    /// re-resolved. The pass reads the stored window on every run (R55), so
+    /// `runtime.window` can stay the launch snapshot.
     @MainActor
     static func makeReminderWindowsViewModel(
         runtime: AppRuntime,
@@ -22,13 +21,20 @@ extension RegardsTabRoot {
             window: runtime.environment.window,
             contacts: runtime.environment.contacts,
             clock: runtime.clock,
-            onSaved: { await upcoming.updateWindow($0) }
+            onSaved: { window in
+                do {
+                    try await runtime.scheduler.runFull()
+                } catch {
+                    schedulingLog.error("reschedule after window save failed: \(error, privacy: .private)")
+                }
+                await upcoming.updateWindow(window)
+            }
         )
     }
 
-    /// One contact's override editor, built per push from Contact Detail. It
-    /// saves through `updateReminderWindowOverride`, so it needs no `onSaved`:
-    /// Upcoming follows `observeTracked`, and Contact Detail re-reads the
+    /// One contact's override editor, built per push from Contact Detail. A
+    /// save or reset reschedules that contact (§9 "override change"); Upcoming
+    /// follows through `observeTracked`, and Contact Detail re-reads the
     /// contact when it reappears.
     @MainActor
     static func makeContactWindowEditor(
@@ -40,7 +46,15 @@ extension RegardsTabRoot {
             window: runtime.environment.window,
             contacts: runtime.environment.contacts,
             clock: runtime.clock,
-            onSaved: { _ in } // An override save reaches Upcoming through observeTracked.
+            onSaved: { _ in
+                do {
+                    try await runtime.scheduler.run(for: contactId)
+                } catch {
+                    schedulingLog.error("reschedule after override save failed: \(error, privacy: .private)")
+                }
+            }
         )
     }
+
+    private static let schedulingLog = RegardsLogger.feature("SchedulingPass")
 }

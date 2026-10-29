@@ -100,11 +100,11 @@ public final class ReminderWindowsViewModel {
     @ObservationIgnored private var loadedDraft: Draft?
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
-    /// `onSaved` is deliberately undefaulted: it is how a global save reaches
-    /// `UpcomingViewModel.updateWindow`. A defaulted no-op is how an editor
-    /// ends up saving a window the Upcoming tab never sees. It is not
-    /// called for an override save, which reaches Upcoming through
-    /// `observeTracked`.
+    /// `onSaved` is deliberately undefaulted: it is how a saved window reaches
+    /// SchedulingPass and, for a global save, `UpcomingViewModel.updateWindow`.
+    /// A defaulted no-op is how an editor ends up saving a window nothing
+    /// reschedules. It runs after every successful save, and after an
+    /// override reset with the global window the contact now follows.
     public init(target: Target,
                 window: any ReminderWindowRepository,
                 contacts: any ContactRepository,
@@ -276,6 +276,7 @@ public final class ReminderWindowsViewModel {
                     return false
                 }
                 hasStoredOverride = true
+                await onSaved(candidate)
             }
             validationMessage = nil
             return true
@@ -298,6 +299,11 @@ public final class ReminderWindowsViewModel {
             }
             hasStoredOverride = false
             validationMessage = nil
+            // `try?`: the reset is already saved. A failed read only skips the
+            // immediate reschedule; the next foreground `runFull()` covers it.
+            if let global = try? await window.fetchGlobal() {
+                await onSaved(global)
+            }
             return true
         } catch {
             fail("Couldn't switch back to the default window. Try again.")

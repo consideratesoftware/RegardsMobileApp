@@ -227,6 +227,11 @@ final class AppLaunchCoordinator {
             // another `start()` is still loading, which starts the consumer
             // itself when it finishes.
             if phase != .loading { beginConsumingNotificationActions() }
+            // The DEBUG mock launch is born `.ready` with no launch body, so
+            // its scheduling pass runs here.
+            if dependencies == nil, phase == .ready, let runtime {
+                await runSchedulingPass(runtime: runtime)
+            }
             return
         }
         didStart = true
@@ -276,6 +281,8 @@ final class AppLaunchCoordinator {
                 beginConsumingNotificationActions()
                 beginObservingContactStoreChanges(dependencies: dependencies)
                 await reconcileNow(runtime: runtime, dependencies: dependencies)
+                // After the reconcile, so the pass sees this launch's contacts.
+                await runSchedulingPass(runtime: runtime)
                 return
             }
 
@@ -385,6 +392,7 @@ final class AppLaunchCoordinator {
         if let dependencies {
             beginObservingContactStoreChanges(dependencies: dependencies)
         }
+        await runSchedulingPass(runtime: runtime)
     }
 
     // Reconciliation triggers (`handleSceneActivation`, store-change
