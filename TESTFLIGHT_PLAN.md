@@ -12,23 +12,20 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-28
+- Updated: 2026-10-29
 - Baseline: `main` at `0b784d7` (merge of PR #66, `TF-07a`, the engine,
   merged 2026-10-28). PR #65, `TF-07b` (schema v3 and `observeSchedule`),
   merged as `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06`
   fast-follow, merged as `3ebe90e`. `TF-05` merged as PR #63 (`a887ece`),
   and `TF-06` merged as PR #62 (`de33098`).
-- Active work: `TF-07c` (pass core, database half only) is in flight in the
-  `claude/tf-07c-pass-core` lane, by owner ruling 8 (2026-10-28). It has no
-  pull request yet. `TF-07d` through `TF-07g` follow it in the same lane.
-  `TF-11` is in flight in its own lane. Owner ruling 8 moved every device-only
-  check to the pre-release device pass (see `Owner gates`), so TF-03's device
-  acceptance no longer blocks `TF-07` or `TF-11`. `TF-03`'s code is merged in
-  PR #48.
+- Active work: `TF-07c` is PR #67 (`claude/tf-07c-pass-core`), in review, database half only. `TF-07d` through
+  `TF-07g` follow it in the same lane. `TF-11` is in progress on `claude/tf-11-onboarding` in its own lane.
+  Owner ruling 8 moved every device-only check to the pre-release device pass (see `Owner gates`), so TF-03's
+  device acceptance no longer blocks `TF-07` or `TF-11`. `TF-03`'s code is merged in PR #48.
 - Next ready work: none. `TF-07d` through `TF-07g` wait for `TF-07c`.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: none (`gh pr list --state open`, 2026-10-28).
+- Open pull requests: #67 (`TF-07c`, `claude/tf-07c-pass-core`). Checked with `gh pr list --state open` on 2026-10-29.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
@@ -199,11 +196,11 @@ numbers.
 | TF-04 | DONE | TF-02 | Caught up, Snooze, and Log other persist from every surface they appear on (Contact Detail: all three, as buttons; Overdue: Caught up and Snooze as native `List`/`.swipeActions`, swipe right and left; Upcoming: Caught up only, cadence rows only, swipe right; neither list screen has a Log-other row action, and Upcoming ships no Snooze action; tapping a list row previews the channel action pending TF-08; both screens migrated from `ScrollView`/`RegardsCard` per-row buttons to `List` in round 12, which R52 records); Snooze via a narrow `SchedulingPass` DB-only stub (single cadence `ScheduledReminder` write, no window/engine/reconciliation — PR25 absorbs it); live lists update via `ContactRepository.observeTracked()`; interaction, action, and mock/GRDB parity tests pass | PR22; R11, R24, R34, R36, R46, R52 |
 | TF-05 | DONE | TF-04 | Reminder-window editor persists valid global/per-contact windows and visibly reshapes lists; zero-capacity saves fail clearly; the editor never changes a timezone: the global editor writes back the one it loaded and a per-contact override copies the global window's (`saveNeverChangesTimezone`, the R55 ruling of 2026-10-11) | PR23; R4, R9; PR #63 (`a887ece`, 2026-10-15) |
 | TF-06 | DONE | TF-04 | Local notification adapter, permission UI, categories, actions, and deterministic adapter tests. **Hard gate (owner ruling 2026-08-22): must not ship notification *scheduling* until R57 is resolved.** `SchedulingPass.snooze` writes a raw `now + 7d` with no `nextAllowedSlot` call, so a snoozed reminder's `scheduledFor` can sit outside the user's declared window. That is only a wrong displayed date today; the moment this lane wires real notifications it becomes a reminder that actually fires outside the window — the one promise §9 calls unbreakable. R57's fix is owned by TF-07, which is queued *after* this lane, so the ordering has to be enforced here rather than assumed | PR24; R11, R57 |
-| TF-07 | ACTIVE | TF-04, TF-05, TF-06 (TF-03: device acceptance deferred, owner ruling 8) | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved. Also owns (owner rulings 2026-10-11, [PR #58 comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/58#issuecomment-6113801644)): R55, and TF-06's on-device exit checks (a local notification fires at a window boundary; its Caught up and Snooze actions round-trip), run in the airplane-mode device test. TF-06 handoff (R57): restore TF-06's request builder and its tests from `fec13d7`, add `schedule`, `cancel`, and `pendingIdentifiers` reading `now` once per request, add `willPresent`, and delete `NotificationSchedulingGateTests` in the PR that resolves R57. Also closes a gap that PR #64 review (pr-correctness) found: a notification Caught up for a contact that becomes untracked between the handler's eligibility fetch and the write still logs an interaction, because `InteractionLogging.markCaughtUp` checks only `isActive`. TF-07 slice (d) keeps the notification path's eligibility check, `isCadenceEligible`, under the same lock as the interaction write, which closes it. TF-07 ships as 7 PRs: (a) engine, (b) schema v3 and observation, (c) pass core, (d) interaction consolidation, (e) OS scheduling (resolves R57), (f) reactive lists, (g) labels, badge and device acceptance. (a) merged as PR #66 (`0b784d7`, 2026-10-28); (b) merged as PR #65 (`a09138d`, 2026-10-17); (c) is in flight by owner ruling 8 (2026-10-28), with no pull request yet; (d) to (g) follow (c). | PR25; R4–R6, R10–R11, R24, R55, R57 |
+| TF-07 | ACTIVE | TF-04, TF-05, TF-06 (TF-03: device acceptance deferred, owner ruling 8) | SchedulingPass is the sole idempotent reminder writer; reconciliation, batching, occasions, no-double-up, orphan cancellation, and reactive Upcoming are proved. Also owns (owner rulings 2026-10-11, [PR #58 comment](https://github.com/consideratesoftware/RegardsMobileApp/pull/58#issuecomment-6113801644)): R55, and TF-06's on-device exit checks (a local notification fires at a window boundary; its Caught up and Snooze actions round-trip), run in the airplane-mode device test. TF-06 handoff (R57): restore TF-06's request builder and its tests from `fec13d7`, add `schedule`, `cancel`, and `pendingIdentifiers` reading `now` once per request, add `willPresent`, and delete `NotificationSchedulingGateTests` in the PR that resolves R57. Also closes a gap that PR #64 review (pr-correctness) found: a notification Caught up for a contact that becomes untracked between the handler's eligibility fetch and the write still logs an interaction, because `InteractionLogging.markCaughtUp` checks only `isActive`. TF-07 slice (d) keeps the notification path's eligibility check, `isCadenceEligible`, under the same lock as the interaction write, which closes it. TF-07 ships as 7 PRs: (a) engine, (b) schema v3 and observation, (c) pass core, (d) interaction consolidation, (e) OS scheduling (resolves R57), (f) reactive lists, (g) labels, badge and device acceptance. (a) merged as PR #66 (`0b784d7`, 2026-10-28); (b) merged as PR #65 (`a09138d`, 2026-10-17); (c) is PR #67 (`claude/tf-07c-pass-core`), in review; (d) to (g) follow (c). | PR25; R4–R6, R10–R11, R24, R55, R57 |
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
-| TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage. Any tracking or cadence write calls `scheduler.run(for:)` for the affected contacts; pre-onboarding starters are covered by `.ready`, which runs `runFull()`. | PR27; R13, R16–R17 |
+| TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage. Any tracking or cadence write calls `scheduler.run(for:)` for the affected contacts. | PR27; R13, R16–R17 |
 | TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits. Group collapse in the scheduling pass (one cadence reminder per group, member-max interaction) is part of this item, moved from TF-07 by owner ruling 6 (2026-10-28). | PR28; R11–R12, R24 |
-| TF-11 | BLOCKED | TF-03, TF-06 | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls. Any tracking or cadence write calls `scheduler.run(for:)` for the affected contacts; pre-onboarding starters are covered by `.ready`, which runs `runFull()`. | PR29; R11, R14 |
+| TF-11 | BLOCKED | TF-03, TF-06 | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls. In progress on `claude/tf-11-onboarding`: slices 1 to 3 are done (tracking write; starter picker from Settings; onboarding concept, contacts, and starter flow). Slices 4 (Settings Contacts re-entry) and 5 (notification ask) remain. Starter saves and later tracking or cadence writes must call `scheduler.run(for:)` for the affected contacts. Whichever of TF-07c and TF-11 merges second wires that call after the starter saves. | PR29; R11, R14 |
 | TF-12 | BLOCKED | TF-09, TF-10 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
 | TF-13 | BLOCKED | TF-12 | Widget target and App Group migration preserve the DB; read-only small/medium/lock widgets refresh from SchedulingPass | PR31 |
 | TF-14 | BLOCKED | TF-02, TF-11 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
@@ -588,6 +585,13 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
 - TF-11 fresh-install device pass: grant, deny, and limited paths; relaunch in the middle of the starter contacts; the notification ask; and a VoiceOver smoke.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 - TF-07g airplane-mode device run, moved here from TF-06's on-device exit checks (owner ruling of 2026-10-11, recorded in the TF-07 row). On a physical iPhone in airplane mode: an overdue contact gets a digest at the next window open; a single notification fires at a window boundary; and Caught up and Snooze 1 week round-trip from a notification.
+  Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
+
+- PR #67 (TF-07c), four device steps, one result line.
+  1. All Contacts, cadence under 1 day (seeded or corrupt): the row reads sensibly with VoiceOver, with no dangling " · " and no last-interaction text.
+  2. Save latency: global window and contact override saves on a real-sized contact list. Note how long Save stays dimmed and whether VoiceOver says anything. Upcoming follows the new window without leaving the tab.
+  3. DEBUG mock launch: VoiceOver focus after the splash lands on Upcoming, and the birthday and anniversary rows are on the first render.
+  4. Snooze return: snooze from Overdue and from Contact Detail. Overdue and Upcoming agree on when a snooze outside window hours lapses.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
 Current gates:

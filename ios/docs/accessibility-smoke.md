@@ -103,6 +103,9 @@ Apply this checklist to every screen changed by the pull request:
       banner reads as one sentence ("N contact(s) couldn't be read and
       needs/need attention.") with no separate icon announcement, and
       VoiceOver can still reach a healthy row below it.
+- [ ] All Contacts only, when a contact has a cadence under 1 day (seeded or
+      corrupt): the row reads as one sentence, with no dangling " · " and no
+      last-interaction text (PR #67 device step 1).
 
 ## Reminder windows
 
