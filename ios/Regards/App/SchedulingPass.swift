@@ -178,6 +178,10 @@ public actor SchedulingPass {
                 occurrences: occurrences.map(\.1),
                 context: context
             ) else {
+                // The sweep below cancels the pending row, floor and all: a
+                // snooze set before the window lost capacity doesn't come
+                // back when capacity returns. Accepted, since the editors
+                // refuse to save a zero-capacity window (PR #67 review).
                 zeroCapacity.insert(contact.id)
                 continue
             }
