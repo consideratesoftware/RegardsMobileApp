@@ -243,9 +243,10 @@ public actor SchedulingPass {
         }
         for row in pending where !snapshotContactIds.contains(row.contactId) {
             // Only a contact that decodes as untracked or archived loses its
-            // rows. `try?`: a contact that fails to decode is left alone, the
-            // snapshot's policy; one tracked since the snapshot is the next
-            // run's to schedule.
+            // rows. `try?` folds two cases into "leave the row alone": a
+            // contact that fails to decode (the snapshot's policy) and a
+            // failed read, which the next run retries. A contact tracked
+            // since the snapshot is the next run's to schedule.
             guard let contact = try? await contacts.fetch(id: row.contactId),
                   !(contact.tracked && contact.isActive) else { continue }
             try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
