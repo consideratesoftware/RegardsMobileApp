@@ -234,8 +234,12 @@ public actor SchedulingPass {
         } catch {
             // The fail-closed read hit an undecodable row, and it fails the
             // same way on every run while that row exists, so orphans stay
-            // pending until the row is fixed or replaced. Nothing reads them:
-            // every screen filters to tracked contacts.
+            // pending until the row is fixed or replaced. The orphans
+            // themselves never show (every screen filters to tracked
+            // contacts), but Overdue and Upcoming read the same
+            // fetchAllPending(), so until TF-07f moves them to the snapshot
+            // one undecodable row hides every snooze and every Upcoming
+            // occasion row.
             // The type only: an error can carry row or contact values.
             let errorType = String(describing: type(of: error))
             Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
