@@ -202,6 +202,7 @@
 		F625BD6617F5E1AC2DDDEEBB /* RegardsColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A066353B2C73B917108465E /* RegardsColors.swift */; };
 		F66C4DF5CB98911DFE1C8ED8 /* ContactRepositoryOverrideFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFCB01A0AB276C59369DCF5F /* ContactRepositoryOverrideFallbackTests.swift */; };
 		F7CFD0A5006B8C4F8447B639 /* MergeDuplicatesScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBE62539B723BA47983FEEB8 /* MergeDuplicatesScreen.swift */; };
+		F81BEDE7974298538DB02A39 /* GRDBContactRepository+FieldWrites.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0429805DEA1AB784136F8ED2 /* GRDBContactRepository+FieldWrites.swift */; };
 		F98BE2E4842EF3E6CBDA8657 /* ReminderWindowsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DB31564E7E54375B8B7FCB /* ReminderWindowsViewModelTests.swift */; };
 		FA460EC6D6F298B10F35467B /* RegardsLoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7428641DD04FA994EB6C765F /* RegardsLoadState.swift */; };
 		FB5E64AD9A52BEF429194D6F /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 1A8E1B586940E1B4EED330AE /* GRDB */; };
@@ -236,6 +237,7 @@
 		02CF83C240B9A7DA03AB6E53 /* AppLaunchArchivePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchArchivePersistenceTests.swift; sourceTree = "<group>"; };
 		03942DF2AF18E649A0CCFDD5 /* ContactsReconcilerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsReconcilerTests.swift; sourceTree = "<group>"; };
 		04097B13A504DF68A9CEAD6E /* DispatchWaitHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchWaitHelpers.swift; sourceTree = "<group>"; };
+		0429805DEA1AB784136F8ED2 /* GRDBContactRepository+FieldWrites.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GRDBContactRepository+FieldWrites.swift"; sourceTree = "<group>"; };
 		046C9467DCBC3F837F1538AA /* ColorContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorContrastTests.swift; sourceTree = "<group>"; };
 		069B04546D68874FB8492E5F /* CadenceDescriptorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceDescriptorTests.swift; sourceTree = "<group>"; };
 		06C62064F42036FE27034429 /* AppLaunchCoordinatorRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchCoordinatorRecoveryTests.swift; sourceTree = "<group>"; };
@@ -709,6 +711,7 @@
 				9429573F87B0DEC54F1099B6 /* CancellableBox.swift */,
 				16738B3353782A7FC97B0A67 /* DatabaseFactory.swift */,
 				8660B33741B4961FAB6E2884 /* DatabaseMigrator.swift */,
+				0429805DEA1AB784136F8ED2 /* GRDBContactRepository+FieldWrites.swift */,
 				C054BD9A6750C3593207FC27 /* GRDBMinorRepositories.swift */,
 				4A61EE486988C12FCD099BEB /* MockRepositories.swift */,
 				3748DE14016D570B69C3D079 /* MockRepositories+SeedCast.swift */,
@@ -1199,6 +1202,7 @@
 				AE4E36D73752AD75BD1E9977 /* DeepLinkBuilder.swift in Sources */,
 				23158702D04EE983294DCB46 /* DuplicateDetector.swift in Sources */,
 				70A982C133A28D9F87CB2CAC /* EditContactScreen.swift in Sources */,
+				F81BEDE7974298538DB02A39 /* GRDBContactRepository+FieldWrites.swift in Sources */,
 				AF78986C15ABBB0ECE02417D /* GRDBMinorRepositories.swift in Sources */,
 				010F5F72D12DB5D9F8665337 /* InteractionLog.swift in Sources */,
 				612D14E2C0A4D65F50DB4C52 /* InteractionLogging.swift in Sources */,

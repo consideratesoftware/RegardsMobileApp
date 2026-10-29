@@ -1,9 +1,9 @@
 import Foundation
 
-// The Star Wars sample-cast fixture — split out of `MockRepositories.swift`
-// to keep that file under the lint length limit. Pure fixture data, no
-// logic; kept next to `MockStore` conceptually via this same-module
-// extension.
+// The Star Wars sample-cast fixture, plus the two date helpers its occasion
+// seeds use — split out of `MockRepositories.swift` to keep that file under
+// the lint length limit. Kept next to `MockStore` conceptually via this
+// same-module extension.
 extension MockStore {
     static func seedCast(
         now: Date,
@@ -106,5 +106,34 @@ extension MockStore {
             ))
         }
         return contacts
+    }
+
+    /// The seeded occasion instant `offset` days after `startOfToday`, at the given local `hour`.
+    /// `date(bySettingHour:)` is `Optional`; seeding used to sit in an `if let` that silently dropped occasions on
+    /// nil, making R34's representative states unreachable with nothing to say so. A real DST gap (US Pacific,
+    /// 2026-03-08, hour 2) never returns nil, but this guard stays defensive: fall forward, then to the day start.
+    nonisolated static func occasionInstant(
+        daysAfter startOfToday: Date,
+        offset: Int,
+        hour: Int,
+        calendar: Calendar
+    ) -> Date? {
+        guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else {
+            return nil
+        }
+        if let exact = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) {
+            return exact
+        }
+        return calendar.nextDate(
+            after: day,
+            matching: DateComponents(hour: hour, minute: 0, second: 0),
+            matchingPolicy: .nextTime,
+            direction: .forward
+        ) ?? day
+    }
+
+    nonisolated static func monthDayString(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.month, .day], from: date)
+        return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
     }
 }

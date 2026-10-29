@@ -233,36 +233,6 @@ actor MockStore {
 
         return (contacts, groups, reminders, interactions)
     }
-
-    /// The seeded occasion instant `offset` days after `startOfToday`, at the given local `hour`.
-    /// `date(bySettingHour:)` is `Optional`; seeding used to sit in an `if let` that silently dropped occasions on
-    /// nil, making R34's representative states unreachable with nothing to say so. A real DST gap (US Pacific,
-    /// 2026-03-08, hour 2) never returns nil, but this guard stays defensive: fall forward, then to the day start.
-    nonisolated static func occasionInstant(
-        daysAfter startOfToday: Date,
-        offset: Int,
-        hour: Int,
-        calendar: Calendar
-    ) -> Date? {
-        guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else {
-            return nil
-        }
-        if let exact = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) {
-            return exact
-        }
-        return calendar.nextDate(
-            after: day,
-            matching: DateComponents(hour: hour, minute: 0, second: 0),
-            matchingPolicy: .nextTime,
-            direction: .forward
-        ) ?? day
-    }
-
-    private nonisolated static func monthDayString(for date: Date, calendar: Calendar) -> String {
-        let components = calendar.dateComponents([.month, .day], from: date)
-        return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
-    }
-
 }
 
 extension MockStore {
@@ -403,6 +373,21 @@ extension MockStore {
         guard var c = contacts[id], c.isActive else { return false }
         c.reminderWindowOverride = window
         contacts[id] = try mockStoredContact(c)
+        broadcastTrackedChange()
+        broadcastScheduleChange()
+        return true
+    }
+
+    /// Mirrors `GRDBContactRepository.updateTracking`: validates before touching anything, writes only `tracked` and
+    /// `cadenceDays` on the current entry (actor-isolated, so no stale snapshot can revert another field), and treats
+    /// an archived contact as "no match." Broadcasts for the same R23 parity as the writes above.
+    @discardableResult
+    func updateTracking(id: UUID, cadenceDays: Int?) throws -> Bool {
+        try ContactTrackingError.validate(cadenceDays)
+        guard var c = contacts[id], c.isActive else { return false }
+        c.tracked = cadenceDays != nil
+        c.cadenceDays = cadenceDays
+        contacts[id] = c
         broadcastTrackedChange()
         broadcastScheduleChange()
         return true
