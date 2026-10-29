@@ -277,6 +277,9 @@ struct ContactTrackingContractTests {
         #expect(reminders.map(\.id) == [reminder.id])
     }
 
+}
+
+extension ContactTrackingContractTests {
     /// Upcoming and Overdue rebuild their rows from `observeTracked()`. A
     /// field-scoped write that forgets to broadcast leaves a freshly picked
     /// starter out of both lists until the next unrelated write (the same
@@ -300,6 +303,61 @@ struct ContactTrackingContractTests {
         let emitted = try #require(await iterator.next())
         let observed = try #require(emitted.first { $0.id == contactID })
         #expect(observed.cadenceDays == 14)
+    }
+
+    /// `observeSchedule()` feeds persisted-row Upcoming (R10) and holds only
+    /// tracked contacts, so a starter picked from Settings must reach the
+    /// snapshot without waiting for an unrelated write.
+    @Test(
+        "observeSchedule adds the contact to the snapshot after updateTracking tracks it",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeScheduleEmitsOnTracking(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contactID = try contractUUID(793)
+        try await repositories.contacts.upsert(contractContact(id: contactID, suffix: "tracking-schedule"))
+        let stream = await repositories.reminders.observeSchedule()
+        var iterator = stream.makeAsyncIterator()
+        let initial = try #require(await iterator.next())
+        #expect(!initial.contacts.map(\.id).contains(contactID))
+
+        _ = try await repositories.contacts.updateTracking(id: contactID, cadenceDays: 14)
+
+        let afterTracking = try #require(await iterator.next())
+        let tracked = try #require(afterTracking.contacts.first { $0.id == contactID })
+        #expect(tracked.cadenceDays == 14)
+    }
+
+    @Test(
+        "observeSchedule drops the contact and its reminder rows after updateTracking untracks it",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases
+    )
+    func observeScheduleEmitsOnUntracking(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contactID = try contractUUID(794)
+        let reminder = ScheduledReminder(
+            id: try contractUUID(795),
+            contactId: contactID,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_100),
+            osNotificationId: "tracking-schedule-untrack"
+        )
+        try await repositories.contacts.upsert(
+            contractContact(id: contactID, suffix: "tracking-schedule-untrack", tracked: true))
+        try await repositories.reminders.upsert(reminder)
+        let stream = await repositories.reminders.observeSchedule()
+        var iterator = stream.makeAsyncIterator()
+        let initial = try #require(await iterator.next())
+        #expect(initial.contacts.map(\.id).contains(contactID))
+        #expect(initial.reminders.map(\.id).contains(reminder.id))
+
+        _ = try await repositories.contacts.updateTracking(id: contactID, cadenceDays: nil)
+
+        let afterUntracking = try #require(await iterator.next())
+        #expect(!afterUntracking.contacts.map(\.id).contains(contactID))
+        #expect(!afterUntracking.reminders.map(\.contactId).contains(contactID))
     }
 
     // MARK: - Decision #29 with a late tracking write

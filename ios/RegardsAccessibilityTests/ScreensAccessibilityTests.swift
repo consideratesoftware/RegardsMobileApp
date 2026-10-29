@@ -118,12 +118,14 @@ final class ScreensAccessibilityTests: XCTestCase {
 
     @MainActor
     func testOnboardingPassesAudit() throws {
-        let app = launchToSettings()
-        navigateFromSettings(
-            triggerIdentifier: "settings.onboarding-preview",
-            to: "screen.onboarding",
-            in: app
-        )
+        // Settings no longer links to the permission intro (TF-11 slice 2
+        // removed the inert "Onboarding preview" row), so the only way to see
+        // it is a fresh install: the first-launch fixture stops there.
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-first-launch-runtime")
+        app.launch()
+        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 10), "A fresh launch should stop at the pre-prompt.")
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
