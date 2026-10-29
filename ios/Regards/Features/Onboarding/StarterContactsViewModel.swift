@@ -7,10 +7,11 @@ import SwiftUI
 /// serves first-run onboarding and the Settings row "Choose people to keep in
 /// touch with".
 ///
-/// **What is offered.** Every active imported contact, sorted by name. Under
-/// limited Contacts access the importer and reconciler only keep the shared
-/// contacts active, so the shared subset is what shows here without any
-/// extra filtering. Archived contacts are never offered.
+/// **What is offered.** Every active imported contact, sorted by name. On a
+/// fresh install under limited Contacts access, only the shared contacts were
+/// imported, so only they show. After a downgrade from full access, contacts
+/// imported earlier stay active (§7: a limited read never archives) and show
+/// here too, as in All Contacts. Archived contacts are never offered.
 ///
 /// **What Save writes.** Only the difference from what was tracked when the
 /// list loaded, one `updateTracking` call per changed contact: a picked
@@ -50,6 +51,11 @@ final class StarterContactsViewModel {
     /// Picked contact ids with the cadence chosen for each.
     private(set) var selection: [UUID: Int] = [:]
     private(set) var isSaving = false
+    /// Set once Done or Skip has finished the screen, so nothing can change
+    /// or write after the caller starts leaving (onboarding completes, or
+    /// Settings pops). A partial save that leaves unsaved changes doesn't set
+    /// it: the screen stays and Done offers what is left.
+    private(set) var isFinished = false
     /// The one inline message slot: a refused 4th pick or a save problem.
     /// Cleared by the next pick, cadence change, or save attempt.
     private(set) var statusMessage: String?
@@ -109,7 +115,7 @@ final class StarterContactsViewModel {
     /// Whether Done has something to write. Picking nobody on a fresh install
     /// has nothing to save, so the screen's Skip is the way out.
     var canSave: Bool {
-        loadState == .loaded && !isSaving && hasUnsavedChanges
+        loadState == .loaded && !isSaving && !isFinished && hasUnsavedChanges
     }
 
     private var hasUnsavedChanges: Bool { selection != baseline }
@@ -141,7 +147,8 @@ final class StarterContactsViewModel {
     /// A newly picked contact starts at every 2 weeks.
     @discardableResult
     func toggle(_ id: UUID) -> Bool {
-        guard loadState == .loaded, !isSaving, contacts.contains(where: { $0.id == id }) else { return false }
+        guard loadState == .loaded, !isSaving, !isFinished,
+              contacts.contains(where: { $0.id == id }) else { return false }
         if selection[id] != nil {
             selection[id] = nil
             statusMessage = nil
@@ -158,10 +165,10 @@ final class StarterContactsViewModel {
     }
 
     /// Changes the cadence of a picked contact. Ignored for one that isn't
-    /// picked, for a value below 1 day (`updateTracking` would refuse it), and
-    /// while a save is writing.
+    /// picked, for a value below 1 day (`updateTracking` would refuse it),
+    /// while a save is writing, and once the screen is finished.
     func setCadence(_ days: Int, for id: UUID) {
-        guard selection[id] != nil, days >= 1, !isSaving else { return }
+        guard selection[id] != nil, days >= 1, !isSaving, !isFinished else { return }
         selection[id] = days
         statusMessage = nil
     }
@@ -208,6 +215,7 @@ final class StarterContactsViewModel {
             return false
         }
         guard !vanished.isEmpty else {
+            isFinished = true
             announce(savedAnnouncement())
             return true
         }
@@ -220,15 +228,22 @@ final class StarterContactsViewModel {
         let result = "\(savedAnnouncement()) \(names) \(verb) no longer in your contacts."
         statusMessage = result
         announce(result)
+        isFinished = !hasUnsavedChanges
         // The caller may leave the screen now, so only VoiceOver hears this message.
-        return !hasUnsavedChanges
+        return isFinished
     }
 
     /// Leaves without writing. Drops any unsaved picks so a screen that stays
-    /// mounted (Settings) doesn't keep showing them.
-    func skip() {
+    /// mounted (Settings) doesn't keep showing them. Returns `false`, and
+    /// changes nothing, while a save is writing or once the screen is
+    /// finished, so the caller must not leave.
+    @discardableResult
+    func skip() -> Bool {
+        guard !isSaving, !isFinished else { return false }
         selection = baseline
         statusMessage = nil
+        isFinished = true
+        return true
     }
 
     // MARK: - Private

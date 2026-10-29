@@ -16,9 +16,9 @@ struct StarterContactsScreen: View {
     /// picks survive a re-render and a new push starts clean.
     @State private var viewModel: StarterContactsViewModel
     private let showsSkip: Bool
-    /// Under limited Contacts access only the shared contacts were imported,
-    /// so onboarding says why the list is short and where to share more
-    /// (owner ruling, 2026-10-17: no in-app picker).
+    /// Under limited Contacts access Regards can read only the contacts the
+    /// user shared, so onboarding says so and where to share more (owner
+    /// ruling, 2026-10-17: no in-app picker).
     private let showsLimitedAccessNote: Bool
     private let onFinish: () -> Void
     @State private var searchText = ""
@@ -174,7 +174,7 @@ struct StarterContactsScreen: View {
         }
         .buttonStyle(.plain)
         // The picks are being written; the view model ignores edits too.
-        .disabled(viewModel.isSaving)
+        .disabled(viewModel.isSaving || viewModel.isFinished)
         .accessibilityLabel(contact.displayName)
         .accessibilityValue(contact.preferredChannel.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -195,7 +195,7 @@ struct StarterContactsScreen: View {
                 Text("How often")
             }
             .pickerStyle(.menu)
-            .disabled(viewModel.isSaving)
+            .disabled(viewModel.isSaving || viewModel.isFinished)
             .tint(RegardsDS.accentInk)
             .frame(minHeight: 44)
             .accessibilityLabel("How often for \(contact.displayName)")
@@ -256,8 +256,7 @@ struct StarterContactsScreen: View {
             }
             if showsSkip {
                 Button {
-                    viewModel.skip()
-                    onFinish()
+                    if viewModel.skip() { onFinish() }
                 } label: {
                     Text("Skip for now")
                         .font(.subheadline.weight(.semibold))
@@ -266,7 +265,7 @@ struct StarterContactsScreen: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.isSaving)
+                .disabled(viewModel.isSaving || viewModel.isFinished)
                 .accessibilityIdentifier("starter.skip")
             }
         }
