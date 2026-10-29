@@ -402,11 +402,11 @@ public struct ReminderEngine: Sendable {
     ///
     /// The quiet end is materialized with wall-clock APIs (§9 contract 1).
     /// On a fall-back day it tries `.last`, then `.first`, and keeps the first
-    /// one that reads the quiet end; when that is before an occurrence in the
-    /// fold's second pass, it moves by the fold length. Foundation's `.last`
-    /// is wrong in some zones, so a repeated quiet end can resolve to its
-    /// first pass (Lord Howe 2026-04-05: 01:45 +11:00), which is still
-    /// outside quiet hours. On a spring-forward day a quiet end inside the
+    /// one that reads the quiet end; Foundation's `.last` is wrong in some
+    /// zones, so that can be the first pass. It then moves by the fold length
+    /// when the occurrence is in the fold's second pass, or when the fold
+    /// re-enters quiet hours after it, so the fire waits for the last quiet
+    /// end of that stretch. On a spring-forward day a quiet end inside the
     /// gap resolves to the gap end.
     ///
     /// Only `quietHours` is read from `window`. `timeZone` is the global
@@ -452,6 +452,14 @@ public struct ReminderEngine: Sendable {
         // one fold length later (Lord Howe's 30-minute fold, 2026-04-05).
         if end < occurrence {
             end += timeZone.daylightSavingTimeOffset(for: end) - timeZone.daylightSavingTimeOffset(for: occurrence)
+        }
+        // A fold after this end whose clock reads inside quiet hours re-enters
+        // them, so they last until the second pass of the quiet end (Lord
+        // Howe 2026-04-05: quiet 22:00-01:45 ends at 01:45 +10:30).
+        if let transition, transition > end,
+           timeZone.daylightSavingTimeOffset(for: end) > timeZone.daylightSavingTimeOffset(for: transition),
+           quiet.contains(wallClock(of: transition, calendar: calendar)) {
+            end += timeZone.daylightSavingTimeOffset(for: end) - timeZone.daylightSavingTimeOffset(for: transition)
         }
         // On the occurrence's day, not before it, outside quiet hours (§9).
         guard end >= occurrence, calendar.isDate(end, inSameDayAs: occurrence),
