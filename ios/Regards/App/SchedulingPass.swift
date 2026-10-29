@@ -33,8 +33,9 @@ import Foundation
 /// it never cancels what it can't decode, and one bad row never stops
 /// scheduling for everyone else. An undecodable row at an id the pass writes
 /// (a decodable contact's cadence or occasion id) is replaced by that write.
-/// The orphan sweep reads `fetchAllPending()`, which fails closed; a failure
-/// skips only that sweep.
+/// The orphan sweep reads `fetchAllPending()`, which fails closed: while an
+/// undecodable pending row exists that no run replaces, every run skips the
+/// sweep, and only the sweep.
 ///
 /// **Snooze precondition (R54).** `snooze(contactId:)` checks
 /// `isCadenceEligible` itself, here rather than at each caller, because a
@@ -226,9 +227,10 @@ public actor SchedulingPass {
                 pending = try await reminders.fetchAllPending()
             }
         } catch {
-            // The fail-closed read hit an undecodable row. Skipping the sweep
-            // only leaves orphans pending until a later run; nothing reads
-            // them, since every screen filters to tracked contacts.
+            // The fail-closed read hit an undecodable row, and it fails the
+            // same way on every run while that row exists, so orphans stay
+            // pending until the row is fixed or replaced. Nothing reads them:
+            // every screen filters to tracked contacts.
             Self.log.error("orphan sweep skipped: \(error, privacy: .private)")
             return
         }
