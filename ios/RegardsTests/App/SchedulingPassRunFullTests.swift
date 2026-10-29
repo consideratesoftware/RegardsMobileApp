@@ -275,9 +275,12 @@ struct SchedulingPassRunFullTests {
             await finished.mark()
             return wrote
         }
-        // Without the lock the snooze finishes while the run is parked. With
-        // it, the snooze cannot finish, so this gives it a bounded number of
-        // turns (the suite's `Task.yield()` polling convention), then moves on.
+        // A negative wait: with the lock the snooze cannot finish until the run
+        // does, so this loop is expected to run all 3_000 turns (milliseconds)
+        // and move on. Without the lock the snooze finishes within a few turns
+        // and the loop exits early. The bound is the suite's `Task.yield()`
+        // polling convention; nothing here sleeps or depends on timing for a
+        // pass, only for how quickly a mutant is caught.
         var turns = 0
         while turns < 3_000, !(await finished.isMarked) {
             await Task.yield()
@@ -291,5 +294,47 @@ struct SchedulingPassRunFullTests {
         let row = try #require(try await fixture.cadenceRow(contact))
         #expect(row.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
         #expect(row.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+    }
+
+    /// A pending row due at 18:00 for a contact overdue by a 7-day cadence.
+    /// Lengthening the cadence to 60 days makes the contact not overdue, so
+    /// the no-re-nag guard no longer holds and the row follows the new due date.
+    @Test(
+        "A due row is derived again when the cadence lengthens past it",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func dueRowIsRederivedWhenTheCadenceLengthens(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-05-01 10:00")
+        try await fixture.pass.runFull()
+        fixture.setNow("2026-06-10 18:30")
+        var longer = contact
+        longer.cadenceDays = 60
+        try await fixture.repositories.contacts.upsert(longer)
+
+        try await fixture.pass.runFull()
+
+        // 2026-05-01 10:00 plus 60 days is 06-30 10:00.
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-30 18:00"))
+    }
+
+    /// R55: the window is read on every run. Moving the global window to
+    /// another zone moves the same wall-clock slot with it.
+    @Test(
+        "runFull derives slots in the zone of the window as stored now",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func runFullUsesTheCurrentWindowZone(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+
+        try await fixture.repositories.window.saveGlobal(PassFixture.eveningWindow(zone: "Europe/London"))
+        try await fixture.pass.runFull()
+
+        // 18:00 BST on 06-10 is 17:00 UTC.
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor
+                == ISO8601DateFormatter().date(from: "2026-06-10T17:00:00Z"))
     }
 }

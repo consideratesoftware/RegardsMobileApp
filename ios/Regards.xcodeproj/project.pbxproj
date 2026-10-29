@@ -119,6 +119,7 @@
 		89AFC1B2598F645EFC30F244 /* CancellableBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9429573F87B0DEC54F1099B6 /* CancellableBox.swift */; };
 		89B44E98910D79F72FE1CCDC /* UpcomingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858D00E29EA76BF067B5CF33 /* UpcomingViewModel.swift */; };
 		89E654766C446D32758871CD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 07DFCE9573BE0729618E8E9F /* PrivacyInfo.xcprivacy */; };
+		8A4B3D3EAD4926C9111667B5 /* SchedulingPassCancellationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E92261F2C5BB319C26042E /* SchedulingPassCancellationTests.swift */; };
 		8A5241F35FD827211755D5F9 /* Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13E842ECF76B44914750B2A /* Channel.swift */; };
 		8AB2F404FE525C0D7F43A21C /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0950902FF5E235B5FB5F695E /* SettingsScreen.swift */; };
 		8B34747587732A165A8AABFF /* ContactsSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */; };
@@ -431,6 +432,7 @@
 		DEED67A526A2E67A56F9E0A6 /* ScreensAccessibilityTests+Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+Notifications.swift"; sourceTree = "<group>"; };
 		E06DD4E5622574D16D1559B7 /* MergeDuplicatesViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeDuplicatesViewModelTests.swift; sourceTree = "<group>"; };
 		E0ABE512E2B05FB378890460 /* RepositoryFakes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryFakes.swift; sourceTree = "<group>"; };
+		E0E92261F2C5BB319C26042E /* SchedulingPassCancellationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassCancellationTests.swift; sourceTree = "<group>"; };
 		E1A555DA9AD77E965B4071BF /* SchedulingPassTriggerOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassTriggerOrderTests.swift; sourceTree = "<group>"; };
 		E1F69E8D289AB13128D0AD1B /* RegardsAccessibilityTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RegardsAccessibilityTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E21F9599027EE763D25CFC53 /* SchedulingPassTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassTriggerTests.swift; sourceTree = "<group>"; };
@@ -680,6 +682,7 @@
 				10AFB91724C972036043E115 /* RegardsIntentRouterTests.swift */,
 				9628392A18BE56DFD931C1CC /* RootViewSceneActivationTests.swift */,
 				FC7E29F54453C73EEE9AF609 /* SchedulingPassCadenceCycleTests.swift */,
+				E0E92261F2C5BB319C26042E /* SchedulingPassCancellationTests.swift */,
 				ABBA009B745C8E8BB5DD68B1 /* SchedulingPassCaughtUpTests.swift */,
 				ADAD63827BA67E4D35469DC6 /* SchedulingPassCorruptRowTests.swift */,
 				B4E7DA965F6B235782ED5844 /* SchedulingPassOccasionTests.swift */,
@@ -1181,6 +1184,7 @@
 				2A5DD5805C21199B9D51E5CE /* ScheduleObservationContractTests.swift in Sources */,
 				730D7986238D9D420E308969 /* ScheduleObservationSnapshotContractTests.swift in Sources */,
 				875DF210621FA3C10FC3B85F /* SchedulingPassCadenceCycleTests.swift in Sources */,
+				8A4B3D3EAD4926C9111667B5 /* SchedulingPassCancellationTests.swift in Sources */,
 				3F41DC0E58374974EDAA29C9 /* SchedulingPassCaughtUpTests.swift in Sources */,
 				D29E726702274357B853BAC1 /* SchedulingPassCorruptRowTests.swift in Sources */,
 				FB76558A0530FD8F3A2529FE /* SchedulingPassFixture.swift in Sources */,

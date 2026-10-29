@@ -140,4 +140,22 @@ struct SchedulingPassTriggerTests {
         #expect(reset)
         #expect(try await Self.cadenceRow(harness, contact)?.scheduledFor == Self.la(Self.overdueSlot))
     }
+
+    /// The pass logs its failure and the app carries on (§9a): a read failure
+    /// must not hold the tab root back, on launch or on foreground.
+    @Test("A failing pass does not keep the app out of .ready")
+    func passFailureDoesNotBlockReady() async throws {
+        // `StubReminderRepository.observeSchedule()` finishes with no value,
+        // which makes `runFull()` throw.
+        let harness = try await NotificationActionHandlingTests.harness(
+            backend: .mock, onboarded: true, reminders: StubReminderRepository())
+        await #expect(throws: (any Error).self) { try await harness.scheduler.runFull() }
+
+        await harness.launch.start()
+        #expect(harness.launch.phase == .ready)
+
+        await harness.launch.handleSceneActivation()
+
+        #expect(harness.launch.phase == .ready)
+    }
 }

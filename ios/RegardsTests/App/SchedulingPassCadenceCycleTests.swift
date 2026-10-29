@@ -118,4 +118,68 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.cadenceRow(contact) == snoozed)
         #expect(snoozed.scheduledFor == PassFixture.at("2026-06-17 18:00"))
     }
+
+    /// Accepted until TF-07d (R60) runs the transition, the log write and the
+    /// reschedule in one lock span: a run that lands between `caughtUp` and a
+    /// failed action's restore writes a fresh pending row without the floor,
+    /// and the restore then finds nothing to put back. The snooze is lost.
+    /// This pins today's behavior; the R60 interleaving test replaces it.
+    @Test(
+        "A run between Caught up and its restore loses the snooze floor (accepted until TF-07d)",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func runFullBetweenCaughtUpAndRestoreLosesTheFloor(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        #expect(try await fixture.pass.caughtUp(contactId: contact.id))
+
+        try await fixture.pass.runFull()
+        try await fixture.pass.restorePendingAfterFailedCaughtUp(contactId: contact.id)
+
+        let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.snoozedUntil == nil)
+        #expect(row.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+    }
+
+    /// Plain no-re-nag with a floor: the snoozed slot has started, the contact
+    /// has not talked to the person, and is still overdue. The run leaves the
+    /// row, floor included, exactly as it was.
+    @Test(
+        "A snoozed row whose slot has started is left alone while the contact is still overdue",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func dueSnoozedRowIsLeftAloneWithoutInteraction(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        let snoozed = try #require(try await fixture.cadenceRow(contact))
+        #expect(snoozed.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+        fixture.setNow("2026-06-17 18:30")
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(contact) == snoozed)
+        #expect(snoozed.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+    }
+
+    /// Contact Detail asks the pass for the snooze date. Once the snoozed slot
+    /// has started the snooze is over, although the row keeps its floor, so the
+    /// answer is nil rather than a time in the past.
+    @Test(
+        "pendingSnoozeDate is nil once the snoozed slot has started",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func pendingSnoozeDateIsNilOnceTheSlotStarts(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == PassFixture.at("2026-06-17 18:00"))
+        fixture.setNow("2026-06-17 18:30")
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == nil)
+    }
 }

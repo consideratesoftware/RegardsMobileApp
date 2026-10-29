@@ -68,6 +68,49 @@ struct SchedulingPassOccasionTests {
         #expect(try await fixture.occasionRow(contact, .birthday)?.scheduledFor == PassFixture.at("2026-06-11 09:00"))
     }
 
+    /// Snooze resolves through the same derivation as the run, so a snooze
+    /// whose slot lands on the contact's occasion day moves past it too.
+    @Test(
+        "A snooze landing on an occasion day moves to the next day's slot",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeLandingOnAnOccasionDayMovesToTheNextDaySlot(backend: RepositoryContractBackend) async throws {
+        // Snoozed on 06-10, the floor is 06-17 10:00 and its slot 06-17 18:00.
+        let fixture = try await PassFixture(
+            backend: backend, occasions: try Self.birthdays(on: MonthDay(month: 6, day: 17), for: [1]))
+        let withBirthday = try await fixture.addContact(1)
+        let withoutBirthday = try await fixture.addContact(2)
+
+        _ = try await fixture.pass.snooze(contactId: withBirthday.id)
+        _ = try await fixture.pass.snooze(contactId: withoutBirthday.id)
+
+        let moved = try #require(try await fixture.cadenceRow(withBirthday))
+        #expect(moved.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        #expect(moved.scheduledFor == PassFixture.at("2026-06-18 18:00"))
+        #expect(try await fixture.cadenceRow(withoutBirthday)?.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(withBirthday) == moved, "the next run keeps the deferred slot")
+    }
+
+    /// The slot after an occasion day can be another occasion day (here a
+    /// birthday on 06-12 and an anniversary on 06-13), so the deferral repeats.
+    @Test("Consecutive occasion days defer the cadence slot twice", arguments: RepositoryContractBackend.allCases)
+    func consecutiveOccasionDaysDeferCadenceTwice(backend: RepositoryContractBackend) async throws {
+        let id = try contractUUID(7_001)
+        let fixture = try await PassFixture(backend: backend, occasions: { _ in
+            [ContactOccasion(contactId: id, kind: .birthday, monthDay: MonthDay(month: 6, day: 12)),
+             ContactOccasion(contactId: id, kind: .anniversary, monthDay: MonthDay(month: 6, day: 13))]
+        })
+        // Due 06-12 10:00, so the first slot is 06-12 18:00.
+        let contact = try await fixture.addContact(1, cadenceDays: 10, lastInteracted: "2026-06-02 10:00")
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-14 18:00"))
+    }
+
     // MARK: - Quiet hours and occasion time (R5)
 
     /// The birthday sits at 09:00. The override's quiet hours 06:00-10:00

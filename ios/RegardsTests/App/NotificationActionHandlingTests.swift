@@ -178,11 +178,7 @@ struct NotificationActionHandlingTests {
         harness.fake.send(.snooze(barrier.id))
         await Self.expectBarrierSettled(harness, barrier.id)
 
-        let logs = try await harness.repositories.interactions.fetchRecent(forContact: ineligible.id, limit: 10)
-        #expect(logs.isEmpty)
-        #expect(try await harness.repositories.reminders.fetchPending(forContact: ineligible.id).isEmpty)
-        let after = try #require(try await harness.repositories.contacts.fetch(id: ineligible.id))
-        #expect(after.lastInteractedAt == ineligible.lastInteractedAt)
+        try await Self.expectUntouched(harness, ineligible, ineligible: true)
         try await Self.expectUntouched(harness, bystander)
     }
 
@@ -467,10 +463,13 @@ extension NotificationActionHandlingTests {
     /// original `lastInteractedAt`. A plain pending cadence row without a
     /// floor is allowed: the ready-phase run writes one for every overdue
     /// contact, and it is not an action's doing.
-    static func expectUntouched(_ harness: Harness, _ contact: Contact) async throws {
+    ///
+    /// `ineligible` contacts get no row from anything, the ready-phase run
+    /// included, so for them any pending row at all is a failure.
+    static func expectUntouched(_ harness: Harness, _ contact: Contact, ineligible: Bool = false) async throws {
         #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
         let pending = try await harness.repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending.allSatisfy { $0.snoozedUntil == nil })
+        #expect(ineligible ? pending.isEmpty : pending.allSatisfy { $0.snoozedUntil == nil })
         let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
         #expect(after.lastInteractedAt == contact.lastInteractedAt)
     }

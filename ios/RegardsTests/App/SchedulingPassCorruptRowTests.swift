@@ -110,4 +110,20 @@ struct SchedulingPassCorruptRowTests {
         try await world.pass.runFull()
         #expect(try await world.repositories.reminders.fetchPending(forContact: orphan.id).isEmpty)
     }
+
+    /// The pass replaces an undecodable row only at an id it writes. The
+    /// cadence id is one, so the bad row there is overwritten by the upsert.
+    @Test("An undecodable row at the cadence id is replaced by the pass's own row")
+    func undecodableRowAtTheCadenceIdIsReplaced() async throws {
+        let world = try await World()
+        let contact = try await world.addContact(1)
+        let cadenceID = SchedulingPass.reminderID(contactId: contact.id, kind: .cadence)
+        try await world.insertUndecodableRow(for: contact, id: cadenceID)
+
+        try await world.pass.runFull()
+
+        let pending = try await world.repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending.map(\.id) == [cadenceID])
+        #expect(pending.first?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+    }
 }
