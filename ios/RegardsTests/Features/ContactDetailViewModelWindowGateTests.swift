@@ -51,7 +51,12 @@ struct ContactDetailViewModelWindowGateTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { gateNow }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { gateNow }
+            ),
             clock: { gateNow }
         )
         await viewModel.load()
@@ -74,7 +79,12 @@ struct ContactDetailViewModelWindowGateTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { gateNow }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { gateNow }
+            ),
             clock: { gateNow }
         )
 

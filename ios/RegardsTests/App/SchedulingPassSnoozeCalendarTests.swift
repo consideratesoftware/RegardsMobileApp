@@ -48,8 +48,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -82,8 +82,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -111,8 +111,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -148,8 +148,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -181,8 +181,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -215,8 +215,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -248,8 +248,8 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)

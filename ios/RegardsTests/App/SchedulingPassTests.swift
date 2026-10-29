@@ -19,6 +19,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -47,6 +48,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -69,9 +71,19 @@ struct SchedulingPassTests {
         let first = Date(timeIntervalSince1970: 1_800_000_000)
         let second = first.addingTimeInterval(3 * 86_400)
 
-        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { first })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            clock: { first }
+        )
             .snooze(contactId: contact.id)
-        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { second })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            clock: { second }
+        )
             .snooze(contactId: contact.id)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
@@ -101,6 +113,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -141,7 +154,12 @@ struct SchedulingPassTests {
         let storedBeforeSnooze = try #require(try await repositories.contacts.fetch(id: contact.id)).lastInteractedAt
         let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { now })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            clock: { now }
+        )
             .snooze(contactId: contact.id)
 
         let interactions = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 100)
@@ -171,6 +189,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -204,6 +223,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -243,6 +263,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -266,6 +287,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -289,6 +311,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 
@@ -316,6 +339,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
 

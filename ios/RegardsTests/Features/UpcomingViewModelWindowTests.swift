@@ -40,7 +40,12 @@ struct UpcomingViewModelWindowTests {
         return UpcomingViewModel(
             contacts: contactsRepository,
             reminders: remindersRepository,
-            scheduler: SchedulingPass(reminders: remindersRepository, contacts: contactsRepository, clock: { now }),
+            scheduler: SchedulingPass(
+                reminders: remindersRepository,
+                contacts: contactsRepository,
+                window: FixedReminderWindowRepository(),
+                clock: { now }
+            ),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { now }

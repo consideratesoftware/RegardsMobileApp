@@ -19,7 +19,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -53,7 +53,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository.failing(),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository.failing(),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -79,7 +79,7 @@ struct UpcomingViewModelStateTests {
         let loaded = UpcomingViewModel(
             contacts: loadedContacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: loadedContacts,
                 clock: { UpcomingFixtures.now }
@@ -96,7 +96,7 @@ struct UpcomingViewModelStateTests {
         let failing = UpcomingViewModel(
             contacts: failingContacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: failingContacts,
                 clock: { UpcomingFixtures.now }
@@ -127,7 +127,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository([reminder]),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -161,7 +161,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -218,7 +218,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository([reminder]),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -256,7 +256,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository([reminder]),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository([reminder]),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -284,7 +284,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository(),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -324,7 +324,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository([occasion]),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository([occasion]),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -366,7 +366,7 @@ struct UpcomingViewModelStateTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: StubReminderRepository([visible, orphaned]),
-            scheduler: SchedulingPass(
+            scheduler: makeScheduler(
                 reminders: StubReminderRepository([visible, orphaned]),
                 contacts: contacts,
                 clock: { UpcomingFixtures.now }
@@ -382,4 +382,10 @@ struct UpcomingViewModelStateTests {
         #expect(rows.compactMap(\.id.reminderId) == [visible.id])
         #expect(!rows.contains { $0.contactId == untracked.id })
     }
+}
+
+/// The `SchedulingPass` these tests hand Upcoming: an every-day, all-day window in the device timezone.
+private func makeScheduler(reminders: any ReminderRepository, contacts: any ContactRepository,
+                           clock: @escaping @Sendable () -> Date) -> SchedulingPass {
+    SchedulingPass(reminders: reminders, contacts: contacts, window: FixedReminderWindowRepository(), clock: clock)
 }

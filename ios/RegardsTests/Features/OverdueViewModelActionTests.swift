@@ -42,7 +42,12 @@ struct OverdueViewModelActionTests {
             contacts: contacts,
             interactions: interactions,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: clock
+            ),
             clock: clock
         )
     }
@@ -131,7 +136,12 @@ struct OverdueViewModelActionTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = SchedulingPass(
+            reminders: reminders,
+            contacts: contacts,
+            window: FixedReminderWindowRepository(),
+            clock: { Self.now }
+        )
         let viewModel = OverdueViewModel(
             contacts: contacts,
             interactions: interactions,
@@ -182,7 +192,12 @@ struct OverdueViewModelActionTests {
         let contacts = StubContactRepository.failingUpsert([contact])
         let interactions = StubInteractionRepository()
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = SchedulingPass(
+            reminders: reminders,
+            contacts: contacts,
+            window: FixedReminderWindowRepository(),
+            clock: { Self.now }
+        )
         let viewModel = OverdueViewModel(
             contacts: contacts,
             interactions: interactions,
@@ -242,7 +257,12 @@ struct OverdueViewModelActionTests {
             contacts: gatedContacts,
             interactions: interactions,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: gatedReminders, contacts: gatedContacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: gatedReminders,
+                contacts: gatedContacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await gate.open()
@@ -351,7 +371,12 @@ struct OverdueViewModelActionTests {
             contacts: gatedContacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: gatedReminders, contacts: gatedContacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: gatedReminders,
+                contacts: gatedContacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await gate.open()

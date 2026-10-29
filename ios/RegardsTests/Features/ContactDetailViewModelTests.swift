@@ -53,7 +53,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository([log]),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
 
@@ -71,7 +76,12 @@ struct ContactDetailViewModelTests {
             contactId: UUID(),
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
 
@@ -89,7 +99,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository.failing(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
 
@@ -117,7 +132,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
 
@@ -134,7 +154,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
 
@@ -151,7 +176,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
 
@@ -168,7 +198,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now },
             calendar: {
                 var calendar = Calendar(identifier: .gregorian)
@@ -194,7 +229,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -218,7 +258,12 @@ struct ContactDetailViewModelTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()

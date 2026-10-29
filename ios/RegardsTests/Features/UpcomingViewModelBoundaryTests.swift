@@ -243,7 +243,12 @@ struct UpcomingViewModelBoundaryTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { nowDate }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { nowDate }
+            ),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { nowDate }
@@ -305,6 +310,7 @@ struct UpcomingViewModelBoundaryTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(reminders),
                 contacts: contactsRepository,
+                window: FixedReminderWindowRepository(),
                 clock: { now }
             ),
             interactions: StubInteractionRepository(),

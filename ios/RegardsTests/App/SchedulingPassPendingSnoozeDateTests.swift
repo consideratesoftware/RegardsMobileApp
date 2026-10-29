@@ -37,6 +37,7 @@ struct SchedulingPassPendingSnoozeDateTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
             clock: { now }
         )
         let laterDate = now.addingTimeInterval(14 * 86_400)

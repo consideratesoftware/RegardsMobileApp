@@ -63,7 +63,12 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: clock.now
+            ),
             clock: clock.now
         )
         await viewModel.load()
@@ -94,7 +99,12 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: clock.now
+            ),
             clock: clock.now
         )
         await viewModel.load()
@@ -124,7 +134,12 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: clock.now
+            ),
             clock: clock.now
         )
         await viewModel.load()
@@ -174,7 +189,12 @@ struct OverdueViewModelSnoozeTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: clock.now
+            ),
             clock: clock.now
         )
         await viewModel.load()
@@ -253,7 +273,12 @@ struct OverdueViewModelSnoozeTests {
             contacts: gatedContacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: gatedContacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: gatedContacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await gate.open()
@@ -308,7 +333,12 @@ struct OverdueViewModelSnoozeTests {
             contacts: baseContacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: gatedReminders, contacts: baseContacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: gatedReminders,
+                contacts: baseContacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()

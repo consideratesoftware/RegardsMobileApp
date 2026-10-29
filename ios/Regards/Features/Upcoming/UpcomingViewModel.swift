@@ -329,10 +329,10 @@ public final class UpcomingViewModel {
             ?? now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
-        // A contact's pending cadence reminder's `scheduledFor`, keyed by
-        // contact id — Snooze's only persisted trace (§14 PR22's
-        // `SchedulingPass.snooze` stub; no separate "snoozed" flag exists on
-        // `Contact`). Inlined rather than a shared `PendingSnoozeLookup`
+        // A snoozed contact's pending cadence reminder's `scheduledFor` (the
+        // floor resolved into the window, §9), keyed by contact id. Only a
+        // row with a floor is a snooze; SchedulingPass's plain cadence rows
+        // are left to the computation below. Inlined rather than a shared `PendingSnoozeLookup`
         // helper (staged review round 7: two call sites, below §17's
         // abstraction floor of three) — `OverdueViewModel.performLoad` has
         // its own identical copy. Once a snooze lapses this map is simply
@@ -341,7 +341,7 @@ public final class UpcomingViewModel {
         // snoozed date passes.
         let snoozedUntilByContact = Dictionary(
             reminders
-                .filter { $0.kind == .cadence }
+                .filter { $0.kind == .cadence && $0.snoozedUntil != nil }
                 .map { ($0.contactId, $0.scheduledFor) },
             // `max($0, $1)`, not "whichever comes last in the array": two
             // pending cadence rows for one contact shouldn't happen (the

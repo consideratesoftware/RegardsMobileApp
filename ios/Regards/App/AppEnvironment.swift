@@ -62,30 +62,18 @@ public struct AppRuntime: Sendable {
     public let userCalendar: Calendar
     public let clock: @Sendable () -> Date
     /// The single `SchedulingPass` writer for this runtime (decision #36).
-    /// This §14 PR22 stub needs `reminders` + `clock` + `calendar` — the
-    /// last of these is correctness-critical, not optional: `snooze`'s
-    /// wall-clock 7-day push (correctness fix, staged review) resolves
-    /// through whichever `Calendar` is passed in. Built from `window.timeZone`
-    /// (the persisted reminder window's own timezone), not `userCalendar` —
-    /// fixed staged-review bug, round 6: `userCalendar` is the *device's*
-    /// timezone, snapshotted once at launch, and using it here meant a
-    /// device/window timezone mismatch (or traveling mid-session) could push
-    /// `scheduledFor` an hour off across a DST boundary relative to the
-    /// window's own timezone, the one every other scheduling computation in
-    /// this codebase treats as authoritative (`ReminderEngine`,
-    /// `UpcomingViewModel.buildRows`). `userCalendar` stays reserved for
-    /// user-facing elapsed-day labels (`OverdueViewModel`,
-    /// `ContactDetailViewModel`), which intentionally track the device's
-    /// calendar instead — see this struct's own doc comment. Composed here,
-    /// alongside `environment`, so every screen shares the same `scheduler`
-    /// instance.
+    /// Composed here, alongside `environment`, so every screen shares this
+    /// one instance; its lock (R59) only serialises callers that share it.
+    /// It reads the persisted window on every run (R55), so a window edit
+    /// never needs a new runtime or a second pass.
     public let scheduler: SchedulingPass
 
     public init(
         environment: AppEnvironment,
         window: ReminderWindow,
         userCalendar: Calendar,
-        clock: @escaping @Sendable () -> Date
+        clock: @escaping @Sendable () -> Date,
+        occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion] = { _ in [] }
     ) {
         self.environment = environment
         self.window = window
@@ -94,8 +82,9 @@ public struct AppRuntime: Sendable {
         self.scheduler = SchedulingPass(
             reminders: environment.reminders,
             contacts: environment.contacts,
-            clock: clock,
-            calendar: Self.calendar(for: window.timeZone)
+            window: environment.window,
+            occasions: occasions,
+            clock: clock
         )
     }
 
@@ -116,7 +105,10 @@ public struct AppRuntime: Sendable {
             ),
             window: window,
             userCalendar: calendar(for: .current),
-            clock: { now }
+            clock: { now },
+            // The seed cast's occasions come from a provider, as Contacts
+            // will supply them in PR30, and the pass writes their rows.
+            occasions: MockRepositories.occasionProvider(now: now, window: window)
         )
     }
 
@@ -130,7 +122,9 @@ public struct AppRuntime: Sendable {
             environment: environment,
             window: window,
             userCalendar: calendar(for: .current),
-            clock: { Date() }
+            clock: { Date() },
+            // No occasion source until PR30 reads Contacts and Calendar.
+            occasions: { _ in [] }
         )
     }
 

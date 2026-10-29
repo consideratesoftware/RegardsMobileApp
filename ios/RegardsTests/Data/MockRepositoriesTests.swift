@@ -71,7 +71,8 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
-            scheduler: SchedulingPass(reminders: mocks.reminders, contacts: mocks.contacts, clock: { now }),
+            scheduler: SchedulingPass(reminders: mocks.reminders, contacts: mocks.contacts,
+                                      window: mocks.window, clock: { now }),
             interactions: mocks.interactions,
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -163,7 +164,8 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: remindersRepository,
-            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
+                                      window: mocks.window, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -215,7 +217,8 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: remindersRepository,
-            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
+                                      window: mocks.window, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -279,7 +282,8 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: remindersRepository,
-            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { nowDate }),
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
+                                      window: mocks.window, clock: { nowDate }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
@@ -319,7 +323,8 @@ struct MockRepositoriesTests {
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: remindersRepository,
-            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts, clock: { now }),
+            scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
+                                      window: mocks.window, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }

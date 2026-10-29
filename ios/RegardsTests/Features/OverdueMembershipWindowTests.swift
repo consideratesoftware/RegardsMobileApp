@@ -33,7 +33,12 @@ struct OverdueMembershipWindowTests {
             contacts: contacts,
             interactions: StubInteractionRepository(),
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { wednesday }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { wednesday }
+            ),
             clock: { wednesday },
             calendar: calendar
         )

@@ -34,7 +34,12 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -64,7 +69,12 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -97,7 +107,12 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: clock.now),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: clock.now
+            ),
             clock: clock.now
         )
         await viewModel.load()
@@ -134,7 +149,12 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: interactions,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -167,7 +187,12 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -199,7 +224,12 @@ struct ContactDetailViewModelSnoozeTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                clock: { Self.now }
+            ),
             clock: { Self.now }
         )
         await viewModel.load()
@@ -242,7 +272,12 @@ struct ContactDetailViewModelSnoozeTests {
         let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = SchedulingPass(
+            reminders: reminders,
+            contacts: contacts,
+            window: FixedReminderWindowRepository(),
+            clock: { Self.now }
+        )
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
             contacts: contacts,

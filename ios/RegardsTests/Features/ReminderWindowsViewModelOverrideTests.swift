@@ -269,7 +269,10 @@ struct ReminderWindowsViewModelOverrideTests {
             contacts: environment.contacts,
             reminders: environment.reminders,
             scheduler: SchedulingPass(
-                reminders: environment.reminders, contacts: environment.contacts, clock: { now }
+                reminders: environment.reminders,
+                contacts: environment.contacts,
+                window: environment.window,
+                clock: { now }
             ),
             interactions: environment.interactions,
             window: global,

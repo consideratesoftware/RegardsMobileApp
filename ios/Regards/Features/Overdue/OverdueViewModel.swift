@@ -165,16 +165,17 @@ public final class OverdueViewModel {
                 Self.log.error("failed to load pending reminders for snooze lookup: \(error, privacy: .private)")
                 pendingReminders = []
             }
-            // A contact's pending cadence reminder's `scheduledFor`, keyed by
-            // contact id — Snooze's only persisted trace (§14 PR22's
-            // `SchedulingPass.snooze` stub; no separate "snoozed" flag exists
-            // on `Contact`). Inlined rather than a shared `PendingSnoozeLookup`
+            // A snoozed contact's pending cadence reminder's `scheduledFor`
+            // (the floor resolved into the window, §9), keyed by contact id.
+            // Only a row with a floor is a snooze: SchedulingPass also writes
+            // a plain pending row for every eligible contact, and that one
+            // must not hide an overdue contact. Inlined rather than a shared `PendingSnoozeLookup`
             // helper (staged review round 7: two call sites, below §17's
             // abstraction floor of three) — `UpcomingViewModel.buildRows` has
             // its own identical copy.
             let snoozedUntilByContact = Dictionary(
                 pendingReminders
-                    .filter { $0.kind == .cadence }
+                    .filter { $0.kind == .cadence && $0.snoozedUntil != nil }
                     .map { ($0.contactId, $0.scheduledFor) },
                 // `max($0, $1)`, not "whichever comes last in the array": two
                 // pending cadence rows for one contact shouldn't happen (the
@@ -394,24 +395,14 @@ public final class OverdueViewModel {
 
     static let log = RegardsLogger.feature("Overdue")
 
-    /// `snoozedUntil` is the contact's pending cadence `ScheduledReminder`'s
-    /// `scheduledFor`, if one exists (§14 PR22's `SchedulingPass.snooze`
-    /// stub) — `nil` for a never-snoozed contact. While it's still in the
-    /// future the contact is suppressed from Overdue entirely, regardless of
-    /// how overdue the raw cadence math says it is; once it lapses, this
-    /// falls through to the ordinary `lastInteractedAt`-based computation
-    /// unchanged, so the row "returns" on its own the next time this runs
-    /// after the snoozed date passes.
-    ///
-    /// The raw persisted `scheduledFor`, not a window-resolved one:
-    /// `UpcomingViewModel.buildRows` folds the same value into
-    /// `engine.nextAllowedSlot(...)` instead, so the two screens can
-    /// disagree on the exact instant a snooze lapses whenever the raw
-    /// timestamp falls outside the window's allowed hours/days — tracked,
-    /// not silently accepted, as R57 (ARCHITECTURE.md §19): real, deferred
-    /// to TF-07/PR25's joined observation rather than fixed here, since a
-    /// fix now would be rewritten the moment that lands. Delete R57 when
-    /// it does; do not let this comment quietly outlive it.
+    /// `snoozedUntil` is the snoozed contact's pending cadence row's
+    /// `scheduledFor`: the snooze floor already resolved into the contact's
+    /// effective window by `SchedulingPass` (§9, R57's write half). `nil` for
+    /// a contact with no snooze. While it's in the future the contact is
+    /// suppressed from Overdue regardless of the cadence math; once it
+    /// passes, the ordinary `lastInteractedAt` computation decides again.
+    /// Upcoming resolves the same stored slot to the same instant, so the two
+    /// screens agree on when a snooze lapses.
     static func makeOverdueRow(for contact: Contact,
                                now: Date,
                                calendar: Calendar,

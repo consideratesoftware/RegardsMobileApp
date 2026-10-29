@@ -43,6 +43,42 @@ public struct MockRepositories: Sendable {
     public static let defaultWindow = ReminderWindow.defaultV1(
         timezone: TimeZone(identifier: "Asia/Kolkata") ?? .current
     )
+
+    /// The seed cast's occasions for `SchedulingPass`, in place of seeded rows: Shmi's birthday tomorrow and
+    /// Obi-Wan's "Jedi Order anniversary" in 4 days, both local days in `window`'s timezone. The pass writes their
+    /// rows at the window's occasion time, so the Phase 0 Upcoming states stay reachable.
+    public static func occasionProvider(
+        now: Date,
+        window: ReminderWindow
+    ) -> @Sendable ([Contact]) async -> [ContactOccasion] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = window.timeZone
+        let startOfToday = calendar.startOfDay(for: now)
+        func monthDay(daysAfterToday offset: Int) -> MonthDay? {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else { return nil }
+            let components = calendar.dateComponents([.month, .day], from: day)
+            return MonthDay.make(month: components.month ?? 0, day: components.day ?? 0)
+        }
+        let birthday = monthDay(daysAfterToday: 1)
+        let anniversary = monthDay(daysAfterToday: 4)
+        return { contacts in
+            contacts.compactMap { contact in
+                switch contact.systemContactRef {
+                case "sys-shmi":
+                    birthday.map {
+                        ContactOccasion(contactId: contact.id, kind: .birthday, monthDay: $0, label: "Birthday")
+                    }
+                case "sys-obiwan":
+                    anniversary.map {
+                        ContactOccasion(contactId: contact.id, kind: .anniversary, monthDay: $0,
+                                        label: "Jedi Order anniversary")
+                    }
+                default:
+                    nil
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Shared in-memory store
@@ -133,8 +169,9 @@ actor MockStore {
         }
     }
 
-    /// Phase 0 deliberately renders representative persisted states (virtual merge marker, recent interactions,
-    /// both occasion tags) so the corresponding UI isn't unreachable implementation. Local fixtures only.
+    /// Phase 0 deliberately renders representative persisted states (virtual merge marker, recent interactions)
+    /// so the corresponding UI isn't unreachable implementation. Local fixtures only. Both occasion tags come from
+    /// `MockRepositories.occasionProvider(now:window:)`.
     private nonisolated static func seedRepresentativeStates(
         now: Date,
         window: ReminderWindow,
@@ -148,7 +185,7 @@ actor MockStore {
         let day: TimeInterval = 86_400
         var contacts = seededContacts
         var groups: [UUID: ContactGroup] = [:]
-        var reminders: [UUID: ScheduledReminder] = [:]
+        let reminders: [UUID: ScheduledReminder] = [:]
         var interactions: [UUID: InteractionLog] = [:]
 
         if var leia = contacts.values.first(where: { $0.systemContactRef == "sys-leia" }) {
@@ -191,46 +228,8 @@ actor MockStore {
             interactions[earlier.id] = earlier
         }
 
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = window.timeZone
-        let startOfToday = calendar.startOfDay(for: now)
-
-        if let shmi = contacts.values.first(where: { $0.systemContactRef == "sys-shmi" }),
-           let birthdayTime = Self.occasionInstant(
-               daysAfter: startOfToday,
-               offset: 1,
-               hour: 9,
-               calendar: calendar
-           ) {
-            let birthday = ScheduledReminder(
-                contactId: shmi.id,
-                kind: .birthday,
-                occasionDate: Self.monthDayString(for: birthdayTime, calendar: calendar),
-                occasionLabel: "Birthday",
-                scheduledFor: birthdayTime,
-                osNotificationId: "contact-\(shmi.id.uuidString)-\(ReminderKind.birthday.rawValue)"
-            )
-            reminders[birthday.id] = birthday
-        }
-
-        if let obiWan = contacts.values.first(where: { $0.systemContactRef == "sys-obiwan" }),
-           let anniversaryTime = Self.occasionInstant(
-               daysAfter: startOfToday,
-               offset: 4,
-               hour: 9,
-               calendar: calendar
-           ) {
-            let anniversary = ScheduledReminder(
-                contactId: obiWan.id,
-                kind: .anniversary,
-                occasionDate: Self.monthDayString(for: anniversaryTime, calendar: calendar),
-                occasionLabel: "Jedi Order anniversary",
-                scheduledFor: anniversaryTime,
-                osNotificationId: "contact-\(obiWan.id.uuidString)-\(ReminderKind.anniversary.rawValue)"
-            )
-            reminders[anniversary.id] = anniversary
-        }
-
+        // The birthday and anniversary rows come from `occasionProvider`
+        // through SchedulingPass, as Contacts will supply them in PR30.
         return (contacts, groups, reminders, interactions)
     }
 
@@ -257,12 +256,6 @@ actor MockStore {
             direction: .forward
         ) ?? day
     }
-
-    private nonisolated static func monthDayString(for date: Date, calendar: Calendar) -> String {
-        let components = calendar.dateComponents([.month, .day], from: date)
-        return String(format: "%02d-%02d", components.month ?? 1, components.day ?? 1)
-    }
-
 }
 
 extension MockStore {
