@@ -219,7 +219,7 @@ public struct AllContactsScreen: View {
                     .font(.body.weight(.medium))
                     .foregroundStyle(RegardsDS.ink)
                 Text(
-                    [contact.cadenceDays.map { CadenceDescriptor.describe(days: $0) },
+                    [AllContactsViewModel.cadenceSegment(days: contact.cadenceDays),
                      contact.lastInteractedAt.flatMap {
                         Contact.relativeDescription(for: $0, from: viewModel.now)
                      }
