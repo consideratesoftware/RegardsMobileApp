@@ -8,10 +8,10 @@ import Foundation
 ///
 /// **Derivation (§9).** A cadence row's `scheduledFor` is
 /// `nextAllowedSlot(max(now, overdueAt, snoozedUntil))` in the contact's
-/// effective window (`reminderWindowOverride ?? global`), moved past any
-/// occasion day of the same contact (contract 6). An occasion row's
-/// `scheduledFor` is its next occurrence at the global `occasionTime`,
-/// moved out of the effective window's quiet hours by
+/// effective window (`reminderWindowOverride ?? global`), moved past the
+/// day of any occasion of the same contact that will notify (contract 6).
+/// An occasion row's `scheduledFor` is its next occurrence at the global
+/// `occasionTime`, moved out of the effective window's quiet hours by
 /// `ReminderEngine.occasionFireDate`, or the occurrence itself when quiet
 /// hours run past its day (owner ruling 9: the row stays, no notification).
 ///
@@ -176,7 +176,7 @@ public actor SchedulingPass {
                 overdueAt: overdueAt,
                 floor: floor,
                 window: effective,
-                occasionDays: occurrences.map(\.1),
+                occurrences: occurrences.map(\.1),
                 context: context
             ) else {
                 zeroCapacity.insert(contact.id)
@@ -276,12 +276,13 @@ public actor SchedulingPass {
     /// The cadence slot (§9): from `max(now, overdueAt, floor)`, joining the
     /// slot in progress only for an overdue contact with no snooze (a snooze
     /// target is always a future slot start, never the slot it lands in), then
-    /// past any occasion day (contract 6). Nil means zero capacity.
+    /// past the day of any occurrence that will notify in `window` (contract
+    /// 6). Nil means zero capacity.
     private static func cadenceSlot(
         overdueAt: Date,
         floor: Date?,
         window: ReminderWindow,
-        occasionDays: [Date],
+        occurrences: [Date],
         context: Context
     ) -> Date? {
         let engine = context.engine
@@ -290,9 +291,15 @@ public actor SchedulingPass {
             in: window,
             includingContainingSlot: floor == nil && overdueAt <= context.now
         ) else { return nil }
-        // Contract 6: the occasion wins its day. Bounded by the number of
-        // occasion days, since each step moves past one of them.
+        // Contract 6: an occasion that will notify wins its day (tech-lead
+        // ruling, 2026-10-28). One that never notifies keeps its row but
+        // leaves the cadence slot alone, so the contact still hears something
+        // that day. Bounded by the number of occasion days, since each step
+        // moves past one of them.
         let calendar = context.calendar
+        let occasionDays = occurrences.filter {
+            engine.occasionFireDate(for: $0, in: window, timeZone: calendar.timeZone) != nil
+        }
         for _ in occasionDays {
             guard let day = occasionDays.first(where: { calendar.isDate($0, inSameDayAs: slot) }),
                   let nextDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: day)),
@@ -365,7 +372,7 @@ public actor SchedulingPass {
             overdueAt: anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400),
             floor: floor,
             window: contact.reminderWindowOverride ?? global,
-            occasionDays: occurrences.map(\.1),
+            occurrences: occurrences.map(\.1),
             context: context
         ) else {
             return false
