@@ -42,7 +42,24 @@ extension AppLaunchCoordinatorRecoveryTests {
         #expect(kept?.cadenceDays == 14)
     }
 
-    @Test("Double-tapping Done starts one completion save")
+    @Test("Done after onboarding is already complete writes nothing")
+    func finishAfterReadyWritesNothing() async throws {
+        let profile = RetryingRecoveryProfileRepository(profile: Self.startedTrialProfile, failuresRemaining: 0)
+        let source = RecoveryContactsSource(status: .authorized, contacts: [Self.systemContact])
+        let launch = coordinator(runtime: runtime(profile: profile), source: source)
+        await launch.start()
+        await launch.finishOnboarding()
+        #expect(launch.phase == .ready)
+        #expect(await profile.saveCount() == 1)
+
+        await launch.finishOnboarding()
+
+        #expect(launch.phase == .ready)
+        #expect(await profile.saveCount() == 1)
+        #expect(try await profile.fetch().onboardingCompletedAt == Self.now)
+    }
+
+    @Test("Double-tapping Done starts one completion save", .timeLimit(.minutes(1)))
     func doubleFinishTapStartsOneSave() async throws {
         let profile = BlockingRecoveryProfileRepository(profile: Self.startedTrialProfile)
         let source = RecoveryContactsSource(status: .authorized, contacts: [Self.systemContact])
@@ -53,6 +70,9 @@ extension AppLaunchCoordinatorRecoveryTests {
         let firstTap = Task { await launch.finishOnboarding() }
         await profile.waitUntilSaveStarts()
         await launch.finishOnboarding()
+        // The second tap returned while the first save is still held, and
+        // started no save of its own.
+        #expect(await profile.saveCount() == 1)
         await profile.finishSave()
         await firstTap.value
 

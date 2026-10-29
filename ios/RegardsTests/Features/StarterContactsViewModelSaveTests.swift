@@ -110,6 +110,93 @@ struct StarterContactsViewModelSaveTests {
         #expect(!viewModel.isSaving)
     }
 
+    // MARK: Leaving the screen
+
+    @Test("Skip pressed while Save is writing is refused, and the picks still match the store afterwards")
+    func skipDuringSaveIsRefused() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let cy = Self.person("Cy")
+        for person in [ana, cy] { try await store.upsert(person) }
+        let gate = AsyncGate()
+        let viewModel = StarterContactsViewModel(
+            contacts: ScriptedTrackingContactRepository(store, gate: gate),
+            announce: { _ in }
+        )
+        await viewModel.load()
+        viewModel.toggle(ana.id)
+        viewModel.toggle(cy.id)
+
+        let saving = Task { await viewModel.save() }
+        // Ana's write is held; Cy's has not started.
+        await gate.waitUntilArrived()
+        let skipped = viewModel.skip()
+        #expect(!skipped, "Skip must not leave while a write is in flight.")
+        #expect(viewModel.selection.count == 2, "Refused Skip must not drop the picks being written.")
+        await gate.open()
+        let saved = await saving.value
+
+        #expect(saved)
+        let inStore = try await Self.trackedInStore(store)
+        #expect(inStore.count == 2)
+        #expect(viewModel.selection == inStore)
+        #expect(!viewModel.canSave)
+    }
+
+    @Test("After a successful Save the screen is finished: picks, cadences, a second save and Skip all do nothing")
+    func editsAfterDoneAreRefused() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let cy = Self.person("Cy")
+        for person in [ana, cy] { try await store.upsert(person) }
+        let repository = ScriptedTrackingContactRepository(store)
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        await viewModel.load()
+        viewModel.toggle(ana.id)
+        #expect(await viewModel.save())
+        #expect(viewModel.isFinished)
+        let written = try await Self.trackedInStore(store)
+        let callsAfterDone = await repository.updateTrackingCalls
+
+        let pickedCy = viewModel.toggle(cy.id)
+        let unpickedAna = viewModel.toggle(ana.id)
+        viewModel.setCadence(90, for: ana.id)
+        let skipped = viewModel.skip()
+        let savedAgain = await viewModel.save()
+
+        #expect(!pickedCy && !unpickedAna && !skipped && !savedAgain)
+        #expect(viewModel.selection == written, "A finished screen must keep showing what was written.")
+        #expect(!viewModel.canSave)
+        #expect(await repository.updateTrackingCalls == callsAfterDone, "No write after Done.")
+        #expect(try await Self.trackedInStore(store) == written)
+    }
+
+    @Test("After Skip the screen is finished: picks, cadences and a save all do nothing")
+    func editsAfterSkipAreRefused() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        try await store.upsert(ana)
+        let repository = ScriptedTrackingContactRepository(store)
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        await viewModel.load()
+        viewModel.toggle(ana.id)
+
+        let skipped = viewModel.skip()
+
+        #expect(skipped)
+        #expect(viewModel.isFinished)
+        #expect(viewModel.selection.isEmpty, "Skip drops unsaved picks.")
+        let pickedAgain = viewModel.toggle(ana.id)
+        viewModel.setCadence(90, for: ana.id)
+        let saved = await viewModel.save()
+        #expect(!pickedAgain)
+        #expect(!saved)
+        #expect(viewModel.selection.isEmpty, "A finished screen must not show new picks.")
+        #expect(!viewModel.canSave)
+        #expect(await repository.updateTrackingCalls == 0, "Skip writes nothing, and nothing after it may.")
+        #expect(try await Self.trackedInStore(store).isEmpty)
+    }
+
     // MARK: A write that throws midway
 
     @Test("A save that fails on its second write leaves Done offering exactly the contact that was not written")

@@ -168,6 +168,27 @@ extension AppLaunchCoordinatorTests {
         #expect(launch.onboardingStep == .starter)
     }
 
+    // The launch flips .loading to .onboarding only if nothing else decided
+    // the phase while it read the authorization.
+    @Test("Browsing without contacts during the authorization read is not undone when the read returns")
+    func actionDuringAuthorizationReadIsNotUndone() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let source = BlockingAuthorizationContactsSource(contacts: [Self.systemContact])
+        let launch = coordinator(environment: environment, source: source)
+        let start = Task { await launch.start() }
+        await source.waitUntilCurrentAuthorizationStarts()
+
+        await launch.continueWithoutContacts()
+        #expect(launch.phase == .ready)
+        await source.finishCurrentAuthorization()
+        await start.value
+
+        #expect(launch.phase == .ready)
+        #expect(try await environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await environment.contacts.fetchAll().isEmpty, "The stale launch must not import afterwards.")
+        #expect(await source.counts().fetches == 0)
+    }
+
     // MARK: Finishing
 
     @Test("Finishing the starter step writes completion last and opens the tabs")
@@ -251,7 +272,7 @@ extension AppLaunchCoordinatorTests {
 
     // MARK: Limited access
 
-    @Test("A limited launch offers only the shared people and says the list is limited")
+    @Test("A fresh limited install offers only the shared people and says the list is limited")
     func limitedImportOffersSharedSubsetOnly() async throws {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         // The system shows Regards 2 of the user's 5 contacts; the other 3
@@ -267,6 +288,34 @@ extension AppLaunchCoordinatorTests {
         let picker = StarterContactsViewModel(contacts: environment.contacts)
         await picker.load()
         #expect(picker.contacts.map(\.displayName) == ["Han Solo", "Leia Organa"])
+    }
+
+    // A pin, not a regression test: it passes on the code before the repair on
+    // purpose. §7: a limited read never archives, so contacts imported under
+    // full access stay active after a downgrade and the picker offers them
+    // too, as All Contacts shows them.
+    @Test("A relaunch after a downgrade to limited keeps the earlier imports on offer")
+    func limitedRelaunchAfterDowngradeKeepsEarlierImports() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let everyone = [Self.systemContact, Self.han, Self.luke]
+        let first = coordinator(
+            environment: environment,
+            source: ScriptedLaunchContactsSource(status: .authorized, contacts: everyone)
+        )
+        await first.start()
+        #expect(first.onboardingStep == .starter)
+
+        let second = coordinator(
+            environment: environment,
+            source: ScriptedLaunchContactsSource(status: .limited, contacts: [Self.han])
+        )
+        await second.start()
+
+        #expect(second.onboardingStep == .starter)
+        #expect(second.starterAccessIsLimited)
+        let picker = StarterContactsViewModel(contacts: environment.contacts)
+        await picker.load()
+        #expect(picker.contacts.map(\.displayName) == ["Han Solo", "Leia Organa", "Luke Skywalker"])
     }
 
     @Test("Allowing limited access from the pre-prompt also marks the starter step limited")
