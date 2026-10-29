@@ -43,8 +43,6 @@ final class StarterContactsViewModel {
 
     static let limitMessage = "You can pick up to 3 people. Remove one to choose someone else."
     static let saveFailedMessage = "Couldn't save your picks. Try again."
-    static let contactsChangedMessage =
-        "Some people are no longer in your contacts. Check your picks, then save again."
 
     private(set) var loadState: RegardsLoadState = .loading
     /// Every offered contact, sorted by name.
@@ -111,8 +109,10 @@ final class StarterContactsViewModel {
     /// Whether Done has something to write. Picking nobody on a fresh install
     /// has nothing to save, so the screen's Skip is the way out.
     var canSave: Bool {
-        loadState == .loaded && !isSaving && selection != baseline
+        loadState == .loaded && !isSaving && hasUnsavedChanges
     }
+
+    private var hasUnsavedChanges: Bool { selection != baseline }
 
     // MARK: - Load
 
@@ -141,7 +141,7 @@ final class StarterContactsViewModel {
     /// A newly picked contact starts at every 2 weeks.
     @discardableResult
     func toggle(_ id: UUID) -> Bool {
-        guard loadState == .loaded, contacts.contains(where: { $0.id == id }) else { return false }
+        guard loadState == .loaded, !isSaving, contacts.contains(where: { $0.id == id }) else { return false }
         if selection[id] != nil {
             selection[id] = nil
             statusMessage = nil
@@ -158,18 +158,29 @@ final class StarterContactsViewModel {
     }
 
     /// Changes the cadence of a picked contact. Ignored for one that isn't
-    /// picked, and for a value below 1 day (`updateTracking` would refuse it).
+    /// picked, for a value below 1 day (`updateTracking` would refuse it), and
+    /// while a save is writing.
     func setCadence(_ days: Int, for id: UUID) {
-        guard selection[id] != nil, days >= 1 else { return }
+        guard selection[id] != nil, days >= 1, !isSaving else { return }
         selection[id] = days
         statusMessage = nil
     }
 
     // MARK: - Finishing
 
-    /// Writes the picks. Returns `true` when every write landed, so the screen
-    /// can leave; on `false` the screen stays, the message says why, and
+    /// Writes the picks. Returns `true` when nothing is left to save, so the
+    /// screen can leave; on `false` the screen stays, the message says why, and
     /// nothing the user picked is lost.
+    ///
+    /// Picks and cadence changes are ignored while this runs, and it writes a
+    /// snapshot of the picks taken at the start, so what it marks as saved is
+    /// exactly what it wrote. `baseline` follows each write as it lands: after
+    /// a write that throws, earlier writes stay (there is no rollback), the
+    /// screen shows them as saved, and Done offers what is left.
+    ///
+    /// A contact archived since the list loaded is dropped from the screen.
+    /// Whether it was picked or unpicked, its write can't land, so it is named
+    /// in the result and never counted as saved.
     @discardableResult
     func save() async -> Bool {
         guard canSave else { return false }
@@ -177,26 +188,39 @@ final class StarterContactsViewModel {
         defer { isSaving = false }
         statusMessage = nil
 
-        var vanished = false
+        let target = selection
+        var vanished: [Contact] = []
         do {
-            for contact in contacts where selection[contact.id] != baseline[contact.id] {
-                let landed = try await repository.updateTracking(id: contact.id, cadenceDays: selection[contact.id])
-                if !landed { vanished = true }
+            for contact in contacts where target[contact.id] != baseline[contact.id] {
+                let landed = try await repository.updateTracking(id: contact.id, cadenceDays: target[contact.id])
+                if landed {
+                    baseline[contact.id] = target[contact.id]
+                } else {
+                    vanished.append(contact)
+                }
             }
         } catch {
             Self.log.error("failed to save starter contacts: \(error, privacy: .private)")
+            // Best effort: take the store's word for what is tracked. If this
+            // read fails too, `baseline` already holds every write that landed.
             await resync()
             fail(Self.saveFailedMessage)
             return false
         }
-        if vanished {
-            await resync()
-            fail(Self.contactsChangedMessage)
-            return false
+        guard !vanished.isEmpty else {
+            announce(savedAnnouncement())
+            return true
         }
-        baseline = selection
-        announce(savedAnnouncement())
-        return true
+        let gone = Set(vanished.map(\.id))
+        contacts.removeAll { gone.contains($0.id) }
+        selection = selection.filter { !gone.contains($0.key) }
+        baseline = baseline.filter { !gone.contains($0.key) }
+        let names = ListFormatter.localizedString(byJoining: vanished.map(\.displayName))
+        let verb = vanished.count == 1 ? "is" : "are"
+        let result = "\(savedAnnouncement()) \(names) \(verb) no longer in your contacts."
+        statusMessage = result
+        announce(result)
+        return !hasUnsavedChanges
     }
 
     /// Leaves without writing. Drops any unsaved picks so a screen that stays

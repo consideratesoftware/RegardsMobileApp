@@ -173,6 +173,8 @@ struct StarterContactsScreen: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // The picks are being written; the view model ignores edits too.
+        .disabled(viewModel.isSaving)
         .accessibilityLabel(contact.displayName)
         .accessibilityValue(contact.preferredChannel.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -193,6 +195,7 @@ struct StarterContactsScreen: View {
                 Text("How often")
             }
             .pickerStyle(.menu)
+            .disabled(viewModel.isSaving)
             .tint(RegardsDS.accentInk)
             .frame(minHeight: 44)
             .accessibilityLabel("How often for \(contact.displayName)")
