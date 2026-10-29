@@ -419,7 +419,7 @@ private actor TransientRuntimeFactory {
     }
     func attemptCount() -> Int { attempts }
 }
-private actor BlockingAuthorizationContactsSource: ContactsSource {
+actor BlockingAuthorizationContactsSource: ContactsSource {
     private let contacts: [SystemContact]
     private var fetchFailuresRemaining: Int
     private var currentStarted = false

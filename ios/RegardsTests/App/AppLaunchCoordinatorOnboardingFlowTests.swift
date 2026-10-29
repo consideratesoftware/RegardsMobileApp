@@ -147,6 +147,27 @@ extension AppLaunchCoordinatorTests {
         #expect(launch.statusMessage != nil)
     }
 
+    // The test lives here because AppLaunchCoordinatorTests.swift is at the
+    // 500-line lint limit; it uses that file's blocking source.
+    @Test("A resumed launch holds the splash through the authorization read, then lands on the starter step")
+    func resumingLaunchHoldsSplashThroughAuthorizationRead() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let source = BlockingAuthorizationContactsSource(contacts: [Self.systemContact])
+        let launch = coordinator(environment: environment, source: source)
+        let start = Task { await launch.start() }
+        await source.waitUntilCurrentAuthorizationStarts()
+
+        // Mid-read the launch can't know yet whether this is a fresh install
+        // or a resume, so it must not show the concept screen.
+        #expect(launch.phase == .loading)
+
+        await source.finishCurrentAuthorization()
+        await start.value
+
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
+    }
+
     // MARK: Finishing
 
     @Test("Finishing the starter step writes completion last and opens the tabs")
