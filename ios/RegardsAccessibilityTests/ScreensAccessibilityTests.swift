@@ -118,14 +118,14 @@ final class ScreensAccessibilityTests: XCTestCase {
 
     @MainActor
     func testOnboardingPassesAudit() throws {
-        // Settings no longer links to the permission intro (TF-11 slice 2
-        // removed the inert "Onboarding preview" row), so the only way to see
-        // it is a fresh install: the first-launch fixture stops there.
+        // The Contacts pre-prompt. Settings no longer links to it (TF-11
+        // slice 2 removed the inert "Onboarding preview" row), and a fresh
+        // install now starts at the concept screen (slice 3), so the only way
+        // here is Get started.
         let app = XCUIApplication()
         app.launchArguments.append("--regards-first-launch-runtime")
         app.launch()
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
-        XCTAssertTrue(onboarding.waitForExistence(timeout: 10), "A fresh launch should stop at the pre-prompt.")
+        app.passOnboardingConcept()
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 

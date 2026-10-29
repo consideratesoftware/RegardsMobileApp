@@ -1,20 +1,88 @@
 import XCTest
 
-/// The starter-contacts picker, reached from Settings ("Choose people to keep
-/// in touch with", TF-11 slice 2, §10.8). The mock launch has every contact
-/// already tracked and no untracked one to pick, so the audits there only
-/// prove the screen is reachable and well formed. The selection flows run on
-/// the first-launch fixture, which imports one untracked contact (Leia
-/// Organa) into a fresh in-memory store.
+/// The onboarding steps and the starter-contacts picker. TF-11 slice 3 put
+/// them in the launch path: a fresh install shows the concept screen, then the
+/// Contacts pre-prompt, then (after the import) the starter step with Skip.
+/// Slice 2 added the same picker to Settings ("Choose people to keep in touch
+/// with", §10.8). The mock launch has every contact already tracked and no
+/// untracked one to pick, so the Settings audits there only prove the screen
+/// is reachable and well formed. The selection flows run on the first-launch
+/// fixture, which imports one untracked contact (Leia Organa) into a fresh
+/// in-memory store.
 ///
 /// The UI test target can't import the app module, so the identifiers repeat
 /// the ones the screens set.
+extension XCUIApplication {
+    /// Taps "Get started" on a fresh install's concept screen and waits for the
+    /// Contacts pre-prompt. At accessibility5 XCTest must auto-scroll the
+    /// button, and the first synthesized tap can finish that scroll without
+    /// delivering the action, so a missed tap is retried once.
+    @MainActor
+    func passOnboardingConcept() {
+        let getStarted = buttons["onboarding.get-started"]
+        let prompt = descendants(matching: .any)["screen.onboarding"]
+        XCTAssertTrue(getStarted.waitForExistence(timeout: 10), "A fresh launch should stop at the concept screen.")
+        getStarted.tap()
+        if !prompt.waitForExistence(timeout: 5) {
+            XCTAssertTrue(getStarted.exists)
+            getStarted.tap()
+        }
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Get started should show the Contacts pre-prompt.")
+    }
+
+    /// Picks a contact on the starter step and waits for its cadence menu, which
+    /// only a picked row shows. At accessibility5 the first tap on a row below
+    /// the fold can end with just the scroll (the same XCTest quirk as above),
+    /// so a tap that left the row unpicked is repeated once. The `isSelected`
+    /// check keeps a slow first tap from being undone by the second.
+    @MainActor
+    func pickStarter(named name: String) {
+        let row = buttons["starter.contact.\(name)"]
+        let cadence = descendants(matching: .any)["starter.cadence.\(name)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(name) should be offered.")
+        row.tap()
+        if !cadence.waitForExistence(timeout: 3), !row.isSelected {
+            row.tap()
+        }
+        XCTAssertTrue(cadence.waitForExistence(timeout: 5), "A picked contact should show its cadence menu.")
+    }
+
+    /// From a fresh install: Get started, then Allow, then wait for the starter
+    /// step the import lands on. Same single retry as above for the Allow tap.
+    @MainActor
+    func reachOnboardingStarterStep() {
+        passOnboardingConcept()
+        let allow = buttons["onboarding.allow-contacts"]
+        let starter = descendants(matching: .any)["screen.starter-contacts"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+        if !starter.waitForExistence(timeout: 5) {
+            XCTAssertTrue(allow.exists)
+            allow.tap()
+        }
+        XCTAssertTrue(starter.waitForExistence(timeout: 10), "The import should land on the starter step.")
+    }
+}
+
 extension ScreensAccessibilityTests {
     private static let chooseStartersRowID = "settings.choose-starters"
     private static let starterScreenID = "screen.starter-contacts"
     private static let starterDoneID = "starter.done"
     private static let leiaRowID = "starter.contact.Leia Organa"
     private static let leiaCadenceID = "starter.cadence.Leia Organa"
+    private static let starterSkipID = "starter.skip"
+    private static let conceptScreenID = "screen.onboarding-concept"
+
+    @MainActor
+    private func launchFirstLaunch(dynamicTypeSize: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-first-launch-runtime")
+        if let dynamicTypeSize {
+            app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
+        }
+        app.launch()
+        return app
+    }
 
     @MainActor
     private func openStarterPicker(from app: XCUIApplication) {
@@ -26,20 +94,16 @@ extension ScreensAccessibilityTests {
     }
 
     /// A fresh store with one imported, untracked contact, opened on Settings.
+    /// Skips the starter step, which writes nothing, so Leia stays untracked.
     @MainActor
     private func launchFirstLaunchToSettings(dynamicTypeSize: String? = nil) -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments.append("--regards-first-launch-runtime")
-        if let dynamicTypeSize {
-            app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = dynamicTypeSize
-        }
-        app.launch()
-
-        let allow = app.buttons["onboarding.allow-contacts"]
-        XCTAssertTrue(allow.waitForExistence(timeout: 10), "A fresh launch should stop at the Contacts pre-prompt.")
-        allow.tap()
+        let app = launchFirstLaunch(dynamicTypeSize: dynamicTypeSize)
+        app.reachOnboardingStarterStep()
+        let skip = app.buttons[Self.starterSkipID]
+        XCTAssertTrue(skip.waitForExistence(timeout: 5))
+        skip.tap()
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        XCTAssertTrue(overdue.waitForExistence(timeout: 10), "The import should reveal the tabs.")
+        XCTAssertTrue(overdue.waitForExistence(timeout: 10), "Skipping the starter step should reveal the tabs.")
         navigateToTab(named: "Settings", from: "screen.overdue", to: "screen.settings", in: app)
         return app
     }
@@ -76,12 +140,8 @@ extension ScreensAccessibilityTests {
         let app = launchFirstLaunchToSettings()
         openStarterPicker(from: app)
 
-        leiaRow(in: app).tap()
+        app.pickStarter(named: "Leia Organa")
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)[Self.leiaCadenceID].waitForExistence(timeout: 10),
-            "A picked contact should show its cadence menu."
-        )
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -90,9 +150,8 @@ extension ScreensAccessibilityTests {
         let app = launchFirstLaunchToSettings(dynamicTypeSize: "accessibility5")
         openStarterPicker(from: app)
 
-        leiaRow(in: app).tap()
+        app.pickStarter(named: "Leia Organa")
 
-        XCTAssertTrue(app.descendants(matching: .any)[Self.leiaCadenceID].waitForExistence(timeout: 10))
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
@@ -199,5 +258,74 @@ extension ScreensAccessibilityTests {
         openStarterPicker(from: app)
 
         XCTAssertFalse(leiaRow(in: app).isSelected, "An unconfirmed pick must not be saved.")
+    }
+
+    // MARK: Onboarding steps (TF-11 slice 3)
+
+    @MainActor
+    func testOnboardingConceptPassesAudit() throws {
+        let app = launchFirstLaunch()
+        let concept = app.descendants(matching: .any)[Self.conceptScreenID]
+        XCTAssertTrue(concept.waitForExistence(timeout: 10), "A fresh launch should stop at the concept screen.")
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    @MainActor
+    func testOnboardingGetStartedShowsContactsPrePrompt() {
+        let app = launchFirstLaunch()
+
+        app.passOnboardingConcept()
+
+        XCTAssertTrue(app.buttons["onboarding.allow-contacts"].exists, "The pre-prompt should offer the Contacts ask.")
+        XCTAssertFalse(app.descendants(matching: .any)[Self.conceptScreenID].exists)
+    }
+
+    @MainActor
+    func testOnboardingStarterPassesAudit() throws {
+        let app = launchFirstLaunch()
+        app.reachOnboardingStarterStep()
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    @MainActor
+    func testOnboardingStarterPassesAuditAtAccessibility5() throws {
+        let app = launchFirstLaunch(dynamicTypeSize: "accessibility5")
+        app.reachOnboardingStarterStep()
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    /// Done saves picks and Skip saves nothing. With nothing picked, only Skip
+    /// does anything, so Done must not look tappable.
+    @MainActor
+    func testOnboardingStarterOffersSkipAndDisablesDoneUntilPicked() {
+        let app = launchFirstLaunch()
+        app.reachOnboardingStarterStep()
+
+        let skip = app.buttons[Self.starterSkipID]
+        XCTAssertTrue(skip.waitForExistence(timeout: 5), "The starter step has no back button, so it needs Skip.")
+        XCTAssertTrue(skip.isEnabled)
+        XCTAssertGreaterThanOrEqual(skip.frame.height, 44)
+        XCTAssertFalse(app.buttons[Self.starterDoneID].isEnabled, "Done has nothing to save before a pick.")
+
+        app.pickStarter(named: "Leia Organa")
+
+        XCTAssertTrue(app.buttons[Self.starterDoneID].isEnabled, "Done should enable once a contact is picked.")
+    }
+
+    @MainActor
+    func testOnboardingStarterSkipRevealsTabsAndTracksNoOne() {
+        let app = launchFirstLaunch()
+        app.reachOnboardingStarterStep()
+        app.buttons[Self.starterSkipID].tap()
+
+        let overdue = app.descendants(matching: .any)["screen.overdue"]
+        XCTAssertTrue(overdue.waitForExistence(timeout: 10), "Skip should finish onboarding and reveal the tabs.")
+        navigateToTab(named: "Contacts", from: "screen.overdue", to: "screen.contacts", in: app)
+
+        XCTAssertTrue(app.staticTexts["Leia Organa"].waitForExistence(timeout: 10), "The import should still show.")
+        XCTAssertFalse(app.staticTexts["every 2 weeks"].exists, "Skip must not track anyone.")
     }
 }

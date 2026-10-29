@@ -92,7 +92,9 @@ struct AppLaunchCoordinatorTests {
         #expect(profile.entitlementRefreshedAt == originalRefresh)
     }
 
-    @Test("An authorized relaunch resumes import and saves completion last")
+    // TF-11 slice 3 changed this expectation: the import lands on the starter
+    // step; `finishOnboarding()` writes completion later.
+    @Test("An authorized relaunch resumes import and waits at the starter step")
     func authorizedRelaunchResumesImport() async throws {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
@@ -103,10 +105,11 @@ struct AppLaunchCoordinatorTests {
 
         await launch.start()
 
-        #expect(launch.phase == .ready)
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         let runtime = try #require(launch.runtime)
         let profile = try await runtime.environment.profile.fetch()
-        #expect(profile.onboardingCompletedAt == now)
+        #expect(profile.onboardingCompletedAt == nil)
         #expect(try await runtime.environment.contacts.fetchAll().map(\.systemContactRef)
             == [Self.systemContact.identifier])
         #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
@@ -134,10 +137,12 @@ struct AppLaunchCoordinatorTests {
 
         await launch.requestContactsAndImport()
 
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: a successful retry lands on the starter step.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         let runtime = try #require(launch.runtime)
         #expect(try await runtime.environment.contacts.fetchAll().count == 1)
-        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
     }
 
     @Test("Denied permission offers a durable browse-only path")
@@ -238,11 +243,13 @@ struct AppLaunchCoordinatorTests {
         await launch.requestContactsAndImport()
         await source.finishCurrentAuthorization()
         await start.value
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: stale launch work must not move the starter step.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         #expect(launch.statusMessage == nil)
         #expect(await source.counts() == .init(current: 2, requests: 1, fetches: 1))
         let runtime = try #require(launch.runtime)
-        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
         #expect(try await runtime.environment.contacts.fetchAll().count == 1)
     }
 
@@ -259,10 +266,12 @@ struct AppLaunchCoordinatorTests {
         await source.finishCurrentAuthorization()
         await start.value
 
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: starter step, onboarding still open.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         #expect(launch.statusMessage == nil)
         let runtime = try #require(launch.runtime)
-        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
         #expect(try await runtime.environment.contacts.fetchAll().count == 1)
     }
 
