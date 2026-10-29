@@ -409,20 +409,17 @@ public final class UpcomingViewModel {
             }
         }
 
-        // Occasion rows are seeded in the Phase 0 mock repository so their
-        // birthday/anniversary states remain reachable and auditable. TF-07
-        // replaces this bounded fetch with the persisted ValueObservation
-        // pipeline that owns every Upcoming row (§14 PR25 / R10).
+        // Occasion rows are SchedulingPass's (the mock runtime's come from
+        // `MockRepositories.occasionProvider`). TF-07f replaces this bounded
+        // fetch with the persisted ValueObservation pipeline that owns every
+        // Upcoming row (§14 PR25 / R10).
         //
-        // Known deviation: §9 contract 6 (an occasion suppresses a same-day
-        // cadence reminder for the same contact) is NOT enforced here. This
-        // view model computes cadence rows independently of the persisted
-        // reminders it reads, so it can't decide which of two candidates
-        // survives without duplicating the scheduler — that's SchedulingPass's
-        // job (§14 PR25 / TF-07, R6). Until it lands, a contact whose cadence
-        // falls on the same local day as an occasion can appear twice; the
-        // rows carry distinct IDs (R36), so the duplicate is visible rather
-        // than corrupting identity or ordering.
+        // Known deviation until TF-07f: SchedulingPass's rows apply §9
+        // contract 6 (an occasion suppresses a same-day cadence reminder for
+        // the same contact), but this view model computes cadence rows itself,
+        // so a contact whose cadence falls on an occasion's day can appear
+        // twice. The rows carry distinct IDs (R36), so the duplicate is
+        // visible rather than corrupting identity or ordering.
         let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
         let startOfToday = calendar.startOfDay(for: now)
         for reminder in reminders where reminder.kind != .cadence {

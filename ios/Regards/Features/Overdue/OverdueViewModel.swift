@@ -311,8 +311,8 @@ public final class OverdueViewModel {
     }
 
     /// "Snooze <name> 1 week" from an Overdue row: pushes the contact's cadence
-    /// reminder 7 days out through `SchedulingPass` (§14 PR22's DB-only
-    /// stub) and removes the row from view immediately, mirroring
+    /// reminder to the first window slot at least 7 days out through
+    /// `SchedulingPass` and removes the row from view immediately, mirroring
     /// `markCaughtUp`'s instant-removal contract. No interaction is logged
     /// and `lastInteractedAt` is untouched (decision #31).
     ///
