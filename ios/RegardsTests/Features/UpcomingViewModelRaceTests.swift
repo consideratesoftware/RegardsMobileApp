@@ -43,6 +43,7 @@ struct UpcomingViewModelRaceTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
@@ -102,6 +103,7 @@ struct UpcomingViewModelRaceTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         let window = ReminderWindow.allDayEveryDay(timezone: UpcomingFixtures.utc, digestHorizonDays: 5)
@@ -161,6 +163,7 @@ struct UpcomingViewModelRaceTests {
                 reminders: gatedReminders,
                 contacts: gatedContacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             interactions: StubInteractionRepository(),
@@ -234,6 +237,7 @@ struct UpcomingViewModelRaceTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             interactions: StubInteractionRepository(),

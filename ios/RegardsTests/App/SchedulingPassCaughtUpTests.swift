@@ -22,6 +22,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         try await scheduler.snooze(contactId: contact.id)
@@ -62,6 +63,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         try await scheduler.snooze(contactId: contact.id) // the canonical row
@@ -99,6 +101,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
         )
 
@@ -143,6 +146,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         try await scheduler.snooze(contactId: contact.id)
@@ -178,6 +182,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         try await scheduler.snooze(contactId: contact.id)
@@ -209,6 +214,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
         )
 
@@ -238,6 +244,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { firstNow }
         )
         try await scheduler.snooze(contactId: contact.id)
@@ -249,6 +256,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { secondNow }
         )
             .snooze(contactId: contact.id)
@@ -294,6 +302,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -331,6 +340,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -359,6 +369,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -403,6 +414,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -431,6 +443,7 @@ struct SchedulingPassCaughtUpTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         _ = try await free.snooze(contactId: contact.id)

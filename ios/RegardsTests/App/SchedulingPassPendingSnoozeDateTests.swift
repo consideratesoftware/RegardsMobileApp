@@ -38,6 +38,7 @@ struct SchedulingPassPendingSnoozeDateTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         let laterDate = now.addingTimeInterval(14 * 86_400)
@@ -82,6 +83,7 @@ struct SchedulingPassPendingSnoozeDateTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         try await repositories.reminders.upsert(ScheduledReminder(

@@ -41,6 +41,7 @@ struct UpcomingViewModelDuplicateRowTests {
                 reminders: StubReminderRepository([occasion]),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -98,6 +99,7 @@ struct UpcomingViewModelDuplicateRowTests {
                 reminders: StubReminderRepository(occasions),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -141,6 +143,7 @@ struct UpcomingViewModelDuplicateRowTests {
                 reminders: StubReminderRepository([laterOccasion]),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),

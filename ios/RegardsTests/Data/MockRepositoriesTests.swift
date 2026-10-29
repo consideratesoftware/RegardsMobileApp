@@ -157,7 +157,7 @@ struct MockRepositoriesTests {
             contacts: mocks.contacts,
             reminders: remindersRepository,
             scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
-                                      window: mocks.window, clock: { now }),
+                                      window: mocks.window, occasions: { _ in [] }, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -210,7 +210,7 @@ struct MockRepositoriesTests {
             contacts: mocks.contacts,
             reminders: remindersRepository,
             scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
-                                      window: mocks.window, clock: { now }),
+                                      window: mocks.window, occasions: { _ in [] }, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }
@@ -275,7 +275,7 @@ struct MockRepositoriesTests {
             contacts: mocks.contacts,
             reminders: remindersRepository,
             scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
-                                      window: mocks.window, clock: { nowDate }),
+                                      window: mocks.window, occasions: { _ in [] }, clock: { nowDate }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { nowDate }
@@ -316,7 +316,7 @@ struct MockRepositoriesTests {
             contacts: mocks.contacts,
             reminders: remindersRepository,
             scheduler: SchedulingPass(reminders: remindersRepository, contacts: mocks.contacts,
-                                      window: mocks.window, clock: { now }),
+                                      window: mocks.window, occasions: { _ in [] }, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
             clock: { now }

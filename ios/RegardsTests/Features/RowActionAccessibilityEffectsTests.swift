@@ -187,6 +187,7 @@ struct RowActionAccessibilityEffectsTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Date(timeIntervalSince1970: 1_800_000_000) }
             ),
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
@@ -239,6 +240,7 @@ struct RowActionAccessibilityEffectsTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Date(timeIntervalSince1970: 1_800_000_000) }
             ),
             interactions: StubInteractionRepository(),

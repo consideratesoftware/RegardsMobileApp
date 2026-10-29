@@ -51,6 +51,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -85,6 +86,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -114,6 +116,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -151,6 +154,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -184,6 +188,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -218,6 +223,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -251,6 +257,7 @@ struct SchedulingPassSnoozeCalendarTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
             clock: { now }
         )
 

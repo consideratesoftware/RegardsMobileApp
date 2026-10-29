@@ -247,6 +247,7 @@ struct UpcomingViewModelBoundaryTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { nowDate }
             ),
             interactions: StubInteractionRepository(),
@@ -311,6 +312,7 @@ struct UpcomingViewModelBoundaryTests {
                 reminders: StubReminderRepository(reminders),
                 contacts: contactsRepository,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { now }
             ),
             interactions: StubInteractionRepository(),

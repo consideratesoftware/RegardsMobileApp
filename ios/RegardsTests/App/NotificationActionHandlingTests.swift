@@ -417,7 +417,8 @@ extension NotificationActionHandlingTests {
             environment: environment,
             window: ReminderWindow.defaultV1(timezone: windowZone),
             userCalendar: userCalendar,
-            clock: { now }
+            clock: { now },
+            occasions: { _ in [] }
         )
         let fake = DebugNotificationScheduling()
         let launch = AppLaunchCoordinator(

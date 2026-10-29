@@ -57,6 +57,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -80,6 +81,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -103,6 +105,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -136,6 +139,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -158,6 +162,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -180,6 +185,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -202,6 +208,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now },
@@ -233,6 +240,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -262,6 +270,7 @@ struct ContactDetailViewModelTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }

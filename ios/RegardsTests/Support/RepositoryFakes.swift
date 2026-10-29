@@ -449,9 +449,14 @@ actor FixedReminderWindowRepository: ReminderWindowRepository {
         self.window = window
     }
 
+    /// America/Los_Angeles, not the machine's zone: the expectations of every
+    /// suite that takes this default must not depend on where it runs (CI is
+    /// UTC; a developer's Mac is not).
+    static let defaultTimeZone = TimeZone(identifier: "America/Los_Angeles") ?? .gmt
+
     /// Every day, 00:00-23:59, no quiet hours, in `timeZone`: Snooze lands on
     /// the first local midnight at or after its floor.
-    init(timeZone: TimeZone = .current) {
+    init(timeZone: TimeZone = FixedReminderWindowRepository.defaultTimeZone) {
         self.window = ReminderWindow(
             allowedDays: .allDays,
             allowedTimeRanges: [TimeRange(start: .midnight, end: .endOfDay)],

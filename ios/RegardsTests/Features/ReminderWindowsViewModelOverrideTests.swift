@@ -272,6 +272,7 @@ struct ReminderWindowsViewModelOverrideTests {
                 reminders: environment.reminders,
                 contacts: environment.contacts,
                 window: environment.window,
+                occasions: { _ in [] },
                 clock: { now }
             ),
             interactions: environment.interactions,

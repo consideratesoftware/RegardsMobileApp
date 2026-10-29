@@ -55,6 +55,7 @@ struct ContactDetailViewModelWindowGateTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { gateNow }
             ),
             clock: { gateNow }
@@ -83,6 +84,7 @@ struct ContactDetailViewModelWindowGateTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { gateNow }
             ),
             clock: { gateNow }

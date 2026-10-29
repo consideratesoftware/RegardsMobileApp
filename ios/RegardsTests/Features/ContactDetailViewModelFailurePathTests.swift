@@ -49,6 +49,7 @@ struct ContactDetailViewModelFailurePathTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -102,6 +103,7 @@ struct ContactDetailViewModelFailurePathTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
@@ -159,6 +161,7 @@ struct ContactDetailViewModelFailurePathTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
@@ -202,6 +205,7 @@ struct ContactDetailViewModelFailurePathTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         try await scheduler.snooze(contactId: contact.id) // a real pending cadence row to restore
@@ -255,6 +259,7 @@ struct ContactDetailViewModelFailurePathTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -285,6 +290,7 @@ struct ContactDetailViewModelFailurePathTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -328,6 +334,7 @@ struct ContactDetailViewModelFailurePathTests {
                 reminders: reminders,
                 contacts: base,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }

@@ -46,6 +46,7 @@ struct OverdueViewModelActionTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: clock
             ),
             clock: clock
@@ -140,6 +141,7 @@ struct OverdueViewModelActionTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         let viewModel = OverdueViewModel(
@@ -196,6 +198,7 @@ struct OverdueViewModelActionTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         let viewModel = OverdueViewModel(
@@ -261,6 +264,7 @@ struct OverdueViewModelActionTests {
                 reminders: gatedReminders,
                 contacts: gatedContacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -375,6 +379,7 @@ struct OverdueViewModelActionTests {
                 reminders: gatedReminders,
                 contacts: gatedContacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }

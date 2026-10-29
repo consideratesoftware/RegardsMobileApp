@@ -383,9 +383,3 @@ struct UpcomingViewModelStateTests {
         #expect(!rows.contains { $0.contactId == untracked.id })
     }
 }
-
-/// The `SchedulingPass` these tests hand Upcoming: an every-day, all-day window in the device timezone.
-private func makeScheduler(reminders: any ReminderRepository, contacts: any ContactRepository,
-                           clock: @escaping @Sendable () -> Date) -> SchedulingPass {
-    SchedulingPass(reminders: reminders, contacts: contacts, window: FixedReminderWindowRepository(), clock: clock)
-}

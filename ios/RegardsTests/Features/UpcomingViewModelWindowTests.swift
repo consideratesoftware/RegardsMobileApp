@@ -44,6 +44,7 @@ struct UpcomingViewModelWindowTests {
                 reminders: remindersRepository,
                 contacts: contactsRepository,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { now }
             ),
             interactions: StubInteractionRepository(),

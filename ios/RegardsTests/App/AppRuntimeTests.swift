@@ -136,7 +136,8 @@ struct AppRuntimeTests {
             environment: seedEnvironment,
             window: window,
             userCalendar: deviceCalendar,
-            clock: { now }
+            clock: { now },
+            occasions: { _ in [] }
         )
         try await runtime.scheduler.snooze(contactId: contact.id)
 

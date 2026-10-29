@@ -65,6 +65,7 @@ struct NeverContactedAnchorParityTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now },
@@ -90,6 +91,7 @@ struct NeverContactedAnchorParityTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             interactions: StubInteractionRepository(),

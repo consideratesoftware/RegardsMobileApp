@@ -38,6 +38,7 @@ struct ContactDetailViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -73,6 +74,7 @@ struct ContactDetailViewModelSnoozeTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -111,6 +113,7 @@ struct ContactDetailViewModelSnoozeTests {
                 reminders: StubReminderRepository(),
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: clock.now
             ),
             clock: clock.now
@@ -153,6 +156,7 @@ struct ContactDetailViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -191,6 +195,7 @@ struct ContactDetailViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -228,6 +233,7 @@ struct ContactDetailViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -276,6 +282,7 @@ struct ContactDetailViewModelSnoozeTests {
             reminders: reminders,
             contacts: contacts,
             window: FixedReminderWindowRepository(),
+            occasions: { _ in [] },
             clock: { Self.now }
         )
         let viewModel = ContactDetailViewModel(

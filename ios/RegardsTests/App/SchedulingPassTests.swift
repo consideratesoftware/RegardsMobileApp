@@ -30,6 +30,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -61,6 +62,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -88,6 +90,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { first }
         )
             .snooze(contactId: contact.id)
@@ -95,6 +98,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { second }
         )
             .snooze(contactId: contact.id)
@@ -128,6 +132,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -172,6 +177,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
             .snooze(contactId: contact.id)
@@ -204,6 +210,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -238,6 +245,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -278,6 +286,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -302,6 +311,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -326,6 +336,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -354,6 +365,7 @@ struct SchedulingPassTests {
             reminders: repositories.reminders,
             contacts: repositories.contacts,
             window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 

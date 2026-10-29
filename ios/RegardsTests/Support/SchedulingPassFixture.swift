@@ -191,3 +191,20 @@ extension MockRepositories {
         )
     }
 }
+
+/// The pass the view-model tests hand a screen: no occasions and an every-day,
+/// all-day window in America/Los_Angeles (`FixedReminderWindowRepository`'s
+/// default), so Snooze lands on the first local midnight at or after its floor.
+func makeScheduler(
+    reminders: any ReminderRepository,
+    contacts: any ContactRepository,
+    clock: @escaping @Sendable () -> Date
+) -> SchedulingPass {
+    SchedulingPass(
+        reminders: reminders,
+        contacts: contacts,
+        window: FixedReminderWindowRepository(),
+        occasions: { _ in [] },
+        clock: clock
+    )
+}

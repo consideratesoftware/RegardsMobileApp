@@ -67,6 +67,7 @@ struct OverdueViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: clock.now
             ),
             clock: clock.now
@@ -103,6 +104,7 @@ struct OverdueViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: clock.now
             ),
             clock: clock.now
@@ -138,6 +140,7 @@ struct OverdueViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: clock.now
             ),
             clock: clock.now
@@ -193,6 +196,7 @@ struct OverdueViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: clock.now
             ),
             clock: clock.now
@@ -277,6 +281,7 @@ struct OverdueViewModelSnoozeTests {
                 reminders: reminders,
                 contacts: gatedContacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }
@@ -337,6 +342,7 @@ struct OverdueViewModelSnoozeTests {
                 reminders: gatedReminders,
                 contacts: baseContacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { Self.now }
             ),
             clock: { Self.now }

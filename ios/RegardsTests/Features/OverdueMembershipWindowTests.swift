@@ -37,6 +37,7 @@ struct OverdueMembershipWindowTests {
                 reminders: reminders,
                 contacts: contacts,
                 window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
                 clock: { wednesday }
             ),
             clock: { wednesday },
