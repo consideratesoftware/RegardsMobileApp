@@ -322,13 +322,18 @@ public actor SchedulingPass {
         context: Context
     ) -> [(ContactOccasion, Date)] {
         guard let zone = TimeZone(identifier: context.global.timezoneIdentifier) else { return [] }
+        // Ties break on the month-day, then the label, so the row a run
+        // writes never depends on the order the source returns occasions in.
+        func key(_ entry: (ContactOccasion, Date)) -> (Date, String, String) {
+            (entry.1, entry.0.monthDay.isoString, entry.0.label ?? "")
+        }
         var nearest: [ReminderKind: (ContactOccasion, Date)] = [:]
         for occasion in occasions where occasion.kind != .cadence {
-            let occurrence = context.engine.nextOccasionOccurrence(monthDay: occasion.monthDay, timezone: zone)
-            if let current = nearest[occasion.kind], current.1 <= occurrence { continue }
-            nearest[occasion.kind] = (occasion, occurrence)
+            let entry = (occasion, context.engine.nextOccasionOccurrence(monthDay: occasion.monthDay, timezone: zone))
+            if let current = nearest[occasion.kind], key(current) <= key(entry) { continue }
+            nearest[occasion.kind] = entry
         }
-        return nearest.values.sorted { $0.1 < $1.1 }
+        return nearest.values.sorted { ($0.1, $0.0.kind.rawValue) < ($1.1, $1.0.kind.rawValue) }
     }
 
     // MARK: - Snooze and caught up
