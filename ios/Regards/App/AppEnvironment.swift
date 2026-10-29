@@ -73,7 +73,7 @@ public struct AppRuntime: Sendable {
         window: ReminderWindow,
         userCalendar: Calendar,
         clock: @escaping @Sendable () -> Date,
-        occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion] = { _ in [] }
+        occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion]
     ) {
         self.environment = environment
         self.window = window

@@ -84,14 +84,15 @@ public actor SchedulingPass {
         lockWaiters.removeFirst().resume()
     }
 
-    /// `window` has no default: Snooze resolves through the persisted window
-    /// on every call, and a silent fallback window is the R9 bug. `occasions`
-    /// returns `[]` in production until PR30 reads Contacts and Calendar.
+    /// `window` and `occasions` have no default: Snooze resolves through the
+    /// persisted window on every call, and a silent fallback is the R9 bug.
+    /// Production passes an `occasions` that returns `[]` until PR30 reads
+    /// Contacts and Calendar.
     public init(
         reminders: any ReminderRepository,
         contacts: any ContactRepository,
         window: any ReminderWindowRepository,
-        occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion] = { _ in [] },
+        occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion],
         clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.reminders = reminders
