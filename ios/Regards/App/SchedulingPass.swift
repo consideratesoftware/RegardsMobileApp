@@ -29,10 +29,11 @@ import Foundation
 /// **Corrupt rows.** `runFull()` and `run(for:)` read one
 /// `ReminderRepository.observeSchedule()` snapshot, which drops an
 /// undecodable contact (with its rows) or row. The pass follows that policy:
-/// it neither rewrites nor cancels what it can't decode, and one bad row
-/// never stops scheduling for everyone else. A bad row at a deterministic id
-/// the pass writes is replaced by the upsert. The orphan sweep reads
-/// `fetchAllPending()`, which fails closed; a failure skips only that sweep.
+/// it never cancels what it can't decode, and one bad row never stops
+/// scheduling for everyone else. An undecodable row at an id the pass writes
+/// (a decodable contact's cadence or occasion id) is replaced by that write.
+/// The orphan sweep reads `fetchAllPending()`, which fails closed; a failure
+/// skips only that sweep.
 ///
 /// **Snooze precondition (R54).** `snooze(contactId:)` checks
 /// `isCadenceEligible` itself, here rather than at each caller, because a
@@ -211,8 +212,8 @@ public actor SchedulingPass {
         }
     }
 
-    /// Cancels pending rows whose contact the snapshot doesn't hold
-    /// (untracked, archived, or undecodable), which the snapshot can't show.
+    /// Cancels pending rows whose contact the snapshot doesn't hold because
+    /// it is untracked or archived. The snapshot can't show those rows.
     private func cancelOrphans(snapshotContactIds: Set<UUID>, only contactId: UUID?) async throws {
         if let contactId, snapshotContactIds.contains(contactId) { return }
         let pending: [ScheduledReminder]
@@ -230,6 +231,12 @@ public actor SchedulingPass {
             return
         }
         for row in pending where !snapshotContactIds.contains(row.contactId) {
+            // Only a contact that decodes as untracked or archived loses its
+            // rows. `try?`: a contact that fails to decode is left alone, the
+            // snapshot's policy; one tracked since the snapshot is the next
+            // run's to schedule.
+            guard let contact = try? await contacts.fetch(id: row.contactId),
+                  !(contact.tracked && contact.isActive) else { continue }
             try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
         }
     }
