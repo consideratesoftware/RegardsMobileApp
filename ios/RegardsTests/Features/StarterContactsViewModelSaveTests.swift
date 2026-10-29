@@ -75,6 +75,41 @@ struct StarterContactsViewModelSaveTests {
         #expect(!viewModel.isSaving)
     }
 
+    @Test("Edits made while Save is writing are ignored, and the screen then matches the store")
+    func editsDuringSaveAreIgnored() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let cy = Self.person("Cy")
+        for person in [ana, cy] { try await store.upsert(person) }
+        let gate = AsyncGate()
+        let repository = ScriptedTrackingContactRepository(store, gate: gate)
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        await viewModel.load()
+        viewModel.toggle(cy.id)
+        let picksAtSaveStart = viewModel.selection
+        #expect(picksAtSaveStart == [cy.id: StarterContactsViewModel.defaultCadenceDays])
+
+        let saving = Task { await viewModel.save() }
+        await gate.waitUntilArrived()
+        #expect(viewModel.isSaving)
+        let pickedAna = viewModel.toggle(ana.id)
+        let unpickedCy = viewModel.toggle(cy.id)
+        viewModel.setCadence(90, for: cy.id)
+        #expect(!pickedAna)
+        #expect(!unpickedCy)
+        #expect(viewModel.selection == picksAtSaveStart, "Edits during Save must change nothing.")
+        #expect(viewModel.cadenceDays(for: cy.id) == StarterContactsViewModel.defaultCadenceDays)
+        await gate.open()
+        let saved = await saving.value
+
+        #expect(saved)
+        let inStore = try await Self.trackedInStore(store)
+        #expect(inStore == picksAtSaveStart)
+        #expect(viewModel.selection == inStore)
+        #expect(!viewModel.canSave, "Nothing differs from the store, so Done has nothing to write.")
+        #expect(!viewModel.isSaving)
+    }
+
     // MARK: A write that throws midway
 
     @Test("A save that fails on its second write leaves Done offering exactly the contact that was not written")
