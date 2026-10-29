@@ -128,6 +128,29 @@ struct SchedulingPassRunFullTests {
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
     }
 
+    /// The slot has already started, so the no-re-nag rule would keep the due
+    /// row. A window that can no longer fire at all wins over it: the row is
+    /// cancelled and the contact is listed for the Settings badge.
+    @Test(
+        "A due row is cancelled and the contact recorded when its window loses all capacity",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func zeroCapacityWithADueRowCancelsAndRecords(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        fixture.setNow("2026-06-10 18:30")
+        _ = try await fixture.repositories.contacts.updateReminderWindowOverride(
+            id: contact.id,
+            window: PassFixture.eveningWindow(quiet: TimeRange(start: TimeOfDay(hour: 17), end: TimeOfDay(hour: 20))))
+
+        try await fixture.pass.run(for: contact.id)
+
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
+    }
+
     @Test(
         "run(for:) updates the zero-capacity list for that contact only",
         arguments: RepositoryContractBackend.allCases
@@ -268,47 +291,5 @@ struct SchedulingPassRunFullTests {
         let row = try #require(try await fixture.cadenceRow(contact))
         #expect(row.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
         #expect(row.scheduledFor == PassFixture.at("2026-06-17 18:00"))
-    }
-
-    // MARK: - Corrupt rows
-
-    /// The pass follows the snapshot's drop policy: an undecodable contact is
-    /// invisible to it, and one bad row never stops scheduling for everyone
-    /// else. Its pending row is left as stored, neither rewritten nor
-    /// cancelled.
-    @Test("An undecodable contact does not stop the run and keeps its stored row")
-    func corruptContactDoesNotStopTheRun() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let repositories = GRDBRepositories(dbQueue: database)
-        try await repositories.window.saveGlobal(PassFixture.eveningWindow())
-        let clock = MutableClock(PassFixture.at("2026-06-10 10:00"))
-        let pass = SchedulingPass(
-            reminders: repositories.reminders,
-            contacts: repositories.contacts,
-            window: repositories.window,
-            clock: { clock.now() })
-        let corrupt = Contact(
-            id: try contractUUID(7_101), systemContactRef: "pass-corrupt", displayName: "Corrupt",
-            tracked: true, cadenceDays: 7, lastInteractedAt: PassFixture.at("2026-05-01 10:00"))
-        let healthy = Contact(
-            id: try contractUUID(7_102), systemContactRef: "pass-healthy", displayName: "Healthy",
-            tracked: true, cadenceDays: 7, lastInteractedAt: PassFixture.at("2026-05-01 10:00"))
-        try await repositories.contacts.upsert(corrupt)
-        try await repositories.contacts.upsert(healthy)
-        let storedRow = ScheduledReminder(
-            contactId: corrupt.id, kind: .cadence, scheduledFor: PassFixture.at("2026-06-30 18:00"),
-            osNotificationId: "contact-\(corrupt.id.uuidString)-cadence")
-        try await repositories.reminders.upsert(storedRow)
-        try await database.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET phonesJson = ? WHERE id = ?",
-                arguments: ["null", corrupt.id.uuidString])
-        }
-
-        try await pass.runFull()
-
-        let healthyRow = try await repositories.reminders.fetchPending(forContact: healthy.id).first
-        #expect(healthyRow?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
-        #expect(try await repositories.reminders.fetchPending(forContact: corrupt.id) == [storedRow])
     }
 }

@@ -111,4 +111,56 @@ struct SchedulingPassSnoozeWindowTests {
         #expect(row.snoozedUntil == utc.date(from: "2026-03-12T12:00:00Z"))
         #expect(row.scheduledFor == utc.date(from: "2026-03-12T12:00:00Z"))
     }
+
+    /// A tap 0.5 s past a slot start: the floor, 7 days later, is 0.5 s past
+    /// that slot's start. The row stores whole seconds, so the next run reads
+    /// the floor rounded down, which is exactly the slot start. The snooze has
+    /// to resolve the stored floor, or the next run moves the row a day.
+    @Test(
+        "A snooze tapped just past a slot start resolves the same way on the next run",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func subSecondFloorResolvesTheSameOnTheNextRun(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        fixture.setNow(PassFixture.at("2026-06-10 18:00").addingTimeInterval(0.5))
+        // Settles every other row first (the mock's seed cast gets rows too).
+        try await fixture.pass.runFull()
+
+        _ = try await fixture.pass.snooze(contactId: contact.id)
+
+        let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.snoozedUntil == PassFixture.at("2026-06-17 18:00"))
+        #expect(row.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+        let writesBefore = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(await fixture.reminders.writeCount == writesBefore)
+        #expect(try await fixture.cadenceRow(contact) == row)
+    }
+
+    /// The floor governs only while its slot is ahead. Here the contact talked
+    /// to the person after the snoozed slot started, so the no-re-nag guard no
+    /// longer applies, and the next run drops the spent floor and schedules
+    /// from the new anchor.
+    @Test(
+        "A snooze is spent once its slot has started",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func snoozeIsSpentOnceItsSlotHasStarted(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        _ = try await fixture.pass.snooze(contactId: contact.id)
+        #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        fixture.setNow("2026-06-17 18:30")
+        _ = try await fixture.repositories.contacts.updateLastInteractedAt(
+            id: contact.id, at: PassFixture.at("2026-06-17 18:20"))
+
+        try await fixture.pass.runFull()
+
+        let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.scheduledFor == PassFixture.at("2026-06-25 18:00"))
+        #expect(row.snoozedUntil == nil)
+    }
 }

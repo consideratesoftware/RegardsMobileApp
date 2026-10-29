@@ -114,4 +114,30 @@ struct SchedulingPassTriggerTests {
         #expect(try await Self.cadenceRow(harness, edited)?.scheduledFor == Self.la("2027-03-10 14:00"))
         #expect(try await Self.cadenceRow(harness, bystander) == staleRow)
     }
+
+    /// "Use default window" clears the override and re-runs that contact, so
+    /// its row returns to the global window's slot.
+    @Test(
+        "Resetting a contact override to the default window reschedules that contact",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func overrideResetRunsThatContact(backend: RepositoryContractBackend) async throws {
+        let harness = try await NotificationActionHandlingTests.harness(backend: backend, onboarded: true)
+        let contact = try await NotificationActionHandlingTests.seed(harness, id: 707, suffix: "trigger-reset")
+        let afternoon = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 14), end: TimeOfDay(hour: 15))],
+            timezoneIdentifier: "America/Los_Angeles")
+        _ = try await harness.repositories.contacts.updateReminderWindowOverride(id: contact.id, window: afternoon)
+        await harness.launch.start()
+        let runtime = try #require(harness.launch.runtime)
+        #expect(try await Self.cadenceRow(harness, contact)?.scheduledFor == Self.la("2027-03-10 14:00"))
+        let editor = RegardsTabRoot.makeContactWindowEditor(contactId: contact.id, runtime: runtime)
+        await editor.load()
+
+        let reset = await editor.resetToDefault()
+
+        #expect(reset)
+        #expect(try await Self.cadenceRow(harness, contact)?.scheduledFor == Self.la(Self.overdueSlot))
+    }
 }
