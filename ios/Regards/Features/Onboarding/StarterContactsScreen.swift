@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Pick up to 3 people to keep in touch with, and how often (TF-11, §14
-/// PR29). Reached from Settings today; the onboarding flow shows the same
-/// screen with `showsSkip` on, since it has no back button.
+/// PR29). Reached from Settings and from the onboarding flow, which shows
+/// the same screen with `showsSkip` on, since it has no back button.
 ///
 /// The importer's channel is shown read-only on each row. Per-contact channel
 /// choice belongs to Contact Detail (R58), not here.
@@ -16,6 +16,10 @@ struct StarterContactsScreen: View {
     /// picks survive a re-render and a new push starts clean.
     @State private var viewModel: StarterContactsViewModel
     private let showsSkip: Bool
+    /// Under limited Contacts access only the shared contacts were imported,
+    /// so onboarding says why the list is short and where to share more
+    /// (owner ruling, 2026-10-17: no in-app picker).
+    private let showsLimitedAccessNote: Bool
     private let onFinish: () -> Void
     @State private var searchText = ""
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -23,10 +27,12 @@ struct StarterContactsScreen: View {
     init(
         viewModel: StarterContactsViewModel,
         showsSkip: Bool = false,
+        showsLimitedAccessNote: Bool = false,
         onFinish: @escaping () -> Void
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.showsSkip = showsSkip
+        self.showsLimitedAccessNote = showsLimitedAccessNote
         self.onFinish = onFinish
     }
 
@@ -80,6 +86,16 @@ struct StarterContactsScreen: View {
                     .foregroundStyle(RegardsDS.ink)
                     .padding(.top, 8)
                     .accessibilityIdentifier("starter.count")
+            }
+            if showsLimitedAccessNote {
+                Text(
+                    "Regards can only see the contacts you shared with it. "
+                    + "To add more people, change Contacts access for Regards in iOS Settings."
+                )
+                .font(.footnote)
+                .foregroundStyle(RegardsDS.muted)
+                .padding(.top, 6)
+                .accessibilityIdentifier("starter.limited-note")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

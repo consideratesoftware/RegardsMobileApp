@@ -45,23 +45,7 @@ struct RootView: View {
                 SplashView()
                     .transition(.opacity)
             case .onboarding:
-                OnboardingScreen(
-                    showsPermissionAction: !launch.onboardingCompletionPending,
-                    isBusy: launch.isImporting,
-                    statusMessage: launch.statusMessage,
-                    canContinueWithoutContacts: launch.canContinueWithoutContacts,
-                    continueActionTitle: launch.onboardingCompletionPending
-                        ? "Finish setup"
-                        : "Continue without contacts",
-                    onAllow: {
-                        Task { await launch.requestContactsAndImport() }
-                    },
-                    onContinueWithoutContacts: {
-                        Task { await launch.continueWithoutContacts() }
-                    },
-                    onWhyWeAsk: { showsTransparency = true }
-                )
-                .transition(.opacity)
+                OnboardingFlowView(launch: launch, onWhyWeAsk: { showsTransparency = true })
             case .ready:
                 if let runtime = launch.runtime {
                     RegardsTabRoot(
@@ -80,6 +64,7 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: launch.phase)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: launch.onboardingStep)
         .task {
             await launch.start()
         }
