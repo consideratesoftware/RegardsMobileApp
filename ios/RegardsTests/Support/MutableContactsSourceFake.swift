@@ -13,6 +13,10 @@ final class MutableContactsSource: ContactsSource, @unchecked Sendable {
     private var status: ContactsAuthorizationStatus
     private var contacts: [SystemContact]
     private var fetchCount = 0
+    private var requestCount = 0
+    /// What the next `requestAccess()` does. Nil keeps the old behavior:
+    /// return the current status without changing it.
+    private var requestOutcome: Result<ContactsAuthorizationStatus, any Error>?
     private var continuation: AsyncStream<Void>.Continuation?
     /// Fires once per `fetchAllContacts()` call, right before it returns —
     /// lets a test simulate a permission change landing mid-enumeration
@@ -29,7 +33,26 @@ final class MutableContactsSource: ContactsSource, @unchecked Sendable {
     }
 
     func requestAccess() async throws -> ContactsAuthorizationStatus {
-        lock.withLock { status }
+        let outcome: Result<ContactsAuthorizationStatus, any Error>? = lock.withLock {
+            requestCount += 1
+            if case .success(let granted)? = requestOutcome { status = granted }
+            return requestOutcome
+        }
+        switch outcome {
+        case .success(let granted)?: return granted
+        case .failure(let error)?: throw error
+        case nil: return lock.withLock { status }
+        }
+    }
+
+    /// Scripts the system prompt: a success becomes the new status, a failure
+    /// throws and leaves the status alone.
+    func setRequestOutcome(_ outcome: Result<ContactsAuthorizationStatus, any Error>?) {
+        lock.withLock { requestOutcome = outcome }
+    }
+
+    func requestCountValue() -> Int {
+        lock.withLock { requestCount }
     }
 
     func fetchAllContacts() async throws -> [SystemContact] {
