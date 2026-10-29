@@ -22,9 +22,10 @@ import Foundation
 ///
 /// **No re-nag (§9 "Notification fired", owner ruling 5).** A cadence row
 /// whose time has come (fired, or pending at or before `now`) is left alone
-/// while the contact is still overdue and its anchor hasn't moved past the
-/// row. Until TF-07e marks rows fired from the OS, a due pending row stands
-/// in for a fired one.
+/// while the contact is still overdue, its anchor hasn't moved past the row,
+/// and its window still has capacity; a zero-capacity window cancels even a
+/// due pending row. Until TF-07e marks rows fired from the OS, a due pending
+/// row stands in for a fired one.
 ///
 /// **Corrupt rows.** `runFull()` and `run(for:)` read one
 /// `ReminderRepository.observeSchedule()` snapshot, which drops an
@@ -164,14 +165,11 @@ public actor SchedulingPass {
             let existing = existingById[id]
             let anchor = contact.lastInteractedAt ?? contact.createdAt
             let overdueAt = anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
-            if let existing, existing.state == .fired || existing.scheduledFor <= now,
-               overdueAt <= now, anchor <= existing.scheduledFor {
-                desiredIds.insert(id)
-                continue
-            }
             // The floor governs only while its slot is still ahead; once that
             // slot has started the snooze is spent.
             let floor = existing.flatMap { $0.state == .pending && $0.scheduledFor > now ? $0.snoozedUntil : nil }
+            // Capacity first: a zero-capacity window gets its id recorded and
+            // its pending row cancelled below, even when that row is due.
             guard let slot = Self.cadenceSlot(
                 overdueAt: overdueAt,
                 floor: floor,
@@ -183,6 +181,10 @@ public actor SchedulingPass {
                 continue
             }
             desiredIds.insert(id)
+            if let existing, existing.state == .fired || existing.scheduledFor <= now,
+               overdueAt <= now, anchor <= existing.scheduledFor {
+                continue
+            }
             let desired = ScheduledReminder(
                 id: id,
                 contactId: contact.id,
