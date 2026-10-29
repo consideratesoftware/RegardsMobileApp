@@ -56,6 +56,7 @@
 		3CD64DE48976BBB5B7BAC907 /* ContactWriteTrackingFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4BC46872D022EC2D29BB71 /* ContactWriteTrackingFakes.swift */; };
 		3D00C6A0B7F474714C95A2D8 /* ContactTrackingContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7F3DA1482D6B5B6D8883A2 /* ContactTrackingContractTests.swift */; };
 		3F41DC0E58374974EDAA29C9 /* SchedulingPassCaughtUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBA009B745C8E8BB5DD68B1 /* SchedulingPassCaughtUpTests.swift */; };
+		3F6DC0DB288028F70A255584 /* StarterContactsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DB3CC465DD48A5112C4E91 /* StarterContactsScreen.swift */; };
 		41104597B6F35D584519B9AE /* RegardsNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 843338B9ADB21D66831CBD33 /* RegardsNavigation.swift */; };
 		420D99B905258F36BAA53237 /* ContactRepositoryValidationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BAFAF663E3C29B2AA69355 /* ContactRepositoryValidationContractTests.swift */; };
 		4259270440C964E040D9BE4D /* AllContactsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D76123545E584E57C62C887 /* AllContactsViewModelTests.swift */; };
@@ -88,6 +89,7 @@
 		612D14E2C0A4D65F50DB4C52 /* InteractionLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35FFABA2F385B00DA6FAC7 /* InteractionLogging.swift */; };
 		6146A6D7764DA45B93A25904 /* ReminderWindowRepositoryReadContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749A533304ABA207075077DC /* ReminderWindowRepositoryReadContractTests.swift */; };
 		63088204C5AB3C3C6FD63917 /* AnnualRecurrenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E56E8D68511FF7E66764BF0 /* AnnualRecurrenceTests.swift */; };
+		634D7738559553C47AAAD8A5 /* StarterContactsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30EA0721D0E9460F2AD564B4 /* StarterContactsViewModel.swift */; };
 		642A6B9C73657D97CF22CB14 /* RegardsApp+ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D7968D3C4F277905163294 /* RegardsApp+ViewModifiers.swift */; };
 		66F6609E3BEBF32932BBA054 /* AppLaunchCoordinatorImportFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40F36D00920F373317A664A /* AppLaunchCoordinatorImportFailureTests.swift */; };
 		6734B0E2612FBD640782D869 /* MergeDuplicatesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282A9FA27C27C33B29E89167 /* MergeDuplicatesViewModel.swift */; };
@@ -273,6 +275,7 @@
 		2F0F1602FA69250B09439710 /* ContactValueAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactValueAccessibility.swift; sourceTree = "<group>"; };
 		2F35FFABA2F385B00DA6FAC7 /* InteractionLogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionLogging.swift; sourceTree = "<group>"; };
 		2FDCEF0842E2124C5BA6158C /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		30EA0721D0E9460F2AD564B4 /* StarterContactsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterContactsViewModel.swift; sourceTree = "<group>"; };
 		31A02186F019EB95A53170B0 /* DuplicateDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDetector.swift; sourceTree = "<group>"; };
 		3305FC28E614B9F9D3B32F77 /* ScheduleObservationSnapshotContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleObservationSnapshotContractTests.swift; sourceTree = "<group>"; };
 		33EC9E9494EB1265441684D9 /* ContactsSourceStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsSourceStressTests.swift; sourceTree = "<group>"; };
@@ -290,6 +293,7 @@
 		423064D9789D307905C7C6A4 /* ScheduleObservationContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleObservationContractTests.swift; sourceTree = "<group>"; };
 		42F3D3C420533360C93540BD /* AppLaunchCoordinatorAuthorizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchCoordinatorAuthorizationTests.swift; sourceTree = "<group>"; };
 		44784660B920D198E5EFCB5A /* ScreensAccessibilityTests+Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+Navigation.swift"; sourceTree = "<group>"; };
+		44DB3CC465DD48A5112C4E91 /* StarterContactsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterContactsScreen.swift; sourceTree = "<group>"; };
 		479B4EFD6960B8E62D8635BE /* LaunchAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAccessibilityTests.swift; sourceTree = "<group>"; };
 		479FAC52C961F5A92DD72733 /* ScreensAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreensAccessibilityTests.swift; sourceTree = "<group>"; };
 		47DD4E9A1F63D784EBA57296 /* UpcomingFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingFixtures.swift; sourceTree = "<group>"; };
@@ -685,6 +689,8 @@
 			isa = PBXGroup;
 			children = (
 				7DF5695280B533191F946271 /* OnboardingScreen.swift */,
+				44DB3CC465DD48A5112C4E91 /* StarterContactsScreen.swift */,
+				30EA0721D0E9460F2AD564B4 /* StarterContactsViewModel.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -1253,6 +1259,8 @@
 				537EBABD04D21D985843D4CA /* SchedulingPass.swift in Sources */,
 				8AB2F404FE525C0D7F43A21C /* SettingsScreen.swift in Sources */,
 				1C2A8BD23E72A67A6C88AB09 /* SplashView.swift in Sources */,
+				3F6DC0DB288028F70A255584 /* StarterContactsScreen.swift in Sources */,
+				634D7738559553C47AAAD8A5 /* StarterContactsViewModel.swift in Sources */,
 				7234F46728E9FD30A25C4FA4 /* Tag.swift in Sources */,
 				6CC51AA3DEEDC42042CBE745 /* TimeOfDay.swift in Sources */,
 				82B4C9CF1FA0CB4ABA29F1FB /* TimePickerField.swift in Sources */,

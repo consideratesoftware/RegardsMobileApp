@@ -446,11 +446,11 @@ struct RegardsTabRoot: View {
             MergeDuplicatesScreen(viewModel: mergeDuplicatesVM)
         case .transparency:
             TransparencyScreen()
-        case .onboarding:
-            OnboardingScreen(
-                showsPermissionAction: false,
-                onWhyWeAsk: {
-                    navigation.settingsPath.append(RegardsSettingsRoute.transparency)
+        case .starterContacts:
+            StarterContactsScreen(
+                viewModel: StarterContactsViewModel(contacts: runtime.environment.contacts),
+                onFinish: {
+                    if !navigation.settingsPath.isEmpty { navigation.settingsPath.removeLast() }
                 }
             )
         }

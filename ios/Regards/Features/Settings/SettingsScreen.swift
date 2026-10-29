@@ -4,7 +4,7 @@ enum RegardsSettingsRoute: Hashable {
     case reminderWindows
     case mergeDuplicates
     case transparency
-    case onboarding
+    case starterContacts
 }
 
 public struct SettingsScreen: View {
@@ -28,6 +28,16 @@ public struct SettingsScreen: View {
         ScrollView {
             VStack(spacing: 0) {
                 header
+
+                SectionHeader("People")
+                RegardsCard {
+                    navRow(
+                        id: "choose-starters",
+                        title: "Choose people to keep in touch with",
+                        subtitle: "Pick up to 3, and how often.",
+                        route: .starterContacts
+                    )
+                }
 
                 SectionHeader("Reminders")
                 RegardsCard {
@@ -154,16 +164,6 @@ public struct SettingsScreen: View {
                         title: "Transparency",
                         subtitle: "How the privacy claim is verifiable.",
                         route: .transparency
-                    )
-                }
-
-                SectionHeader("Help")
-                RegardsCard {
-                    navRow(
-                        id: "onboarding-preview",
-                        title: "Onboarding preview",
-                        subtitle: "Revisit the permission intro.",
-                        route: .onboarding
                     )
                 }
 
