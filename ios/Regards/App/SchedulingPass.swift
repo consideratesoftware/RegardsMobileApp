@@ -235,7 +235,9 @@ public actor SchedulingPass {
             // same way on every run while that row exists, so orphans stay
             // pending until the row is fixed or replaced. Nothing reads them:
             // every screen filters to tracked contacts.
-            Self.log.error("orphan sweep skipped: \(error, privacy: .private)")
+            // The type only: an error can carry row or contact values.
+            let errorType = String(describing: type(of: error))
+            Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
             return
         }
         for row in pending where !snapshotContactIds.contains(row.contactId) {

@@ -27,7 +27,9 @@ extension AppLaunchCoordinator {
         do {
             try await runtime.scheduler.runFull()
         } catch {
-            Self.reconciliationLog.error("scheduling pass failed: \(error, privacy: .private)")
+            // The type only: an error can carry row or contact values.
+            let errorType = String(describing: type(of: error))
+            Self.reconciliationLog.error("scheduling pass failed: \(errorType, privacy: .public)")
         }
     }
 

@@ -25,7 +25,9 @@ extension RegardsTabRoot {
                 do {
                     try await runtime.scheduler.runFull()
                 } catch {
-                    schedulingLog.error("reschedule after window save failed: \(error, privacy: .private)")
+                    // The type only: an error can carry row or contact values.
+                    let errorType = String(describing: type(of: error))
+                    schedulingLog.error("reschedule after window save failed: \(errorType, privacy: .public)")
                 }
                 await upcoming.updateWindow(window)
             }
@@ -50,7 +52,9 @@ extension RegardsTabRoot {
                 do {
                     try await runtime.scheduler.run(for: contactId)
                 } catch {
-                    schedulingLog.error("reschedule after override save failed: \(error, privacy: .private)")
+                    // The type only: an error can carry row or contact values.
+                    let errorType = String(describing: type(of: error))
+                    schedulingLog.error("reschedule after override save failed: \(errorType, privacy: .public)")
                 }
             }
         )
