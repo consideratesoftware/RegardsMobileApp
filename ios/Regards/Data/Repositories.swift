@@ -262,9 +262,10 @@ public protocol ReminderRepository: Sendable {
     /// mock yields at once). A read error finishes the stream with no value;
     /// TF-07f decides whether the consumer needs the error for a retry
     /// state (R9a). GRDB drops an undecodable contact with its rows, and an
-    /// undecodable reminder row, where `fetchPending` throws; TF-07c sets the
-    /// shared policy. The mock can't fail to decode, so parity covers healthy
-    /// rows only. No default: a missing implementation must fail to compile.
+    /// undecodable reminder row, where `fetchPending` throws. SchedulingPass
+    /// follows the snapshot, and its orphan sweep leaves an undecodable
+    /// contact's rows alone. The mock can't fail to decode, so parity covers
+    /// healthy rows only. No default: a missing implementation must fail to compile.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot>
 }
 
