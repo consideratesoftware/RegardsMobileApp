@@ -151,7 +151,6 @@ actor MockStore {
         let representative = Self.seedRepresentativeStates(now: now, contacts: contacts)
         contacts = representative.contacts
         groups = representative.groups
-        reminders = representative.reminders
         interactions = representative.interactions
 
         if seedCorruptRow {
@@ -174,13 +173,11 @@ actor MockStore {
     ) -> (
         contacts: [UUID: Contact],
         groups: [UUID: ContactGroup],
-        reminders: [UUID: ScheduledReminder],
         interactions: [UUID: InteractionLog]
     ) {
         let day: TimeInterval = 86_400
         var contacts = seededContacts
         var groups: [UUID: ContactGroup] = [:]
-        let reminders: [UUID: ScheduledReminder] = [:]
         var interactions: [UUID: InteractionLog] = [:]
 
         if var leia = contacts.values.first(where: { $0.systemContactRef == "sys-leia" }) {
@@ -225,7 +222,7 @@ actor MockStore {
 
         // The birthday and anniversary rows come from `occasionProvider`
         // through SchedulingPass, as Contacts will supply them in PR30.
-        return (contacts, groups, reminders, interactions)
+        return (contacts, groups, interactions)
     }
 }
 
