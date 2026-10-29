@@ -34,4 +34,14 @@ extension AppLaunchCoordinator {
     func advanceToStarterStep() {
         onboardingStep = .starter
     }
+
+    /// State for the Settings Contacts access row (R14's re-entry clause).
+    /// Nil without a Contacts source (the DEBUG mock runtime), which hides the
+    /// row. After a grant the row imports through the foreground reconcile.
+    func makeContactsAccessViewModel() -> ContactsAccessViewModel? {
+        guard let source = dependencies?.contactsSource else { return nil }
+        return ContactsAccessViewModel(source: source, reconcile: { [weak self] in
+            await self?.handleSceneActivation()
+        })
+    }
 }

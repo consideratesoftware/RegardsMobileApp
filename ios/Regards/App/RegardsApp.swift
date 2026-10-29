@@ -51,7 +51,8 @@ struct RootView: View {
                     RegardsTabRoot(
                         runtime: runtime,
                         reconciliationGeneration: launch.reconciliationCount,
-                        notifications: launch.notifications
+                        notifications: launch.notifications,
+                        contactsAccess: launch.makeContactsAccessViewModel()
                     )
                     .transition(.opacity)
                 } else {
@@ -184,6 +185,9 @@ struct RegardsTabRoot: View {
     /// Nil when the launch has no notification seam, which hides the Settings
     /// notifications section.
     @State private var notificationPermissionVM: NotificationPermissionViewModel?
+    /// Nil when the launch has no Contacts source, which hides the Settings
+    /// Contacts access row.
+    @State private var contactsAccessVM: ContactsAccessViewModel?
     @State private var intentRouter = RegardsIntentRouter.shared
     @Namespace private var overdueContactTransition
     @Namespace private var upcomingContactTransition
@@ -192,7 +196,8 @@ struct RegardsTabRoot: View {
     init(
         runtime: AppRuntime,
         reconciliationGeneration: Int = 0,
-        notifications: (any NotificationScheduling)? = nil
+        notifications: (any NotificationScheduling)? = nil,
+        contactsAccess: ContactsAccessViewModel? = nil
     ) {
         self.runtime = runtime
         self.reconciliationGeneration = reconciliationGeneration
@@ -208,6 +213,7 @@ struct RegardsTabRoot: View {
         self._notificationPermissionVM = State(
             initialValue: notifications.map { NotificationPermissionViewModel(notifications: $0) }
         )
+        self._contactsAccessVM = State(initialValue: contactsAccess)
     }
 
     // MARK: - View model composition
@@ -407,7 +413,7 @@ struct RegardsTabRoot: View {
 
     private var settingsRoot: some View {
         NavigationStack(path: $navigation.settingsPath) {
-            SettingsScreen(notifications: notificationPermissionVM)
+            SettingsScreen(notifications: notificationPermissionVM, contactsAccess: contactsAccessVM)
                 .navigationDestination(for: RegardsSettingsRoute.self) { route in
                     settingsDestination(for: route)
                 }

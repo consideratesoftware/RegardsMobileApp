@@ -173,6 +173,7 @@
 		C17E9AC4724CF5518EDC0353 /* MockRepositories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A61EE486988C12FCD099BEB /* MockRepositories.swift */; };
 		C55A581F07D2B3ACC5964E9E /* DatabaseEncodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34F3B77FC1249E22E2AB870 /* DatabaseEncodingTests.swift */; };
 		C6FD326C7F698F351F444B69 /* ContactCadenceEligibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94824DAEAF893FE6B6331EBD /* ContactCadenceEligibilityTests.swift */; };
+		C83F03BD09DC2682FFB9DA39 /* ContactsAccessViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E1E0D8FECFD60F4A7E41F5 /* ContactsAccessViewModel.swift */; };
 		C8D5AB8C903B7B893049282C /* ScreensAccessibilityTests+Assertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACAF82F1B446277BBAF4B1BD /* ScreensAccessibilityTests+Assertions.swift */; };
 		C9F1471BB12A78C99CB7EF1E /* ReminderWindowsViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC3ED374B7ABAAE3E016FF3 /* ReminderWindowsViewModelSaveTests.swift */; };
 		CB1192EDCAC1990240969487 /* DatabaseMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8660B33741B4961FAB6E2884 /* DatabaseMigrator.swift */; };
@@ -185,6 +186,7 @@
 		CF3320154FCFF7B545D22AEB /* ScreensAccessibilityTests+ContactWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089D71C160EADA0013F662BB /* ScreensAccessibilityTests+ContactWindow.swift */; };
 		CFE946F42B8BB0A443EFFDC0 /* ScreensAccessibilityTests+Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4D4CD40D911D13AA4D2BFE /* ScreensAccessibilityTests+Onboarding.swift */; };
 		D02616FCEEA8888EF9DEF40A /* ContactsImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A240F758BF789AC64D5A3E /* ContactsImporterTests.swift */; };
+		D0761594F8A5AEE88B174990 /* ContactsAccessRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B68C9A93D93DB489B38138 /* ContactsAccessRow.swift */; };
 		D123A29F870155E184BD7B2F /* StarterContactsViewModelSaveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8FACA718BDB9EFC78225D2C /* StarterContactsViewModelSaveTests.swift */; };
 		D2519370DA6A639FBD030621 /* UpcomingFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47DD4E9A1F63D784EBA57296 /* UpcomingFixtures.swift */; };
 		D59482A851D46D93C13F6132 /* StarterContactsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA441CEA4B74BE9E90B465C8 /* StarterContactsViewModelTests.swift */; };
@@ -265,6 +267,7 @@
 		11E0102D9499D35503808FA5 /* AppLaunchCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchCoordinatorTests.swift; sourceTree = "<group>"; };
 		11FB87B0798421853230A006 /* UpdateLastInteractedAtContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateLastInteractedAtContractTests.swift; sourceTree = "<group>"; };
 		12A7E06561B26D29C72F196A /* ContactsReconcilerFieldScopedWriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsReconcilerFieldScopedWriteTests.swift; sourceTree = "<group>"; };
+		12B68C9A93D93DB489B38138 /* ContactsAccessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsAccessRow.swift; sourceTree = "<group>"; };
 		16738B3353782A7FC97B0A67 /* DatabaseFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseFactory.swift; sourceTree = "<group>"; };
 		196DC04E6A284D9227CF2232 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1A40C514B390F4D2E4D15531 /* SchedulingPassSnoozeCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassSnoozeCalendarTests.swift; sourceTree = "<group>"; };
@@ -396,6 +399,7 @@
 		B2493B33C517BB8115C32A4A /* InteractionLoggingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionLoggingTests.swift; sourceTree = "<group>"; };
 		B4B5E6620099016E635E9FB5 /* Contact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contact.swift; sourceTree = "<group>"; };
 		B57C28CA08D1BB3A9563C562 /* UpcomingViewModelWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingViewModelWindowTests.swift; sourceTree = "<group>"; };
+		B5E1E0D8FECFD60F4A7E41F5 /* ContactsAccessViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsAccessViewModel.swift; sourceTree = "<group>"; };
 		B64397CFE1EC38502A0F6B7F /* SchedulingPassTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassTests.swift; sourceTree = "<group>"; };
 		B69375AA7276B54426303032 /* AsyncGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncGate.swift; sourceTree = "<group>"; };
 		B6A032C37BB9536A4B49D799 /* UpcomingViewModelRaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingViewModelRaceTests.swift; sourceTree = "<group>"; };
@@ -971,6 +975,8 @@
 		F0E6ED18F8207F8810A1F14D /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				12B68C9A93D93DB489B38138 /* ContactsAccessRow.swift */,
+				B5E1E0D8FECFD60F4A7E41F5 /* ContactsAccessViewModel.swift */,
 				912C65B12865EEB131803362 /* NotificationPermissionViewModel.swift */,
 				0950902FF5E235B5FB5F695E /* SettingsScreen.swift */,
 				212E7604734F51D4345DEAFB /* TransparencyScreen.swift */,
@@ -1235,6 +1241,8 @@
 				0685E5F9AB81A2735CD64AF6 /* ContactDetailScreen.swift in Sources */,
 				DD20A1B2BD058209D6FE830D /* ContactDetailViewModel.swift in Sources */,
 				4DC3FCCE2BE3579953F30E74 /* ContactValueAccessibility.swift in Sources */,
+				D0761594F8A5AEE88B174990 /* ContactsAccessRow.swift in Sources */,
+				C83F03BD09DC2682FFB9DA39 /* ContactsAccessViewModel.swift in Sources */,
 				2B1FA0240CD82896DAD34D95 /* ContactsImporter.swift in Sources */,
 				CB3CA010C4EBE1D62D594D9E /* ContactsReconciler.swift in Sources */,
 				A5D9F43AF9DAEB2B469E469C /* ContactsSource.swift in Sources */,
