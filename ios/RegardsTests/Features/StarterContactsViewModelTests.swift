@@ -368,30 +368,6 @@ extension StarterContactsViewModelTests {
         #expect(try await repository.fetch(id: people[0].id)?.cadenceDays == 90)
     }
 
-    @Test("A contact that was archived while the screen was open fails the save with a message")
-    func contactArchivedBeforeSaveFailsTheSave() async throws {
-        let database = try DatabaseFactory.makeInMemoryDatabase()
-        let repository = ProductionRepositoryFactory.makeEnvironment(database: database).contacts
-        let leia = Self.contact("Leia Organa")
-        let han = Self.contact("Han Solo")
-        for person in [leia, han] { try await repository.upsert(person) }
-        let announcements = Announcements()
-        let viewModel = Self.viewModel(repository, announcements)
-        await viewModel.load()
-        viewModel.toggle(leia.id)
-        viewModel.toggle(han.id)
-        try await repository.archive(id: leia.id, at: Self.loggedAt)
-
-        let saved = await viewModel.save()
-
-        #expect(!saved)
-        #expect(viewModel.statusMessage == StarterContactsViewModel.contactsChangedMessage)
-        #expect(announcements.messages == [StarterContactsViewModel.contactsChangedMessage])
-        // The archived contact is gone from the list; the other pick stays.
-        #expect(viewModel.contacts.map(\.id) == [han.id])
-        #expect(viewModel.isSelected(han.id))
-    }
-
     // MARK: Cadence
 
     @Test("A cadence below 1 day or for a contact that isn't picked changes nothing")

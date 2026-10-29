@@ -139,6 +139,9 @@ struct StarterContactsViewModelSaveTests {
         let inStore = try await Self.trackedInStore(store)
         #expect(inStore.keys.contains(han.id))
         #expect(!inStore.keys.contains(leia.id))
+        // The archived contact leaves the list; the other pick stays.
+        #expect(viewModel.contacts.map(\.id) == [han.id])
+        #expect(viewModel.isSelected(han.id))
         // Done is on only if the screen still differs from the store.
         #expect(viewModel.canSave == (viewModel.selection != inStore))
     }
