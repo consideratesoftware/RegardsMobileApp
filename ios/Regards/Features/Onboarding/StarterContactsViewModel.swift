@@ -220,6 +220,7 @@ final class StarterContactsViewModel {
         let result = "\(savedAnnouncement()) \(names) \(verb) no longer in your contacts."
         statusMessage = result
         announce(result)
+        // The caller may leave the screen now, so only VoiceOver hears this message.
         return !hasUnsavedChanges
     }
 

@@ -285,16 +285,15 @@ final class AppLaunchCoordinator {
                 return
             }
 
-            phase = .onboarding
-            beginConsumingNotificationActions()
             let actionGeneration = onboardingActionGeneration
             let authorization = await dependencies.contactsSource.currentAuthorization()
+            // Splash stays up through the read, so a resumed launch never shows the concept screen.
+            if phase == .loading { phase = .onboarding }
+            beginConsumingNotificationActions()
             guard phase == .onboarding,
                   !isImporting,
                   onboardingActionGeneration == actionGeneration else { return }
             try Task.checkCancellation()
-            // `.notDetermined` leaves the step alone: a "Get started" tap
-            // during the read above must not be sent back to the concept.
             if authorization != .notDetermined { onboardingStep = .contacts }
             switch authorization {
             case .authorized, .limited:
