@@ -103,8 +103,9 @@ public final class ReminderWindowsViewModel {
     /// `onSaved` is deliberately undefaulted: it is how a saved window reaches
     /// SchedulingPass and, for a global save, `UpcomingViewModel.updateWindow`.
     /// A defaulted no-op is how an editor ends up saving a window nothing
-    /// reschedules. It runs after every successful save, and after an
-    /// override reset with the global window the contact now follows.
+    /// reschedules. It runs after every save that writes (an unchanged
+    /// draft with no stored override writes nothing and skips it), and after
+    /// an override reset with the global window the contact now follows.
     public init(target: Target,
                 window: any ReminderWindowRepository,
                 contacts: any ContactRepository,
