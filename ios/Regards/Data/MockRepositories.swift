@@ -148,11 +148,7 @@ actor MockStore {
             self.contacts[contact.id] = contact
         }
 
-        let representative = Self.seedRepresentativeStates(
-            now: now,
-            window: window,
-            contacts: contacts
-        )
+        let representative = Self.seedRepresentativeStates(now: now, contacts: contacts)
         contacts = representative.contacts
         groups = representative.groups
         reminders = representative.reminders
@@ -174,7 +170,6 @@ actor MockStore {
     /// `MockRepositories.occasionProvider(now:window:)`.
     private nonisolated static func seedRepresentativeStates(
         now: Date,
-        window: ReminderWindow,
         contacts seededContacts: [UUID: Contact]
     ) -> (
         contacts: [UUID: Contact],
@@ -231,30 +226,6 @@ actor MockStore {
         // The birthday and anniversary rows come from `occasionProvider`
         // through SchedulingPass, as Contacts will supply them in PR30.
         return (contacts, groups, reminders, interactions)
-    }
-
-    /// The seeded occasion instant `offset` days after `startOfToday`, at the given local `hour`.
-    /// `date(bySettingHour:)` is `Optional`; seeding used to sit in an `if let` that silently dropped occasions on
-    /// nil, making R34's representative states unreachable with nothing to say so. A real DST gap (US Pacific,
-    /// 2026-03-08, hour 2) never returns nil, but this guard stays defensive: fall forward, then to the day start.
-    nonisolated static func occasionInstant(
-        daysAfter startOfToday: Date,
-        offset: Int,
-        hour: Int,
-        calendar: Calendar
-    ) -> Date? {
-        guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else {
-            return nil
-        }
-        if let exact = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) {
-            return exact
-        }
-        return calendar.nextDate(
-            after: day,
-            matching: DateComponents(hour: hour, minute: 0, second: 0),
-            matchingPolicy: .nextTime,
-            direction: .forward
-        ) ?? day
     }
 }
 
