@@ -54,6 +54,7 @@
 		3ADA4550DCB6B73488E0DF2A /* RawOverrideStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26195D683C0F659D442688B4 /* RawOverrideStore.swift */; };
 		3C582E23416A609FE3F503DC /* ReminderEngineLordHoweTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 390566838C5DDFCD1396B4D0 /* ReminderEngineLordHoweTests.swift */; };
 		3CD64DE48976BBB5B7BAC907 /* ContactWriteTrackingFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4BC46872D022EC2D29BB71 /* ContactWriteTrackingFakes.swift */; };
+		3D00C6A0B7F474714C95A2D8 /* ContactTrackingContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7F3DA1482D6B5B6D8883A2 /* ContactTrackingContractTests.swift */; };
 		3F41DC0E58374974EDAA29C9 /* SchedulingPassCaughtUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBA009B745C8E8BB5DD68B1 /* SchedulingPassCaughtUpTests.swift */; };
 		41104597B6F35D584519B9AE /* RegardsNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 843338B9ADB21D66831CBD33 /* RegardsNavigation.swift */; };
 		420D99B905258F36BAA53237 /* ContactRepositoryValidationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BAFAF663E3C29B2AA69355 /* ContactRepositoryValidationContractTests.swift */; };
@@ -308,6 +309,7 @@
 		5C3B67E6C1AFDBFB09BCD36F /* UpcomingViewModelBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingViewModelBoundaryTests.swift; sourceTree = "<group>"; };
 		5C934F5CE784566F2D99DB3E /* ScriptedNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptedNotifications.swift; sourceTree = "<group>"; };
 		5D63A8C1D2611B3DDFBB8804 /* ReminderWindowsViewModelEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsViewModelEditingTests.swift; sourceTree = "<group>"; };
+		5D7F3DA1482D6B5B6D8883A2 /* ContactTrackingContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactTrackingContractTests.swift; sourceTree = "<group>"; };
 		5D86ADF0B31A3FC6974F389C /* OverdueViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdueViewModel.swift; sourceTree = "<group>"; };
 		5F9D0BF8616E5CBC54E5540B /* ReminderWindowEditorFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowEditorFixtures.swift; sourceTree = "<group>"; };
 		635DD8ABC5566F908EA70F10 /* ReminderWindowsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsViewModel.swift; sourceTree = "<group>"; };
@@ -477,6 +479,7 @@
 				F310E3AAD43D5A0F07C6D191 /* ContactObservationContractTests.swift */,
 				EFCB01A0AB276C59369DCF5F /* ContactRepositoryOverrideFallbackTests.swift */,
 				B7BAFAF663E3C29B2AA69355 /* ContactRepositoryValidationContractTests.swift */,
+				5D7F3DA1482D6B5B6D8883A2 /* ContactTrackingContractTests.swift */,
 				C34F3B77FC1249E22E2AB870 /* DatabaseEncodingTests.swift */,
 				0F801281CA1EC0111165A9B8 /* DatabaseMigratorTests.swift */,
 				AA0ED82A6D4AF73A19B55814 /* DatabaseMigratorV3Tests.swift */,
@@ -1092,6 +1095,7 @@
 				525FB993FCC1DBAB35D68CC8 /* ContactObservationContractTests.swift in Sources */,
 				F66C4DF5CB98911DFE1C8ED8 /* ContactRepositoryOverrideFallbackTests.swift in Sources */,
 				420D99B905258F36BAA53237 /* ContactRepositoryValidationContractTests.swift in Sources */,
+				3D00C6A0B7F474714C95A2D8 /* ContactTrackingContractTests.swift in Sources */,
 				3CD64DE48976BBB5B7BAC907 /* ContactWriteTrackingFakes.swift in Sources */,
 				D02616FCEEA8888EF9DEF40A /* ContactsImporterTests.swift in Sources */,
 				DA5318732173A38E990CD0DC /* ContactsReconcilerAuthorizationTests.swift in Sources */,
