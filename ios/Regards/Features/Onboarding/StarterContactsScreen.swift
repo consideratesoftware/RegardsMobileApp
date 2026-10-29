@@ -49,9 +49,11 @@ struct StarterContactsScreen: View {
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
-        .searchable(text: $searchText, prompt: "Search contacts")
-        .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
         .accessibilityIdentifier("screen.starter-contacts")
+        .searchable(text: $searchText, prompt: "Search contacts")
+        // After the identifier above: a container identifier applied to the
+        // inset too would replace the ids on Done, Skip and the message.
+        .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         // A re-appearance (the keyboard, a popover closing) must not reload
@@ -155,10 +157,9 @@ struct StarterContactsScreen: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(contact.displayName)
         .accessibilityValue(contact.preferredChannel.displayName)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("starter.contact.\(contact.displayName)")
     }
 
