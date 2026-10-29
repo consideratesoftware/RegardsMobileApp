@@ -51,28 +51,20 @@ struct MockRepositoriesTests {
         #expect(interactions.map(\.source) == [.reminderCaughtUp, .manual])
     }
 
-    @Test("Representative birthday and anniversary states are pending")
-    func representativeOccasionState() async throws {
-        let mocks = MockRepositories(now: MockRepositories.defaultNow)
-
-        let reminders = try await mocks.reminders.fetchAllPending()
-        #expect(Set(reminders.map(\.kind)) == [.birthday, .anniversary])
-        #expect(reminders.allSatisfy { $0.state == .pending })
-    }
-
     @Test("Upcoming identities are stable and occasion rows use reminder IDs")
     @MainActor
     func stableUpcomingIDs() async throws {
         let now = MockRepositories.defaultNow
         let mocks = MockRepositories(now: now)
-        let reminders = try await mocks.reminders.fetchAllPending()
+        let scheduler = mocks.occasionPass(now: now)
+        try await scheduler.runFull()
+        let reminders = try await mocks.reminders.fetchAllPending().filter { $0.kind != .cadence }
 
         let timezone = try #require(TimeZone(identifier: "Asia/Kolkata"))
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
-            scheduler: SchedulingPass(reminders: mocks.reminders, contacts: mocks.contacts,
-                                      window: mocks.window, clock: { now }),
+            scheduler: scheduler,
             interactions: mocks.interactions,
             window: .defaultV1(timezone: timezone),
             clock: { now }

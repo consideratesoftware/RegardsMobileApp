@@ -362,4 +362,45 @@ struct OverdueViewModelSnoozeTests {
         _ = await action.value
         #expect(viewModel.rows.isEmpty, "snooze's trailing reload must clear the restored row")
     }
+
+    /// The pass writes a pending cadence row for every overdue contact, due at
+    /// the next window slot, with no snooze floor. Reading that row's
+    /// `scheduledFor` as a snooze would hide the contact from Overdue until
+    /// the slot, which is the opposite of the pass's job (TF-07c).
+    @Test("An overdue contact with a future pass-written cadence row and no snooze floor stays in Overdue")
+    func overdueKeepsContactWithFuturePassRow() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let passRow = ScheduledReminder(
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Self.now.addingTimeInterval(3 * 3_600),
+            osNotificationId: "contact-\(contact.id.uuidString)-cadence"
+        )
+        let viewModel = Self.viewModel(
+            contacts: StubContactRepository([contact]),
+            reminders: StubReminderRepository([passRow]))
+
+        await viewModel.load()
+
+        #expect(viewModel.rows.map(\.contactId) == [contact.id])
+    }
+
+    @Test("A cadence row with a snooze floor in the future hides the contact from Overdue")
+    func overdueHidesContactWithAFutureSnoozeRow() async throws {
+        let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
+        let snooze = ScheduledReminder(
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Self.now.addingTimeInterval(7 * 86_400 + 3_600),
+            osNotificationId: "contact-\(contact.id.uuidString)-cadence",
+            snoozedUntil: Self.now.addingTimeInterval(7 * 86_400)
+        )
+        let viewModel = Self.viewModel(
+            contacts: StubContactRepository([contact]),
+            reminders: StubReminderRepository([snooze]))
+
+        await viewModel.load()
+
+        #expect(viewModel.rows.isEmpty)
+    }
 }

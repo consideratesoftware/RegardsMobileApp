@@ -231,7 +231,8 @@ struct UpcomingViewModelWindowTests {
             contactId: contact.id,
             kind: .cadence,
             scheduledFor: try Self.utc("2027-01-19T10:00:00Z"), // Tuesday
-            osNotificationId: "snooze-override"
+            osNotificationId: "snooze-override",
+            snoozedUntil: try Self.utc("2027-01-19T10:00:00Z")
         )
         let viewModel = Self.viewModel(
             contacts: [contact],
@@ -242,5 +243,28 @@ struct UpcomingViewModelWindowTests {
         await viewModel.load()
 
         #expect(Self.cadenceRow(for: contact, in: viewModel)?.scheduledFor == (try Self.utc("2027-01-23T10:00:00Z")))
+    }
+
+    /// The pass-written cadence row has no floor, so it is not a snooze and
+    /// must not move Upcoming's own cadence row (TF-07c). Compared with the
+    /// same contact and no reminder rows at all.
+    @Test("A pending cadence row without a snooze floor leaves the Upcoming cadence row where it was")
+    func passRowWithoutFloorIsNotASnooze() async throws {
+        let contact = UpcomingFixtures.contact(systemRef: "pass-row", cadenceDays: 7)
+        let passRow = ScheduledReminder(
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: try Self.utc("2027-01-30T19:00:00Z"),
+            osNotificationId: "pass-row"
+        )
+        let window = Self.weekdayEvenings
+        let withoutRow = Self.viewModel(contacts: [contact], window: window)
+        let withRow = Self.viewModel(contacts: [contact], reminders: [passRow], window: window)
+
+        await withoutRow.load()
+        await withRow.load()
+
+        let expected = try #require(Self.cadenceRow(for: contact, in: withoutRow)?.scheduledFor)
+        #expect(Self.cadenceRow(for: contact, in: withRow)?.scheduledFor == expected)
     }
 }

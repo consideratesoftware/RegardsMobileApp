@@ -229,6 +229,7 @@ struct SchedulingPassCaughtUpTests {
     )
     func restorePendingAfterFailedCaughtUpDoesNotClobberAFreshSnooze(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
+        try await repositories.window.saveGlobal(SchedulingPassTests.utcWindow)
         let contact = contractContact(id: try contractUUID(513), suffix: "caughtup-restore-resnoozed", tracked: true)
         try await repositories.contacts.upsert(contact)
         let firstNow = Date(timeIntervalSince1970: 1_800_000_000)
@@ -258,7 +259,7 @@ struct SchedulingPassCaughtUpTests {
         let afterRestore = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(afterRestore.count == 1)
         #expect(afterRestore[0].scheduledFor == freshSnooze.scheduledFor)
-        #expect(afterRestore[0].scheduledFor == secondNow.addingTimeInterval(7 * 86_400))
+        #expect(afterRestore[0].snoozedUntil == secondNow.addingTimeInterval(7 * 86_400))
     }
 
     /// R59 regression, rewritten for the per-contact lock (staged review

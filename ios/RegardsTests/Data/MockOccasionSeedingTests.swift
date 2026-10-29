@@ -110,25 +110,21 @@ struct MockOccasionSeedingTests {
     @Test("The shipped fixture never puts a cadence and an occasion on one day")
     @MainActor
     func shippedFixtureHasNoSameDayDuplicate() async throws {
-        // §9 contract 6 is unenforced in UpcomingViewModel until TF-07, so the
-        // shipped mock build must not create the duplicate itself. A future
-        // edit to a seeded cadence or occasion offset could silently
-        // reintroduce a doubled row in every screenshot and demo; this pins it.
+        // Upcoming computes its cadence rows itself until TF-07f, so a seeded
+        // cadence or occasion offset that lands both on one day would double
+        // a row in every screenshot and demo. This pins the shipped fixture.
         // The shipped window, not a UTC stand-in: guarding the fixture means
         // guarding it under the timezone the app actually boots with.
         let window = MockRepositories.defaultWindow
         let timezone = window.timeZone
         let now = MockRepositories.defaultNow
         let mocks = MockRepositories(now: now, window: window)
+        let scheduler = mocks.occasionPass(now: now, window: window)
+        try await scheduler.runFull()
         let viewModel = UpcomingViewModel(
             contacts: mocks.contacts,
             reminders: mocks.reminders,
-            scheduler: SchedulingPass(
-                reminders: mocks.reminders,
-                contacts: mocks.contacts,
-                window: mocks.window,
-                clock: { now }
-            ),
+            scheduler: scheduler,
             interactions: mocks.interactions,
             window: window,
             clock: { now }
@@ -139,22 +135,41 @@ struct MockOccasionSeedingTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timezone
         var seen: Set<String> = []
-        for row in viewModel.groups.flatMap(\.rows) {
+        let rows = viewModel.groups.flatMap(\.rows)
+        #expect(rows.contains { $0.kind == .birthday } && rows.contains { $0.kind == .anniversary })
+        for row in rows {
             let day = calendar.startOfDay(for: row.scheduledFor)
             let key = "\(row.contactId.uuidString)-\(day.timeIntervalSince1970)"
             #expect(seen.insert(key).inserted, "duplicate same-day row for \(row.name)")
         }
     }
 
-    @Test("Seeded occasion notification ids use the §9 contract-5 identity")
+    @Test("The store seeds no occasion rows; the pass writes the representative birthday and anniversary")
+    func representativeOccasionState() async throws {
+        let now = MockRepositories.defaultNow
+        let mocks = MockRepositories(now: now)
+        #expect(try await mocks.reminders.fetchAllPending().isEmpty)
+
+        try await mocks.occasionPass(now: now).runFull()
+
+        let occasions = try await mocks.reminders.fetchAllPending().filter { $0.kind != .cadence }
+        #expect(Set(occasions.map(\.kind)) == [.birthday, .anniversary])
+        #expect(occasions.allSatisfy { $0.state == .pending })
+    }
+
+    @Test("Occasion rows the pass writes for the seed cast use the §9 contract-5 identity")
     func seededOccasionIdentitiesMatchTheScheme() async throws {
         // TF-07's reconcile and orphan-cancellation logic keys on
         // "contact-{uuid}-{kind}"; a mock-only "mock-birthday-{uuid}" shape
         // would drift from what that logic expects to find.
-        let mocks = MockRepositories(now: MockRepositories.defaultNow)
-        let pending = try await mocks.reminders.fetchAllPending()
+        let now = MockRepositories.defaultNow
+        let mocks = MockRepositories(now: now)
+        try await mocks.occasionPass(now: now).runFull()
 
-        for reminder in pending where reminder.kind != .cadence {
+        let occasions = try await mocks.reminders.fetchAllPending().filter { $0.kind != .cadence }
+
+        #expect(Set(occasions.map(\.kind)) == [.birthday, .anniversary])
+        for reminder in occasions {
             let expected = "contact-\(reminder.contactId.uuidString)-\(reminder.kind.rawValue)"
             #expect(reminder.osNotificationId == expected)
         }
@@ -186,7 +201,7 @@ struct MockOccasionSeedingTests {
     }
 
     @Test(
-        "Both representative occasions seed across DST-transition days",
+        "Both representative occasions get rows across DST-transition days",
         arguments: [
             ("America/Los_Angeles", 2026, 3, 8),
             ("America/Los_Angeles", 2026, 11, 1),
@@ -209,7 +224,9 @@ struct MockOccasionSeedingTests {
             hour: 12
         ))).addingTimeInterval(-86_400)
 
-        let mocks = MockRepositories(now: now, window: .defaultV1(timezone: timezone))
+        let window = ReminderWindow.defaultV1(timezone: timezone)
+        let mocks = MockRepositories(now: now, window: window)
+        try await mocks.occasionPass(now: now, window: window).runFull()
         let pending = try await mocks.reminders.fetchAllPending()
 
         #expect(pending.contains { $0.kind == .birthday })

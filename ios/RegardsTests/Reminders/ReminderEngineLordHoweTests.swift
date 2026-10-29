@@ -5,7 +5,8 @@ import Testing
 /// `nextAllowedSlot` around Lord Howe's 30-minute DST shifts: spring-forward
 /// Sun Oct 4 2026 (02:00 +10:30 -> 02:30 +11:00) and fall-back Sun Apr 5 2026
 /// (02:00 +11:00 -> 01:30 +10:30). A returned slot start must read a
-/// wall-clock time inside its slot.
+/// wall-clock time inside its slot. The transition-day sweep also covers
+/// Antarctica/Troll, Pacific/Chatham and New York.
 struct ReminderEngineLordHoweTests {
 
     private static let zone = "Australia/Lord_Howe"
@@ -112,8 +113,28 @@ struct ReminderEngineLordHoweTests {
             name: "Lord Howe fall-back", zone: "Australia/Lord_Howe",
             start: "2026-04-05T00:00:00+11:00", end: "2026-04-06T00:00:00+10:30",
             slots: [slot(1, 0, 1, 20), slot(1, 0, 1, 45), slot(1, 15, 2, 15), slot(1, 30, 2, 0),
-                    slot(1, 45, 2, 30), slot(1, 30, 3, 0), slot(0, 0, 4, 0)],
-            inSlotProbes: 137),
+                    slot(1, 45, 2, 0), slot(1, 45, 2, 30), slot(1, 30, 3, 0), slot(0, 0, 4, 0)],
+            inSlotProbes: 143),
+        // Antarctica/Troll shifts 2 hours at 01:00 UTC: 03:00 +02:00 -> 01:00 +00:00.
+        TransitionDay(
+            name: "Antarctica/Troll fall-back", zone: "Antarctica/Troll",
+            start: "2026-10-25T00:00:00+02:00", end: "2026-10-26T00:00:00+00:00",
+            slots: [slot(1, 0, 1, 20), slot(1, 15, 2, 15), slot(1, 30, 2, 0), slot(2, 0, 2, 40),
+                    slot(2, 30, 3, 30), slot(0, 0, 4, 0)],
+            inSlotProbes: 151),
+        // Pacific/Chatham shifts 1 hour (+12:45 <-> +13:45) at 02:45 / 03:45 local.
+        TransitionDay(
+            name: "Pacific/Chatham spring-forward", zone: "Pacific/Chatham",
+            start: "2026-09-27T00:00:00+12:45", end: "2026-09-28T00:00:00+13:45",
+            slots: [slot(2, 0, 3, 0), slot(2, 30, 2, 50), slot(2, 50, 3, 50), slot(3, 30, 4, 0),
+                    slot(3, 45, 4, 15), slot(0, 0, 5, 0)],
+            inSlotProbes: 71),
+        TransitionDay(
+            name: "Pacific/Chatham fall-back", zone: "Pacific/Chatham",
+            start: "2026-04-05T00:00:00+13:45", end: "2026-04-06T00:00:00+12:45",
+            slots: [slot(2, 30, 3, 0), slot(2, 45, 3, 15), slot(2, 50, 3, 0), slot(3, 0, 3, 45),
+                    slot(3, 30, 4, 0), slot(0, 0, 5, 0)],
+            inSlotProbes: 125),
         TransitionDay(
             name: "New York fall-back", zone: "America/New_York",
             start: "2026-11-01T00:00:00-04:00", end: "2026-11-02T00:00:00-05:00",
