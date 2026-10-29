@@ -177,8 +177,11 @@ final class AppLaunchCoordinator {
 
     /// Not `private`: `AppLaunchCoordinator+DebugLaunch.swift` calls this
     /// across the file split (see that file's header comment).
+    /// Born `.loading`: `start()` runs the scheduling pass first, then flips
+    /// to `.ready`, so the tab root's first load already sees the rows the
+    /// pass writes (the seed cast's birthday and anniversary).
     init(mockRuntime: AppRuntime, notifications: (any NotificationScheduling)?) {
-        self.phase = .ready
+        self.phase = .loading
         self.runtime = mockRuntime
         self.dependencies = nil
         self.notifications = notifications
@@ -222,16 +225,16 @@ final class AppLaunchCoordinator {
     func start() async {
         guard !didStart, let dependencies else {
             // No launch body runs here: the DEBUG mock launch, or a
-            // coordinator whose phase was set without one. Its phase is
-            // already decided (DEBUG `testingPhase: .loading` excepted) unless
-            // another `start()` is still loading, which starts the consumer
-            // itself when it finishes.
-            if phase != .loading { beginConsumingNotificationActions() }
-            // The DEBUG mock launch is born `.ready` with no launch body, so
-            // its scheduling pass runs here.
-            if dependencies == nil, phase == .ready, let runtime {
+            // coordinator whose phase was set without one. The mock launch's
+            // only step is the scheduling pass, before `.ready` (see
+            // `init(mockRuntime:)`). Any other phase is already decided (DEBUG
+            // `testingPhase: .loading` excepted) unless another `start()` is
+            // still loading, which starts the consumer itself when it finishes.
+            if dependencies == nil, phase == .loading, let runtime {
                 await runSchedulingPass(runtime: runtime)
+                phase = .ready
             }
+            if phase != .loading { beginConsumingNotificationActions() }
             return
         }
         didStart = true
