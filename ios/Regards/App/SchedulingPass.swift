@@ -437,12 +437,15 @@ public actor SchedulingPass {
     }
 
     /// The active snooze's resolved instant for Contact Detail (R56): the
-    /// pending cadence row's `scheduledFor` when it carries a floor, so the
-    /// screen and Overdue agree on when the snooze lapses. `nil` when nothing
-    /// is snoozed. `.max()` so a stray second row can't win by fetch order.
+    /// pending cadence row's `scheduledFor` when it carries a floor and is
+    /// still ahead, so the screen and Overdue agree on when the snooze
+    /// lapses. `nil` when no snooze is still ahead: a spent floor can stay
+    /// on a due row, which the no-re-nag rule leaves alone. `.max()` so a
+    /// stray second row can't win by fetch order.
     public func pendingSnoozeDate(contactId: UUID) async throws -> Date? {
-        try await reminders.fetchPending(forContact: contactId)
-            .filter { $0.kind == .cadence && $0.snoozedUntil != nil }
+        let now = clock()
+        return try await reminders.fetchPending(forContact: contactId)
+            .filter { $0.kind == .cadence && $0.snoozedUntil != nil && $0.scheduledFor > now }
             .map(\.scheduledFor)
             .max()
     }
