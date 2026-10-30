@@ -389,9 +389,9 @@ final class AppLaunchCoordinator {
         canContinueWithoutContacts = false
         onboardingCompletionPending = false
         phase = .ready
-        // First-launch import already read the full system store this
-        // session, so skip an immediate re-reconcile here — foreground and
-        // store-change triggers cover everything from this point on.
+        // Store-change and foreground triggers cover everything from here on.
+        // `finishOnboarding()` also reconciles once: the Contacts app may have
+        // changed during the starter step, before this listener existed.
         if let dependencies {
             beginObservingContactStoreChanges(dependencies: dependencies)
         }
@@ -485,7 +485,9 @@ final class AppLaunchCoordinator {
             statusMessage = Self.postImportCompletionFailureMessage
             canContinueWithoutContacts = true
             onboardingStep = .contacts
+            return
         }
+        await reconcileNow(runtime: runtime, dependencies: dependencies)
     }
 
     private static let importFailureMessage =
