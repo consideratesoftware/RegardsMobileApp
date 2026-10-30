@@ -161,6 +161,75 @@ struct SettingsContactsRowTests {
         #expect(probe.reconcileCount == 1)
     }
 
+    /// On a device a decline reaches the app as an error (CNError 100) while
+    /// the status becomes `.denied`. That is a decision, not a failure: no
+    /// error line, no "couldn't ask" announcement, nothing imported.
+    @Test("A decline reported as a thrown error shows denied, no error line, and imports nothing")
+    func declineByThrowShowsNoErrorAndDoesNotReconcile() async {
+        let source = MutableContactsSource(status: .notDetermined)
+        source.setRequestOutcome(.failure(RequestFailed()), decidingOnFailure: .denied)
+        let probe = Probe()
+        let viewModel = Self.viewModel(source, probe)
+        await viewModel.load()
+
+        await viewModel.requestAccess()
+
+        #expect(viewModel.status == .denied)
+        #expect(!viewModel.requestFailed)
+        #expect(probe.messages == ["Contacts access off"])
+        #expect(probe.reconcileCount == 0)
+        #expect(source.requestCountValue() == 1)
+    }
+
+    @Test("An error line clears when the status later changes")
+    func errorLineClearsWhenStatusChanges() async {
+        let source = MutableContactsSource(status: .notDetermined)
+        source.setRequestOutcome(.failure(RequestFailed()))
+        let probe = Probe()
+        let viewModel = Self.viewModel(source, probe)
+        await viewModel.load()
+        await viewModel.requestAccess()
+        #expect(viewModel.requestFailed)
+
+        // A re-read that finds the same status keeps the error.
+        await viewModel.refresh()
+        #expect(viewModel.requestFailed)
+
+        // The user decides in iOS Settings, so the error no longer applies.
+        source.setStatus(.denied)
+        await viewModel.refresh()
+
+        #expect(viewModel.status == .denied)
+        #expect(!viewModel.requestFailed)
+    }
+
+    /// The scene turning active starts a status read, then the user taps Allow
+    /// and the grant is read back first. The older read finishes last, still
+    /// saying not determined. It must not bring the "Allow" button back or
+    /// speak again.
+    @Test("A stale status read that finishes after a grant does not overwrite it")
+    func staleReadFinishingAfterGrantDoesNotRegressStatus() async {
+        let source = MutableContactsSource(status: .notDetermined)
+        source.setRequestOutcome(.success(.authorized))
+        let probe = Probe()
+        let viewModel = Self.viewModel(source, probe)
+        await viewModel.load()
+        source.holdReads(count: 1)
+        let older = Task { await viewModel.refresh() }
+        #expect(await eventually { source.heldReadCountValue() == 1 })
+
+        await viewModel.requestAccess()
+        #expect(viewModel.status == .authorized)
+        source.releaseHeldRead(at: 0, as: .notDetermined)
+        await older.value
+
+        #expect(viewModel.status == .authorized)
+        #expect(probe.messages == ["Contacts access on"])
+        #expect(probe.reconcileCount == 1)
+        await viewModel.requestAccess()
+        #expect(source.requestCountValue() == 1)
+    }
+
     @Test("A request before the first status read does not prompt")
     func requestBeforeFirstReadDoesNotPrompt() async {
         let source = MutableContactsSource(status: .notDetermined)

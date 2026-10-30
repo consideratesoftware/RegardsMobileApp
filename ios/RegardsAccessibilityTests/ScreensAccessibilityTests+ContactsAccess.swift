@@ -102,8 +102,9 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
-    /// The mock launch has no Contacts source, so a row there would be inert.
-    /// The other People row proves the screen did load, so the absence isn't a
+    /// Pin: the mock launch has no Contacts source, so a row there would be
+    /// inert. This passes on the code before the row existed, on purpose. The
+    /// other People row proves the screen did load, so the absence isn't a
     /// screen that failed to render.
     @MainActor
     func testSettingsWithoutContactsSourceHasNoContactsRow() throws {
