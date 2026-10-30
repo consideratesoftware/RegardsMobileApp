@@ -215,8 +215,19 @@ public struct ReminderEngine: Sendable {
                 if includingContainingSlot, containsDate,
                    let activeSlotStart = candidateStarts.filter({ candidate in
                        let time = wallClock(of: candidate, calendar: calendar)
-                       return candidate <= date && slot.start <= time && time < slot.end
-                           && staysInside(slot, from: candidate, to: date, calendar: calendar)
+                       guard candidate <= date, slot.start <= time, time < slot.end else { return false }
+                       // Between transitions the wall clock only moves
+                       // forward, so only the readings just before and at
+                       // each transition can leave the slot.
+                       var transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: candidate)
+                       while let current = transition, current <= date {
+                           for reading in [current.addingTimeInterval(-1), current] {
+                               let readingTime = wallClock(of: reading, calendar: calendar)
+                               guard slot.start <= readingTime, readingTime < slot.end else { return false }
+                           }
+                           transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: current)
+                       }
+                       return true
                    }).max() {
                     activeSlotStarts.append(activeSlotStart)
                 }
@@ -234,21 +245,6 @@ public struct ReminderEngine: Sendable {
             if let futureSlotStart = futureSlotStarts.min() { return futureSlotStart }
         }
         return nil
-    }
-
-    /// Whether every wall-clock minute from `start` to `end` reads inside
-    /// `slot`. Between transitions the wall clock only moves forward, so only
-    /// the readings just before and at each transition can leave the slot.
-    private func staysInside(_ slot: WallClockSlot, from start: Date, to end: Date, calendar: Calendar) -> Bool {
-        var transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: start)
-        while let current = transition, current <= end {
-            for reading in [current.addingTimeInterval(-1), current] {
-                let time = wallClock(of: reading, calendar: calendar)
-                guard slot.start <= time, time < slot.end else { return false }
-            }
-            transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: current)
-        }
-        return true
     }
 
     /// Wall-clock firing slots for the window: allowed ranges with wrapping /
