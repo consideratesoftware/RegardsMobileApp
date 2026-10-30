@@ -444,7 +444,10 @@ struct RegardsTabRoot: View {
                 showsLimitedAccessNote: access == .limited,
                 contactsAccessIsOff: access == .denied || access == .restricted || access == .notDetermined,
                 onFinish: {
-                    // A slow save can finish after Back; never pop another screen.
+                    // Pops only when the starter picker is the top route, so a
+                    // save that finishes after Back can't pop another screen.
+                    // Known gap (follow-up task): if the picker was popped and
+                    // pushed again, an older save can still pop the new one.
                     if navigation.settingsPath.last == .starterContacts { navigation.settingsPath.removeLast() }
                 }
             )
