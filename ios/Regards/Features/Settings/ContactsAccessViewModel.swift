@@ -102,8 +102,10 @@ public final class ContactsAccessViewModel {
     }
 
     /// Opens the Regards page in iOS Settings, where Contacts access can be
-    /// changed. Takes the `OpenURLAction` so a test can see the URL.
+    /// changed. Takes the `OpenURLAction` so a test can see the URL. Only for
+    /// `.denied`: a restriction can't be lifted there, so it does nothing.
     public func openContactsSettings(using openURL: OpenURLAction) {
+        guard status == .denied else { return }
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         openURL(url)
     }
