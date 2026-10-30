@@ -118,7 +118,7 @@ final class StarterContactsViewModel {
     }
 
     /// Whether Done has something to write. Picking nobody on a fresh install
-    /// has nothing to save, so the screen's Skip is the way out.
+    /// has nothing to save, so onboarding's Skip is the way out.
     var canSave: Bool {
         loadState == .loaded && !isSaving && !isFinished && hasUnsavedChanges
     }
