@@ -368,8 +368,12 @@ final class AppLaunchCoordinator {
         isImporting = true
         defer { isImporting = false }
 
+        let wasPending = onboardingCompletionPending
         do {
             try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
+            // After the starter step (Done, Skip, or a "Finish setup" retry)
+            // the Contacts app may have changed, so reconcile once.
+            if wasPending { await reconcileNow(runtime: runtime, dependencies: dependencies) }
         } catch {
             statusMessage = onboardingCompletionPending
                 ? Self.postImportCompletionFailureMessage
@@ -470,24 +474,14 @@ final class AppLaunchCoordinator {
     }
 
     /// The starter step's Done and Skip (TF-11): `onboardingCompletedAt` is
-    /// onboarding's last write. A failed save returns to the Contacts step's
-    /// "Finish setup", which retries through `continueWithoutContacts()`.
+    /// onboarding's last write, through the same path as the "Finish setup"
+    /// retry, so both reconcile once after it. A failed save returns to the
+    /// Contacts step's "Finish setup".
     func finishOnboarding() async {
-        guard phase == .onboarding, onboardingStep == .starter,
-              let runtime, let dependencies, !isImporting else { return }
-        onboardingActionGeneration &+= 1
-        isImporting = true
-        defer { isImporting = false }
+        guard phase == .onboarding, onboardingStep == .starter, runtime != nil, !isImporting else { return }
         onboardingCompletionPending = true
-        do {
-            try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
-        } catch {
-            statusMessage = Self.postImportCompletionFailureMessage
-            canContinueWithoutContacts = true
-            onboardingStep = .contacts
-            return
-        }
-        await reconcileNow(runtime: runtime, dependencies: dependencies)
+        await continueWithoutContacts()
+        if phase != .ready { onboardingStep = .contacts }
     }
 
     private static let importFailureMessage =
