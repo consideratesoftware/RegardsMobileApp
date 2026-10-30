@@ -56,9 +56,14 @@ final class StarterContactsViewModel {
     /// Settings pops). A partial save that leaves unsaved changes doesn't set
     /// it: the screen stays and Done offers what is left.
     private(set) var isFinished = false
-    /// The one inline message slot: a refused 4th pick or a save problem.
-    /// Cleared by the next pick, cadence change, or save attempt.
+    /// The one inline message slot: a refused 4th pick, a save problem, or
+    /// the result of a save that dropped archived picks. Cleared by the next
+    /// pick, cadence change, or save attempt.
     private(set) var statusMessage: String?
+    /// Whether `statusMessage` reports a problem (a refused pick, a failed
+    /// save) rather than a result (a save that dropped archived picks), so
+    /// the screen styles it as one.
+    private(set) var statusIsProblem = false
 
     private let repository: any ContactRepository
     private let announce: @MainActor (String) -> Void
@@ -156,6 +161,7 @@ final class StarterContactsViewModel {
         }
         guard selection.count < Self.maxSelection else {
             statusMessage = Self.limitMessage
+            statusIsProblem = true
             announce(Self.limitMessage)
             return false
         }
@@ -227,6 +233,7 @@ final class StarterContactsViewModel {
         let verb = vanished.count == 1 ? "is" : "are"
         let result = "\(savedAnnouncement()) \(names) \(verb) no longer in your contacts."
         statusMessage = result
+        statusIsProblem = false
         announce(result)
         isFinished = !hasUnsavedChanges
         // The caller may leave the screen now, so only VoiceOver hears this message.
@@ -250,6 +257,7 @@ final class StarterContactsViewModel {
 
     private func fail(_ text: String) {
         statusMessage = text
+        statusIsProblem = true
         announce(text)
     }
 

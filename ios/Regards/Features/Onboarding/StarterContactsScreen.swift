@@ -240,7 +240,7 @@ struct StarterContactsScreen: View {
             if let message = viewModel.statusMessage {
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(RegardsDS.danger)
+                    .foregroundStyle(viewModel.statusIsProblem ? RegardsDS.danger : RegardsDS.muted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("starter.message")
