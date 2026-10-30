@@ -445,10 +445,6 @@ struct StubReminderWindowRepository: ReminderWindowRepository {
 actor FixedReminderWindowRepository: ReminderWindowRepository {
     private var window: ReminderWindow
 
-    init(_ window: ReminderWindow) {
-        self.window = window
-    }
-
     /// America/Los_Angeles, not the machine's zone: the expectations of every
     /// suite that takes this default must not depend on where it runs (CI is
     /// UTC; a developer's Mac is not).

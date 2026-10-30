@@ -182,4 +182,58 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
         #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == nil)
     }
+
+    // MARK: - Pins: a row that left the snapshot never blocks the next one
+
+    /// Pin. A caught-up row (`userCaughtUp`) and a cancelled row are not in
+    /// the snapshot, so the no-re-nag guard never sees them, however far the
+    /// clock has moved past the old `scheduledFor`. If the snapshot ever
+    /// returned them, the guard (`anchor <= old scheduledFor`) would keep a
+    /// stale row here and the contact would get no reminder.
+    @Test(
+        "A contact caught up from Upcoming, with the old slot still ahead, gets a new pending row when overdue again",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func caughtUpWithTheOldSlotAheadGetsAFreshRowLater(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1, cadenceDays: 7)
+        try await fixture.pass.runFull()
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        #expect(try await fixture.pass.caughtUp(contactId: contact.id))
+        _ = try await fixture.repositories.contacts.updateLastInteractedAt(
+            id: contact.id, at: PassFixture.at("2026-06-10 10:00"))
+        // Past the old 06-10 18:00 slot and past the new due date, 06-17 10:00.
+        fixture.setNow("2026-06-18 10:00")
+
+        try await fixture.pass.runFull()
+
+        let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.state == .pending)
+        #expect(row.scheduledFor == PassFixture.at("2026-06-18 18:00"))
+        #expect(row.snoozedUntil == nil)
+    }
+
+    @Test(
+        "A cancelled cadence row does not block the new row when the cadence is set again",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func cancelledRowDoesNotBlockTheNextOne(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1, cadenceDays: 7)
+        try await fixture.pass.runFull()
+        var cleared = contact
+        cleared.cadenceDays = nil
+        try await fixture.repositories.contacts.upsert(cleared)
+        try await fixture.pass.runFull()
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        try await fixture.repositories.contacts.upsert(contact)
+        // Past the cancelled row's 06-10 18:00.
+        fixture.setNow("2026-06-11 10:00")
+
+        try await fixture.pass.runFull()
+
+        let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.state == .pending)
+        #expect(row.scheduledFor == PassFixture.at("2026-06-11 18:00"))
+    }
 }

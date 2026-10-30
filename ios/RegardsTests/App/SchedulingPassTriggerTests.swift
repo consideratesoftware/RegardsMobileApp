@@ -153,8 +153,7 @@ struct SchedulingPassTriggerTests {
     func passFailureDoesNotBlockReady() async throws {
         // `StubReminderRepository.observeSchedule()` finishes with no value,
         // which makes `runFull()` throw.
-        let harness = try await NotificationActionHandlingTests.harness(
-            backend: .mock, onboarded: true, reminders: StubReminderRepository())
+        let harness = try await Self.failingPassHarness(started: false)
         await #expect(throws: (any Error).self) { try await harness.scheduler.runFull() }
 
         await harness.launch.start()
@@ -169,10 +168,10 @@ struct SchedulingPassTriggerTests {
 
     /// `StubReminderRepository.observeSchedule()` finishes with no value, so
     /// `runFull()` and `run(for:)` throw while every write still lands.
-    private static func failingPassHarness() async throws -> Harness {
+    private static func failingPassHarness(started: Bool = true) async throws -> Harness {
         let harness = try await NotificationActionHandlingTests.harness(
             backend: .mock, onboarded: true, reminders: StubReminderRepository())
-        await harness.launch.start()
+        if started { await harness.launch.start() }
         return harness
     }
 

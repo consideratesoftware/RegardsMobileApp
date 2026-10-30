@@ -2,9 +2,11 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// `SchedulingPass.snooze` mock/GRDB parity (ARCHITECTURE.md §14 PR22's
-/// DB-only stub). Shares `RepositoriesTests.swift`'s `RepositoryContractBackend`
-/// / `contractContact` / `contractUUID` helpers.
+/// `SchedulingPass.snooze` on both backends: the floor and its window-resolved
+/// slot, replacement instead of duplication, concurrent taps, and the
+/// precondition checks (unknown, untracked and no-cadence contacts). Shares
+/// `RepositoriesTests.swift`'s `RepositoryContractBackend` / `contractContact`
+/// / `contractUUID` helpers.
 struct SchedulingPassTests {
 
     /// The global window, so the 7 calendar days count in UTC on any machine.

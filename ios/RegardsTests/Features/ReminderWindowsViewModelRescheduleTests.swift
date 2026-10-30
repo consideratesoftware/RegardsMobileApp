@@ -79,8 +79,8 @@ struct ReminderWindowsViewModelRescheduleTests {
     func resetWhoseGlobalReadFailsStaysOpenAndSaysSo() async throws {
         let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
         let recorder = Fixtures.SaveRecorder()
-        let failingReads = FailAfterFirstFetchWindowRepository(
-            wrapped: world.environment.window, counter: CallCounter())
+        let failingReads = FailingFetchWindowRepository(
+            wrapped: world.environment.window, failingCalls: { $0 > 1 })
         let editor = Fixtures.editor(
             .contact(world.target.id), contacts: world.environment.contacts, window: failingReads,
             recorder: recorder)
@@ -115,6 +115,119 @@ struct ReminderWindowsViewModelRescheduleTests {
         #expect(editor.validationMessage == nil)
         #expect(recorder.windows.count == 2, "the second save ran onSaved again")
         #expect(recorder.windows.first == recorder.windows.last)
+    }
+
+    /// After a reset clears the override but the pass (or the global re-read)
+    /// fails, the editor holds no override and an unedited draft. Save must
+    /// still rerun the pass with the global window, as the message promises
+    /// ("Save retries"), and never create an override from the draft.
+    enum ResetFailure: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case passFails
+        case globalReadFails
+
+        var testDescription: String { rawValue }
+    }
+
+    @Test(
+        "Save after a failed reset runs the reschedule again and stores no override",
+        arguments: ResetFailure.allCases
+    )
+    func saveAfterAFailedResetRetriesTheReschedule(failure: ResetFailure) async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let recorder = Fixtures.SaveRecorder()
+        // Call 1 is the load; call 2 is the reset's read; call 3 is the retry's.
+        let reads = FailingFetchWindowRepository(
+            wrapped: world.environment.window, failingCalls: { failure == .globalReadFails && $0 == 2 })
+        let editor = Fixtures.editor(
+            .contact(world.target.id), contacts: world.environment.contacts, window: reads, recorder: recorder)
+        await editor.load()
+        recorder.rescheduled = failure != .passFails
+        #expect(!(await editor.resetToDefault()))
+        #expect(editor.validationMessage == Self.message)
+        let windowsAfterReset = recorder.windows.count
+        recorder.rescheduled = true
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(editor.validationMessage == nil)
+        #expect(recorder.windows.count == windowsAfterReset + 1, "the retry ran the pass")
+        #expect(recorder.windows.last == Fixtures.storedGlobal, "with the global window the contact follows")
+        #expect(!editor.hasStoredOverride)
+        #expect(try await world.environment.contacts.fetch(id: world.target.id)?.reminderWindowOverride == nil)
+        #expect(editor.draft == Draft(Fixtures.storedGlobal))
+    }
+
+    /// A retry that fails again keeps the editor open and the debt owed, so
+    /// the next Save tries once more.
+    @Test("A retry that fails again stays open, and the next Save still reruns the pass")
+    func failedRetryAfterAResetStaysOwed() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let recorder = Fixtures.SaveRecorder()
+        recorder.rescheduled = false
+        let editor = await Self.loadedEditor(.contact(world.target.id), world: world, recorder: recorder)
+        #expect(!(await editor.resetToDefault()))
+
+        #expect(!(await editor.save()))
+        #expect(editor.validationMessage == Self.message)
+        recorder.rescheduled = true
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(recorder.windows.count == 3)
+        #expect(try await world.environment.contacts.fetch(id: world.target.id)?.reminderWindowOverride == nil)
+    }
+
+    // MARK: - The Saving… cue
+
+    enum Action: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case save
+        case reset
+
+        var testDescription: String { rawValue }
+    }
+
+    /// The screen reads `saveButtonTitle` for Save's label and dims the form
+    /// and the reset button while `isSaving`. A hosted SwiftUI button exposes
+    /// no accessibility element to a unit test (see
+    /// `SettingsNotificationsHostingTests`), so the dimming is checked at the
+    /// view-model level through `isSaving` and by the XCUI audits; the label
+    /// text is checked here.
+    @Test("Save reads Saving… while the pass runs, then Save again", arguments: Action.allCases)
+    func savingCueShowsWhileThePassRuns(action: Action) async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let gate = AsyncGate()
+        let editor = ReminderWindowsViewModel(
+            target: .contact(world.target.id),
+            window: world.environment.window,
+            contacts: world.environment.contacts,
+            clock: { Fixtures.now },
+            onSaved: { _ in
+                await gate.wait()
+                return true
+            })
+        await editor.load()
+        editor.draft.allowedDays = .saturday
+        #expect(editor.saveButtonTitle == "Save")
+        #expect(!editor.isSaving)
+
+        let running = Task { @MainActor in
+            switch action {
+            case .save: await editor.save()
+            case .reset: await editor.resetToDefault()
+            }
+        }
+        await gate.waitUntilArrived()
+
+        #expect(editor.isSaving)
+        #expect(editor.saveButtonTitle == "Saving\u{2026}")
+
+        await gate.open()
+        let finished = await running.value
+
+        #expect(finished)
+        #expect(!editor.isSaving)
+        #expect(editor.saveButtonTitle == "Save")
     }
 
     // MARK: - The return value and the message agree

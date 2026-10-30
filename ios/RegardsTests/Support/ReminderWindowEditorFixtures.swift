@@ -136,26 +136,25 @@ struct ThrowingSaveWindowRepository: ReminderWindowRepository {
     func saveGlobal(_ window: ReminderWindow) async throws { throw RepositoryFakeFailure() }
 }
 
-/// The first `fetchGlobal()` throws (a failed editor load); later reads and
-/// writes pass through to `wrapped`.
-struct FailFirstFetchWindowRepository: ReminderWindowRepository {
+/// A global window whose `fetchGlobal()` throws on the calls `failingCalls`
+/// selects (counted from 1 across the repository's life) and passes through to
+/// `wrapped` otherwise. `{ $0 == 1 }` is a failed editor load; `{ $0 > 1 }` is
+/// a store that fails after the editor opened; `{ $0 == 2 }` fails one read
+/// and then recovers. Writes always pass through.
+struct FailingFetchWindowRepository: ReminderWindowRepository {
     let wrapped: any ReminderWindowRepository
-    let counter: CallCounter
-    func fetchGlobal() async throws -> ReminderWindow {
-        if await counter.next() == 1 { throw RepositoryFakeFailure() }
-        return try await wrapped.fetchGlobal()
-    }
-    func saveGlobal(_ window: ReminderWindow) async throws { try await wrapped.saveGlobal(window) }
-}
+    let failingCalls: @Sendable (Int) -> Bool
+    private let counter = CallCounter()
 
-/// The first `fetchGlobal()` (the editor's load) succeeds; every later one
-/// throws, as a store that fails after the editor opened. Writes pass through.
-struct FailAfterFirstFetchWindowRepository: ReminderWindowRepository {
-    let wrapped: any ReminderWindowRepository
-    let counter: CallCounter
+    init(wrapped: any ReminderWindowRepository, failingCalls: @escaping @Sendable (Int) -> Bool) {
+        self.wrapped = wrapped
+        self.failingCalls = failingCalls
+    }
+
     func fetchGlobal() async throws -> ReminderWindow {
-        if await counter.next() > 1 { throw RepositoryFakeFailure() }
+        if failingCalls(await counter.next()) { throw RepositoryFakeFailure() }
         return try await wrapped.fetchGlobal()
     }
+
     func saveGlobal(_ window: ReminderWindow) async throws { try await wrapped.saveGlobal(window) }
 }

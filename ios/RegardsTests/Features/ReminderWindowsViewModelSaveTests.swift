@@ -223,7 +223,7 @@ struct ReminderWindowsViewModelSaveTests {
     func retryAfterFailedLoadRecovers() async throws {
         let world = try await Fixtures.makeWorld()
         let recorder = Fixtures.SaveRecorder()
-        let flaky = FailFirstFetchWindowRepository(wrapped: world.environment.window, counter: CallCounter())
+        let flaky = FailingFetchWindowRepository(wrapped: world.environment.window, failingCalls: { $0 == 1 })
         let editor = Fixtures.editor(.global, contacts: world.environment.contacts, window: flaky, recorder: recorder)
 
         await editor.load()
