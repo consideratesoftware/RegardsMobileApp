@@ -203,9 +203,9 @@ extension ScreensAccessibilityTests {
             }
 
             let trigger = app.descendants(matching: .any)[triggerIdentifier]
-            // At accessibility5 the People section pushes Reminder windows
-            // down until its centre sits under the tab bar: still "hittable",
-            // but a tap there lands on the tab bar. A user scrolls to it, and
+            // At accessibility5 the sections above a row can push its centre
+            // under the tab bar: still "hittable", but a tap there lands on
+            // the tab bar. A user scrolls to it, and
             // so does the test.
             let tabBar = app.tabBars.firstMatch
             let coveredFrom = tabBar.exists ? tabBar.frame.minY : app.frame.maxY

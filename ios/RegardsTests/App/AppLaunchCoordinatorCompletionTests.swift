@@ -43,6 +43,60 @@ extension AppLaunchCoordinatorRecoveryTests {
         #expect(kept?.cadenceDays == 14)
     }
 
+    private static let han = SystemContact(
+        identifier: "completion-han",
+        givenName: "Han",
+        familyName: "Solo",
+        phoneNumbers: ["+1 555 010 2001"],
+        emailAddresses: []
+    )
+
+    @Test("A failed completion save does not reconcile, so a contact added during the starter step waits")
+    func failedFinishDoesNotReconcile() async throws {
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let profile = RetryingRecoveryProfileRepository(profile: Self.startedTrialProfile, failuresRemaining: 1)
+        let environment = AppEnvironment(
+            contacts: base.contacts, groups: base.groups, reminders: base.reminders,
+            interactions: base.interactions, window: base.window, profile: profile
+        )
+        let source = MutableContactsSource(status: .authorized, contacts: [Self.systemContact])
+        let launch = coordinator(environment: environment, source: source)
+        await launch.start()
+        source.setContacts([Self.systemContact, Self.han])
+
+        await launch.finishOnboarding()
+
+        #expect(launch.onboardingCompletionPending)
+        #expect(source.fetchCountValue() == 1, "Only the launch import has read the store.")
+        #expect(try await environment.contacts.fetchAll().count == 1)
+    }
+
+    @Test("A Finish setup retry imports a contact added during the starter step without another event")
+    func completionRetryImportsContactsAddedDuringStarter() async throws {
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let profile = RetryingRecoveryProfileRepository(profile: Self.startedTrialProfile, failuresRemaining: 1)
+        let environment = AppEnvironment(
+            contacts: base.contacts, groups: base.groups, reminders: base.reminders,
+            interactions: base.interactions, window: base.window, profile: profile
+        )
+        let source = MutableContactsSource(status: .authorized, contacts: [Self.systemContact])
+        let launch = coordinator(environment: environment, source: source)
+        await launch.start()
+        // Han is added in the Contacts app while the starter step is on screen,
+        // and the first Done fails to save.
+        source.setContacts([Self.systemContact, Self.han])
+        await launch.finishOnboarding()
+        #expect(launch.onboardingCompletionPending)
+
+        await launch.continueWithoutContacts()
+
+        #expect(launch.phase == .ready)
+        #expect(try await profile.fetch().onboardingCompletedAt == Self.now)
+        let refs = try await environment.contacts.fetchAll().map(\.systemContactRef)
+        #expect(Set(refs) == [Self.systemContact.identifier, Self.han.identifier])
+        #expect(source.fetchCountValue() == 2, "The launch import plus one reconcile after the retry.")
+    }
+
     @Test("Done after onboarding is already complete writes nothing")
     func finishAfterReadyWritesNothing() async throws {
         let profile = RetryingRecoveryProfileRepository(profile: Self.startedTrialProfile, failuresRemaining: 0)

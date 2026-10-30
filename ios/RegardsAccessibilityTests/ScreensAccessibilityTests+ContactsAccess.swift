@@ -108,7 +108,9 @@ extension ScreensAccessibilityTests {
     func testSettingsChoosePeopleWithContactsOffExplainsAccessIsOff() {
         let app = openChoosePeopleWithContactsOff()
 
-        let reason = app.staticTexts["Regards can't see your contacts. Turn on Contacts access above to choose people."]
+        let reason = app.staticTexts[
+            "Regards can't see your contacts. Go back and turn on Contacts access to choose people."
+        ]
         XCTAssertTrue(reason.waitForExistence(timeout: 10), "The empty picker should say Contacts access is off.")
         XCTAssertFalse(
             app.staticTexts["Regards hasn't imported any contacts yet."].exists,

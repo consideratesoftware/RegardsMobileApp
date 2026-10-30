@@ -260,6 +260,7 @@ struct StarterContactsViewModelSaveTests {
         #expect(viewModel.isFinished)
         #expect(viewModel.statusMessage == message)
         #expect(announcements.messages == [message])
+        #expect(!viewModel.statusIsProblem, "A partial save is a result, not a failure.")
         #expect(!viewModel.canSave)
         let inStore = try await Self.trackedInStore(store)
         #expect(inStore.keys.contains(han.id))
@@ -293,6 +294,7 @@ struct StarterContactsViewModelSaveTests {
         #expect(viewModel.isFinished)
         #expect(viewModel.statusMessage == message)
         #expect(announcements.messages == [message])
+        #expect(!viewModel.statusIsProblem)
         #expect(viewModel.contacts.map(\.id) == [han.id])
         #expect(viewModel.selection == [han.id: 30], "Han keeps his cadence and Leia is not counted.")
         // Only Leia's untrack was attempted: Han had nothing to write.
@@ -339,6 +341,7 @@ struct StarterContactsViewModelSaveTests {
 
         #expect(!saved)
         #expect(viewModel.statusMessage == StarterContactsViewModel.saveFailedMessage)
+        #expect(viewModel.statusIsProblem, "A failed save is a problem.")
         #expect(try await Self.trackedInStore(store).keys.contains(ana.id))
         #expect(viewModel.canSave, "Ben is still unwritten, so Done offers him.")
         let callsBeforeRetry = await repository.updateTrackingCalls
