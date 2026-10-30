@@ -210,6 +210,11 @@ public struct AllContactsScreen: View {
 
     private func contactRow(_ contact: Contact) -> some View {
         rowConstructionObserver?(contact.id)
+        let subtitle = [
+            AllContactsViewModel.cadenceSegment(days: contact.cadenceDays),
+            contact.lastInteractedAt.flatMap { Contact.relativeDescription(for: $0, from: viewModel.now) }
+                .map { "last \($0)" },
+        ].compactMap { $0 }.joined(separator: " · ")
 
         return HStack(spacing: 12) {
             Avatar(name: contact.displayName, size: 40,
@@ -218,16 +223,12 @@ public struct AllContactsScreen: View {
                 Text(contact.displayName)
                     .font(.body.weight(.medium))
                     .foregroundStyle(RegardsDS.ink)
-                Text(
-                    [AllContactsViewModel.cadenceSegment(days: contact.cadenceDays),
-                     contact.lastInteractedAt.flatMap {
-                        Contact.relativeDescription(for: $0, from: viewModel.now)
-                     }
-                        .map { "last \($0)" }]
-                    .compactMap { $0 }.joined(separator: " · ")
-                )
-                .font(.footnote)
-                .foregroundStyle(RegardsDS.muted)
+                // No empty footnote when a contact has neither segment.
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(RegardsDS.muted)
+                }
             }
             Spacer()
             ChannelGlyph(channel: contact.preferredChannel, size: 14)
