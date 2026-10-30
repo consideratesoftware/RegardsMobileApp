@@ -30,7 +30,7 @@ public protocol ContactRepository: Sendable {
     /// never on subscribe (ARCHITECTURE.md §14 PR22 — Overdue/Upcoming's
     /// cadence rows stay current after an action on a different screen).
     /// Scoped to `Contact` reads only: the `ScheduledReminder ⋈ Contact` join
-    /// Upcoming's occasion rows need stays on-the-fly until TF-07 (R10).
+    /// Upcoming's occasion rows need stays on-the-fly until TF-07f (R10).
     /// Never replays the current value on subscribe — the subscriber's own
     /// `fetchTracked()` read is the sole source of initial state; an eager
     /// replay could land after a caller's optimistic update and stomp it
