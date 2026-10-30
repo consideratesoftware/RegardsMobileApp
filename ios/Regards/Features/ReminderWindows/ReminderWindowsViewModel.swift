@@ -321,9 +321,9 @@ public final class ReminderWindowsViewModel {
         // catches up.
         let global = try? await window.fetchGlobal()
         lastReadGlobal = global ?? lastReadGlobal
-        // The override is already cleared, so the form shows the default window even
-        // when the re-read failed. Edits made before the reset are dropped: the user
-        // chose "Use default window".
+        // The override is already cleared, so the form shows the default
+        // window even when the re-read failed. Edits made before the reset
+        // are dropped: the user chose "Use default window".
         draft = Draft(lastReadGlobal)
         loadedDraft = draft
         guard let global else {

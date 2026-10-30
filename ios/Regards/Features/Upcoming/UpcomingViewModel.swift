@@ -333,9 +333,9 @@ public final class UpcomingViewModel {
         // floor resolved into the window, §9), keyed by contact id. Only a
         // row with a floor is a snooze; SchedulingPass's plain cadence rows
         // are left to the computation below. Inlined rather than a shared
-        // `PendingSnoozeLookup` helper (staged review round 7: two call
-        // sites, below §17's abstraction floor of three) —
-        // `OverdueViewModel.performLoad` has its own identical copy. A
+        // `PendingSnoozeLookup` helper: two call sites, below §17's
+        // abstraction floor of three. `OverdueViewModel.performLoad` has its
+        // own identical copy. A
         // lapsed snooze stays in this map, but as a past instant: `max`
         // below ignores it and the ordinary computation decides the date, so
         // the row "returns" on its own the next load after the snooze lapses.

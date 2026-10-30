@@ -390,7 +390,7 @@ struct SchedulingPassCaughtUpTests {
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count <= 1)
     }
 
-    /// R61(e), round 20 blocker. The shared lock suspends waiters in a
+    /// R61(e) blocker. The shared lock suspends waiters in a
     /// `withCheckedContinuation`, which is not cancellation-aware: a
     /// cancelled waiter cannot remove itself from the queue. What must hold
     /// regardless is liveness — if a waiting task is cancelled, the lock
