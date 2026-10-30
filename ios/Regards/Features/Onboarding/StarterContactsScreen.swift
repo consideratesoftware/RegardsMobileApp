@@ -21,8 +21,8 @@ struct StarterContactsScreen: View {
     /// design has no in-app contact picker for this.
     private let showsLimitedAccessNote: Bool
     /// Contacts access is denied, restricted or not yet asked (Settings
-    /// route). The empty state then points at the Contacts access row above
-    /// instead of saying nothing was imported.
+    /// route). The empty state then sends the user back to the Contacts
+    /// access row in Settings instead of saying nothing was imported.
     private let contactsAccessIsOff: Bool
     private let onFinish: () -> Void
     @State private var searchText = ""
@@ -121,7 +121,7 @@ struct StarterContactsScreen: View {
             } description: {
                 Text(
                     contactsAccessIsOff
-                        ? "Regards can't see your contacts. Turn on Contacts access above to choose people."
+                        ? "Regards can't see your contacts. Go back and turn on Contacts access to choose people."
                         : "Regards hasn't imported any contacts yet."
                 )
             }
