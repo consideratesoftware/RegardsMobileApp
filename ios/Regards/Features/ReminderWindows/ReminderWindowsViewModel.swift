@@ -47,6 +47,8 @@ public final class ReminderWindowsViewModel {
     /// Counts refusals so the screen can announce a repeat of the same message.
     public private(set) var failureCount = 0
     public private(set) var isSaving = false
+    /// The Save button's label: text only, no spinner (owner, 2026-10-29).
+    public var saveButtonTitle: String { isSaving ? "Saving\u{2026}" : "Save" }
     public private(set) var timezoneIdentifier = TimeZone.current.identifier
     /// The loaded zone's name for display ("Pacific Time"), never the raw
     /// identifier.

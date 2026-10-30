@@ -74,9 +74,9 @@ public struct ReminderWindowsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                // Text only, no spinner (owner): the pass runs before the
-                // editor closes, so Save says it's still working.
-                Button(viewModel.isSaving ? "Saving\u{2026}" : "Save") {
+                // The pass runs before the editor closes, so Save says it's
+                // still working.
+                Button(viewModel.saveButtonTitle) {
                     Task { if await viewModel.save() { dismiss() } }
                 }
                 .disabled(viewModel.loadState != .loaded || viewModel.isSaving)
