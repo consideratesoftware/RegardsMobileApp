@@ -7,9 +7,10 @@ import UIKit
 /// TF-11 slice 4 (§10.8, R14's re-entry clause). The Settings Contacts access
 /// row has 3 behaviors, one per group of `ContactsAuthorizationStatus`:
 ///
-/// - `.denied` and `.restricted` offer iOS Settings and never prompt.
-/// - `.authorized` and `.limited` are status text: nothing to tap, so a
-///   request does nothing.
+/// - `.denied` offers iOS Settings and never prompts.
+/// - `.restricted`, `.authorized` and `.limited` are status text: nothing to
+///   tap. Restricted is parental controls or device management, which iOS
+///   Settings can't lift, so a button there would lead nowhere.
 /// - `.notDetermined` requests access, then runs the coordinator's reconcile
 ///   entry, but only when access was granted.
 ///
@@ -22,14 +23,11 @@ import UIKit
 @MainActor
 struct SettingsContactsRowTests {
 
-    // MARK: Denied and restricted
+    // MARK: Denied
 
-    @Test(
-        "Denied and restricted show their status and open iOS Settings, never the prompt",
-        arguments: [ContactsAuthorizationStatus.denied, .restricted]
-    )
-    func deniedAndRestrictedOpenIOSSettings(status: ContactsAuthorizationStatus) async {
-        let source = MutableContactsSource(status: status)
+    @Test("Denied shows its status and opens iOS Settings once, never the prompt")
+    func deniedOpensIOSSettings() async {
+        let source = MutableContactsSource(status: .denied)
         let probe = Probe()
         let viewModel = Self.viewModel(source, probe)
         await viewModel.load()
@@ -41,8 +39,29 @@ struct SettingsContactsRowTests {
         })
         await viewModel.requestAccess()
 
-        #expect(viewModel.status == status)
+        #expect(viewModel.status == .denied)
         #expect(opened.urls.map(\.absoluteString) == [UIApplication.openSettingsURLString])
+        #expect(source.requestCountValue() == 0)
+        #expect(probe.reconcileCount == 0)
+    }
+
+    // MARK: Restricted
+
+    /// Parental controls or device management: iOS Settings can't lift the
+    /// restriction, so the row is status text with no button. Nothing prompts
+    /// or imports. The absence of a button is the row's shape, which a unit
+    /// test can't see; this pins the view model side.
+    @Test("Restricted shows its status; a request neither prompts nor imports")
+    func restrictedIsStatusOnly() async {
+        let source = MutableContactsSource(status: .restricted)
+        let probe = Probe()
+        let viewModel = Self.viewModel(source, probe)
+        await viewModel.load()
+
+        await viewModel.requestAccess()
+
+        #expect(viewModel.status == .restricted)
+        #expect(!viewModel.requestFailed)
         #expect(source.requestCountValue() == 0)
         #expect(probe.reconcileCount == 0)
     }
@@ -186,8 +205,15 @@ struct SettingsContactsRowTests {
         await viewModel.refresh()
         source.setStatus(.denied)
         await viewModel.refresh()
+        source.setStatus(.restricted)
+        await viewModel.refresh()
 
-        #expect(probe.messages == ["Contacts access on", "Contacts access limited", "Contacts access off"])
+        #expect(probe.messages == [
+            "Contacts access on",
+            "Contacts access limited",
+            "Contacts access off",
+            "Contacts access restricted",
+        ])
         // Coming back from iOS Settings only re-reads. Importing is the
         // foreground reconcile's job, so this path never calls it.
         #expect(probe.reconcileCount == 0)
@@ -200,6 +226,7 @@ struct SettingsContactsRowTests {
 
     private final class OpenedURLs {
         var urls: [URL] = []
+
     }
 
     /// Collects what the view model said and how often it reconciled.
