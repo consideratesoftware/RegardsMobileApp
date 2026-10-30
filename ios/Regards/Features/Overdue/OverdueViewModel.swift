@@ -179,11 +179,11 @@ public final class OverdueViewModel {
                     .map { ($0.contactId, $0.scheduledFor) },
                 // `max($0, $1)`, not "whichever comes last in the array": two
                 // pending cadence rows for one contact shouldn't happen (the
-                // deterministic `cadenceReminderID` write-path is meant to
-                // keep it to one), but if it ever did, picking by array order
-                // would make the winner depend on fetch ordering rather than
-                // on which row is actually later — `max` is correct
-                // regardless of order.
+                // deterministic `SchedulingPass.reminderID(contactId:kind:)`
+                // write path keeps it to one), but if it ever did, picking by
+                // array order would make the winner depend on fetch ordering
+                // rather than on which row is actually later — `max` is
+                // correct regardless of order.
                 uniquingKeysWith: { max($0, $1) }
             )
             let now = clock()
@@ -370,10 +370,9 @@ public final class OverdueViewModel {
             // Unconditional, where this used to reload only on rejection:
             // the success path has the same staleness hole (staged review
             // round 19, and see `markCaughtUp` above for the mechanism).
-            // The per-contact lock in `SchedulingPass` widened the window by
-            // letting the write queue behind another mutation for this
-            // contact, so a reload has longer to resolve against pre-write
-            // state.
+            // `SchedulingPass`'s one shared FIFO lock (R59) widens the window
+            // by letting the write queue behind any other mutation, so a
+            // reload has longer to resolve against pre-write state.
             await performLoad()
             return wrote
         } catch {

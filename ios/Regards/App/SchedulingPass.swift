@@ -335,10 +335,10 @@ public actor SchedulingPass {
         context: Context
     ) -> [(ContactOccasion, Date)] {
         guard let zone = TimeZone(identifier: context.global.timezoneIdentifier) else { return [] }
-        // Ties break on the month-day, then the label, so the row a run
-        // writes never depends on the order the source returns occasions in.
-        // A nil label sorts before "" so the order is total over everything
-        // the row persists.
+        // Ties break on the month-day, then the label (nil before ""), so the
+        // row a run writes never depends on the order the source returns
+        // occasions in. The order is total up to canonical equivalence: two
+        // occasions with the same key persist the same row.
         func key(_ entry: (ContactOccasion, Date)) -> (Date, String, Int, String) {
             (entry.1, entry.0.monthDay.isoString, entry.0.label == nil ? 0 : 1, entry.0.label ?? "")
         }

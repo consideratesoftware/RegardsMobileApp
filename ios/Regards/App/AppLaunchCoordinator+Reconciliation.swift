@@ -21,8 +21,8 @@ extension AppLaunchCoordinator {
     /// `runFull()` for the `.ready` triggers (launch, retry, onboarding done,
     /// the DEBUG mock launch) and foreground, each after its Contacts
     /// reconcile (§9 "App launch/foreground"). A failure is logged, not
-    /// shown: the rows from the last good run stay, and the next trigger
-    /// runs the pass again.
+    /// shown. Writes the failed run made before it stopped may already have
+    /// landed; the next trigger runs the pass again.
     func runSchedulingPass(runtime: AppRuntime) async {
         do {
             try await runtime.scheduler.runFull()

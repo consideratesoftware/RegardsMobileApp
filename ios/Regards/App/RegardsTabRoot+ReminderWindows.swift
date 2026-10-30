@@ -10,8 +10,8 @@ extension RegardsTabRoot {
     /// `SchedulingPass` (§9 "Global window change"), then hands the window to
     /// the live Upcoming view model, which reads the snoozes the pass just
     /// re-resolved. It returns whether the pass ran, so the editor can say
-    /// when reminders didn't update. The pass reads the stored window on every run (R55), so
-    /// `runtime.window` can stay the launch snapshot.
+    /// when reminders didn't update. The pass reads the stored window on
+    /// every run (R55), so `runtime.window` can stay the launch snapshot.
     @MainActor
     static func makeReminderWindowsViewModel(
         runtime: AppRuntime,
