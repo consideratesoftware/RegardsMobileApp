@@ -493,5 +493,5 @@ final class AppLaunchCoordinator {
     private static let importFailureMessage =
         "Regards couldn't finish importing contacts. Retry to resume, or continue without contacts."
     private static let postImportCompletionFailureMessage =
-        "Contacts were imported, but Regards couldn't finish setup. Try again."
+        "Contacts were imported, but Regards couldn't finish setup. Tap Finish setup to try again."
 }
