@@ -74,6 +74,9 @@ public final class ReminderWindowsViewModel {
     /// A write landed but its reschedule didn't (`onSaved` returned false or
     /// a reset couldn't re-read the global window). The next Save reruns it.
     @ObservationIgnored private var rescheduleOwed = false
+    /// The newest global window read. Display only: never written, never
+    /// passed to `onSaved`.
+    @ObservationIgnored private var lastReadGlobal = ReminderWindow.defaultV1()
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
     /// `onSaved` is deliberately undefaulted: it is how a saved window reaches
@@ -104,6 +107,7 @@ public final class ReminderWindowsViewModel {
         loadState = .loading
         do {
             let global = try await window.fetchGlobal()
+            lastReadGlobal = global
             timezoneIdentifier = global.timezoneIdentifier
             switch target {
             case .global:
@@ -305,22 +309,29 @@ public final class ReminderWindowsViewModel {
         }
     }
 
-    /// After an override is cleared: shows the global window the contact now
-    /// follows and reschedules with it. Shared by `resetToDefault()` and the
-    /// Save that retries a failed one. Returns whether reminders were
-    /// rescheduled; on `false` the reschedule stays owed.
+    /// After an override is cleared: shows the global window, or the last one
+    /// read if the re-read fails, and reschedules with it. Shared by
+    /// `resetToDefault()` and the Save that retries a failed one. Returns
+    /// whether reminders were rescheduled; on `false` the reschedule stays
+    /// owed.
     private func followGlobalAndReschedule() async -> Bool {
         // `try?`: the override is already cleared, so a failed read is the
         // same "not rescheduled" outcome; the next foreground `runFull()`
         // catches up.
-        guard let global = try? await window.fetchGlobal() else {
+        let global = try? await window.fetchGlobal()
+        lastReadGlobal = global ?? lastReadGlobal
+        // The override is already cleared, so the form shows the default window even
+        // when the re-read failed. Edits made before the reset are dropped: the user
+        // chose "Use default window".
+        draft = Draft(lastReadGlobal)
+        loadedDraft = draft
+        guard let global else {
             rescheduleOwed = true
             return false
         }
-        draft = Draft(global)
-        loadedDraft = draft
-        rescheduleOwed = !(await onSaved(global))
-        return !rescheduleOwed
+        let rescheduled = await onSaved(global)
+        rescheduleOwed = !rescheduled
+        return rescheduled
     }
 
     // MARK: - Validation
