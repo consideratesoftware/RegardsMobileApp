@@ -26,35 +26,6 @@ public final class ReminderWindowsViewModel {
         case contact(UUID)
     }
 
-    /// The fields the editor changes. Timezone is deliberately absent.
-    public struct Draft: Equatable, Sendable {
-        public var allowedDays: DayOfWeekMask
-        public var allowedTimeRanges: [TimeRange]
-        public var quietHours: TimeRange?
-        public var occasionTime: TimeOfDay
-        public var digestHorizonDays: Int
-
-        public init(allowedDays: DayOfWeekMask,
-                    allowedTimeRanges: [TimeRange],
-                    quietHours: TimeRange?,
-                    occasionTime: TimeOfDay,
-                    digestHorizonDays: Int) {
-            self.allowedDays = allowedDays
-            self.allowedTimeRanges = allowedTimeRanges
-            self.quietHours = quietHours
-            self.occasionTime = occasionTime
-            self.digestHorizonDays = digestHorizonDays
-        }
-
-        init(_ window: ReminderWindow) {
-            self.init(allowedDays: window.allowedDays,
-                      allowedTimeRanges: window.allowedTimeRanges,
-                      quietHours: window.quietHours,
-                      occasionTime: window.occasionTime,
-                      digestHorizonDays: window.digestHorizonDays)
-        }
-    }
-
     public static let horizonChoices = [7, 14, 30]
     static let newRange = TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 10))
     static let defaultQuietHours = TimeRange(start: TimeOfDay(hour: 22, minute: 30),
@@ -98,6 +69,9 @@ public final class ReminderWindowsViewModel {
     let clock: () -> Date
     private let onSaved: @MainActor (ReminderWindow) async -> Bool
     @ObservationIgnored private var loadedDraft: Draft?
+    /// A write landed but its reschedule didn't (`onSaved` returned false or
+    /// a reset couldn't re-read the global window). The next Save reruns it.
+    @ObservationIgnored private var rescheduleOwed = false
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
     /// `onSaved` is deliberately undefaulted: it is how a saved window reaches
@@ -260,6 +234,13 @@ public final class ReminderWindowsViewModel {
             // draft as loaded, not today's global window, which may have
             // changed while the editor was open.
             if case .contact = target, !hasStoredOverride, draft == loadedDraft {
+                // After a reset whose reschedule failed, Save retries it with
+                // the default window the contact now follows. This path never
+                // writes an override.
+                if rescheduleOwed, !(await followGlobalAndReschedule()) {
+                    fail(Self.notRescheduledMessage)
+                    return false
+                }
                 validationMessage = nil
                 return true
             }
@@ -283,9 +264,11 @@ public final class ReminderWindowsViewModel {
                 hasStoredOverride = true
             }
             guard await onSaved(candidate) else {
+                rescheduleOwed = true
                 fail(Self.notRescheduledMessage)
                 return false
             }
+            rescheduleOwed = false
             validationMessage = nil
             return true
         } catch {
@@ -308,16 +291,7 @@ public final class ReminderWindowsViewModel {
                 return false
             }
             hasStoredOverride = false
-            // `try?`: the reset already landed, so a failed read is reported
-            // as "not rescheduled", not as a failed reset; the next
-            // foreground `runFull()` catches up.
-            guard let global = try? await window.fetchGlobal() else {
-                fail(Self.notRescheduledMessage)
-                return false
-            }
-            draft = Draft(global)
-            loadedDraft = draft
-            guard await onSaved(global) else {
+            guard await followGlobalAndReschedule() else {
                 fail(Self.notRescheduledMessage)
                 return false
             }
@@ -327,6 +301,24 @@ public final class ReminderWindowsViewModel {
             fail("Couldn't switch back to the default window. Try again.")
             return false
         }
+    }
+
+    /// After an override is cleared: shows the global window the contact now
+    /// follows and reschedules with it. Shared by `resetToDefault()` and the
+    /// Save that retries a failed one. Returns whether reminders were
+    /// rescheduled; on `false` the reschedule stays owed.
+    private func followGlobalAndReschedule() async -> Bool {
+        // `try?`: the override is already cleared, so a failed read is the
+        // same "not rescheduled" outcome; the next foreground `runFull()`
+        // catches up.
+        guard let global = try? await window.fetchGlobal() else {
+            rescheduleOwed = true
+            return false
+        }
+        draft = Draft(global)
+        loadedDraft = draft
+        rescheduleOwed = !(await onSaved(global))
+        return !rescheduleOwed
     }
 
     // MARK: - Validation
@@ -417,5 +409,37 @@ public final class ReminderWindowsViewModel {
     private func fail(_ message: String) {
         validationMessage = message
         failureCount += 1
+    }
+}
+
+// Outside the class body only to keep it under SwiftLint's type_body_length.
+extension ReminderWindowsViewModel {
+    /// The fields the editor changes. Timezone is deliberately absent.
+    public struct Draft: Equatable, Sendable {
+        public var allowedDays: DayOfWeekMask
+        public var allowedTimeRanges: [TimeRange]
+        public var quietHours: TimeRange?
+        public var occasionTime: TimeOfDay
+        public var digestHorizonDays: Int
+
+        public init(allowedDays: DayOfWeekMask,
+                    allowedTimeRanges: [TimeRange],
+                    quietHours: TimeRange?,
+                    occasionTime: TimeOfDay,
+                    digestHorizonDays: Int) {
+            self.allowedDays = allowedDays
+            self.allowedTimeRanges = allowedTimeRanges
+            self.quietHours = quietHours
+            self.occasionTime = occasionTime
+            self.digestHorizonDays = digestHorizonDays
+        }
+
+        init(_ window: ReminderWindow) {
+            self.init(allowedDays: window.allowedDays,
+                      allowedTimeRanges: window.allowedTimeRanges,
+                      quietHours: window.quietHours,
+                      occasionTime: window.occasionTime,
+                      digestHorizonDays: window.digestHorizonDays)
+        }
     }
 }
