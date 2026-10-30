@@ -67,4 +67,22 @@ struct ReminderWindowsScreenAnnouncementTests {
 
         #expect(recorder.announcements.isEmpty)
     }
+
+    @Test("A save whose pass fails announces the not-rescheduled sentence")
+    func notRescheduledSaveAnnouncesTheSentence() async throws {
+        let world = try await Fixtures.makeWorld()
+        let saveRecorder = Fixtures.SaveRecorder()
+        saveRecorder.rescheduled = false
+        let viewModel = Fixtures.editor(.global, world: world, recorder: saveRecorder)
+        let recorder = Recorder()
+        let window = await Self.host(viewModel, recorder: recorder)
+        defer { window.isHidden = true }
+        #expect(viewModel.loadState == .loaded)
+        viewModel.draft.allowedDays = .saturday
+
+        #expect(!(await viewModel.save()))
+
+        #expect(await eventuallyPumpingRunLoop { recorder.announcements.count == 1 })
+        #expect(recorder.announcements == [ReminderWindowsViewModel.notRescheduledMessage])
+    }
 }

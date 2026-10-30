@@ -147,3 +147,15 @@ struct FailFirstFetchWindowRepository: ReminderWindowRepository {
     }
     func saveGlobal(_ window: ReminderWindow) async throws { try await wrapped.saveGlobal(window) }
 }
+
+/// The first `fetchGlobal()` (the editor's load) succeeds; every later one
+/// throws, as a store that fails after the editor opened. Writes pass through.
+struct FailAfterFirstFetchWindowRepository: ReminderWindowRepository {
+    let wrapped: any ReminderWindowRepository
+    let counter: CallCounter
+    func fetchGlobal() async throws -> ReminderWindow {
+        if await counter.next() > 1 { throw RepositoryFakeFailure() }
+        return try await wrapped.fetchGlobal()
+    }
+    func saveGlobal(_ window: ReminderWindow) async throws { try await wrapped.saveGlobal(window) }
+}

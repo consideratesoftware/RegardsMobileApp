@@ -164,4 +164,71 @@ struct SchedulingPassTriggerTests {
 
         #expect(harness.launch.phase == .ready)
     }
+
+    // MARK: - A failing pass after a window save
+
+    /// `StubReminderRepository.observeSchedule()` finishes with no value, so
+    /// `runFull()` and `run(for:)` throw while every write still lands.
+    private static func failingPassHarness() async throws -> Harness {
+        let harness = try await NotificationActionHandlingTests.harness(
+            backend: .mock, onboarded: true, reminders: StubReminderRepository())
+        await harness.launch.start()
+        return harness
+    }
+
+    private static let afternoon = [TimeRange(start: TimeOfDay(hour: 14), end: TimeOfDay(hour: 15))]
+    private static let notRescheduled = ReminderWindowsViewModel.notRescheduledMessage
+
+    @Test("A global save whose pass fails tells the editor, and Upcoming still gets the window")
+    func globalSaveWithFailingPassSaysRemindersDidNotUpdate() async throws {
+        let harness = try await Self.failingPassHarness()
+        let runtime = try #require(harness.launch.runtime)
+        let upcoming = RegardsTabRoot.makeUpcomingViewModel(runtime: runtime)
+        let editor = RegardsTabRoot.makeReminderWindowsViewModel(runtime: runtime, upcoming: upcoming)
+        await editor.load()
+        editor.draft.allowedTimeRanges = Self.afternoon
+
+        let saved = await editor.save()
+
+        #expect(!saved)
+        #expect(editor.validationMessage == Self.notRescheduled)
+        let stored = try await runtime.environment.window.fetchGlobal()
+        #expect(stored.allowedTimeRanges == Self.afternoon)
+        #expect(upcoming.window == stored)
+    }
+
+    @Test("An override save whose pass fails tells the editor, with the override stored")
+    func overrideSaveWithFailingPassSaysRemindersDidNotUpdate() async throws {
+        let harness = try await Self.failingPassHarness()
+        let runtime = try #require(harness.launch.runtime)
+        let contact = try await NotificationActionHandlingTests.seed(harness, id: 708, suffix: "failing-override")
+        let editor = RegardsTabRoot.makeContactWindowEditor(contactId: contact.id, runtime: runtime)
+        await editor.load()
+        editor.draft.allowedTimeRanges = Self.afternoon
+
+        let saved = await editor.save()
+
+        #expect(!saved)
+        #expect(editor.validationMessage == Self.notRescheduled)
+        let stored = try await harness.repositories.contacts.fetch(id: contact.id)
+        #expect(stored?.reminderWindowOverride?.allowedTimeRanges == Self.afternoon)
+    }
+
+    @Test("An override reset whose pass fails tells the editor, with the override cleared")
+    func overrideResetWithFailingPassSaysRemindersDidNotUpdate() async throws {
+        let harness = try await Self.failingPassHarness()
+        let runtime = try #require(harness.launch.runtime)
+        let contact = try await NotificationActionHandlingTests.seed(harness, id: 709, suffix: "failing-reset")
+        let override = ReminderWindow(
+            allowedDays: .allDays, allowedTimeRanges: Self.afternoon, timezoneIdentifier: "America/Los_Angeles")
+        _ = try await harness.repositories.contacts.updateReminderWindowOverride(id: contact.id, window: override)
+        let editor = RegardsTabRoot.makeContactWindowEditor(contactId: contact.id, runtime: runtime)
+        await editor.load()
+
+        let reset = await editor.resetToDefault()
+
+        #expect(!reset)
+        #expect(editor.validationMessage == Self.notRescheduled)
+        #expect(try await harness.repositories.contacts.fetch(id: contact.id)?.reminderWindowOverride == nil)
+    }
 }
