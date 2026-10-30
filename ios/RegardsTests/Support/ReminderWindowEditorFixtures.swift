@@ -90,11 +90,16 @@ enum ReminderWindowEditorFixtures {
         return World(environment: environment, target: target, bystander: bystander)
     }
 
-    /// Records every window passed to `onSaved`.
+    /// Records every window passed to `onSaved`, and answers it with
+    /// `rescheduled` (whether the pass ran).
     @MainActor
     final class SaveRecorder {
         private(set) var windows: [ReminderWindow] = []
-        func record(_ window: ReminderWindow) { windows.append(window) }
+        var rescheduled = true
+        func record(_ window: ReminderWindow) -> Bool {
+            windows.append(window)
+            return rescheduled
+        }
     }
 
     static func editor(

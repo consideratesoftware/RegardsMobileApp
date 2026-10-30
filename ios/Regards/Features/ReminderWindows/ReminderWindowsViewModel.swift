@@ -96,7 +96,7 @@ public final class ReminderWindowsViewModel {
     /// The clock `save()` probes capacity with. The screen reads the same one
     /// for its "now" marker, so both agree.
     let clock: () -> Date
-    private let onSaved: @MainActor (ReminderWindow) async -> Void
+    private let onSaved: @MainActor (ReminderWindow) async -> Bool
     @ObservationIgnored private var loadedDraft: Draft?
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
@@ -105,12 +105,14 @@ public final class ReminderWindowsViewModel {
     /// A defaulted no-op is how an editor ends up saving a window nothing
     /// reschedules. It runs after every save that writes (an unchanged
     /// draft with no stored override writes nothing and skips it), and after
-    /// an override reset with the global window the contact now follows.
+    /// an override reset with the global window the contact now follows. It
+    /// returns whether reminders were rescheduled; `false` keeps the editor
+    /// open with `notRescheduledMessage`, since the write itself landed.
     public init(target: Target,
                 window: any ReminderWindowRepository,
                 contacts: any ContactRepository,
                 clock: @escaping () -> Date = { Date() },
-                onSaved: @escaping @MainActor (ReminderWindow) async -> Void) {
+                onSaved: @escaping @MainActor (ReminderWindow) async -> Bool) {
         self.target = target
         self.window = window
         self.contacts = contacts
@@ -243,7 +245,10 @@ public final class ReminderWindowsViewModel {
 
     // MARK: - Save
 
-    /// Checks I1 once, then writes. Returns whether the write landed.
+    /// Checks I1 once, writes, then reschedules through `onSaved`. Returns
+    /// whether the editor can close: past the guard, `true` exactly when
+    /// `validationMessage` is nil afterwards, and every `false` goes through
+    /// `fail`.
     @discardableResult
     public func save() async -> Bool {
         guard loadState == .loaded, !isSaving else { return false }
@@ -270,14 +275,16 @@ public final class ReminderWindowsViewModel {
             switch target {
             case .global:
                 try await window.saveGlobal(candidate)
-                await onSaved(candidate)
             case .contact(let id):
                 guard try await contacts.updateReminderWindowOverride(id: id, window: candidate) else {
                     fail("This contact is no longer available, so the window wasn't saved.")
                     return false
                 }
                 hasStoredOverride = true
-                await onSaved(candidate)
+            }
+            guard await onSaved(candidate) else {
+                fail(Self.notRescheduledMessage)
+                return false
             }
             validationMessage = nil
             return true
@@ -287,7 +294,9 @@ public final class ReminderWindowsViewModel {
         }
     }
 
-    /// Clears the contact's override so they follow the global window again.
+    /// Clears the contact's override so they follow the global window again,
+    /// shows that window in the draft, and reschedules through `onSaved`.
+    /// Returns whether the editor can close, with `save()`'s invariant.
     @discardableResult
     public func resetToDefault() async -> Bool {
         guard case .contact(let id) = target, loadState == .loaded, !isSaving else { return false }
@@ -299,12 +308,20 @@ public final class ReminderWindowsViewModel {
                 return false
             }
             hasStoredOverride = false
-            validationMessage = nil
-            // `try?`: the reset is already saved. A failed read only skips the
-            // immediate reschedule; the next foreground `runFull()` covers it.
-            if let global = try? await window.fetchGlobal() {
-                await onSaved(global)
+            // `try?`: the reset already landed, so a failed read is reported
+            // as "not rescheduled", not as a failed reset; the next
+            // foreground `runFull()` catches up.
+            guard let global = try? await window.fetchGlobal() else {
+                fail(Self.notRescheduledMessage)
+                return false
             }
+            draft = Draft(global)
+            loadedDraft = draft
+            guard await onSaved(global) else {
+                fail(Self.notRescheduledMessage)
+                return false
+            }
+            validationMessage = nil
             return true
         } catch {
             fail("Couldn't switch back to the default window. Try again.")
@@ -393,6 +410,8 @@ public final class ReminderWindowsViewModel {
 
     private static let invalidWindowMessage = "This window isn't valid."
     private static let saveFailureMessage = "Couldn't save your reminder window. Try again."
+    static let notRescheduledMessage =
+        "Saved, but reminders couldn't update. They'll refresh next time you open Regards."
     private static let loadFailureText = "Couldn't load your reminder window."
 
     private func fail(_ message: String) {

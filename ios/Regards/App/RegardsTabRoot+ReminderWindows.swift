@@ -9,7 +9,8 @@ extension RegardsTabRoot {
     /// `onSaved` reschedules every contact through the runtime's one
     /// `SchedulingPass` (§9 "Global window change"), then hands the window to
     /// the live Upcoming view model, which reads the snoozes the pass just
-    /// re-resolved. The pass reads the stored window on every run (R55), so
+    /// re-resolved. It returns whether the pass ran, so the editor can say
+    /// when reminders didn't update. The pass reads the stored window on every run (R55), so
     /// `runtime.window` can stay the launch snapshot.
     @MainActor
     static func makeReminderWindowsViewModel(
@@ -22,14 +23,18 @@ extension RegardsTabRoot {
             contacts: runtime.environment.contacts,
             clock: runtime.clock,
             onSaved: { window in
+                var rescheduled = true
                 do {
                     try await runtime.scheduler.runFull()
                 } catch {
                     // The type only: an error can carry row or contact values.
                     let errorType = String(describing: type(of: error))
                     schedulingLog.error("reschedule after window save failed: \(errorType, privacy: .public)")
+                    rescheduled = false
                 }
+                // Upcoming follows the saved window whether or not the pass ran.
                 await upcoming.updateWindow(window)
+                return rescheduled
             }
         )
     }
@@ -51,10 +56,12 @@ extension RegardsTabRoot {
             onSaved: { _ in
                 do {
                     try await runtime.scheduler.run(for: contactId)
+                    return true
                 } catch {
                     // The type only: an error can carry row or contact values.
                     let errorType = String(describing: type(of: error))
                     schedulingLog.error("reschedule after override save failed: \(errorType, privacy: .public)")
+                    return false
                 }
             }
         )
