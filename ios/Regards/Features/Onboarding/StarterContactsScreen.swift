@@ -17,9 +17,13 @@ struct StarterContactsScreen: View {
     @State private var viewModel: StarterContactsViewModel
     private let showsSkip: Bool
     /// Under limited Contacts access Regards can read only the contacts the
-    /// user shared, so onboarding says so and where to share more (owner
+    /// user shared, so the screen says so and where to share more (owner
     /// ruling, 2026-10-17: no in-app picker).
     private let showsLimitedAccessNote: Bool
+    /// Contacts access is denied, restricted or not yet asked (Settings
+    /// route). The empty state then points at the Contacts access row above
+    /// instead of saying nothing was imported.
+    private let contactsAccessIsOff: Bool
     private let onFinish: () -> Void
     @State private var searchText = ""
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -28,11 +32,13 @@ struct StarterContactsScreen: View {
         viewModel: StarterContactsViewModel,
         showsSkip: Bool = false,
         showsLimitedAccessNote: Bool = false,
+        contactsAccessIsOff: Bool = false,
         onFinish: @escaping () -> Void
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.showsSkip = showsSkip
         self.showsLimitedAccessNote = showsLimitedAccessNote
+        self.contactsAccessIsOff = contactsAccessIsOff
         self.onFinish = onFinish
     }
 
@@ -113,7 +119,11 @@ struct StarterContactsScreen: View {
             ContentUnavailableView {
                 Label("No contacts to choose from", systemImage: "person.2")
             } description: {
-                Text("Regards hasn't imported any contacts yet.")
+                Text(
+                    contactsAccessIsOff
+                        ? "Regards can't see your contacts. Turn on Contacts access above to choose people."
+                        : "Regards hasn't imported any contacts yet."
+                )
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 24)

@@ -438,8 +438,11 @@ struct RegardsTabRoot: View {
         case .transparency:
             TransparencyScreen()
         case .starterContacts:
+            let access = contactsAccessVM?.status
             StarterContactsScreen(
                 viewModel: StarterContactsViewModel(contacts: runtime.environment.contacts),
+                showsLimitedAccessNote: access == .limited,
+                contactsAccessIsOff: access == .denied || access == .restricted || access == .notDetermined,
                 onFinish: {
                     // A slow save can finish after Back; never pop another screen.
                     if navigation.settingsPath.last == .starterContacts { navigation.settingsPath.removeLast() }
