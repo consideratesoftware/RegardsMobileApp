@@ -44,6 +44,10 @@ struct OnboardingFlowView: View {
                     )
                 }
                 .transition(.opacity)
+            } else {
+                // Unreachable: `.starter` follows an import, which needs the
+                // runtime. The splash beats an empty screen if that changes.
+                SplashView()
             }
         }
     }
