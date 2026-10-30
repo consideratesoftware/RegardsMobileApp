@@ -74,7 +74,9 @@ public struct ReminderWindowsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
+                // Text only, no spinner (owner): the pass runs before the
+                // editor closes, so Save says it's still working.
+                Button(viewModel.isSaving ? "Saving\u{2026}" : "Save") {
                     Task { if await viewModel.save() { dismiss() } }
                 }
                 .disabled(viewModel.loadState != .loaded || viewModel.isSaving)
@@ -196,12 +198,14 @@ public struct ReminderWindowsScreen: View {
         } label: {
             Text("Use default window")
                 .font(.body.weight(.medium))
-                .foregroundStyle(RegardsDS.accentInk)
+                // The plain style doesn't dim a custom color when disabled.
+                .foregroundStyle(viewModel.isSaving ? RegardsDS.muted : RegardsDS.accentInk)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .padding(.horizontal, 16)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(viewModel.isSaving)
         .accessibilityIdentifier("reminder-windows.use-default")
         .padding(.top, 8)
     }
