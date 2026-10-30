@@ -7,8 +7,11 @@ import UIKit
 /// and R14's re-entry clause). The row has one state per
 /// `ContactsAuthorizationStatus` group:
 /// - `.notDetermined`: a button that raises the system prompt, then imports.
-/// - `.denied` and `.restricted`: a button that opens iOS Settings. The
-///   foreground reconcile imports when the user comes back.
+/// - `.denied`: a button that opens iOS Settings. The foreground reconcile
+///   imports when the user comes back.
+/// - `.restricted` (parental controls or device management): status text only,
+///   since the user can't change it in iOS Settings and a button would lead
+///   nowhere.
 /// - `.authorized` and `.limited`: status text only.
 ///
 /// `status` stays nil until the first read, so the row never shows a state the
@@ -66,7 +69,8 @@ public final class ContactsAccessViewModel {
         switch current {
         case .authorized: announce("Contacts access on")
         case .limited: announce("Contacts access limited")
-        case .denied, .restricted: announce("Contacts access off")
+        case .denied: announce("Contacts access off")
+        case .restricted: announce("Contacts access restricted")
         case .notDetermined: break
         }
     }

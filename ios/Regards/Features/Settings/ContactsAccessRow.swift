@@ -24,7 +24,7 @@ struct ContactsAccessRow: View {
                     .accessibilityIdentifier("settings.contacts-access")
                     .accessibilityLabel("Allow Contacts access")
                     .accessibilityHint("iOS will ask whether Regards can read your contacts.")
-                case .denied, .restricted:
+                case .denied:
                     Button {
                         viewModel.openContactsSettings(using: openURL)
                     } label: {
@@ -39,6 +39,13 @@ struct ContactsAccessRow: View {
                     .accessibilityHint(
                         "Opens the settings for Regards in iOS. Regards imports your contacts when you come back."
                     )
+                case .restricted:
+                    // No button: iOS Settings can't lift a restriction, so a
+                    // control here would lead nowhere.
+                    text("Contacts access restricted", "Contacts access is restricted on this iPhone.")
+                        .accessibilityElement(children: .combine)
+                        .accessibilityFocused(isFocused)
+                        .accessibilityIdentifier("settings.contacts-access")
                 case .authorized:
                     // Plain text with no button trait: nothing is left to do,
                     // so a control here would be inert.
