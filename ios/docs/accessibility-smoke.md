@@ -22,8 +22,7 @@ under a **Manual accessibility smoke** heading.
 - [ ] Launch app. VoiceOver announces "Regards. Loading." as a header.
 - [ ] Force a production database-open failure. VoiceOver announces the error,
       focuses “Try Again”, and activation recovers to onboarding without a trap.
-- [ ] On a fresh install, VoiceOver reaches the Contacts pre-prompt heading,
-      benefit cards, permission CTA, and proofs link in reading order.
+- [ ] On a fresh install, VoiceOver reaches the concept heading and the "Get started" button first. Activating "Get started" then reaches the Contacts pre-prompt heading, benefit cards, permission CTA, and proofs link in reading order.
 - [ ] Activate "Why we ask" and return with Done; neither route traps focus.
 - [ ] Grant, deny (both before and during launch), and retry states expose only
       working controls. Importing disables duplicate activation, and the
@@ -39,10 +38,10 @@ under a **Manual accessibility smoke** heading.
 
 These steps belong to the pre-release device pass. They are not merge gates (owner ruling of 2026-10-28). Record each answer in the smoke record.
 
-- [ ] Fresh install, grant: concept, then Get started, then the system prompt, then Allow, then the import, then the starter step. Note where VoiceOver focus lands after each step change (concept to Contacts, Contacts to starter, starter to tabs).
+- [ ] Fresh install, grant: concept, then Get started, then the Contacts pre-prompt, then Allow, then the system prompt, then the import, then the starter step. Note where VoiceOver focus lands after each step change (concept to Contacts, Contacts to starter, starter to tabs).
 - [ ] Fresh install, deny: Continue without contacts reaches the tab root. There is no starter step.
 - [ ] Fresh install, limited: the starter step shows the limited note (`starter.limited-note`), and VoiceOver reads it.
-- [ ] Relaunch mid-starter: pick 2 people, force-quit, and relaunch. The starter step opens with the same 2 picks and no duplicate rows.
+- [ ] Relaunch mid-starter: picks saved earlier stay on the starter step after relaunch, with no duplicate rows. Only Done saves, so picks chosen but not saved are gone after force-quit. Record what the step shows after relaunch.
 - [ ] Done with picks: VoiceOver hears "Saved. Keeping in touch with N people." Note whether the announcement survives the change to the tab root in onboarding.
 - [ ] Settings → Choose people to keep in touch with: Done announces the same "Saved" text, and Settings shows again.
 - [ ] A fourth pick: VoiceOver hears "You can pick up to 3 people. Remove one to choose someone else."
@@ -54,7 +53,6 @@ These steps belong to the pre-release device pass. They are not merge gates (own
 - [ ] Limited: the row shows "Contacts access limited" and "Regards can read only the contacts you shared." It has no button.
 - [ ] Restricted: the row shows "Contacts access restricted" and "Contacts access is restricted on this iPhone." It has no button.
 - [ ] Return from iOS Settings after changing access. Note whether the row updates and where VoiceOver focus lands.
-
 
 ## Settings notifications
 

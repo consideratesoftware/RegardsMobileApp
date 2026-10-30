@@ -26,8 +26,9 @@ never pick up Android work.
   gate passes.
   `TF-06` shipped no notification scheduling, so resolving R57 (owner ruling
   2026-08-22, see its queue row) falls to `TF-07`.
-- Blocked: `TF-07c` through `TF-07g` and `TF-11` need `TF-03`. `TF-03` stays
-  `OWNER` until its acceptance run passes, so they stay `BLOCKED`.
+- Blocked: `TF-07c` through `TF-07g` need `TF-03`. `TF-03` stays
+  `OWNER` until its acceptance run passes, so they stay `BLOCKED`. `TF-11` is
+  in review in PR #68.
 - Open pull requests: #66 (`TF-07a`).
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
