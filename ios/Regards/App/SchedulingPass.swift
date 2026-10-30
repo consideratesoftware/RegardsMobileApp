@@ -123,7 +123,14 @@ public actor SchedulingPass {
     /// Writes the rows the snapshot says should exist, for every tracked
     /// contact or only `contactId`, and cancels pending rows that shouldn't.
     private func reschedule(only contactId: UUID?) async throws {
-        let snapshot = try await readSnapshot()
+        // One read: the first snapshot `observeSchedule()` emits holds the
+        // contacts, the pending and fired rows, and the window.
+        var firstSnapshot: ScheduleSnapshot?
+        for await emitted in await reminders.observeSchedule() {
+            firstSnapshot = emitted
+            break
+        }
+        guard let snapshot = firstSnapshot else { throw SnapshotUnavailable() }
         let context = Context(now: clock(), global: snapshot.window)
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
@@ -256,15 +263,6 @@ public actor SchedulingPass {
                   !(contact.tracked && contact.isActive) else { continue }
             try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
         }
-    }
-
-    /// The first snapshot `observeSchedule()` emits: contacts, pending and
-    /// fired rows, and the window, all from one read.
-    private func readSnapshot() async throws -> ScheduleSnapshot {
-        for await snapshot in await reminders.observeSchedule() {
-            return snapshot
-        }
-        throw SnapshotUnavailable()
     }
 
     /// `observeSchedule()` finished without a value: its read failed.
