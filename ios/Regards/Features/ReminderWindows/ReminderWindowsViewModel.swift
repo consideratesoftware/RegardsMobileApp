@@ -47,7 +47,7 @@ public final class ReminderWindowsViewModel {
     /// Counts refusals so the screen can announce a repeat of the same message.
     public private(set) var failureCount = 0
     public private(set) var isSaving = false
-    /// The Save button's label: text only, no spinner (owner, 2026-10-29).
+    /// The Save button's label: text only, no spinner.
     public var saveButtonTitle: String { isSaving ? "Saving\u{2026}" : "Save" }
     public private(set) var timezoneIdentifier = TimeZone.current.identifier
     /// The loaded zone's name for display ("Pacific Time"), never the raw
@@ -83,10 +83,11 @@ public final class ReminderWindowsViewModel {
     /// SchedulingPass and, for a global save, `UpcomingViewModel.updateWindow`.
     /// A defaulted no-op is how an editor ends up saving a window nothing
     /// reschedules. It runs after every save that writes (an unchanged
-    /// draft with no stored override writes nothing and skips it), and after
-    /// an override reset with the global window the contact now follows. It
-    /// returns whether reminders were rescheduled; `false` keeps the editor
-    /// open with `notRescheduledMessage`, since the write itself landed.
+    /// draft with no stored override writes nothing and skips it, unless a
+    /// reset's reschedule is still owed), and after an override reset with
+    /// the global window the contact now follows. It returns whether
+    /// reminders were rescheduled; `false` keeps the editor open with
+    /// `notRescheduledMessage`, since the write itself landed.
     public init(target: Target,
                 window: any ReminderWindowRepository,
                 contacts: any ContactRepository,

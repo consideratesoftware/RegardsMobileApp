@@ -212,23 +212,23 @@ public struct ReminderEngine: Sendable {
                 // wall clock leaves the slot on either side rejects it, so its
                 // slot start (the digest identity) can't collide with an
                 // earlier digest (R63).
-                if includingContainingSlot, containsDate,
-                   let activeSlotStart = candidateStarts.filter({ candidate in
-                       let time = wallClock(of: candidate, calendar: calendar)
-                       guard candidate <= date, slot.start <= time, time < slot.end else { return false }
-                       // Between transitions the wall clock only moves
-                       // forward, so only the readings just before and at
-                       // each transition can leave the slot.
-                       var transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: candidate)
-                       while let current = transition, current <= date {
-                           for reading in [current.addingTimeInterval(-1), current] {
-                               let readingTime = wallClock(of: reading, calendar: calendar)
-                               guard slot.start <= readingTime, readingTime < slot.end else { return false }
-                           }
-                           transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: current)
-                       }
-                       return true
-                   }).max() {
+                let activeCandidates = candidateStarts.filter { candidate in
+                    let time = wallClock(of: candidate, calendar: calendar)
+                    guard candidate <= date, slot.start <= time, time < slot.end else { return false }
+                    // Between transitions the wall clock only moves forward,
+                    // so only the readings just before and at each transition
+                    // can leave the slot.
+                    var transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: candidate)
+                    while let current = transition, current <= date {
+                        for reading in [current.addingTimeInterval(-1), current] {
+                            let readingTime = wallClock(of: reading, calendar: calendar)
+                            guard slot.start <= readingTime, readingTime < slot.end else { return false }
+                        }
+                        transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: current)
+                    }
+                    return true
+                }
+                if includingContainingSlot, containsDate, let activeSlotStart = activeCandidates.max() {
                     activeSlotStarts.append(activeSlotStart)
                 }
 

@@ -336,7 +336,7 @@ public actor SchedulingPass {
         // Ties break on the month-day, then the label (nil before ""), so the
         // row a run writes never depends on the order the source returns
         // occasions in. The order is total up to canonical equivalence: two
-        // occasions with the same key persist the same row.
+        // occasions with the same key compare equal.
         func key(_ entry: (ContactOccasion, Date)) -> (Date, String, Int, String) {
             (entry.1, entry.0.monthDay.isoString, entry.0.label == nil ? 0 : 1, entry.0.label ?? "")
         }
