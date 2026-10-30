@@ -35,6 +35,27 @@ under a **Manual accessibility smoke** heading.
       (Settings → Accessibility → Display & Text Size → Larger Text → slider
       all the way up). App re-renders without clipping or truncation.
 
+## Onboarding steps and starter contacts
+
+These steps belong to the pre-release device pass. They are not merge gates (owner ruling 7, 2026-10-28). Record each answer in the smoke record.
+
+- [ ] Fresh install, grant: concept, then Get started, then the system prompt, then Allow, then the import, then the starter step. Note where VoiceOver focus lands after each step change (concept to Contacts, Contacts to starter, starter to tabs).
+- [ ] Fresh install, deny: Continue without contacts reaches the tab root. There is no starter step.
+- [ ] Fresh install, limited: the starter step shows the limited note (`starter.limited-note`), and VoiceOver reads it.
+- [ ] Relaunch mid-starter: pick 2 people, force-quit, and relaunch. The starter step opens with the same 2 picks and no duplicate rows.
+- [ ] Done with picks: VoiceOver hears "Saved. Keeping in touch with N people." Note whether the announcement survives the change to the tab root in onboarding.
+- [ ] Settings → Choose people to keep in touch with: Done announces the same "Saved" text, and Settings shows again.
+- [ ] A fourth pick: VoiceOver hears "You can pick up to 3 people. Remove one to choose someone else."
+
+## Settings Contacts access
+
+- [ ] Not determined: the row is labelled "Allow Contacts access" with its hint. Activating it shows the iOS prompt.
+- [ ] Denied: the row is labelled "Contacts access off. Open iOS Settings". Activating it opens iOS Settings.
+- [ ] Limited: the row shows "Contacts access limited" and "Regards can read only the contacts you shared." It has no button.
+- [ ] Restricted: the row shows "Contacts access restricted" and "Contacts access is restricted on this iPhone." It has no button.
+- [ ] Return from iOS Settings after changing access. Note whether the row updates and where VoiceOver focus lands.
+
+
 ## Settings notifications
 
 Run on a fresh install. The visible text and the VoiceOver label can differ,
