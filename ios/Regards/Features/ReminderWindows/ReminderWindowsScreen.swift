@@ -105,16 +105,24 @@ public struct ReminderWindowsScreen: View {
             if let message = viewModel.validationMessage {
                 errorBanner(message)
             }
-            daysSection
-            timeRangesSection
-            quietHoursSection
-            if isOverride {
-                overrideNote
-                if viewModel.hasStoredOverride { resetButton }
-            } else {
-                occasionSection
-                horizonSection
+            // The whole form is disabled and dimmed while a save or reset
+            // runs its pass: an edit made then would be dropped when the
+            // editor closes. The plain-styled pills and buttons don't dim on
+            // their own.
+            Group {
+                daysSection
+                timeRangesSection
+                quietHoursSection
+                if isOverride {
+                    overrideNote
+                    if viewModel.hasStoredOverride { resetButton }
+                } else {
+                    occasionSection
+                    horizonSection
+                }
             }
+            .disabled(viewModel.isSaving)
+            .opacity(viewModel.isSaving ? 0.5 : 1)
             Text("All times local · \(viewModel.timezoneName). Daylight saving time is handled automatically.")
                 .font(.caption)
                 .foregroundStyle(RegardsDS.muted)
@@ -198,14 +206,12 @@ public struct ReminderWindowsScreen: View {
         } label: {
             Text("Use default window")
                 .font(.body.weight(.medium))
-                // The plain style doesn't dim a custom color when disabled.
-                .foregroundStyle(viewModel.isSaving ? RegardsDS.muted : RegardsDS.accentInk)
+                .foregroundStyle(RegardsDS.accentInk)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .padding(.horizontal, 16)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.isSaving)
         .accessibilityIdentifier("reminder-windows.use-default")
         .padding(.top, 8)
     }
