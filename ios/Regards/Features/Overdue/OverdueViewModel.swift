@@ -169,10 +169,10 @@ public final class OverdueViewModel {
             // (the floor resolved into the window, §9), keyed by contact id.
             // Only a row with a floor is a snooze: SchedulingPass also writes
             // a plain pending row for every eligible contact, and that one
-            // must not hide an overdue contact. Inlined rather than a shared `PendingSnoozeLookup`
-            // helper (staged review round 7: two call sites, below §17's
-            // abstraction floor of three) — `UpcomingViewModel.buildRows` has
-            // its own identical copy.
+            // must not hide an overdue contact. Inlined rather than a shared
+            // `PendingSnoozeLookup` helper (staged review round 7: two call
+            // sites, below §17's abstraction floor of three) —
+            // `UpcomingViewModel.buildRows` has its own identical copy.
             let snoozedUntilByContact = Dictionary(
                 pendingReminders
                     .filter { $0.kind == .cadence && $0.snoozedUntil != nil }
