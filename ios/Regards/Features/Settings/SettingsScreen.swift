@@ -34,21 +34,6 @@ public struct SettingsScreen: View {
             VStack(spacing: 0) {
                 header
 
-                SectionHeader("People")
-                RegardsCard {
-                    VStack(spacing: 0) {
-                        if let contactsAccess {
-                            ContactsAccessRow(viewModel: contactsAccess, isFocused: $contactsRowFocused)
-                        }
-                        navRow(
-                            id: "choose-starters",
-                            title: "Choose people to keep in touch with",
-                            subtitle: "Pick up to 3, and how often.",
-                            route: .starterContacts
-                        )
-                    }
-                }
-
                 SectionHeader("Reminders")
                 RegardsCard {
                     VStack(spacing: 0) {
@@ -64,6 +49,21 @@ public struct SettingsScreen: View {
                             title: "Find duplicate contacts",
                             subtitle: "Virtual merges only.",
                             route: .mergeDuplicates
+                        )
+                    }
+                }
+
+                SectionHeader("People")
+                RegardsCard {
+                    VStack(spacing: 0) {
+                        if let contactsAccess {
+                            ContactsAccessRow(viewModel: contactsAccess, isFocused: $contactsRowFocused)
+                        }
+                        navRow(
+                            id: "choose-starters",
+                            title: "Choose people to keep in touch with",
+                            subtitle: "Pick up to 3, and how often.",
+                            route: .starterContacts
                         )
                     }
                 }
