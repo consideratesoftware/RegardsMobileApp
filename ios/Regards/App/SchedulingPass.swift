@@ -337,8 +337,10 @@ public actor SchedulingPass {
         guard let zone = TimeZone(identifier: context.global.timezoneIdentifier) else { return [] }
         // Ties break on the month-day, then the label, so the row a run
         // writes never depends on the order the source returns occasions in.
-        func key(_ entry: (ContactOccasion, Date)) -> (Date, String, String) {
-            (entry.1, entry.0.monthDay.isoString, entry.0.label ?? "")
+        // A nil label sorts before "" so the order is total over everything
+        // the row persists.
+        func key(_ entry: (ContactOccasion, Date)) -> (Date, String, Int, String) {
+            (entry.1, entry.0.monthDay.isoString, entry.0.label == nil ? 0 : 1, entry.0.label ?? "")
         }
         var nearest: [ReminderKind: (ContactOccasion, Date)] = [:]
         for occasion in occasions where occasion.kind != .cadence {
