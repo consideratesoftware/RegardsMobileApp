@@ -202,7 +202,7 @@ numbers.
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
 | TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage | PR27; R13, R16–R17 |
 | TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits | PR28; R11–R12, R24 |
-| TF-11 | ACTIVE | TF-03, TF-06 | Onboarding: concept, Contacts step, starter picker (onboarding and Settings), limited path, relaunch resume, and the Settings Contacts access row. **PR29 slices 1 to 4 are in review in one PR.** Slice 5 (notification ask, a conditional fourth step) waits for TF-07e and gets its own PR. Starter and Settings saves need `scheduler.run(for:)`: whichever of TF-07c and TF-11 merges second wires it (tech-lead ruling, 2026-10-28). Device checks: Pre-release device pass. | PR29; R11, R14 (R14 open, progress note) |
+| TF-11 | ACTIVE | TF-06 | Onboarding: concept, Contacts step, starter picker (onboarding and Settings), limited path, relaunch resume, and the Settings Contacts access row. **PR29 slices 1 to 4 are in review in one PR.** TF-03 is no longer a dependency (owner ruling of 2026-10-28, device deferral). Slice 5 (notification ask, a conditional fourth step) waits for TF-07e (OS notification scheduling) and gets its own PR. Starter and Settings saves need `scheduler.run(for:)`: whichever of TF-07c and TF-11 merges second wires it (tech-lead ruling, 2026-10-28). Device checks: Pre-release device pass. | PR29; R11, R14 (R14 open, progress note) |
 | TF-12 | BLOCKED | TF-09, TF-10 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
 | TF-13 | BLOCKED | TF-12 | Widget target and App Group migration preserve the DB; read-only small/medium/lock widgets refresh from SchedulingPass | PR31 |
 | TF-14 | BLOCKED | TF-02, TF-11 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
@@ -838,7 +838,7 @@ will be requested when their owning gate becomes active:
 
 ### Pre-release device pass
 
-Device-only checks run once, before the internal TestFlight build. They are not merge gates (owner ruling 7, 2026-10-28). TF-03's device checks join this pass.
+Device-only checks run once, before the internal TestFlight build. They are not merge gates (owner ruling of 2026-10-28). TF-03's device checks join this pass.
 
 TF-11, PR29 slices 1 to 4. The steps are in `ios/docs/accessibility-smoke.md`:
 

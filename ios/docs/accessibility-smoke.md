@@ -37,7 +37,7 @@ under a **Manual accessibility smoke** heading.
 
 ## Onboarding steps and starter contacts
 
-These steps belong to the pre-release device pass. They are not merge gates (owner ruling 7, 2026-10-28). Record each answer in the smoke record.
+These steps belong to the pre-release device pass. They are not merge gates (owner ruling of 2026-10-28). Record each answer in the smoke record.
 
 - [ ] Fresh install, grant: concept, then Get started, then the system prompt, then Allow, then the import, then the starter step. Note where VoiceOver focus lands after each step change (concept to Contacts, Contacts to starter, starter to tabs).
 - [ ] Fresh install, deny: Continue without contacts reaches the tab root. There is no starter step.
