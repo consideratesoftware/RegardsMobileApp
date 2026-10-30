@@ -40,10 +40,10 @@ struct SchedulingPassCaughtUpTests {
 
     /// Invariant test, not a fix (staged review round 10): `caughtUp` (and
     /// `restorePendingAfterFailedCaughtUp`) only ever target
-    /// `cadenceReminderID(contactId:)` — never a full "every pending row
+    /// `reminderID(contactId:kind:)` — never a full "every pending row
     /// for this contact" sweep. That's only safe because `SchedulingPass`
     /// is documented as the sole writer of cadence rows, always at that
-    /// one deterministic id (see `cadenceReminderID`'s own doc comment); a
+    /// one deterministic id (see `reminderID(contactId:kind:)`'s doc comment); a
     /// row at any other id would indeed be permanently unclearable by this
     /// actor. This seeds exactly such a row directly through the
     /// repository — bypassing `SchedulingPass` entirely, since nothing in
@@ -270,15 +270,15 @@ struct SchedulingPassCaughtUpTests {
         #expect(afterRestore[0].snoozedUntil == secondNow.addingTimeInterval(7 * 86_400))
     }
 
-    /// R59 regression, rewritten for the per-contact lock (staged review
+    /// R59 regression, rewritten for the shared lock (staged review
     /// round 17). Rounds 14–16 fixed this with a compare-and-set and each
     /// fix exposed the next interleaving; `SchedulingPass` now serialises
-    /// mutations per contact instead, so the whole class is closed rather
-    /// than one pair at a time.
+    /// every mutation behind one FIFO lock, so the whole class is closed
+    /// rather than one pair at a time.
     ///
     /// **Both operations go through one `SchedulingPass` on purpose.** The
-    /// locks are actor state, so they only serialise callers sharing an
-    /// instance — which production does (`AppEnvironment.scheduler` is a
+    /// lock is actor state, so it only serialises callers sharing an
+    /// instance — which production does (`AppRuntime.scheduler` is a
     /// single `let`, handed to every screen). An earlier version of this
     /// test used two instances to force the race; that no longer models
     /// anything real, and would test only that two schedulers can corrupt
@@ -390,12 +390,11 @@ struct SchedulingPassCaughtUpTests {
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count <= 1)
     }
 
-    /// R61(e), round 20 blocker. The per-contact lock suspends waiters in a
+    /// R61(e), round 20 blocker. The shared lock suspends waiters in a
     /// `withCheckedContinuation`, which is not cancellation-aware: a
     /// cancelled waiter cannot remove itself from the queue. What must hold
     /// regardless is liveness — if a waiting task is cancelled, the lock
-    /// must still reach the next caller for that contact rather than
-    /// stranding it forever.
+    /// must still reach the next caller rather than stranding it forever.
     ///
     /// Structure: a gated first caller holds the lock; a second caller
     /// queues behind it and is then cancelled; a third caller queues too.
@@ -403,7 +402,7 @@ struct SchedulingPassCaughtUpTests {
     /// complete. If it cannot, this test hangs rather than fails — which is
     /// itself the signal, since a stranded lock has no failing assertion to
     /// report.
-    @Test("A cancelled waiter does not strand the per-contact lock")
+    @Test("A cancelled waiter does not strand the shared lock")
     func cancelledWaiterDoesNotStrandTheLock() async throws {
         let repositories = try RepositoryContractBackend.mock.makeRepositories()
         let contact = contractContact(id: try contractUUID(530), suffix: "r61e-cancel", tracked: true)

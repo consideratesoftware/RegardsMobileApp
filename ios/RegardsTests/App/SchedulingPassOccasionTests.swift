@@ -260,4 +260,115 @@ struct SchedulingPassOccasionTests {
         #expect(try await fixture.occasionRow(contact, .birthday) == first)
         #expect(await fixture.reminders.writeCount == writesBefore)
     }
+
+    // MARK: - Same-date tie-breaks
+
+    /// Two same-kind occasions for one contact that land on one instant. The
+    /// row the run writes must not depend on the order the source returns them
+    /// in (Contacts has no stable order), so a second run in the other order
+    /// writes nothing.
+    private static func tiedOccasions(
+        _ entries: [(monthDay: MonthDay, label: String?)]
+    ) throws -> @Sendable ([Contact]) async -> [ContactOccasion] {
+        let id = try contractUUID(7_001)
+        return { _ in
+            entries.map { ContactOccasion(contactId: id, kind: .birthday, monthDay: $0.monthDay, label: $0.label) }
+        }
+    }
+
+    /// A pass over `fixture`'s repositories, sharing its counting wrapper and
+    /// clock, that reads its occasions from `occasions`.
+    private static func pass(
+        over fixture: PassFixture,
+        occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion]
+    ) -> SchedulingPass {
+        let clock = fixture.clock
+        return SchedulingPass(
+            reminders: fixture.reminders,
+            contacts: fixture.repositories.contacts,
+            window: fixture.repositories.window,
+            occasions: occasions,
+            clock: { clock.now() })
+    }
+
+    struct LabelOrder: Sendable, CustomTestStringConvertible {
+        let name: String
+        let first: String?
+        let second: String?
+        /// What the row stores, the same for both orders.
+        let stored: String?
+
+        var testDescription: String { name }
+    }
+
+    static let labelOrders = [
+        LabelOrder(name: "A then B", first: "A", second: "B", stored: "A"),
+        LabelOrder(name: "B then A", first: "B", second: "A", stored: "A"),
+        LabelOrder(name: "nil then empty", first: nil, second: "", stored: nil),
+        LabelOrder(name: "empty then nil", first: "", second: nil, stored: nil),
+    ]
+
+    @Test(
+        "Two same-date occasions of a kind write the same row whatever order the source returns them in",
+        arguments: RepositoryContractBackend.allCases, labelOrders
+    )
+    func sameDateOccasionsWriteTheSameRowInEitherOrder(
+        backend: RepositoryContractBackend, order: LabelOrder
+    ) async throws {
+        let day = MonthDay(month: 6, day: 12)
+        let fixture = try await PassFixture(
+            backend: backend,
+            occasions: try Self.tiedOccasions([(day, order.first), (day, order.second)]))
+        let contact = try await fixture.addContact(1)
+
+        try await fixture.pass.runFull()
+
+        let row = try #require(try await fixture.occasionRow(contact, .birthday))
+        #expect(row.occasionLabel == order.stored)
+    }
+
+    @Test(
+        "Reversing the order the source returns same-date occasions in writes nothing",
+        arguments: RepositoryContractBackend.allCases, labelOrders
+    )
+    func reversingTheSourceOrderWritesNothing(backend: RepositoryContractBackend, order: LabelOrder) async throws {
+        let day = MonthDay(month: 6, day: 12)
+        let fixture = try await PassFixture(
+            backend: backend,
+            occasions: try Self.tiedOccasions([(day, order.first), (day, order.second)]))
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let written = try #require(try await fixture.occasionRow(contact, .birthday))
+        let writesBefore = await fixture.reminders.writeCount
+        let reversed = Self.pass(
+            over: fixture, occasions: try Self.tiedOccasions([(day, order.second), (day, order.first)]))
+
+        try await reversed.runFull()
+
+        #expect(try await fixture.occasionRow(contact, .birthday) == written)
+        #expect(await fixture.reminders.writeCount == writesBefore)
+    }
+
+    /// In a non-leap year (2027) Feb 29 falls back to Feb 28, so both resolve
+    /// to the same instant. The month-day breaks the tie, and "02-28" wins.
+    @Test(
+        "Feb 29 and Feb 28 in a non-leap year write the Feb 28 row in either order",
+        arguments: RepositoryContractBackend.allCases, [true, false]
+    )
+    func feb29AndFeb28CollideOnFeb28(backend: RepositoryContractBackend, leapDayFirst: Bool) async throws {
+        let feb28 = MonthDay(month: 2, day: 28)
+        let feb29 = MonthDay(month: 2, day: 29)
+        let entries: [(monthDay: MonthDay, label: String?)] = leapDayFirst
+            ? [(feb29, "Leap"), (feb28, "Common")]
+            : [(feb28, "Common"), (feb29, "Leap")]
+        let fixture = try await PassFixture(backend: backend, occasions: try Self.tiedOccasions(entries))
+        let contact = try await fixture.addContact(1)
+
+        try await fixture.pass.runFull()
+
+        let row = try #require(try await fixture.occasionRow(contact, .birthday))
+        #expect(row.occasionDate == "02-28")
+        #expect(row.occasionLabel == "Common")
+        #expect(row.scheduledFor == PassFixture.at("2027-02-28 09:00"))
+    }
 }

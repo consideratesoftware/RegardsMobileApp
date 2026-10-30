@@ -9,6 +9,8 @@ import Testing
 /// default window opens a slot at 18:00 every day.
 struct SchedulingPassSnoozeWindowTests {
 
+    // MARK: - Resolving into the window
+
     @Test(
         "A snooze lands in the contact's override window, not the global one",
         arguments: RepositoryContractBackend.allCases
@@ -54,6 +56,8 @@ struct SchedulingPassSnoozeWindowTests {
         #expect(row.scheduledFor == PassFixture.at("2026-06-17 18:00"))
     }
 
+    // MARK: - The floor across runs
+
     /// The pass reads `snoozedUntil` from the pending row, so a run neither
     /// loses the snooze nor moves it, now or after more days have passed.
     @Test("A snooze survives runFull before its slot arrives", arguments: RepositoryContractBackend.allCases)
@@ -88,6 +92,8 @@ struct SchedulingPassSnoozeWindowTests {
         #expect(row.scheduledFor == PassFixture.at("2026-06-17 20:00"))
         #expect(row.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
     }
+
+    // MARK: - Zone and rounding
 
     /// R55: the pass reads the window on every call. 2026-03-05 12:00 UTC is
     /// 07:00 in New York and 12:00 in London; 7 calendar days later New York
@@ -139,6 +145,8 @@ struct SchedulingPassSnoozeWindowTests {
         #expect(await fixture.reminders.writeCount == writesBefore)
         #expect(try await fixture.cadenceRow(contact) == row)
     }
+
+    // MARK: - Spent floors
 
     /// The floor governs only while its slot is ahead. Here the contact talked
     /// to the person after the snoozed slot started, so the no-re-nag guard no

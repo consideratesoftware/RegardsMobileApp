@@ -22,6 +22,8 @@ struct SchedulingPassTriggerTests {
 
     private static let overdueSlot = "2027-03-10 12:00"
 
+    // MARK: - Launch, retry and foreground
+
     @Test("Reaching .ready on launch runs the pass", arguments: RepositoryContractBackend.allCases)
     func launchRunsThePass(backend: RepositoryContractBackend) async throws {
         let harness = try await NotificationActionHandlingTests.harness(backend: backend, onboarded: true)
@@ -61,6 +63,8 @@ struct SchedulingPassTriggerTests {
 
         #expect(try await Self.cadenceRow(harness, contact)?.scheduledFor == Self.la(Self.overdueSlot))
     }
+
+    // MARK: - Window saves
 
     /// Saving the global window reschedules every contact through the
     /// runtime's one pass: no second `SchedulingPass` or `AppRuntime` is
@@ -140,6 +144,8 @@ struct SchedulingPassTriggerTests {
         #expect(reset)
         #expect(try await Self.cadenceRow(harness, contact)?.scheduledFor == Self.la(Self.overdueSlot))
     }
+
+    // MARK: - Failure
 
     /// The pass logs its failure and the app carries on (§9a): a read failure
     /// must not hold the tab root back, on launch or on foreground.

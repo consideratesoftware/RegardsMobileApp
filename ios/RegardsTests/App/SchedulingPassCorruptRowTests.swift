@@ -6,6 +6,9 @@ import Testing
 /// Corrupt stored rows (TF-07c, §9a "Corrupt rows"): the pass reads one
 /// `observeSchedule()` snapshot, which drops what it can't decode, and
 /// follows that. One bad row never stops scheduling for everyone else.
+///
+/// These tests plant undecodable rows below the repository seam, which needs
+/// raw SQL, so this file imports GRDB outside `Data/`.
 struct SchedulingPassCorruptRowTests {
 
     private struct World {

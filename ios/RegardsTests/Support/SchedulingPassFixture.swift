@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import Regards
 
+// MARK: - Counting repository
+
 /// A `ReminderRepository` that forwards every call to a real backend and
 /// counts the writes, so a test can prove a pass run changed nothing.
 /// `observeSchedule()` forwards too: the pass reads its snapshot from it.
@@ -58,6 +60,8 @@ actor CountingReminderRepository: ReminderRepository {
         await wrapped.observeSchedule()
     }
 }
+
+// MARK: - Pass fixture
 
 /// One `SchedulingPass` over a real backend (GRDB or the seeded mock), a
 /// movable clock, and America/New_York windows, so a test reads as dates and
@@ -176,6 +180,8 @@ struct PassFixture {
         clock.advance(by: date.timeIntervalSince(clock.now()))
     }
 }
+
+// MARK: - Mock runtime and view-model helpers
 
 extension MockRepositories {
     /// A pass over the seed cast with the mock occasion provider, as the mock

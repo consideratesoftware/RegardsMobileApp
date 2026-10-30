@@ -81,6 +81,8 @@ struct ReminderEngineInProgressSlotStartTests {
             from: probeDate, in: window, includingContainingSlot: true)
     }
 
+    // MARK: - Named folds
+
     @Test("A second-pass probe in a fall-back fold never gets a start from the first pass", arguments: folds)
     func secondPassProbeStartIsNotFromTheFirstPass(fold: Fold) throws {
         let calendar = try Self.calendar(fold.zone)
@@ -116,6 +118,8 @@ struct ReminderEngineInProgressSlotStartTests {
         #expect(start == EngineFixtures.date(fold.firstPassStart))
         #expect(Self.isUnbroken(from: start, to: probe, slot: fold.slot, calendar: calendar))
     }
+
+    // MARK: - Transition-day sweep
 
     /// The same rule over every 5-minute probe in the slot shapes the
     /// transition-day sweep uses, so a fold the three pins above do not name

@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 import Testing
 @testable import Regards
 
@@ -7,7 +6,7 @@ import Testing
 /// pass derives for every tracked contact, that a second run writes nothing,
 /// zero-capacity windows, orphans, the lock, and corrupt rows. Each test runs
 /// on the GRDB store and the seeded mock; dates are New York local times
-/// (`PassFixture`).
+/// (`PassFixture`). Corrupt rows are in `SchedulingPassCorruptRowTests`.
 struct SchedulingPassRunFullTests {
 
     private actor SnoozeFinished {
