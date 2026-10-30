@@ -51,7 +51,6 @@
 		36DDF0FC9E135C34E29412DC /* ContactAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B718FFDD5767AE98D80A1EF /* ContactAccessibilityTests.swift */; };
 		3716B8FC6F64783F45EC86CD /* ScreensAccessibilityTests+NoInventedTimes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAA351624691C85A8CD1799 /* ScreensAccessibilityTests+NoInventedTimes.swift */; };
 		37EA3EDF75290ED89C6DFFED /* ScreensAccessibilityTests+ReminderWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F9A2DC2ADCBC31904F66FE /* ScreensAccessibilityTests+ReminderWindows.swift */; };
-		3ADA4550DCB6B73488E0DF2A /* RawOverrideStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26195D683C0F659D442688B4 /* RawOverrideStore.swift */; };
 		3C582E23416A609FE3F503DC /* ReminderEngineLordHoweTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 390566838C5DDFCD1396B4D0 /* ReminderEngineLordHoweTests.swift */; };
 		3CD64DE48976BBB5B7BAC907 /* ContactWriteTrackingFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4BC46872D022EC2D29BB71 /* ContactWriteTrackingFakes.swift */; };
 		3D00C6A0B7F474714C95A2D8 /* ContactTrackingContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7F3DA1482D6B5B6D8883A2 /* ContactTrackingContractTests.swift */; };
@@ -118,6 +117,7 @@
 		82E1E49B109EF8FF03503537 /* UpcomingViewModelActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59E559490C6DEA7049F62EE /* UpcomingViewModelActionTests.swift */; };
 		83AA10666D5A7C26D5895344 /* ContactsReconcilerResilienceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A6A21C2DCA33AADA047708 /* ContactsReconcilerResilienceTests.swift */; };
 		84BF0060BAF9E333A37B6D38 /* RegardsPlatformEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531E4D36CE29E5551F8C3E3E /* RegardsPlatformEffects.swift */; };
+		853BB9753C49DD6A9BD1C32B /* RawOverrideStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE5D0941C7D101BDF53D1DCE /* RawOverrideStore.swift */; };
 		85FC8626E94CF48504ABFF2D /* UpcomingViewModelBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3B67E6C1AFDBFB09BCD36F /* UpcomingViewModelBoundaryTests.swift */; };
 		8688A4974A05E6E784F3DEAC /* OverdueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2597D8561B07D85505D5CA /* OverdueRow.swift */; };
 		89AFC1B2598F645EFC30F244 /* CancellableBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9429573F87B0DEC54F1099B6 /* CancellableBox.swift */; };
@@ -282,7 +282,6 @@
 		212E7604734F51D4345DEAFB /* TransparencyScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparencyScreen.swift; sourceTree = "<group>"; };
 		23563203660E749AE7290FAB /* MockOccasionSeedingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockOccasionSeedingTests.swift; sourceTree = "<group>"; };
 		24A240F758BF789AC64D5A3E /* ContactsImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsImporterTests.swift; sourceTree = "<group>"; };
-		26195D683C0F659D442688B4 /* RawOverrideStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawOverrideStore.swift; sourceTree = "<group>"; };
 		282A9FA27C27C33B29E89167 /* MergeDuplicatesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeDuplicatesViewModel.swift; sourceTree = "<group>"; };
 		2A4BC46872D022EC2D29BB71 /* ContactWriteTrackingFakes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactWriteTrackingFakes.swift; sourceTree = "<group>"; };
 		2BF733CEBB77D886C318D9F6 /* NeverContactedAnchorParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeverContactedAnchorParityTests.swift; sourceTree = "<group>"; };
@@ -465,6 +464,7 @@
 		F5B5CB400E9AC786E916B015 /* ScreensAccessibilityTests+RepresentativeStates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+RepresentativeStates.swift"; sourceTree = "<group>"; };
 		FC1EDE1581885F647407E537 /* ObservationSubscriptionToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationSubscriptionToken.swift; sourceTree = "<group>"; };
 		FD23D49A80EFB8405D107012 /* CadenceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceDescriptor.swift; sourceTree = "<group>"; };
+		FE5D0941C7D101BDF53D1DCE /* RawOverrideStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawOverrideStore.swift; sourceTree = "<group>"; };
 		FEA83CFB2493F560AB4FF030 /* OverdueScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdueScreen.swift; sourceTree = "<group>"; };
 		FEBF28C6B21851DD36A0CAE3 /* NotificationScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduling.swift; sourceTree = "<group>"; };
 		FFEAB693894E205010B8179E /* OverdueViewModelActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdueViewModelActionTests.swift; sourceTree = "<group>"; };
@@ -515,7 +515,6 @@
 				AA0ED82A6D4AF73A19B55814 /* DatabaseMigratorV3Tests.swift */,
 				23563203660E749AE7290FAB /* MockOccasionSeedingTests.swift */,
 				7ABF76C0C5D07E0E054F54E3 /* MockRepositoriesTests.swift */,
-				26195D683C0F659D442688B4 /* RawOverrideStore.swift */,
 				E76FF8E82467D75A2AB9932C /* ReconciledFieldsContractTests.swift */,
 				F0D63AF974D1F91B8867B7C3 /* ReminderRepositoryContractTests.swift */,
 				97947E73AD0975A89695E0FC /* ReminderWindowOverrideContractTests.swift */,
@@ -970,6 +969,7 @@
 				AEBBFE7DF137363D94B872FE /* Eventually.swift */,
 				8E0FFD3AB5B457701C2773E4 /* MutableClock.swift */,
 				C2F0D44B6F67CF5399C9639C /* MutableContactsSourceFake.swift */,
+				FE5D0941C7D101BDF53D1DCE /* RawOverrideStore.swift */,
 				5F9D0BF8616E5CBC54E5540B /* ReminderWindowEditorFixtures.swift */,
 				E0ABE512E2B05FB378890460 /* RepositoryFakes.swift */,
 				5C934F5CE784566F2D99DB3E /* ScriptedNotifications.swift */,
@@ -1175,7 +1175,7 @@
 				A8875687A7350049E9019ACE /* OverdueViewModelActionTests.swift in Sources */,
 				E4457278F17AE1064C3D5A09 /* OverdueViewModelSnoozeTests.swift in Sources */,
 				46BDE040140A2537136D6D43 /* OverdueViewModelTests.swift in Sources */,
-				3ADA4550DCB6B73488E0DF2A /* RawOverrideStore.swift in Sources */,
+				853BB9753C49DD6A9BD1C32B /* RawOverrideStore.swift in Sources */,
 				FE46E3F53D3E3AA1991AE8A1 /* ReconciledFieldsContractTests.swift in Sources */,
 				781229BA83C41976A6237AB6 /* ReconciliationCoalescingTests.swift in Sources */,
 				ABEDEEB621267412BA24A096 /* RegardsIntentRouterTests.swift in Sources */,

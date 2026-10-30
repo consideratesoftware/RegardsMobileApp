@@ -94,6 +94,36 @@ extension ScreensAccessibilityTests {
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
+    /// With Contacts access off nothing was imported, and the empty picker must
+    /// say why and where to fix it. "Regards hasn't imported any contacts yet"
+    /// would leave a denied user with no way forward.
+    @MainActor
+    private func openChoosePeopleWithContactsOff() -> XCUIApplication {
+        let app = launchDeniedToSettings()
+        navigateFromSettings(triggerIdentifier: "settings.choose-starters", to: "screen.starter-contacts", in: app)
+        return app
+    }
+
+    @MainActor
+    func testSettingsChoosePeopleWithContactsOffExplainsAccessIsOff() {
+        let app = openChoosePeopleWithContactsOff()
+
+        let reason = app.staticTexts["Regards can't see your contacts. Turn on Contacts access above to choose people."]
+        XCTAssertTrue(reason.waitForExistence(timeout: 10), "The empty picker should say Contacts access is off.")
+        XCTAssertFalse(
+            app.staticTexts["Regards hasn't imported any contacts yet."].exists,
+            "The generic empty copy would hide why the list is empty."
+        )
+    }
+
+    @MainActor
+    func testSettingsChoosePeopleWithContactsOffPassesAudit() throws {
+        let app = openChoosePeopleWithContactsOff()
+        XCTAssertTrue(app.descendants(matching: .any)["starter.empty"].waitForExistence(timeout: 10))
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
     @MainActor
     func testSettingsContactsPassesAuditAtAccessibility5() throws {
         let app = launchDeniedToSettings(dynamicTypeSize: "accessibility5")

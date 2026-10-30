@@ -250,22 +250,104 @@ struct StarterContactsViewModelSaveTests {
         viewModel.toggle(han.id)
         try await store.archive(id: leia.id, at: Self.importedAt)
 
-        _ = await viewModel.save()
+        let saved = await viewModel.save()
 
-        let message = try #require(viewModel.statusMessage)
+        // Han's write landed and Leia's could not, so the save is complete for
+        // everyone who can still be saved: the screen is finished, and the
+        // message (spoken, not shown, since the caller leaves) says who was left out.
+        let message = "Saved. Keeping in touch with 1 person. Leia Organa is no longer in your contacts."
+        #expect(saved)
+        #expect(viewModel.isFinished)
+        #expect(viewModel.statusMessage == message)
         #expect(announcements.messages == [message])
-        #expect(message.contains("Leia Organa"), "The message must name who could not be saved: \(message)")
-        let namesWhatWasSaved = message.contains("Han Solo") || message.contains("1 ")
-        #expect(namesWhatWasSaved, "The message must say what was saved: \(message)")
-        // Han's write went through; Leia's did not and is gone from the list.
+        #expect(!viewModel.canSave)
         let inStore = try await Self.trackedInStore(store)
         #expect(inStore.keys.contains(han.id))
         #expect(!inStore.keys.contains(leia.id))
         // The archived contact leaves the list; the other pick stays.
         #expect(viewModel.contacts.map(\.id) == [han.id])
         #expect(viewModel.isSelected(han.id))
-        // Done is on only if the screen still differs from the store.
-        #expect(viewModel.canSave == (viewModel.selection != inStore))
+        #expect(viewModel.selection == inStore)
+    }
+
+    @Test("A tracked contact unpicked and then archived before Save is named, dropped, and not counted as saved")
+    func unpickedTrackedContactArchivedBeforeSaveIsNamedAndDropped() async throws {
+        let store = try Self.store()
+        let leia = Self.person("Leia Organa")
+        let han = Self.person("Han Solo")
+        for person in [leia, han] { try await store.upsert(person) }
+        #expect(try await store.updateTracking(id: leia.id, cadenceDays: 14))
+        #expect(try await store.updateTracking(id: han.id, cadenceDays: 30))
+        let repository = ScriptedTrackingContactRepository(store)
+        let announcements = Announcements()
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { announcements.record($0) })
+        await viewModel.load()
+        #expect(viewModel.selection.count == 2)
+        viewModel.toggle(leia.id)
+        try await store.archive(id: leia.id, at: Self.importedAt)
+
+        let saved = await viewModel.save()
+
+        let message = "Saved. Keeping in touch with 1 person. Leia Organa is no longer in your contacts."
+        #expect(saved)
+        #expect(viewModel.isFinished)
+        #expect(viewModel.statusMessage == message)
+        #expect(announcements.messages == [message])
+        #expect(viewModel.contacts.map(\.id) == [han.id])
+        #expect(viewModel.selection == [han.id: 30], "Han keeps his cadence and Leia is not counted.")
+        // Only Leia's untrack was attempted: Han had nothing to write.
+        #expect(await repository.updateTrackingCalls == 1)
+    }
+
+    @Test("A slow first load that finishes after a newer load does not overwrite the newer list")
+    func staleLoadFinishingAfterNewerLoadIsDiscarded() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let cy = Self.person("Cy")
+        for person in [ana, cy] { try await store.upsert(person) }
+        let readGate = AsyncGate()
+        let repository = ScriptedTrackingContactRepository(store, readGate: readGate)
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let slowLoad = Task { await viewModel.load() }
+        // The first read has Ana and Cy in hand and is held.
+        await readGate.waitUntilArrived()
+        try await store.archive(id: cy.id, at: Self.importedAt)
+
+        await viewModel.load()
+        #expect(viewModel.contacts.map(\.id) == [ana.id])
+        await readGate.open()
+        await slowLoad.value
+
+        #expect(viewModel.contacts.map(\.id) == [ana.id], "The stale read must not bring Cy back.")
+        #expect(viewModel.loadState == .loaded)
+    }
+
+    @Test("A failed save whose re-read also fails still remembers the writes that landed")
+    func failedSaveWhoseResyncAlsoFailsKeepsLandedWritesAsBaseline() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let ben = Self.person("Ben")
+        for person in [ana, ben] { try await store.upsert(person) }
+        // Read 1 is the load. Every read after it throws, the re-read included.
+        let repository = ScriptedTrackingContactRepository(store, failOnCall: 2, failReadsFromCall: 2)
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        await viewModel.load()
+        viewModel.toggle(ana.id)
+        viewModel.toggle(ben.id)
+
+        let saved = await viewModel.save()
+
+        #expect(!saved)
+        #expect(viewModel.statusMessage == StarterContactsViewModel.saveFailedMessage)
+        #expect(try await Self.trackedInStore(store).keys.contains(ana.id))
+        #expect(viewModel.canSave, "Ben is still unwritten, so Done offers him.")
+        let callsBeforeRetry = await repository.updateTrackingCalls
+
+        let retried = await viewModel.save()
+
+        #expect(retried)
+        #expect(await repository.updateTrackingCalls == callsBeforeRetry + 1, "Ana's landed write is not repeated.")
+        #expect(viewModel.selection == (try await Self.trackedInStore(store)))
     }
 }
 
@@ -275,12 +357,26 @@ private actor ScriptedTrackingContactRepository: ContactRepository {
     private let wrapped: any ContactRepository
     private let gate: AsyncGate?
     private let failOnCall: Int?
+    private let readGate: AsyncGate?
+    private let failReadsFromCall: Int?
     private(set) var updateTrackingCalls = 0
+    private var readCalls = 0
 
-    init(_ wrapped: any ContactRepository, gate: AsyncGate? = nil, failOnCall: Int? = nil) {
+    /// `readGate` holds the first diagnostics read open after it has read, so
+    /// the caller gets a stale snapshot. `failReadsFromCall` makes that read
+    /// number and every later one throw.
+    init(
+        _ wrapped: any ContactRepository,
+        gate: AsyncGate? = nil,
+        failOnCall: Int? = nil,
+        readGate: AsyncGate? = nil,
+        failReadsFromCall: Int? = nil
+    ) {
         self.wrapped = wrapped
         self.gate = gate
         self.failOnCall = failOnCall
+        self.readGate = readGate
+        self.failReadsFromCall = failReadsFromCall
     }
 
     func fetchAll() async throws -> [Contact] { try await wrapped.fetchAll() }
@@ -292,7 +388,12 @@ private actor ScriptedTrackingContactRepository: ContactRepository {
     func upsert(_ contact: Contact) async throws { try await wrapped.upsert(contact) }
     func archive(id: UUID, at: Date) async throws { try await wrapped.archive(id: id, at: at) }
     func fetchAllWithDiagnostics() async throws -> ContactFetchReport {
-        try await wrapped.fetchAllWithDiagnostics()
+        readCalls += 1
+        let call = readCalls
+        if let failReadsFromCall, call >= failReadsFromCall { throw RepositoryFakeFailure() }
+        let report = try await wrapped.fetchAllWithDiagnostics()
+        if let readGate, call == 1 { await readGate.wait() }
+        return report
     }
 
     @discardableResult

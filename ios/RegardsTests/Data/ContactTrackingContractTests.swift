@@ -366,7 +366,7 @@ extension ContactTrackingContractTests {
 
     private static var utcCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        calendar.timeZone = .gmt
         return calendar
     }
 
@@ -385,7 +385,7 @@ extension ContactTrackingContractTests {
         let repositories = try backend.makeRepositories()
         let importedAt = Self.now.addingTimeInterval(-100 * 86_400)
         let oldImport = Contact(
-            id: try contractUUID(793),
+            id: try contractUUID(796),
             systemContactRef: "repository-contract-tracking-old-import",
             displayName: "Old Import",
             preferredChannel: .phoneCall,

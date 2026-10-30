@@ -27,6 +27,7 @@ extension AppLaunchCoordinatorRecoveryTests {
         #expect(launch.phase == .onboarding)
         #expect(launch.onboardingStep == .contacts)
         #expect(launch.onboardingCompletionPending)
+        #expect(launch.statusMessage == Self.finishSetupFailureMessage)
         #expect(launch.canContinueWithoutContacts)
         #expect(!launch.isImporting)
         #expect(try await profile.fetch().onboardingCompletedAt == nil)

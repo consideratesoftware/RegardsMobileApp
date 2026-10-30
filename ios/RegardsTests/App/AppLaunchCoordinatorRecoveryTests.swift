@@ -4,6 +4,8 @@ import Testing
 
 @MainActor
 struct AppLaunchCoordinatorRecoveryTests {
+    static let finishSetupFailureMessage =
+        "Contacts were imported, but Regards couldn't finish setup. Tap Finish setup to try again."
     nonisolated static let now = Date(timeIntervalSince1970: 1_785_600_000)
 
     @Test("A cancelled production open becomes visibly retryable")
@@ -121,7 +123,7 @@ struct AppLaunchCoordinatorRecoveryTests {
         #expect(launch.phase == .onboarding)
         #expect(launch.onboardingCompletionPending)
         #expect(launch.canContinueWithoutContacts)
-        #expect(launch.statusMessage == "Contacts were imported, but Regards couldn't finish setup. Try again.")
+        #expect(launch.statusMessage == Self.finishSetupFailureMessage)
         #expect(try await runtime.environment.contacts.fetchAll().filter {
             $0.systemContactRef == Self.systemContact.identifier
         }.count == 1)

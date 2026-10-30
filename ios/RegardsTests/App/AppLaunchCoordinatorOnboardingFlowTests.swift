@@ -168,6 +168,25 @@ extension AppLaunchCoordinatorTests {
         #expect(launch.onboardingStep == .starter)
     }
 
+    @Test("Finishing onboarding imports a contact added in the Contacts app during the starter step")
+    func finishOnboardingImportsContactsAddedDuringTheStarterStep() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let source = MutableContactsSource(status: .authorized, contacts: [Self.systemContact])
+        let launch = coordinator(environment: environment, source: source)
+        await launch.start()
+        #expect(launch.onboardingStep == .starter)
+        #expect(try await environment.contacts.fetchAll().count == 1)
+
+        // Han is added in the Contacts app while the starter step is on screen.
+        source.setContacts([Self.systemContact, Self.han])
+        await launch.finishOnboarding()
+
+        #expect(launch.phase == .ready)
+        let refs = try await environment.contacts.fetchAll().map(\.systemContactRef)
+        #expect(Set(refs) == [Self.systemContact.identifier, Self.han.identifier])
+        #expect(source.fetchCountValue() == 2, "The import at launch plus one reconcile after Done.")
+    }
+
     // The launch flips .loading to .onboarding only if nothing else decided
     // the phase while it read the authorization.
     @Test("Browsing without contacts during the authorization read is not undone when the read returns")
