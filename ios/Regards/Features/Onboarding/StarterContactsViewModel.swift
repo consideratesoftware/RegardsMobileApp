@@ -26,7 +26,7 @@ import SwiftUI
 /// announcement. Contacts that were already tracked before this screen opened
 /// start picked even if there are more than 3, so opening and saving never
 /// untracks anyone by surprise; the cap only stops adding.
-@MainActor @Observable
+@Observable @MainActor
 final class StarterContactsViewModel {
     struct CadenceChoice: Equatable, Hashable, Sendable, Identifiable {
         let days: Int
@@ -94,8 +94,6 @@ final class StarterContactsViewModel {
         return contacts.filter { $0.displayName.localizedStandardContains(query) }
     }
 
-    var selectedCount: Int { selection.count }
-
     /// "0 of 3 picked", "2 of 3 picked". Past 3 (more contacts were already
     /// tracked than the cap allows) it drops the "of 3", which would be wrong.
     var countSummary: String {
@@ -114,7 +112,8 @@ final class StarterContactsViewModel {
         guard let days = selection[id], !Self.cadencePresets.contains(where: { $0.days == days }) else {
             return Self.cadencePresets
         }
-        let title = CadenceDescriptor.describe(days: days).capitalizedFirst
+        let description = CadenceDescriptor.describe(days: days)
+        let title = description.prefix(1).uppercased() + description.dropFirst()
         return Self.cadencePresets + [CadenceChoice(days: days, title: title)]
     }
 
@@ -218,7 +217,9 @@ final class StarterContactsViewModel {
             // Best effort: take the store's word for what is tracked. If this
             // read fails too, `baseline` already holds every write that landed.
             await resync()
-            fail(Self.saveFailedMessage)
+            statusMessage = Self.saveFailedMessage
+            statusIsProblem = true
+            announce(Self.saveFailedMessage)
             return false
         }
         guard !vanished.isEmpty else {
@@ -255,12 +256,6 @@ final class StarterContactsViewModel {
     }
 
     // MARK: - Private
-
-    private func fail(_ text: String) {
-        statusMessage = text
-        statusIsProblem = true
-        announce(text)
-    }
 
     /// Re-reads the store after a failed or partial save, so `baseline` matches
     /// what is really tracked and the next Save writes the right difference.
@@ -315,11 +310,5 @@ final class StarterContactsViewModel {
         case 1: "Saved. Keeping in touch with 1 person."
         default: "Saved. Keeping in touch with \(selection.count) people."
         }
-    }
-}
-
-private extension String {
-    var capitalizedFirst: String {
-        prefix(1).uppercased() + dropFirst()
     }
 }
