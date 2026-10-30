@@ -33,9 +33,10 @@ import Foundation
 /// it never cancels what it can't decode, and one bad row never stops
 /// scheduling for everyone else. An undecodable row at an id the pass writes
 /// (a decodable contact's cadence or occasion id) is replaced by that write.
-/// The orphan sweep reads `fetchAllPending()`, which fails closed: while an
-/// undecodable pending row exists that no run replaces, every run skips the
-/// sweep, and only the sweep.
+/// The orphan sweep's reads fail closed and skip only the sweep: `runFull()`
+/// reads `fetchAllPending()`, so it skips the sweep while any undecodable
+/// pending row exists that no run replaces; `run(for:)` reads
+/// `fetchPending(forContact:)`, so it skips only when that contact has one.
 ///
 /// **Snooze precondition (R54).** `snooze(contactId:)` checks
 /// `isCadenceEligible` itself, here rather than at each caller, because a
