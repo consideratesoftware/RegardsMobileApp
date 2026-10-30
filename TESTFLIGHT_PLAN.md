@@ -21,9 +21,9 @@ never pick up Android work.
   by owner ruling 7, started 2026-10-17 while `TF-03` is `OWNER`. `TF-07b`
   merged as PR #65 (`a09138d`, 2026-10-17). `TF-03` acceptance is owner work
   (see `Owner gates`); its code is merged in PR #48.
-- Next ready work: none. `TF-03` is `OWNER`, and `TF-07c` through `TF-07g` and
-  `TF-11` list it as a dependency. They all become `READY` when `TF-03`'s owner
-  gate passes.
+- Next ready work: none. `TF-03` is `OWNER`, and `TF-07c` through `TF-07g` list
+  it as a dependency. They become `READY` when `TF-03`'s owner gate passes.
+  `TF-11` no longer depends on `TF-03` (owner ruling of 2026-10-28).
   `TF-06` shipped no notification scheduling, so resolving R57 (owner ruling
   2026-08-22, see its queue row) falls to `TF-07`.
 - Blocked: `TF-07c` through `TF-07g` need `TF-03`. `TF-03` stays
