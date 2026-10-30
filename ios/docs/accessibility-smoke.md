@@ -149,10 +149,11 @@ Reminder window row.
       "Birthdays and anniversaries, separate from cadence." The footer reads
       "All times local · <zone name>. Daylight saving time is handled
       automatically."
-- [ ] Activate Save on a valid window. Save reads "Saving…" and is dimmed while
-      the pass runs, then the editor dismisses, and Upcoming shows the new
-      "Next N days" label. No device fixture can force a pass failure, so the
-      failure sentence is covered by unit tests.
+- [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
+      the new "Next N days" label. Save may read "Saving…" briefly; the
+      save-latency step in the pre-release pass is where the cue is judged. No
+      device fixture can force a pass failure, so the failure sentence is
+      covered by unit tests.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is
       gone, and nothing asks for confirmation.
 - [ ] Open Contact Detail for a tracked contact with a cadence. "Reminder
