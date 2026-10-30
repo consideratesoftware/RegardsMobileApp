@@ -44,6 +44,8 @@ These steps belong to the pre-release device pass. They are not merge gates (own
 - [ ] Relaunch mid-starter: picks saved earlier stay on the starter step after relaunch, with no duplicate rows. Only Done saves, so picks chosen but not saved are gone after force-quit. Record what the step shows after relaunch.
 - [ ] Done with picks: VoiceOver hears "Saved. Keeping in touch with N people." Note whether the announcement survives the change to the tab root in onboarding.
 - [ ] Settings → Choose people to keep in touch with: Done announces the same "Saved" text, and Settings shows again.
+- [ ] Settings → Choose people with Contacts access off (not determined, denied, or restricted) and no contacts: the empty state reads "Regards can't see your contacts. Turn on Contacts access above to choose people."
+- [ ] Settings → Choose people under Limited access: the limited note (`starter.limited-note`) is visible, and VoiceOver reads it.
 - [ ] A fourth pick: VoiceOver hears "You can pick up to 3 people. Remove one to choose someone else."
 
 ## Settings Contacts access

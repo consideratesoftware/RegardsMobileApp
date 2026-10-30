@@ -845,7 +845,7 @@ TF-11, PR29 slices 1 to 4. The steps are in `ios/docs/accessibility-smoke.md`:
 
 - Fresh install: grant, deny, and limited. Relaunch mid-starter.
 - The "Saved" announcement ("Saved. Keeping in touch with N people."): whether it survives the screen change, in onboarding and after Settings pops.
-- The limited note (`starter.limited-note`) is visible on the starter step, and VoiceOver reads it.
+- The limited note (`starter.limited-note`) is visible on the starter step and on Settings → Choose people under Limited access, and VoiceOver reads it.
 - Where VoiceOver focus lands after each onboarding step change: concept to Contacts, Contacts to starter, starter to tabs.
 - Settings Contacts access row shapes: restricted, limited, not determined, and denied. Check the title, subtitle, button trait, and VoiceOver reading of each.
 - Settings scene-active refresh after returning from iOS Settings: the row and VoiceOver focus.
