@@ -335,10 +335,10 @@ public final class UpcomingViewModel {
         // are left to the computation below. Inlined rather than a shared
         // `PendingSnoozeLookup` helper: two call sites, below §17's
         // abstraction floor of three. `OverdueViewModel.performLoad` has its
-        // own identical copy. A
-        // lapsed snooze stays in this map, but as a past instant: `max`
-        // below ignores it and the ordinary computation decides the date, so
-        // the row "returns" on its own the next load after the snooze lapses.
+        // own identical copy. A lapsed snooze stays in this map, but as a
+        // past instant: `max` below ignores it and the ordinary computation
+        // decides the date, so the row "returns" on its own the next load
+        // after the snooze lapses.
         let snoozedUntilByContact = Dictionary(
             reminders
                 .filter { $0.kind == .cadence && $0.snoozedUntil != nil }

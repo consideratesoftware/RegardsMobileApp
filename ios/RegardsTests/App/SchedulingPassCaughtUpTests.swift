@@ -270,11 +270,10 @@ struct SchedulingPassCaughtUpTests {
         #expect(afterRestore[0].snoozedUntil == secondNow.addingTimeInterval(7 * 86_400))
     }
 
-    /// R59 regression, rewritten for the shared lock (staged review
-    /// round 17). Rounds 14–16 fixed this with a compare-and-set and each
-    /// fix exposed the next interleaving; `SchedulingPass` now serialises
-    /// every mutation behind one FIFO lock, so the whole class is closed
-    /// rather than one pair at a time.
+    /// R59 regression, rewritten for the shared lock. Earlier
+    /// compare-and-set fixes each exposed the next interleaving;
+    /// `SchedulingPass` now serialises every mutation behind one FIFO lock,
+    /// so the whole class is closed rather than one pair at a time.
     ///
     /// **Both operations go through one `SchedulingPass` on purpose.** The
     /// lock is actor state, so it only serialises callers sharing an
