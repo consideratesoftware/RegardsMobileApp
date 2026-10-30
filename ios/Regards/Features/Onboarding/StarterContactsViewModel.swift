@@ -18,8 +18,9 @@ import SwiftUI
 /// contact gets its cadence, a contact that was tracked and is no longer
 /// picked gets `nil` (untracked). `updateTracking` moves `tracked` and
 /// `cadenceDays` and nothing else, so a foreground reconcile landing during
-/// the save can't be reverted. `lastInteractedAt` stays nil, which keeps
-/// `createdAt` as the anchor (decision #29). Skip writes nothing.
+/// the save can't be reverted. `lastInteractedAt` stays unchanged, so a
+/// contact never interacted with keeps `createdAt` as the anchor (decision
+/// #29). Skip writes nothing.
 ///
 /// **The cap.** 3 picks. A 4th is refused with an inline message and an
 /// announcement. Contacts that were already tracked before this screen opened

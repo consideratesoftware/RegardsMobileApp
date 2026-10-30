@@ -5,7 +5,7 @@ import SwiftUI
 /// the same screen with `showsSkip` on, since it has no back button.
 ///
 /// The importer's channel is shown read-only on each row. Per-contact channel
-/// choice belongs to Contact Detail (R58), not here.
+/// choice belongs to TF-09's Edit Contact form (R58), not here.
 ///
 /// Needs a navigation container for the search field. Settings provides one;
 /// the onboarding flow must wrap this screen in a `NavigationStack`.
@@ -17,8 +17,8 @@ struct StarterContactsScreen: View {
     @State private var viewModel: StarterContactsViewModel
     private let showsSkip: Bool
     /// Under limited Contacts access Regards can read only the contacts the
-    /// user shared, so the screen says so and where to share more (owner
-    /// ruling, 2026-10-17: no in-app picker).
+    /// user shared, so the screen says so and where to share more. TF-11's
+    /// design has no in-app contact picker for this.
     private let showsLimitedAccessNote: Bool
     /// Contacts access is denied, restricted or not yet asked (Settings
     /// route). The empty state then points at the Contacts access row above
