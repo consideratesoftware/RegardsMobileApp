@@ -178,6 +178,102 @@ struct ReminderWindowsViewModelRescheduleTests {
         #expect(try await world.environment.contacts.fetch(id: world.target.id)?.reminderWindowOverride == nil)
     }
 
+    // MARK: - A reset whose global re-read fails
+
+    /// An editor on a contact with a stored override, whose second global
+    /// read (the reset's) fails and later reads succeed. Draft edits are made
+    /// by the test before it resets.
+    private static func editorWhoseResetReadFails(
+        world: Fixtures.World, recorder: Fixtures.SaveRecorder
+    ) async -> ReminderWindowsViewModel {
+        let reads = FailingFetchWindowRepository(wrapped: world.environment.window, failingCalls: { $0 == 2 })
+        let editor = Fixtures.editor(
+            .contact(world.target.id), contacts: world.environment.contacts, window: reads, recorder: recorder)
+        await editor.load()
+        return editor
+    }
+
+    /// Edits made before "Use default window" are abandoned by that choice.
+    /// When the reset's global re-read fails, Save must not turn them into an
+    /// override: it reruns the pass and writes nothing.
+    @Test("Save after edits and a reset whose read failed stores no override")
+    func saveAfterEditThenFailedReadResetStoresNoOverride() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.editorWhoseResetReadFails(world: world, recorder: recorder)
+        editor.draft.allowedDays = .saturday
+        #expect(!(await editor.resetToDefault()))
+        #expect(editor.validationMessage == Self.message)
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        #expect(editor.validationMessage == nil)
+        #expect(recorder.windows == [Fixtures.storedGlobal], "only the retry ran the pass, with the global window")
+        #expect(try await world.environment.contacts.fetch(id: world.target.id)?.reminderWindowOverride == nil)
+        #expect(!editor.hasStoredOverride)
+        #expect(editor.draft == Draft(Fixtures.storedGlobal))
+    }
+
+    @Test("A reset whose read failed shows the default window the editor last read, not the abandoned edits")
+    func failedReadResetShowsTheDefaultWindow() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.editorWhoseResetReadFails(world: world, recorder: recorder)
+        editor.draft.allowedDays = .saturday
+
+        let reset = await editor.resetToDefault()
+
+        #expect(!reset)
+        #expect(editor.draft == Draft(Fixtures.storedGlobal))
+        #expect(!editor.hasStoredOverride)
+        #expect(recorder.windows.isEmpty)
+    }
+
+    /// After the failed reset the contact follows the default, so an edit now
+    /// is a new override built from the default window the form shows.
+    @Test("An edit after a reset whose read failed saves as a new override from the default window")
+    func editAfterFailedReadResetSavesAnOverrideFromTheDefault() async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let recorder = Fixtures.SaveRecorder()
+        let editor = await Self.editorWhoseResetReadFails(world: world, recorder: recorder)
+        #expect(!(await editor.resetToDefault()))
+        editor.draft.allowedDays = .saturday
+
+        let saved = await editor.save()
+
+        #expect(saved)
+        let stored = try #require(
+            try await world.environment.contacts.fetch(id: world.target.id)?.reminderWindowOverride)
+        #expect(stored.allowedDays == .saturday)
+        #expect(stored.allowedTimeRanges == Fixtures.storedGlobal.allowedTimeRanges)
+        #expect(stored.quietHours == Fixtures.storedGlobal.quietHours)
+        #expect(recorder.windows.count == 1)
+        #expect(editor.hasStoredOverride)
+    }
+
+    /// Pin. A save whose pass failed leaves the draft as the user left it; if
+    /// they edit again, the next Save writes the newer edits.
+    @Test("Save after a failed save writes the newer edits")
+    func saveAfterFailedSaveWritesTheNewerEdits() async throws {
+        let world = try await Fixtures.makeWorld()
+        let recorder = Fixtures.SaveRecorder()
+        recorder.rescheduled = false
+        let editor = await Self.loadedEditor(.contact(world.target.id), world: world, recorder: recorder)
+        editor.draft.allowedDays = .saturday
+        #expect(!(await editor.save()))
+
+        editor.draft.allowedDays = .sunday
+        recorder.rescheduled = true
+        let saved = await editor.save()
+
+        #expect(saved)
+        let stored = try await world.environment.contacts.fetch(id: world.target.id)
+        #expect(stored?.reminderWindowOverride?.allowedDays == .sunday)
+        #expect(recorder.windows.count == 2)
+        #expect(recorder.windows.last?.allowedDays == .sunday)
+    }
+
     // MARK: - The Saving… cue
 
     enum Action: String, CaseIterable, Sendable, CustomTestStringConvertible {
