@@ -48,19 +48,25 @@ struct SettingsContactsRowTests {
     // MARK: Restricted
 
     /// Parental controls or device management: iOS Settings can't lift the
-    /// restriction, so the row is status text with no button. Nothing prompts
-    /// or imports. The absence of a button is the row's shape, which a unit
-    /// test can't see; this pins the view model side.
-    @Test("Restricted shows its status; a request neither prompts nor imports")
+    /// restriction, so the row is status text with no button. Nothing opens,
+    /// prompts or imports. The absence of a button is the row's shape, which a
+    /// unit test can't see; this covers the view model side.
+    @Test("Restricted is status only: it opens nothing, never prompts, and imports nothing")
     func restrictedIsStatusOnly() async {
         let source = MutableContactsSource(status: .restricted)
         let probe = Probe()
         let viewModel = Self.viewModel(source, probe)
         await viewModel.load()
+        let opened = OpenedURLs()
 
+        viewModel.openContactsSettings(using: OpenURLAction { url in
+            opened.urls.append(url)
+            return .handled
+        })
         await viewModel.requestAccess()
 
         #expect(viewModel.status == .restricted)
+        #expect(opened.urls.isEmpty)
         #expect(!viewModel.requestFailed)
         #expect(source.requestCountValue() == 0)
         #expect(probe.reconcileCount == 0)
