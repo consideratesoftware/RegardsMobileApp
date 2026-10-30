@@ -441,7 +441,8 @@ struct RegardsTabRoot: View {
             StarterContactsScreen(
                 viewModel: StarterContactsViewModel(contacts: runtime.environment.contacts),
                 onFinish: {
-                    if !navigation.settingsPath.isEmpty { navigation.settingsPath.removeLast() }
+                    // A slow save can finish after Back; never pop another screen.
+                    if navigation.settingsPath.last == .starterContacts { navigation.settingsPath.removeLast() }
                 }
             )
         }
