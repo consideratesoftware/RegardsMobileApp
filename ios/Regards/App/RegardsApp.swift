@@ -45,29 +45,14 @@ struct RootView: View {
                 SplashView()
                     .transition(.opacity)
             case .onboarding:
-                OnboardingScreen(
-                    showsPermissionAction: !launch.onboardingCompletionPending,
-                    isBusy: launch.isImporting,
-                    statusMessage: launch.statusMessage,
-                    canContinueWithoutContacts: launch.canContinueWithoutContacts,
-                    continueActionTitle: launch.onboardingCompletionPending
-                        ? "Finish setup"
-                        : "Continue without contacts",
-                    onAllow: {
-                        Task { await launch.requestContactsAndImport() }
-                    },
-                    onContinueWithoutContacts: {
-                        Task { await launch.continueWithoutContacts() }
-                    },
-                    onWhyWeAsk: { showsTransparency = true }
-                )
-                .transition(.opacity)
+                OnboardingFlowView(launch: launch, onWhyWeAsk: { showsTransparency = true })
             case .ready:
                 if let runtime = launch.runtime {
                     RegardsTabRoot(
                         runtime: runtime,
                         reconciliationGeneration: launch.reconciliationCount,
-                        notifications: launch.notifications
+                        notifications: launch.notifications,
+                        contactsAccess: launch.makeContactsAccessViewModel()
                     )
                     .transition(.opacity)
                 } else {
@@ -80,6 +65,7 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: launch.phase)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: launch.onboardingStep)
         .task {
             await launch.start()
         }
@@ -199,6 +185,9 @@ struct RegardsTabRoot: View {
     /// Nil when the launch has no notification seam, which hides the Settings
     /// notifications section.
     @State private var notificationPermissionVM: NotificationPermissionViewModel?
+    /// Nil when the launch has no Contacts source, which hides the Settings
+    /// Contacts access row.
+    @State private var contactsAccessVM: ContactsAccessViewModel?
     @State private var intentRouter = RegardsIntentRouter.shared
     @Namespace private var overdueContactTransition
     @Namespace private var upcomingContactTransition
@@ -207,7 +196,8 @@ struct RegardsTabRoot: View {
     init(
         runtime: AppRuntime,
         reconciliationGeneration: Int = 0,
-        notifications: (any NotificationScheduling)? = nil
+        notifications: (any NotificationScheduling)? = nil,
+        contactsAccess: ContactsAccessViewModel? = nil
     ) {
         self.runtime = runtime
         self.reconciliationGeneration = reconciliationGeneration
@@ -223,6 +213,7 @@ struct RegardsTabRoot: View {
         self._notificationPermissionVM = State(
             initialValue: notifications.map { NotificationPermissionViewModel(notifications: $0) }
         )
+        self._contactsAccessVM = State(initialValue: contactsAccess)
     }
 
     // MARK: - View model composition
@@ -422,7 +413,7 @@ struct RegardsTabRoot: View {
 
     private var settingsRoot: some View {
         NavigationStack(path: $navigation.settingsPath) {
-            SettingsScreen(notifications: notificationPermissionVM)
+            SettingsScreen(notifications: notificationPermissionVM, contactsAccess: contactsAccessVM)
                 .navigationDestination(for: RegardsSettingsRoute.self) { route in
                     settingsDestination(for: route)
                 }
@@ -446,11 +437,18 @@ struct RegardsTabRoot: View {
             MergeDuplicatesScreen(viewModel: mergeDuplicatesVM)
         case .transparency:
             TransparencyScreen()
-        case .onboarding:
-            OnboardingScreen(
-                showsPermissionAction: false,
-                onWhyWeAsk: {
-                    navigation.settingsPath.append(RegardsSettingsRoute.transparency)
+        case .starterContacts:
+            let access = contactsAccessVM?.status
+            StarterContactsScreen(
+                viewModel: Self.makeStarterContactsViewModel(runtime: runtime),
+                showsLimitedAccessNote: access == .limited,
+                contactsAccessIsOff: access == .denied || access == .restricted || access == .notDetermined,
+                onFinish: {
+                    // Pops only when the starter picker is the top route, so a
+                    // save that finishes after Back can't pop another screen.
+                    // Known gap (follow-up task): if the picker was popped and
+                    // pushed again, an older save can still pop the new one.
+                    if navigation.settingsPath.last == .starterContacts { navigation.settingsPath.removeLast() }
                 }
             )
         }

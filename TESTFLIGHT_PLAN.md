@@ -12,20 +12,21 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-29
+- Updated: 2026-10-31
 - Baseline: `main` at `0b784d7` (merge of PR #66, `TF-07a`, the engine,
   merged 2026-10-28). PR #65, `TF-07b` (schema v3 and `observeSchedule`),
   merged as `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06`
   fast-follow, merged as `3ebe90e`. `TF-05` merged as PR #63 (`a887ece`),
   and `TF-06` merged as PR #62 (`de33098`).
-- Active work: `TF-07c` is PR #67 (`claude/tf-07c-pass-core`), in review, database half only. `TF-07d` through
+- Active work: `TF-07c` is done (PR #67, merged as `55c3d16` on 2026-10-31). `TF-07d` through
   `TF-07g` follow it in the same lane. `TF-11` is in progress on `claude/tf-11-onboarding` in its own lane.
   Owner ruling 8 moved every device-only check to the pre-release device pass (see `Owner gates`), so TF-03's
   device acceptance no longer blocks `TF-07` or `TF-11`. `TF-03`'s code is merged in PR #48.
-- Next ready work: none. `TF-07d` through `TF-07g` wait for `TF-07c`.
+- Next ready work: none. `TF-07d` is in progress on `claude/tf-07d-interactions`,
+  and `TF-07e` through `TF-07g` follow it.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #67 (`TF-07c`, `claude/tf-07c-pass-core`). Checked with `gh pr list --state open` on 2026-10-29.
+- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`). Checked with `gh pr list --state open` on 2026-10-31.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
@@ -200,7 +201,7 @@ numbers.
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
 | TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage. Any tracking or cadence write calls `scheduler.run(for:)` for the affected contacts. | PR27; R13, R16–R17 |
 | TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits. Group collapse in the scheduling pass (one cadence reminder per group, member-max interaction) is part of this item, moved from TF-07 by owner ruling 6 (2026-10-28). | PR28; R11–R12, R24 |
-| TF-11 | ACTIVE | TF-06 (TF-03: device acceptance deferred, owner ruling 8, 2026-10-28) | Three-screen onboarding, starter contacts, grant/deny/limited paths, relaunch state, notification ask, and no inert controls. In progress on `claude/tf-11-onboarding`: slices 1 to 3 are done (tracking write; starter picker from Settings; onboarding concept, contacts, and starter flow). Slices 4 (Settings Contacts re-entry) and 5 (notification ask) remain. Starter saves and later tracking or cadence writes must call `scheduler.run(for:)` for the affected contacts. Whichever of TF-07c and TF-11 merges second wires that call after the starter saves. | PR29; R11, R14 |
+| TF-11 | ACTIVE | TF-06 | Onboarding: concept, Contacts step, starter picker (onboarding and Settings), limited path, relaunch resume, and the Settings Contacts access row. **PR29 slices 1 to 4 are in review in PR #68.** TF-03 is no longer a dependency (owner ruling of 2026-10-28, device deferral). Slice 5 (notification ask, a conditional fourth step) waits for TF-07e (OS notification scheduling) and gets its own PR. Settings starter saves call `scheduler.run(for:)` for each changed contact, and onboarding starters are covered by the `runFull()` at completion: wired in PR #68 after TF-07c (tech-lead ruling, 2026-10-28). Device checks: Pre-release device pass. | PR29; R11, R14 (R14 open, progress note) |
 | TF-12 | BLOCKED | TF-09, TF-10 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
 | TF-13 | BLOCKED | TF-12 | Widget target and App Group migration preserve the DB; read-only small/medium/lock widgets refresh from SchedulingPass | PR31 |
 | TF-14 | BLOCKED | TF-02, TF-11 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
@@ -580,10 +581,6 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 - PR #64, Contact Detail "Snooze 1 week" label, checked by eye on a device.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
-- TF-11, starter contacts: the "Saved…" announcement survives the screen pop.
-  Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
-- TF-11 fresh-install device pass: grant, deny, and limited paths; relaunch in the middle of the starter contacts; the notification ask; and a VoiceOver smoke.
-  Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 - TF-07g airplane-mode device run, moved here from TF-06's on-device exit checks (owner ruling of 2026-10-11, recorded in the TF-07 row). On a physical iPhone in airplane mode: an overdue contact gets a digest at the next window open; a single notification fires at a window boundary; and Caught up and Snooze 1 week round-trip from a notification.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
@@ -592,6 +589,15 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
   2. DEBUG mock launch: VoiceOver focus after the splash lands on Upcoming, and the birthday and anniversary rows are on the first render.
   3. Snooze return: snooze from Overdue and from Contact Detail. Overdue and Upcoming agree on when a snooze outside window hours lapses.
   A cadence under 1 day has no device check: no device fixture can produce a 0-day cadence. `AllContactsViewModel.cadenceSegment` is covered by `allContactsRowOmitsTheSegmentWithoutAWorkableCadence` and `allContactsRowShowsThePositiveCadence`.
+  Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
+- PR #68 (TF-11, PR29 slices 1 to 4), seven device steps, one result line. The steps are in `ios/docs/accessibility-smoke.md`.
+  1. Fresh install: grant, deny, and limited. Relaunch mid-starter.
+  2. The "Saved" announcement ("Saved. Keeping in touch with N people."): whether it survives the screen change, in onboarding and after Settings pops.
+  3. The limited note (`starter.limited-note`) is visible on the starter step and on Settings → Choose people under Limited access, and VoiceOver reads it.
+  4. Where VoiceOver focus lands after each onboarding step change: concept to Contacts, Contacts to starter, starter to tabs.
+  5. Settings Contacts access row shapes: restricted, limited, not determined, and denied. Check the title, subtitle, button trait, and VoiceOver reading of each.
+  6. Settings scene-active refresh after returning from iOS Settings: the row and VoiceOver focus.
+  7. Settings → Choose people: how long Done reads Saving… on a real-sized list.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
 Standing notes:

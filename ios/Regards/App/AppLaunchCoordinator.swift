@@ -55,6 +55,11 @@ final class AppLaunchCoordinator {
     private(set) var statusMessage: String?
     private(set) var canContinueWithoutContacts = false
     private(set) var onboardingCompletionPending = false
+    /// TF-11. Derived by `start()` on every launch, never persisted. Not
+    /// `private(set)`: AppLaunchCoordinator+Onboarding.swift sets it.
+    var onboardingStep: OnboardingStep = .concept
+    /// The import that reached `.starter` ran under limited Contacts access.
+    private(set) var starterAccessIsLimited = false
 
     /// Backing storage for `reconciliationCount`/`reconciliationCoalesceCount`
     /// below. Nested and `private` on purpose, unlike the file-split
@@ -289,16 +294,19 @@ final class AppLaunchCoordinator {
                 return
             }
 
-            phase = .onboarding
-            beginConsumingNotificationActions()
             let actionGeneration = onboardingActionGeneration
             let authorization = await dependencies.contactsSource.currentAuthorization()
+            // Splash stays up through the read, so a resumed launch never shows the concept screen.
+            if phase == .loading { phase = .onboarding }
+            beginConsumingNotificationActions()
             guard phase == .onboarding,
                   !isImporting,
                   onboardingActionGeneration == actionGeneration else { return }
             try Task.checkCancellation()
+            if authorization != .notDetermined { onboardingStep = .contacts }
             switch authorization {
             case .authorized, .limited:
+                starterAccessIsLimited = authorization == .limited
                 await importAuthorizedContacts(runtime: runtime, dependencies: dependencies)
             case .denied, .restricted:
                 statusMessage = "Contacts access isn't available. You can continue without importing."
@@ -341,6 +349,7 @@ final class AppLaunchCoordinator {
                 canContinueWithoutContacts = true
                 return
             }
+            starterAccessIsLimited = status == .limited
 
             let importer = ContactsImporter(
                 source: dependencies.contactsSource,
@@ -359,7 +368,7 @@ final class AppLaunchCoordinator {
             return
         }
 
-        await completeOnboardingAfterImport(runtime: runtime, clock: dependencies.clock)
+        advanceToStarterStep()
     }
 
     func continueWithoutContacts() async {
@@ -368,8 +377,11 @@ final class AppLaunchCoordinator {
         isImporting = true
         defer { isImporting = false }
 
+        let wasPending = onboardingCompletionPending
         do {
             try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
+            // After the starter step, reconcile once for Contacts changed meanwhile.
+            if wasPending { await reconcileNow(runtime: runtime, dependencies: dependencies) }
         } catch {
             statusMessage = onboardingCompletionPending
                 ? Self.postImportCompletionFailureMessage
@@ -389,9 +401,7 @@ final class AppLaunchCoordinator {
         canContinueWithoutContacts = false
         onboardingCompletionPending = false
         phase = .ready
-        // First-launch import already read the full system store this
-        // session, so skip an immediate re-reconcile here — foreground and
-        // store-change triggers cover everything from this point on.
+        // Store-change and foreground triggers cover what changes from here on.
         if let dependencies {
             beginObservingContactStoreChanges(dependencies: dependencies)
         }
@@ -446,7 +456,7 @@ final class AppLaunchCoordinator {
             return
         }
 
-        await completeOnboardingAfterImport(runtime: runtime, clock: dependencies.clock)
+        advanceToStarterStep()
     }
 
     /// R35 made a single row's write failure non-throwing — logged and
@@ -470,21 +480,17 @@ final class AppLaunchCoordinator {
         result.failed > 0 && result.imported == 0 && result.skipped == 0
     }
 
-    private func completeOnboardingAfterImport(
-        runtime: AppRuntime,
-        clock: @Sendable () -> Date
-    ) async {
+    /// The starter step's Done and Skip (TF-11), through the "Finish setup"
+    /// path. A failed save returns to the Contacts step's "Finish setup".
+    func finishOnboarding() async {
+        guard phase == .onboarding, onboardingStep == .starter, runtime != nil, !isImporting else { return }
         onboardingCompletionPending = true
-        do {
-            try await completeOnboarding(runtime: runtime, clock: clock)
-        } catch {
-            statusMessage = Self.postImportCompletionFailureMessage
-            canContinueWithoutContacts = true
-        }
+        await continueWithoutContacts()
+        if phase != .ready { onboardingStep = .contacts }
     }
 
     private static let importFailureMessage =
         "Regards couldn't finish importing contacts. Retry to resume, or continue without contacts."
     private static let postImportCompletionFailureMessage =
-        "Contacts were imported, but Regards couldn't finish setup. Try again."
+        "Contacts were imported, but Regards couldn't finish setup. Tap Finish setup to try again."
 }

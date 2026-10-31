@@ -18,7 +18,9 @@ final class RegardsNavigationState {
     var overduePath = NavigationPath()
     var upcomingPath = NavigationPath()
     var contactsPath = NavigationPath()
-    var settingsPath = NavigationPath()
+    /// Typed, unlike the other paths: Settings pushes only its own routes,
+    /// and the starter picker checks the top route before it pops.
+    var settingsPath: [RegardsSettingsRoute] = []
     var contactsSearchText = ""
 
     init(selected: RegardsTab = .overdue) {
@@ -35,7 +37,7 @@ final class RegardsNavigationState {
             contactsPath = NavigationPath()
             contactsSearchText = ""
         case .settings:
-            settingsPath = NavigationPath()
+            settingsPath = []
         }
         selected = tab
     }

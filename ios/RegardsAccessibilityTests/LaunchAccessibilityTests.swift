@@ -44,10 +44,10 @@ final class LaunchAccessibilityTests: XCTestCase {
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
         retry.tap()
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        let concept = app.descendants(matching: .any)["screen.onboarding-concept"]
         XCTAssertTrue(
-            onboarding.waitForExistence(timeout: 10),
-            "Retry should reopen the runtime and resume first launch."
+            concept.waitForExistence(timeout: 10),
+            "Retry should reopen the runtime and resume first launch at the concept screen."
         )
     }
 
@@ -68,13 +68,18 @@ final class LaunchAccessibilityTests: XCTestCase {
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
         retry.tap()
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        let concept = app.descendants(matching: .any)["screen.onboarding-concept"]
         XCTAssertTrue(
-            onboarding.waitForExistence(timeout: 10),
-            "Retry should create the production runtime and resume first launch."
+            concept.waitForExistence(timeout: 10),
+            "Retry should create the production runtime and resume first launch at the concept screen."
         )
     }
 
+    /// TF-11 slice 3: concept, then the Contacts pre-prompt, then the import
+    /// lands on the starter step; picking Leia and tapping Done tracks her and
+    /// opens the tabs. "every 2 weeks" (the default pick) shows in All
+    /// Contacts only if the save landed, since an untracked row shows no
+    /// cadence.
     @MainActor
     func testFirstLaunchImportsContactsAndReachesProductionTabs() throws {
         let app = XCUIApplication()
@@ -82,25 +87,33 @@ final class LaunchAccessibilityTests: XCTestCase {
         app.launchEnvironment["REGARDS_UI_TEST_DYNAMIC_TYPE"] = "accessibility5"
         app.launch()
 
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
+        let concept = app.descendants(matching: .any)["screen.onboarding-concept"]
         XCTAssertTrue(
-            onboarding.waitForExistence(timeout: 10),
-            "A fresh production runtime should stop at the Contacts pre-prompt."
+            concept.waitForExistence(timeout: 10),
+            "A fresh production runtime should stop at the concept screen."
         )
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
+        app.passOnboardingConcept()
+        try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
+
         let allow = app.buttons["onboarding.allow-contacts"]
+        let starter = app.descendants(matching: .any)["screen.starter-contacts"]
+        tap(allow, until: starter, message: "A completed import should reveal the starter step.")
+        app.pickStarter(named: "Leia Organa")
+        let done = app.buttons["starter.done"]
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        tap(
-            allow,
-            until: overdue,
-            message: "A completed import should reveal the production-backed tabs."
-        )
+        tap(done, until: overdue, message: "Done should save the pick and reveal the production-backed tabs.")
+
         let contacts = app.descendants(matching: .any)["screen.contacts"]
         selectTab(named: "Contacts", destination: contacts, in: app)
         XCTAssertTrue(
             app.staticTexts["Leia Organa"].waitForExistence(timeout: 10),
-            "Imported, untracked contacts should remain visible in All Contacts."
+            "The imported contact should be visible in All Contacts."
+        )
+        XCTAssertTrue(
+            app.staticTexts["every 2 weeks"].waitForExistence(timeout: 10),
+            "The starter pick should be tracked at the default cadence."
         )
     }
 
@@ -109,8 +122,7 @@ final class LaunchAccessibilityTests: XCTestCase {
         let app = firstLaunchApp(contactsOutcome: "denied")
         app.launch()
 
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
-        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        app.passOnboardingConcept()
         let allow = app.buttons["onboarding.allow-contacts"]
         let status = app.staticTexts["onboarding.status"]
         tap(allow, until: status, message: "Permission denial should reveal recovery copy.")
@@ -149,8 +161,7 @@ final class LaunchAccessibilityTests: XCTestCase {
         let app = firstLaunchApp(contactsOutcome: "import-fails-once")
         app.launch()
 
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
-        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        app.passOnboardingConcept()
         let allow = app.buttons["onboarding.allow-contacts"]
         let status = app.staticTexts["onboarding.status"]
         tap(allow, until: status, message: "Import failure should reveal retry copy.")
@@ -165,8 +176,12 @@ final class LaunchAccessibilityTests: XCTestCase {
         )
         try app.performAccessibilityAudit(for: ScreensAccessibilityTests.structuralAuditCategories)
 
+        // TF-11 slice 3: the resumed import lands on the starter step, and
+        // Skip finishes onboarding.
+        let starter = app.descendants(matching: .any)["screen.starter-contacts"]
+        tap(allow, until: starter, message: "Retry should resume the import and reveal the starter step.")
         let overdue = app.descendants(matching: .any)["screen.overdue"]
-        tap(allow, until: overdue, message: "Retry should resume the import and reveal production-backed tabs.")
+        tap(app.buttons["starter.skip"], until: overdue, message: "Skip should reveal production-backed tabs.")
     }
 
     @MainActor
@@ -174,8 +189,7 @@ final class LaunchAccessibilityTests: XCTestCase {
         let app = firstLaunchApp(contactsOutcome: "import-fails-once")
         app.launch()
 
-        let onboarding = app.descendants(matching: .any)["screen.onboarding"]
-        XCTAssertTrue(onboarding.waitForExistence(timeout: 10))
+        app.passOnboardingConcept()
         let allow = app.buttons["onboarding.allow-contacts"]
         let status = app.staticTexts["onboarding.status"]
         tap(allow, until: status, message: "Import failure should reveal recovery copy.")

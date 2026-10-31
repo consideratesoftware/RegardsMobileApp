@@ -86,6 +86,22 @@ public protocol ContactRepository: Sendable {
     /// rule as `updateLastInteractedAt`.
     @discardableResult
     func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool
+    /// Field-scoped write for choosing whom to keep in touch with (TF-11's
+    /// starter step and its Settings re-entry): moves exactly `tracked` and
+    /// `cadenceDays`. The Settings re-entry runs while foreground reconciles
+    /// can land, so a whole-row `upsert` from a list snapshot could revert a
+    /// reconciled name or a "Caught up" write (§7).
+    ///
+    /// A `cadenceDays` of 1 or more tracks the contact at that cadence. `nil`
+    /// untracks it and clears the cadence, since §7 keeps `cadenceDays` null
+    /// whenever `tracked` is false. Zero or less throws
+    /// `ContactTrackingError.invalidCadenceDays` without writing anything.
+    /// `lastInteractedAt` never moves, so a contact nobody has logged an
+    /// interaction with keeps `createdAt` as its anchor (decision #29).
+    /// Returns `false` when `id` is missing or archived, the same "no match"
+    /// rule as `updateLastInteractedAt`.
+    @discardableResult
+    func updateTracking(id: UUID, cadenceDays: Int?) async throws -> Bool
     /// Corruption-aware read (R50, `AllContactsViewModel`): every row that
     /// decodes, plus a diagnostic for each row that doesn't. Never mutates,
     /// deletes, or silently skips the corrupt row — it stays exactly as
@@ -166,6 +182,18 @@ public struct ReconciledContactFields: Sendable, Equatable {
     }
 }
 
+/// The one input rule `ContactRepository.updateTracking` enforces on every
+/// backend, checked before anything is written.
+public enum ContactTrackingError: Error, Equatable {
+    /// A cadence of zero or fewer days. Tracking needs at least 1 day; `nil`
+    /// is how a caller untracks.
+    case invalidCadenceDays(Int)
+
+    static func validate(_ cadenceDays: Int?) throws {
+        if let cadenceDays, cadenceDays < 1 { throw invalidCadenceDays(cadenceDays) }
+    }
+}
+
 public extension ContactRepository {
     /// Default corruption-aware read for backends that never produce an
     /// undecodable row (in-memory fakes and `MockContactRepository`, whose
@@ -221,6 +249,20 @@ public extension ContactRepository {
         try window?.validate()
         guard var contact = try await fetch(id: id), contact.isActive else { return false }
         contact.reminderWindowOverride = window
+        try await upsert(contact)
+        return true
+    }
+
+    /// Same fallback shape as `updateReminderWindowOverride` above, for
+    /// in-memory test fakes: validates, then fetches and upserts.
+    /// `GRDBContactRepository` and `MockContactRepository` override this with
+    /// one write and no fetch-then-upsert.
+    @discardableResult
+    func updateTracking(id: UUID, cadenceDays: Int?) async throws -> Bool {
+        try ContactTrackingError.validate(cadenceDays)
+        guard var contact = try await fetch(id: id), contact.isActive else { return false }
+        contact.tracked = cadenceDays != nil
+        contact.cadenceDays = cadenceDays
         try await upsert(contact)
         return true
     }
@@ -412,68 +454,6 @@ struct GRDBContactRepository: ContactRepository {
                 }
             )
             box.set(cancellable)
-        }
-    }
-
-    /// Real field-scoped `UPDATE` — see the protocol doc comment. Never
-    /// reads the row first, so it can't clobber a concurrent write outside
-    /// the five columns listed here.
-    func updateReconciledFields(id: UUID, fields: ReconciledContactFields) async throws {
-        let phonesJson = try encodeJSON(fields.phoneNumbers)
-        let emailsJson = try encodeJSON(fields.emailAddresses)
-        try await dbQueue.write { db in
-            try db.execute(
-                sql: """
-                    UPDATE Contact
-                    SET displayName = ?, phonesJson = ?, emailsJson = ?, \
-                        preferredChannelValue = ?, archivedAt = ?
-                    WHERE id = ?
-                    """,
-                arguments: [
-                    fields.displayName, phonesJson, emailsJson, fields.preferredChannelValue,
-                    fields.archivedAt.map { Int($0.timeIntervalSince1970) }, id.uuidString,
-                ])
-        }
-    }
-
-    /// Real field-scoped `UPDATE` — see the protocol doc comment. Never
-    /// reads the row first, so it can't clobber a concurrent
-    /// `ContactsReconciler` write to any other column on the same row.
-    /// `db.changesCount` after the `UPDATE` is SQLite's own
-    /// `sqlite3_changes()` — the row count the statement actually matched,
-    /// not an assumption that a well-formed `id` always exists.
-    ///
-    /// `AND archivedAt IS NULL` (staged review round 8): without it, this
-    /// silently matches — and "succeeds" — a contact the reconciler archived
-    /// between an earlier fetch and this write, the identical race
-    /// `ContactDetailViewModel.snooze`'s `contact.isActive` guard already
-    /// closes for Snooze. See the protocol doc comment for why "archived"
-    /// counts as "no match" here.
-    @discardableResult
-    func updateLastInteractedAt(id: UUID, at date: Date) async throws -> Bool {
-        try await dbQueue.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET lastInteractedAt = ? WHERE id = ? AND archivedAt IS NULL",
-                arguments: [Int(date.timeIntervalSince1970), id.uuidString]
-            )
-            return db.changesCount > 0
-        }
-    }
-
-    /// Real field-scoped `UPDATE`, same shape as `updateLastInteractedAt`
-    /// above: one `UPDATE` with no fetch, matches only an active contact, and
-    /// reports the match from `db.changesCount`. A `nil` window binds a Swift
-    /// `nil`, which GRDB writes as SQL NULL (R39).
-    @discardableResult
-    func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
-        try window?.validate()
-        let json = try window.map { try encodeJSON($0) }
-        return try await dbQueue.write { db in
-            try db.execute(
-                sql: "UPDATE Contact SET reminderWindowOverride = ? WHERE id = ? AND archivedAt IS NULL",
-                arguments: [json, id.uuidString]
-            )
-            return db.changesCount > 0
         }
     }
 

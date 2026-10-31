@@ -118,12 +118,14 @@ final class ScreensAccessibilityTests: XCTestCase {
 
     @MainActor
     func testOnboardingPassesAudit() throws {
-        let app = launchToSettings()
-        navigateFromSettings(
-            triggerIdentifier: "settings.onboarding-preview",
-            to: "screen.onboarding",
-            in: app
-        )
+        // The Contacts pre-prompt. Settings no longer links to it (TF-11
+        // slice 2 removed the inert "Onboarding preview" row), and a fresh
+        // install now starts at the concept screen (slice 3), so the only way
+        // here is Get started.
+        let app = XCUIApplication()
+        app.launchArguments.append("--regards-first-launch-runtime")
+        app.launch()
+        app.passOnboardingConcept()
         try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
     }
 
