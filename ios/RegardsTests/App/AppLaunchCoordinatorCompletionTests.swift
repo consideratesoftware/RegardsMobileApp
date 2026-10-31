@@ -95,8 +95,8 @@ extension AppLaunchCoordinatorRecoveryTests {
         let imported = try await environment.contacts.fetchAll()
         #expect(Set(imported.map(\.systemContactRef)) == [Self.systemContact.identifier, Self.han.identifier])
         #expect(source.fetchCountValue() == 2, "The launch import plus one reconcile after the retry.")
-        // The reconcile only imports: Han is untracked, so the pass has nothing
-        // to schedule for him, and the reconcile ran no pass of its own.
+        // The plan's (g) pin: the contact the reconcile imported is untracked
+        // and has no pending row. (It does not show whether a pass ran.)
         let han = try #require(imported.first { $0.systemContactRef == Self.han.identifier })
         #expect(han.tracked == false)
         #expect(try await environment.reminders.fetchPending(forContact: han.id).isEmpty)

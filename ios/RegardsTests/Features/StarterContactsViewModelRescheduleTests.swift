@@ -102,6 +102,9 @@ extension StarterContactsViewModelSaveTests {
         #expect(saved.calls == [[dee.id]])
     }
 
+    /// A pin: it passes on a view model that never calls `onSaved` at all, and
+    /// fails only if a no-op save or Skip starts to. `noLandedWriteRunsNoPass`
+    /// covers the saves that attempt writes and land none.
     @Test("A save with nothing to write and a Skip reschedule nothing")
     func skipRunsNoPass() async throws {
         let store = try Self.store()
@@ -118,6 +121,34 @@ extension StarterContactsViewModelSaveTests {
         #expect(!savedNothing)
         #expect(skipped)
         #expect(saved.calls.isEmpty)
+    }
+
+    @Test("A save that lands no write reschedules nothing, whether the first write throws or every pick vanished")
+    func noLandedWriteRunsNoPass() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let ben = Self.person("Ben")
+        for person in [ana, ben] { try await store.upsert(person) }
+
+        // The first write throws, so nothing landed.
+        let thrown = SavedCalls()
+        let failing = Self.picker(ScriptedTrackingContactRepository(store, failOnCall: 1), thrown)
+        await failing.load()
+        failing.toggle(ana.id)
+        let failedResult = await failing.save()
+        #expect(!failedResult)
+        #expect(thrown.calls.isEmpty, "Nothing landed, so nothing is rescheduled.")
+
+        // Every pick is archived before Save, so every write returns false.
+        let vanished = SavedCalls()
+        let archiving = Self.picker(store, vanished)
+        await archiving.load()
+        archiving.toggle(ana.id)
+        archiving.toggle(ben.id)
+        try await store.archive(id: ana.id, at: Self.importedAt)
+        try await store.archive(id: ben.id, at: Self.importedAt)
+        _ = await archiving.save()
+        #expect(vanished.calls.isEmpty, "Archived contacts are not rescheduled, and no empty call is made.")
     }
 
     @Test("Save does not return, and the screen is not finished, until the reschedule returns", .timeLimit(.minutes(1)))
