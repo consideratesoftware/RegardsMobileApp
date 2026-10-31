@@ -256,7 +256,7 @@ struct ContactDetailViewModelSnoozeTests {
     }
 
     /// The hosted-review blocker this pins: `logOther` originally never
-    /// called `scheduler.caughtUp`, unlike `markCaughtUp` — both route
+    /// called `scheduler.recordInteraction`, unlike `markCaughtUp` — both route
     /// through `InteractionLogging`, which moves `lastInteractedAt` and
     /// never touches `ScheduledReminder`, so without the call a contact
     /// logged through another channel after a snooze kept showing the stale
@@ -316,7 +316,7 @@ struct ContactDetailViewModelSnoozeTests {
         await viewModel.logOther(channel: .email)
 
         // The pending cadence row is gone outright — direct proof
-        // `scheduler.caughtUp` ran, independent of any Upcoming math.
+        // `scheduler.recordInteraction` ran, independent of any Upcoming math.
         let pending = try await reminders.fetchPending(forContact: contact.id)
         #expect(pending.isEmpty)
 

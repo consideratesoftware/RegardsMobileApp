@@ -18,7 +18,7 @@ struct UpcomingViewModelRaceTests {
 
     /// The three-write partial-failure shape `markCaughtUp`'s doc comment
     /// added a reload for, updated for correctness #4's write-order fix
-    /// (`scheduler.caughtUp` now runs *before* `InteractionLogging`, not
+    /// (`scheduler.recordInteraction` now runs *before* `InteractionLogging`, not
     /// after — see its doc comment) — so "only the last write fails" now
     /// means `InteractionLogging`'s own second write (`contacts.upsert`),
     /// not the scheduler: a scheduler failure now blocks everything after it
@@ -89,9 +89,9 @@ struct UpcomingViewModelRaceTests {
     /// The double-failure this pins (staged review round 8) — see
     /// `OverdueViewModelActionTests
     /// .markCaughtUpDoubleFailureOnRestoreStillReportsFailure`'s sibling
-    /// doc comment for the full shape. `caughtUp` clears a real snooze,
-    /// `InteractionLogging` then fails, and the compensating
-    /// `restorePendingAfterFailedCaughtUp` also fails — the method must
+    /// doc comment for the full shape. `recordInteraction` clears a real
+    /// snooze, `InteractionLogging` then fails, and the compensating restore
+    /// (inside the same lock span) also fails — the method must
     /// still return cleanly, and the reload must show the truthfully
     /// still-overdue contact, not a state the failed restore only wished for.
     @Test("A caught-up write whose own restore also fails does not crash and still reports failure")
@@ -144,7 +144,7 @@ struct UpcomingViewModelRaceTests {
     /// and only checks the final state would pass whether or not the fix
     /// is present, since that trailing reload eventually self-corrects
     /// either way. `GatedTransitionStateReminderRepository` closes that
-    /// hole: it holds `scheduler.caughtUp`'s write open, so this test can
+    /// hole: it holds `scheduler.recordInteraction`'s write open, so this test can
     /// inspect `totalCount` in the exact window *before* `markCaughtUp`
     /// reaches its own reload — the only place the bug is actually
     /// observable.
@@ -184,7 +184,7 @@ struct UpcomingViewModelRaceTests {
         await contactsGate.waitUntilArrived()
 
         // markCaughtUp: its optimistic mutation runs immediately, then it
-        // blocks inside `scheduler.caughtUp` before it can reach its own
+        // blocks inside `scheduler.recordInteraction` before it can reach its own
         // trailing `performLoad()`.
         let action = Task { await viewModel.markCaughtUp(contactId: contact.id) }
         await schedulerGate.waitUntilArrived()

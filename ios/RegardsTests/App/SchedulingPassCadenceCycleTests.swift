@@ -63,6 +63,7 @@ struct SchedulingPassCadenceCycleTests {
     /// run is needed, and the run that follows has nothing to write.
     @Test(
         "Caught up and Log other write the next cadence row in the same call",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases, [SchedulingPass.Interaction.caughtUp, .other(.sms)]
     )
     func caughtUpReschedulesInTheSameCall(
@@ -94,6 +95,7 @@ struct SchedulingPassCadenceCycleTests {
     /// would then write a floorless row at the overdue slot.
     @Test(
         "A failed Caught up throws, leaves the snoozed row as it was, and the next run keeps its floor",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func failedCaughtUpKeepsSnoozeFloor(backend: RepositoryContractBackend) async throws {
@@ -119,6 +121,7 @@ struct SchedulingPassCadenceCycleTests {
     /// stays `userCaughtUp` until the next run writes the next cycle's.
     @Test(
         "A logged interaction survives a failed reschedule, and the next run writes the next row",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func loggedInteractionSurvivesAFailedReschedule(backend: RepositoryContractBackend) async throws {
@@ -149,6 +152,7 @@ struct SchedulingPassCadenceCycleTests {
     /// Fails if the eligibility check leaks into the in-app kinds.
     @Test(
         "In-app actions log for an untracked active contact; the notification kind refuses and logs nothing",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases,
         [SchedulingPass.Interaction.caughtUp, .other(.sms), .caughtUpFromNotification]
     )
@@ -172,7 +176,7 @@ struct SchedulingPassCadenceCycleTests {
 
     /// Log other records `.manual` against the channel the user picked, for
     /// every channel, and Caught up uses the contact's own preferred one.
-    @Test("Log other logs .manual against each channel", arguments: Channel.allCases)
+    @Test("Log other logs .manual against each channel", .timeLimit(.minutes(1)), arguments: Channel.allCases)
     func recordInteractionLogsEveryChannel(channel: Channel) async throws {
         let fixture = try await PassFixture(backend: .mock)
         let contact = try await fixture.addContact(1)

@@ -7,7 +7,7 @@ import Testing
 /// `ContactDetailInteractionLabelTests`' spoken-label coverage). The action
 /// tests (`markCaughtUp`, `logOther`) lock in ARCHITECTURE.md §14 PR22: both
 /// persist through `ContactRepository`/`InteractionRepository` directly, and
-/// both also clear any pending snooze through `SchedulingPass.caughtUp` —
+/// both also clear any pending snooze through `SchedulingPass.recordInteraction` —
 /// `ScheduledReminder`'s sole writer stays `SchedulingPass` (decision #36),
 /// never a direct write from this view model.
 @MainActor

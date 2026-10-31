@@ -8,7 +8,7 @@ import Testing
 /// from that type rather than being duplicated here.
 ///
 /// What these pin: `markCaughtUp` and `logOther` are each two writes now
-/// (`SchedulingPass.caughtUp`, then `InteractionLogging`, in that order —
+/// (`SchedulingPass.recordInteraction`, then `InteractionLogging`, in that order —
 /// see `markCaughtUp`'s doc comment for why the reminder-state write goes
 /// first), so the first can persist while the second throws or partially
 /// applies. Both catch blocks reload unconditionally so the screen ends up
@@ -60,7 +60,7 @@ struct ContactDetailViewModelFailurePathTests {
 
         await viewModel.markCaughtUp()
 
-        // `scheduler.caughtUp` runs first now and succeeds (a no-op — this
+        // `scheduler.recordInteraction` runs first now and succeeds (a no-op — this
         // contact has no pending snooze). `interactions.append` then
         // succeeds too; `upsert` throws right after (documented on
         // `InteractionLogging.record`), so the catch block's `load()` fires.
@@ -75,11 +75,11 @@ struct ContactDetailViewModelFailurePathTests {
 
     /// The three-write partial-failure shape `markCaughtUp`'s doc comment
     /// added a reload for, updated for correctness #4's write-order fix
-    /// (`scheduler.caughtUp` now runs *before* `InteractionLogging`, not
+    /// (`scheduler.recordInteraction` now runs *before* `InteractionLogging`, not
     /// after — see `markCaughtUp`'s doc comment): with the reminder-state
     /// write first, "only the last write fails" now means `contacts.upsert`
     /// — `InteractionLogging`'s second internal write — not
-    /// `scheduler.caughtUp` (a scheduler failure now blocks everything after
+    /// `scheduler.recordInteraction` (a scheduler failure now blocks everything after
     /// it by construction, so it can't produce a partial-persistence case at
     /// all). This sets up a real pending snooze first, specifically so
     /// "the snooze is restored" is provable rather than assumed: `caughtUp`
@@ -144,9 +144,9 @@ struct ContactDetailViewModelFailurePathTests {
     /// The double-failure this pins (staged review round 8) — see
     /// `OverdueViewModelActionTests
     /// .markCaughtUpDoubleFailureOnRestoreStillReportsFailure`'s sibling
-    /// doc comment for the full shape. `caughtUp` clears a real snooze,
-    /// `InteractionLogging` then fails, and the compensating
-    /// `restorePendingAfterFailedCaughtUp` also fails — `markCaughtUp` must
+    /// doc comment for the full shape. `recordInteraction` clears a real
+    /// snooze, `InteractionLogging` then fails, and the compensating restore
+    /// (inside the same lock span) also fails — `markCaughtUp` must
     /// still return cleanly and reload to the truthfully still-overdue
     /// state, not crash or leave the view model out of sync with what
     /// actually persisted.

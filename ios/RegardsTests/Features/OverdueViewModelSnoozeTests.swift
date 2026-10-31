@@ -127,7 +127,7 @@ struct OverdueViewModelSnoozeTests {
     /// suppressing this row until day 7 even once the contact was genuinely
     /// overdue again — cadence 3 days puts that moment well before the
     /// stale snooze's day-7 mark, exactly where a missing
-    /// `SchedulingPass.caughtUp` call would still hide the row.
+    /// `SchedulingPass.recordInteraction` call would still hide the row.
     @Test("A contact caught up after a snooze reappears at the fresh short cadence, not the stale snooze")
     func caughtUpAfterSnoozeReappearsAtFreshCadence() async throws {
         let contact = Self.overdueContact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
@@ -168,7 +168,7 @@ struct OverdueViewModelSnoozeTests {
         // which can still have a background `observeTracked()`-driven
         // reload in flight from earlier in this test — correctness fix
         // (staged review #7) reordered `markCaughtUp` to run
-        // `scheduler.caughtUp` first specifically so that broadcast always
+        // `scheduler.recordInteraction` first specifically so that broadcast always
         // fires *after* the snooze is cleared, but the broadcast's own
         // reload is still a separate, unawaited Task racing this explicit
         // `load()` above. Harmless once it resolves to the same correct

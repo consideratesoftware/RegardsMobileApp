@@ -30,6 +30,7 @@ struct SchedulingPassCaughtUpTests {
 
     @Test(
         "Caught up replaces a snoozed cadence row with the next cycle's, floor gone",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func caughtUpReplacesTheSnoozedRowWithTheNextCycle(backend: RepositoryContractBackend) async throws {
@@ -60,6 +61,7 @@ struct SchedulingPassCaughtUpTests {
     /// the contact that is not the canonical one, so the stray is cancelled.
     @Test(
         "Caught up cancels a cadence row parked at a non-canonical id through the same-span sweep",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func caughtUpSweepsANonCanonicalCadenceRow(backend: RepositoryContractBackend) async throws {
@@ -85,6 +87,7 @@ struct SchedulingPassCaughtUpTests {
 
     @Test(
         "Caught up with no pending reminder still logs and writes the next cadence row",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func caughtUpWithNoPendingRowStillLogsAndSchedules(backend: RepositoryContractBackend) async throws {
@@ -113,12 +116,13 @@ struct SchedulingPassCaughtUpTests {
         #expect(try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).count == 2)
     }
 
-    /// Two concurrent catch-ups serialise on the lock: each runs its whole
+    /// A double tap: two concurrent catch-ups each run their whole
     /// transition, log and reschedule, so both report `true` and log, and the
-    /// contact ends with one floorless next-cycle row. With the lock disabled
-    /// both transitions race the same row and the reschedules interleave.
+    /// contact ends with one floorless next-cycle row. A behavior pin, not an
+    /// R59 discriminator: the end state is the same with the lock disabled.
     @Test(
         "Two concurrent catch-ups both log and leave one floorless next-cycle row",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func concurrentCaughtUpsLeaveOneNextCycleRow(backend: RepositoryContractBackend) async throws {
@@ -249,6 +253,7 @@ struct SchedulingPassCaughtUpTests {
     /// cycle's, floorless.
     @Test(
         "A caught-up issued while a snooze is mid-flight is not silently lost",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func caughtUpDuringInFlightSnoozeIsNotLost(backend: RepositoryContractBackend) async throws {
@@ -290,6 +295,7 @@ struct SchedulingPassCaughtUpTests {
     /// is the point.
     @Test(
         "A caught-up issued mid-snooze is not lost when no reminder row exists yet",
+        .timeLimit(.minutes(1)),
         arguments: RepositoryContractBackend.allCases
     )
     func caughtUpDuringInFlightSnoozeWithNoExistingRow(backend: RepositoryContractBackend) async throws {
@@ -325,7 +331,7 @@ struct SchedulingPassCaughtUpTests {
 
     /// Serialisation must not deadlock or starve: many concurrent mutations
     /// for one contact all complete, and the row stays singular throughout.
-    @Test("Concurrent mixed mutations for one contact all complete under the lock")
+    @Test("Concurrent mixed mutations for one contact all complete under the lock", .timeLimit(.minutes(1)))
     func concurrentMixedMutationsAllComplete() async throws {
         let repositories = try RepositoryContractBackend.mock.makeRepositories()
         let contact = contractContact(id: try contractUUID(529), suffix: "r59-lock-throughput", tracked: true)
@@ -371,7 +377,7 @@ struct SchedulingPassCaughtUpTests {
     /// complete. If it cannot, this test hangs rather than fails — which is
     /// itself the signal, since a stranded lock has no failing assertion to
     /// report.
-    @Test("A cancelled waiter does not strand the shared lock")
+    @Test("A cancelled waiter does not strand the shared lock", .timeLimit(.minutes(1)))
     func cancelledWaiterDoesNotStrandTheLock() async throws {
         let repositories = try RepositoryContractBackend.mock.makeRepositories()
         let contact = contractContact(id: try contractUUID(530), suffix: "r61e-cancel", tracked: true)

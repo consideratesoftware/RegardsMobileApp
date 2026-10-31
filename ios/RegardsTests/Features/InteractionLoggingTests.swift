@@ -137,6 +137,52 @@ struct InteractionLoggingTests {
         #expect(stored.lastInteractedAt == nil)
     }
 
+    /// A notification's Caught up can outlive the contact's tracking, so it
+    /// asks `markCaughtUp` to check `isCadenceEligible` on the read the writes
+    /// use. The refusal comes before `append`, so nothing is logged.
+    enum Ineligible: String, CaseIterable, Sendable {
+        case untracked, noCadence, zeroCadence, archived, missing
+    }
+
+    @Test(
+        "requireCadenceEligible refuses an ineligible or missing contact before any write",
+        arguments: Ineligible.allCases
+    )
+    func requireCadenceEligibleRefusesBeforeAnyWrite(kind: Ineligible) async throws {
+        var contact = Self.contact(lastInteractedAt: nil)
+        switch kind {
+        case .untracked: contact.tracked = false
+        case .noCadence: contact.cadenceDays = nil
+        case .zeroCadence: contact.cadenceDays = 0
+        case .archived: contact.archivedAt = Self.now
+        case .missing: break
+        }
+        let contacts = StubContactRepository(kind == .missing ? [] : [contact])
+        let interactions = StubInteractionRepository()
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+
+        await #expect(throws: InteractionLogging.NotCadenceEligible.self) {
+            try await logging.markCaughtUp(contactId: contact.id, at: Self.now, requireCadenceEligible: true)
+        }
+
+        #expect(await interactions.appendedLogs().isEmpty)
+        let stored = try await contacts.fetchAll().first
+        #expect(stored?.lastInteractedAt == nil)
+    }
+
+    @Test("Without requireCadenceEligible an untracked contact is still logged")
+    func markCaughtUpWithoutTheFlagLogsAnUntrackedContact() async throws {
+        var contact = Self.contact(lastInteractedAt: nil)
+        contact.tracked = false
+        let contacts = StubContactRepository([contact])
+        let interactions = StubInteractionRepository()
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+
+        try await logging.markCaughtUp(contactId: contact.id, at: Self.now)
+
+        #expect(await interactions.appendedLogs().count == 1)
+    }
+
     /// The reverse of the test above: `append` succeeds, then `upsert`
     /// fails. Pins the documented failure mode on `record(...)` — the log
     /// entry is left persisted with no matching `lastInteractedAt` move,
