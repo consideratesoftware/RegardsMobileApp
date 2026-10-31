@@ -139,7 +139,7 @@ struct UpcomingViewModelActionTests {
     /// above doesn't reach: that test fails `interactions.append` itself
     /// (via `StubInteractionRepository.failing()`), so nothing persists at
     /// all. Correctness fix (staged review #7) reordered `markCaughtUp` to
-    /// run `scheduler.caughtUp` *before* `InteractionLogging` — see its doc
+    /// run `scheduler.recordInteraction` *before* `InteractionLogging` — see its doc
     /// Rerouted off a hand-rolled `contacts.upsert(...)` (staged review round
     /// 6) — see `OverdueViewModelActionTests`'s sibling test for why: it
     /// used to prove `observeTracked()` fires on a write method production no

@@ -99,7 +99,7 @@ struct GatedFetchTrackedContactRepository: ContactRepository {
 }
 
 /// Wraps a `ReminderRepository`, delaying `transitionState()` specifically —
-/// the call `SchedulingPass.caughtUp` makes (`updateState()` before staged
+/// the call `SchedulingPass.recordInteraction` makes (`updateState()` before staged
 /// review round 8's compare-and-set fix). Pairs with
 /// `GatedFetchTrackedContactRepository` in tests that need to hold
 /// `markCaughtUp` open *before* it reaches its own trailing `performLoad()`
