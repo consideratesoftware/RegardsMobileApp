@@ -227,7 +227,8 @@ struct AppLaunchCoordinatorRecoveryTests {
             environment: environment,
             window: MockRepositories.defaultWindow,
             userCalendar: calendar,
-            clock: { Self.now }
+            clock: { Self.now },
+            occasions: { _ in [] }
         )
     }
 

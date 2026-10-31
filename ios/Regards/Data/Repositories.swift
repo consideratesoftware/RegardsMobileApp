@@ -30,7 +30,7 @@ public protocol ContactRepository: Sendable {
     /// never on subscribe (ARCHITECTURE.md §14 PR22 — Overdue/Upcoming's
     /// cadence rows stay current after an action on a different screen).
     /// Scoped to `Contact` reads only: the `ScheduledReminder ⋈ Contact` join
-    /// Upcoming's occasion rows need stays on-the-fly until TF-07 (R10).
+    /// Upcoming's occasion rows need stays on-the-fly until TF-07f (R10).
     /// Never replays the current value on subscribe — the subscriber's own
     /// `fetchTracked()` read is the sole source of initial state; an eager
     /// replay could land after a caller's optimistic update and stomp it
@@ -262,9 +262,10 @@ public protocol ReminderRepository: Sendable {
     /// mock yields at once). A read error finishes the stream with no value;
     /// TF-07f decides whether the consumer needs the error for a retry
     /// state (R9a). GRDB drops an undecodable contact with its rows, and an
-    /// undecodable reminder row, where `fetchPending` throws; TF-07c sets the
-    /// shared policy. The mock can't fail to decode, so parity covers healthy
-    /// rows only. No default: a missing implementation must fail to compile.
+    /// undecodable reminder row, where `fetchPending` throws. SchedulingPass
+    /// follows the snapshot, and its orphan sweep leaves an undecodable
+    /// contact's rows alone. The mock can't fail to decode, so parity covers
+    /// healthy rows only. No default: a missing implementation must fail to compile.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot>
 }
 

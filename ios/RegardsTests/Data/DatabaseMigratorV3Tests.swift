@@ -110,8 +110,8 @@ struct DatabaseMigratorV3Tests {
     }
 
     /// A pending cadence row with a NULL floor is ordinary after v3: the pass
-    /// writes one for every contact that is overdue and not snoozed. A
-    /// backfill that ran again on a later launch would mark each as snoozed.
+    /// writes one for every overdue contact that has no snooze. A backfill
+    /// that ran again on a later launch would mark each as snoozed.
     /// Production builds a fresh migrator on every launch, so this does too.
     @Test("A second launch's migrate does not backfill a pending cadence row again")
     func v3DoesNotRebackfillOnSecondMigrate() async throws {
@@ -127,7 +127,7 @@ struct DatabaseMigratorV3Tests {
     }
 
     @Test("Backfill changes only snoozedUntil and the repository reads it back")
-    func v2ToV3PreservesRowAndReadsBackThroughRepository() async throws {
+    func v2ToV3BackfillChangesOnlySnoozedUntil() async throws {
         let queue = try DatabaseQueue()
         let migrator = RegardsSchema.migrator()
         try migrator.migrate(queue, upTo: "v2")

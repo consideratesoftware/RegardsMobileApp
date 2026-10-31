@@ -66,6 +66,13 @@ public struct ReminderWindowsScreen: View {
                 proxy.scrollTo(Self.errorBannerID, anchor: .center)
                 speak(message) { errorFocused = true }
             }
+            // The pass after a save or reset can take a moment. Only its
+            // start is spoken: the end is the dismissal or the banner above.
+            // Posted directly, not through `speak`, so a banner that follows
+            // at once can't drop it; the banner's focus move cuts it short.
+            .onChange(of: viewModel.reschedulesStarted) {
+                announce("Saving")
+            }
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
@@ -74,7 +81,9 @@ public struct ReminderWindowsScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
+                // The pass runs before the editor closes, so Save says it's
+                // still working.
+                Button(viewModel.saveButtonTitle) {
                     Task { if await viewModel.save() { dismiss() } }
                 }
                 .disabled(viewModel.loadState != .loaded || viewModel.isSaving)
@@ -103,16 +112,24 @@ public struct ReminderWindowsScreen: View {
             if let message = viewModel.validationMessage {
                 errorBanner(message)
             }
-            daysSection
-            timeRangesSection
-            quietHoursSection
-            if isOverride {
-                overrideNote
-                if viewModel.hasStoredOverride { resetButton }
-            } else {
-                occasionSection
-                horizonSection
+            // The whole form is disabled and dimmed while a save or reset
+            // runs its pass: an edit made then would be dropped when the
+            // editor closes. The plain-styled pills and buttons don't dim on
+            // their own.
+            Group {
+                daysSection
+                timeRangesSection
+                quietHoursSection
+                if isOverride {
+                    overrideNote
+                    if viewModel.hasStoredOverride { resetButton }
+                } else {
+                    occasionSection
+                    horizonSection
+                }
             }
+            .disabled(viewModel.isSaving)
+            .opacity(viewModel.isSaving ? 0.5 : 1)
             Text("All times local · \(viewModel.timezoneName). Daylight saving time is handled automatically.")
                 .font(.caption)
                 .foregroundStyle(RegardsDS.muted)

@@ -104,6 +104,8 @@ Apply this checklist to every screen changed by the pull request:
       needs/need attention.") with no separate icon announcement, and
       VoiceOver can still reach a healthy row below it.
 
+A cadence under 1 day has no device check, because no device fixture can produce a 0-day cadence. `AllContactsViewModel.cadenceSegment` is covered by the unit tests `allContactsRowOmitsTheSegmentWithoutAWorkableCadence` and `allContactsRowShowsThePositiveCadence`.
+
 ## Reminder windows
 
 Run this when the PR touches the reminder-window editor or Contact Detail's
@@ -148,7 +150,14 @@ Reminder window row.
       "All times local · <zone name>. Daylight saving time is handled
       automatically."
 - [ ] Activate Save on a valid window. The editor dismisses, and Upcoming shows
-      the new "Next N days" label.
+      the new "Next N days" label. Save may read "Saving…" briefly; the
+      save-latency step in the pre-release pass is where the cue is judged. No
+      device fixture can force a pass failure, so the failure sentence is
+      covered by unit tests.
+- [ ] With VoiceOver on, activate Save (or "Use default window") on a valid
+      window. VoiceOver announces "Saving" once when the pass starts. Save
+      reads "Saving…" dimmed, then the editor closes, or the error banner
+      speaks if the pass fails.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is
       gone, and nothing asks for confirmation.
 - [ ] Open Contact Detail for a tracked contact with a cadence. "Reminder

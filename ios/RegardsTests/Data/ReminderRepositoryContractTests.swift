@@ -215,7 +215,7 @@ struct ReminderRepositoryContractTests {
     /// that is caught up and then restored by
     /// `restorePendingAfterFailedCaughtUp` must come back with the floor it
     /// had, or the contact reads as un-snoozed. Read back through
-    /// `fetchPending`, the only read that returns the restored row.
+    /// `fetchPending`.
     @Test(
         "transitionState leaves snoozedUntil untouched when a row leaves pending and comes back",
         arguments: RepositoryContractBackend.allCases, [ReminderState.userCaughtUp, .fired]

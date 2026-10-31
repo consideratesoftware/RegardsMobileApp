@@ -81,7 +81,14 @@ struct ReminderWindowsViewModelSaveTests {
         #expect(overrideChanged == saved)
         #expect(after.global == before.global)
         #expect(after.bystander == before.bystander)
-        #expect(recorder.windows.isEmpty)
+        // onSaved runs only after a successful override save, and carries the
+        // override just stored; the app uses it to re-run that contact.
+        if saved {
+            let stored = try #require(after.target?.reminderWindowOverride)
+            #expect(recorder.windows == [stored])
+        } else {
+            #expect(recorder.windows.isEmpty)
+        }
     }
 
     /// The zone comes from the window as loaded, so a change to the stored
@@ -216,7 +223,7 @@ struct ReminderWindowsViewModelSaveTests {
     func retryAfterFailedLoadRecovers() async throws {
         let world = try await Fixtures.makeWorld()
         let recorder = Fixtures.SaveRecorder()
-        let flaky = FailFirstFetchWindowRepository(wrapped: world.environment.window, counter: CallCounter())
+        let flaky = FailingFetchWindowRepository(wrapped: world.environment.window, failingCalls: { $0 == 1 })
         let editor = Fixtures.editor(.global, contacts: world.environment.contacts, window: flaky, recorder: recorder)
 
         await editor.load()

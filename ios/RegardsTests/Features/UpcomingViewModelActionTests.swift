@@ -45,7 +45,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: interactions,
             window: window,
             clock: { Self.now }
@@ -94,7 +94,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now }),
             interactions: interactions,
             window: window,
             clock: { Self.now }
@@ -119,7 +119,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository.failing(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }
@@ -161,7 +161,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }
@@ -216,11 +216,11 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: Self.eightAMWindow(),
             clock: { Self.now }
@@ -248,11 +248,11 @@ struct UpcomingViewModelActionTests {
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
         let clock = MutableClock(Self.now)
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now)
+        let scheduler = makeScheduler(reminders: reminders, contacts: contacts, clock: clock.now)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
+            scheduler: makeScheduler(reminders: reminders, contacts: contacts, clock: clock.now),
             interactions: StubInteractionRepository(),
             window: window,
             clock: clock.now
@@ -283,11 +283,11 @@ struct UpcomingViewModelActionTests {
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
         let clock = MutableClock(Self.now)
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now)
+        let scheduler = makeScheduler(reminders: reminders, contacts: contacts, clock: clock.now)
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: clock.now),
+            scheduler: makeScheduler(reminders: reminders, contacts: contacts, clock: clock.now),
             interactions: StubInteractionRepository(),
             window: window,
             clock: clock.now
@@ -323,11 +323,11 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }
@@ -380,7 +380,7 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-10 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
@@ -443,7 +443,7 @@ struct UpcomingViewModelActionTests {
         let contact = Self.contact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
         let contacts = StubContactRepository([contact])
         let reminders = StubReminderRepository()
-        let scheduler = SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now })
+        let scheduler = makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now })
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
@@ -477,7 +477,7 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }

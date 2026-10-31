@@ -247,8 +247,8 @@ public final class ContactDetailViewModel {
         }
     }
 
-    /// "Snooze 1 week": pushes the contact's cadence reminder out 7 days
-    /// through `SchedulingPass` (§14 PR22's DB-only stub). No interaction is
+    /// "Snooze 1 week": pushes the contact's cadence reminder to the first
+    /// window slot at least 7 days out through `SchedulingPass`. No interaction is
     /// logged and `lastInteractedAt` is untouched (decision #31).
     ///
     /// Reloads on success (R56 fix, staged review): `load()` now also reads

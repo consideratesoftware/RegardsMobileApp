@@ -61,7 +61,13 @@ struct NeverContactedAnchorParityTests {
             contactId: contact.id,
             contacts: contacts,
             interactionsRepo: StubInteractionRepository(),
-            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: StubReminderRepository(),
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
+                clock: { Self.now }
+            ),
             clock: { Self.now },
             calendar: calendar
         )
@@ -81,7 +87,13 @@ struct NeverContactedAnchorParityTests {
         let upcomingVM = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: SchedulingPass(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: SchedulingPass(
+                reminders: reminders,
+                contacts: contacts,
+                window: FixedReminderWindowRepository(),
+                occasions: { _ in [] },
+                clock: { Self.now }
+            ),
             interactions: StubInteractionRepository(),
             window: window,
             clock: { Self.now }

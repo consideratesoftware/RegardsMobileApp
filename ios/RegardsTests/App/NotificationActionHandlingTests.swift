@@ -30,6 +30,13 @@ struct NotificationActionHandlingTests {
         calendar.timeZone = windowZone
         return calendar.date(from: DateComponents(year: 2027, month: 3, day: 17, hour: 10))!
     }
+    /// The first slot of the default weekday window (12:00-13:00) that opens
+    /// at or after `sevenCalendarDaysLater`, a Wednesday.
+    private static var snoozeSlot: Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = windowZone
+        return calendar.date(from: DateComponents(year: 2027, month: 3, day: 17, hour: 12))!
+    }
 
     struct Harness {
         let launch: AppLaunchCoordinator
@@ -84,9 +91,9 @@ struct NotificationActionHandlingTests {
 
     // MARK: Snooze
 
-    // The two Snooze tests below pin today's date math (a raw `now + 7` calendar
-    // days, R57). TF-07 resolves R57 so the snooze lands inside the user's
-    // reminder window, and will change the dates they expect.
+    // The two Snooze tests below pin the date math: the floor is the tap time
+    // plus 7 calendar days in the window zone, and the row's `scheduledFor` is
+    // the first slot of the contact's window at or after it (R57).
 
     @Test(
         "Snooze from a notification pushes the reminder seven calendar days in the window zone",
@@ -102,7 +109,9 @@ struct NotificationActionHandlingTests {
             try await harness.scheduler.pendingSnoozeDate(contactId: contact.id) != nil
         }
         #expect(settled)
-        #expect(try await harness.scheduler.pendingSnoozeDate(contactId: contact.id) == Self.sevenCalendarDaysLater)
+        #expect(try await harness.scheduler.pendingSnoozeDate(contactId: contact.id) == Self.snoozeSlot)
+        let row = try #require(try await harness.repositories.reminders.fetchPending(forContact: contact.id).first)
+        #expect(row.snoozedUntil == Self.sevenCalendarDaysLater)
         // Decision #31: Snooze logs nothing and leaves lastInteractedAt alone.
         #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
         let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
@@ -125,7 +134,8 @@ struct NotificationActionHandlingTests {
 
         let pending = try await harness.repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
-        #expect(pending.first?.scheduledFor == Self.sevenCalendarDaysLater)
+        #expect(pending.first?.snoozedUntil == Self.sevenCalendarDaysLater)
+        #expect(pending.first?.scheduledFor == Self.snoozeSlot)
     }
 
     // MARK: Ineligible and early actions
@@ -168,11 +178,7 @@ struct NotificationActionHandlingTests {
         harness.fake.send(.snooze(barrier.id))
         await Self.expectBarrierSettled(harness, barrier.id)
 
-        let logs = try await harness.repositories.interactions.fetchRecent(forContact: ineligible.id, limit: 10)
-        #expect(logs.isEmpty)
-        #expect(try await harness.repositories.reminders.fetchPending(forContact: ineligible.id).isEmpty)
-        let after = try #require(try await harness.repositories.contacts.fetch(id: ineligible.id))
-        #expect(after.lastInteractedAt == ineligible.lastInteractedAt)
+        try await Self.expectUntouched(harness, ineligible, ineligible: true)
         try await Self.expectUntouched(harness, bystander)
     }
 
@@ -383,6 +389,8 @@ extension NotificationActionHandlingTests {
             window: backendRepositories.window,
             profile: backendRepositories.profile
         )
+        // Snooze reads the persisted window, not the runtime's copy.
+        try await repositories.window.saveGlobal(ReminderWindow.defaultV1(timezone: windowZone))
         let environment = AppEnvironment(
             contacts: repositories.contacts,
             groups: repositories.groups,
@@ -405,7 +413,8 @@ extension NotificationActionHandlingTests {
             environment: environment,
             window: ReminderWindow.defaultV1(timezone: windowZone),
             userCalendar: userCalendar,
-            clock: { now }
+            clock: { now },
+            occasions: { _ in [] }
         )
         let fake = DebugNotificationScheduling()
         let launch = AppLaunchCoordinator(
@@ -443,15 +452,24 @@ extension NotificationActionHandlingTests {
             id: try contractUUID(id), suffix: suffix, tracked: tracked, archivedAt: archivedAt
         )
         contact.cadenceDays = cadenceDays
+        // The fixture's own UTC override would resolve every snooze through
+        // 10:00-11:00 UTC; these tests use the global window.
+        contact.reminderWindowOverride = nil
         try await harness.repositories.contacts.upsert(contact)
         return try #require(try await harness.repositories.contacts.fetch(id: contact.id))
     }
 
-    /// A contact no action targeted still has no log, no pending row, and its
-    /// original `lastInteractedAt`.
-    static func expectUntouched(_ harness: Harness, _ contact: Contact) async throws {
+    /// A contact no action targeted still has no log, no snooze, and its
+    /// original `lastInteractedAt`. A plain pending cadence row without a
+    /// floor is allowed: the ready-phase run writes one for every overdue
+    /// contact, and it is not an action's doing.
+    ///
+    /// `ineligible` contacts get no row from anything, the ready-phase run
+    /// included, so for them any pending row at all is a failure.
+    static func expectUntouched(_ harness: Harness, _ contact: Contact, ineligible: Bool = false) async throws {
         #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
-        #expect(try await harness.repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
+        let pending = try await harness.repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(ineligible ? pending.isEmpty : pending.allSatisfy { $0.snoozedUntil == nil })
         let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
         #expect(after.lastInteractedAt == contact.lastInteractedAt)
     }

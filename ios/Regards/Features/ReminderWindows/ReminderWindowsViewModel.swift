@@ -26,35 +26,6 @@ public final class ReminderWindowsViewModel {
         case contact(UUID)
     }
 
-    /// The fields the editor changes. Timezone is deliberately absent.
-    public struct Draft: Equatable, Sendable {
-        public var allowedDays: DayOfWeekMask
-        public var allowedTimeRanges: [TimeRange]
-        public var quietHours: TimeRange?
-        public var occasionTime: TimeOfDay
-        public var digestHorizonDays: Int
-
-        public init(allowedDays: DayOfWeekMask,
-                    allowedTimeRanges: [TimeRange],
-                    quietHours: TimeRange?,
-                    occasionTime: TimeOfDay,
-                    digestHorizonDays: Int) {
-            self.allowedDays = allowedDays
-            self.allowedTimeRanges = allowedTimeRanges
-            self.quietHours = quietHours
-            self.occasionTime = occasionTime
-            self.digestHorizonDays = digestHorizonDays
-        }
-
-        init(_ window: ReminderWindow) {
-            self.init(allowedDays: window.allowedDays,
-                      allowedTimeRanges: window.allowedTimeRanges,
-                      quietHours: window.quietHours,
-                      occasionTime: window.occasionTime,
-                      digestHorizonDays: window.digestHorizonDays)
-        }
-    }
-
     public static let horizonChoices = [7, 14, 30]
     static let newRange = TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 10))
     static let defaultQuietHours = TimeRange(start: TimeOfDay(hour: 22, minute: 30),
@@ -76,6 +47,11 @@ public final class ReminderWindowsViewModel {
     /// Counts refusals so the screen can announce a repeat of the same message.
     public private(set) var failureCount = 0
     public private(set) var isSaving = false
+    /// Reschedules started through `onSaved`, so the screen can tell
+    /// VoiceOver "Saving" once per pass (a refusal starts none).
+    public private(set) var reschedulesStarted = 0
+    /// The Save button's label: text only, no spinner.
+    public var saveButtonTitle: String { isSaving ? "Saving\u{2026}" : "Save" }
     public private(set) var timezoneIdentifier = TimeZone.current.identifier
     /// The loaded zone's name for display ("Pacific Time"), never the raw
     /// identifier.
@@ -96,20 +72,30 @@ public final class ReminderWindowsViewModel {
     /// The clock `save()` probes capacity with. The screen reads the same one
     /// for its "now" marker, so both agree.
     let clock: () -> Date
-    private let onSaved: @MainActor (ReminderWindow) async -> Void
+    private let onSaved: @MainActor (ReminderWindow) async -> Bool
     @ObservationIgnored private var loadedDraft: Draft?
+    /// A write landed but its reschedule didn't (`onSaved` returned false or
+    /// a reset couldn't re-read the global window). The next Save reruns it.
+    @ObservationIgnored private var rescheduleOwed = false
+    /// The newest global window read. Display only: never written, never
+    /// passed to `onSaved`.
+    @ObservationIgnored private var lastReadGlobal = ReminderWindow.defaultV1()
     @ObservationIgnored private var rememberedQuietHours = ReminderWindowsViewModel.defaultQuietHours
 
-    /// `onSaved` is deliberately undefaulted: it is how a global save reaches
-    /// `UpcomingViewModel.updateWindow`. A defaulted no-op is how an editor
-    /// ends up saving a window the Upcoming tab never sees. It is not
-    /// called for an override save, which reaches Upcoming through
-    /// `observeTracked`.
+    /// `onSaved` is deliberately undefaulted: it is how a saved window reaches
+    /// SchedulingPass and, for a global save, `UpcomingViewModel.updateWindow`.
+    /// A defaulted no-op is how an editor ends up saving a window nothing
+    /// reschedules. It runs after every save that writes (an unchanged
+    /// draft with no stored override writes nothing and skips it, unless a
+    /// reset's reschedule is still owed), and after an override reset with
+    /// the global window the contact now follows. It returns whether
+    /// reminders were rescheduled; `false` keeps the editor open with
+    /// `notRescheduledMessage`, since the write itself landed.
     public init(target: Target,
                 window: any ReminderWindowRepository,
                 contacts: any ContactRepository,
                 clock: @escaping () -> Date = { Date() },
-                onSaved: @escaping @MainActor (ReminderWindow) async -> Void) {
+                onSaved: @escaping @MainActor (ReminderWindow) async -> Bool) {
         self.target = target
         self.window = window
         self.contacts = contacts
@@ -125,6 +111,7 @@ public final class ReminderWindowsViewModel {
         loadState = .loading
         do {
             let global = try await window.fetchGlobal()
+            lastReadGlobal = global
             timezoneIdentifier = global.timezoneIdentifier
             switch target {
             case .global:
@@ -242,7 +229,10 @@ public final class ReminderWindowsViewModel {
 
     // MARK: - Save
 
-    /// Checks I1 once, then writes. Returns whether the write landed.
+    /// Checks I1 once, writes, then reschedules through `onSaved`. Returns
+    /// whether the editor can close: past the guard, `true` exactly when
+    /// `validationMessage` is nil afterwards, and every `false` goes through
+    /// `fail`.
     @discardableResult
     public func save() async -> Bool {
         guard loadState == .loaded, !isSaving else { return false }
@@ -254,6 +244,13 @@ public final class ReminderWindowsViewModel {
             // draft as loaded, not today's global window, which may have
             // changed while the editor was open.
             if case .contact = target, !hasStoredOverride, draft == loadedDraft {
+                // After a reset whose reschedule failed, Save retries it with
+                // the default window the contact now follows. This path never
+                // writes an override.
+                if rescheduleOwed, !(await followGlobalAndReschedule()) {
+                    fail(Self.notRescheduledMessage)
+                    return false
+                }
                 validationMessage = nil
                 return true
             }
@@ -269,7 +266,6 @@ public final class ReminderWindowsViewModel {
             switch target {
             case .global:
                 try await window.saveGlobal(candidate)
-                await onSaved(candidate)
             case .contact(let id):
                 guard try await contacts.updateReminderWindowOverride(id: id, window: candidate) else {
                     fail("This contact is no longer available, so the window wasn't saved.")
@@ -277,6 +273,13 @@ public final class ReminderWindowsViewModel {
                 }
                 hasStoredOverride = true
             }
+            reschedulesStarted += 1
+            guard await onSaved(candidate) else {
+                rescheduleOwed = true
+                fail(Self.notRescheduledMessage)
+                return false
+            }
+            rescheduleOwed = false
             validationMessage = nil
             return true
         } catch {
@@ -285,7 +288,9 @@ public final class ReminderWindowsViewModel {
         }
     }
 
-    /// Clears the contact's override so they follow the global window again.
+    /// Clears the contact's override so they follow the global window again,
+    /// shows that window in the draft, and reschedules through `onSaved`.
+    /// Returns whether the editor can close, with `save()`'s invariant.
     @discardableResult
     public func resetToDefault() async -> Bool {
         guard case .contact(let id) = target, loadState == .loaded, !isSaving else { return false }
@@ -297,12 +302,42 @@ public final class ReminderWindowsViewModel {
                 return false
             }
             hasStoredOverride = false
+            guard await followGlobalAndReschedule() else {
+                fail(Self.notRescheduledMessage)
+                return false
+            }
             validationMessage = nil
             return true
         } catch {
             fail("Couldn't switch back to the default window. Try again.")
             return false
         }
+    }
+
+    /// After an override is cleared: shows the global window, or the last one
+    /// read if the re-read fails, and reschedules with it. Shared by
+    /// `resetToDefault()` and the Save that retries a failed one. Returns
+    /// whether reminders were rescheduled; on `false` the reschedule stays
+    /// owed.
+    private func followGlobalAndReschedule() async -> Bool {
+        // `try?`: the override is already cleared, so a failed read is the
+        // same "not rescheduled" outcome; the next foreground `runFull()`
+        // catches up.
+        let global = try? await window.fetchGlobal()
+        lastReadGlobal = global ?? lastReadGlobal
+        // The override is already cleared, so the form shows the default
+        // window even when the re-read failed. Edits made before the reset
+        // are dropped: the user chose "Use default window".
+        draft = Draft(lastReadGlobal)
+        loadedDraft = draft
+        guard let global else {
+            rescheduleOwed = true
+            return false
+        }
+        reschedulesStarted += 1
+        let rescheduled = await onSaved(global)
+        rescheduleOwed = !rescheduled
+        return rescheduled
     }
 
     // MARK: - Validation
@@ -386,10 +421,44 @@ public final class ReminderWindowsViewModel {
 
     private static let invalidWindowMessage = "This window isn't valid."
     private static let saveFailureMessage = "Couldn't save your reminder window. Try again."
+    static let notRescheduledMessage =
+        "Saved, but reminders couldn't update. They'll refresh next time you open Regards."
     private static let loadFailureText = "Couldn't load your reminder window."
 
     private func fail(_ message: String) {
         validationMessage = message
         failureCount += 1
+    }
+}
+
+// Outside the class body only to keep it under SwiftLint's type_body_length.
+extension ReminderWindowsViewModel {
+    /// The fields the editor changes. Timezone is deliberately absent.
+    public struct Draft: Equatable, Sendable {
+        public var allowedDays: DayOfWeekMask
+        public var allowedTimeRanges: [TimeRange]
+        public var quietHours: TimeRange?
+        public var occasionTime: TimeOfDay
+        public var digestHorizonDays: Int
+
+        public init(allowedDays: DayOfWeekMask,
+                    allowedTimeRanges: [TimeRange],
+                    quietHours: TimeRange?,
+                    occasionTime: TimeOfDay,
+                    digestHorizonDays: Int) {
+            self.allowedDays = allowedDays
+            self.allowedTimeRanges = allowedTimeRanges
+            self.quietHours = quietHours
+            self.occasionTime = occasionTime
+            self.digestHorizonDays = digestHorizonDays
+        }
+
+        init(_ window: ReminderWindow) {
+            self.init(allowedDays: window.allowedDays,
+                      allowedTimeRanges: window.allowedTimeRanges,
+                      quietHours: window.quietHours,
+                      occasionTime: window.occasionTime,
+                      digestHorizonDays: window.digestHorizonDays)
+        }
     }
 }

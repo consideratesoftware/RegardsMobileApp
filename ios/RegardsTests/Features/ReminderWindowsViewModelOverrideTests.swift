@@ -90,7 +90,7 @@ struct ReminderWindowsViewModelOverrideTests {
     func saveAfterFailedLoadWritesNothing() async throws {
         let world = try await Fixtures.makeWorld()
         let recorder = Fixtures.SaveRecorder()
-        let flaky = FailFirstFetchWindowRepository(wrapped: world.environment.window, counter: CallCounter())
+        let flaky = FailingFetchWindowRepository(wrapped: world.environment.window, failingCalls: { $0 == 1 })
         let editor = Fixtures.editor(.global, contacts: world.environment.contacts, window: flaky, recorder: recorder)
         await editor.load()
         #expect(editor.loadState == .failed)
@@ -269,7 +269,11 @@ struct ReminderWindowsViewModelOverrideTests {
             contacts: environment.contacts,
             reminders: environment.reminders,
             scheduler: SchedulingPass(
-                reminders: environment.reminders, contacts: environment.contacts, clock: { now }
+                reminders: environment.reminders,
+                contacts: environment.contacts,
+                window: environment.window,
+                occasions: { _ in [] },
+                clock: { now }
             ),
             interactions: environment.interactions,
             window: global,

@@ -329,26 +329,27 @@ public final class UpcomingViewModel {
             ?? now.addingTimeInterval(TimeInterval(horizonDays) * 86_400)
         var rows: [UpcomingRowState] = []
 
-        // A contact's pending cadence reminder's `scheduledFor`, keyed by
-        // contact id — Snooze's only persisted trace (§14 PR22's
-        // `SchedulingPass.snooze` stub; no separate "snoozed" flag exists on
-        // `Contact`). Inlined rather than a shared `PendingSnoozeLookup`
-        // helper (staged review round 7: two call sites, below §17's
-        // abstraction floor of three) — `OverdueViewModel.performLoad` has
-        // its own identical copy. Once a snooze lapses this map is simply
-        // not consulted and the ordinary computation below decides the date
-        // unchanged, so the row "returns" on its own the next load after the
-        // snoozed date passes.
+        // A snoozed contact's pending cadence reminder's `scheduledFor` (the
+        // floor resolved into the window, §9), keyed by contact id. Only a
+        // row with a floor is a snooze; SchedulingPass's plain cadence rows
+        // are left to the computation below. Inlined rather than a shared
+        // `PendingSnoozeLookup` helper: two call sites, below §17's
+        // abstraction floor of three. `OverdueViewModel.performLoad` has its
+        // own identical copy. A lapsed snooze stays in this map, but as a
+        // past instant: `max` below ignores it and the ordinary computation
+        // decides the date, so the row "returns" on its own the next load
+        // after the snooze lapses.
         let snoozedUntilByContact = Dictionary(
             reminders
-                .filter { $0.kind == .cadence }
+                .filter { $0.kind == .cadence && $0.snoozedUntil != nil }
                 .map { ($0.contactId, $0.scheduledFor) },
             // `max($0, $1)`, not "whichever comes last in the array": two
             // pending cadence rows for one contact shouldn't happen (the
-            // deterministic `cadenceReminderID` write-path is meant to keep
-            // it to one), but if it ever did, picking by array order would
-            // make the winner depend on fetch ordering rather than on which
-            // row is actually later — `max` is correct regardless of order.
+            // deterministic `SchedulingPass.reminderID(contactId:kind:)` write
+            // path keeps it to one), but if it ever did, picking by array
+            // order would make the winner depend on fetch ordering rather than
+            // on which row is actually later — `max` is correct regardless of
+            // order.
             uniquingKeysWith: { max($0, $1) }
         )
 
@@ -409,20 +410,17 @@ public final class UpcomingViewModel {
             }
         }
 
-        // Occasion rows are seeded in the Phase 0 mock repository so their
-        // birthday/anniversary states remain reachable and auditable. TF-07
-        // replaces this bounded fetch with the persisted ValueObservation
-        // pipeline that owns every Upcoming row (§14 PR25 / R10).
+        // Occasion rows are SchedulingPass's (the mock runtime's come from
+        // `MockRepositories.occasionProvider`). TF-07f replaces this bounded
+        // fetch with the persisted ValueObservation pipeline that owns every
+        // Upcoming row (§14 PR25 / R10).
         //
-        // Known deviation: §9 contract 6 (an occasion suppresses a same-day
-        // cadence reminder for the same contact) is NOT enforced here. This
-        // view model computes cadence rows independently of the persisted
-        // reminders it reads, so it can't decide which of two candidates
-        // survives without duplicating the scheduler — that's SchedulingPass's
-        // job (§14 PR25 / TF-07, R6). Until it lands, a contact whose cadence
-        // falls on the same local day as an occasion can appear twice; the
-        // rows carry distinct IDs (R36), so the duplicate is visible rather
-        // than corrupting identity or ordering.
+        // Known deviation until TF-07f: SchedulingPass's rows apply §9
+        // contract 6 (an occasion suppresses a same-day cadence reminder for
+        // the same contact), but this view model computes cadence rows itself,
+        // so a contact whose cadence falls on an occasion's day can appear
+        // twice. The rows carry distinct IDs (R36), so the duplicate is
+        // visible rather than corrupting identity or ordering.
         let contactsByID = Dictionary(uniqueKeysWithValues: contacts.map { ($0.id, $0) })
         let startOfToday = calendar.startOfDay(for: now)
         for reminder in reminders where reminder.kind != .cadence {
