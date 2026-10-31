@@ -51,8 +51,8 @@ struct ReminderWindowsScreenAnnouncementTests {
         #expect(recorder.announcements == ["Pick at least one day.", "Pick at least one day."])
     }
 
-    @Test("A successful save announces nothing")
-    func successfulSaveAnnouncesNothing() async throws {
+    @Test("A successful save announces only Saving")
+    func successfulSaveAnnouncesOnlySaving() async throws {
         let world = try await Fixtures.makeWorld()
         let viewModel = Fixtures.editor(.global, world: world, recorder: Fixtures.SaveRecorder())
         let recorder = Recorder()
@@ -65,10 +65,10 @@ struct ReminderWindowsScreenAnnouncementTests {
         // Give a late announcement time to land before asserting there is none.
         await settleViewUpdate(iterations: 20)
 
-        #expect(recorder.announcements.isEmpty)
+        #expect(recorder.announcements == ["Saving"])
     }
 
-    @Test("A save whose pass fails announces the not-rescheduled sentence")
+    @Test("A save whose pass fails announces Saving, then the not-rescheduled sentence")
     func notRescheduledSaveAnnouncesTheSentence() async throws {
         let world = try await Fixtures.makeWorld()
         let saveRecorder = Fixtures.SaveRecorder()
@@ -82,8 +82,8 @@ struct ReminderWindowsScreenAnnouncementTests {
 
         #expect(!(await viewModel.save()))
 
-        #expect(await eventuallyPumpingRunLoop { recorder.announcements.count == 1 })
-        #expect(recorder.announcements == [ReminderWindowsViewModel.notRescheduledMessage])
+        #expect(await eventuallyPumpingRunLoop { recorder.announcements.count == 2 })
+        #expect(recorder.announcements == ["Saving", ReminderWindowsViewModel.notRescheduledMessage])
     }
 
     enum Starts: String, CaseIterable, Sendable, CustomTestStringConvertible {
