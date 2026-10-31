@@ -90,11 +90,16 @@ enum ReminderWindowEditorFixtures {
         return World(environment: environment, target: target, bystander: bystander)
     }
 
-    /// Records every window passed to `onSaved`.
+    /// Records every window passed to `onSaved`, and answers it with
+    /// `rescheduled` (whether the pass ran).
     @MainActor
     final class SaveRecorder {
         private(set) var windows: [ReminderWindow] = []
-        func record(_ window: ReminderWindow) { windows.append(window) }
+        var rescheduled = true
+        func record(_ window: ReminderWindow) -> Bool {
+            windows.append(window)
+            return rescheduled
+        }
     }
 
     static func editor(
@@ -131,14 +136,25 @@ struct ThrowingSaveWindowRepository: ReminderWindowRepository {
     func saveGlobal(_ window: ReminderWindow) async throws { throw RepositoryFakeFailure() }
 }
 
-/// The first `fetchGlobal()` throws (a failed editor load); later reads and
-/// writes pass through to `wrapped`.
-struct FailFirstFetchWindowRepository: ReminderWindowRepository {
+/// A global window whose `fetchGlobal()` throws on the calls `failingCalls`
+/// selects (counted from 1 across the repository's life) and passes through to
+/// `wrapped` otherwise. `{ $0 == 1 }` is a failed editor load; `{ $0 > 1 }` is
+/// a store that fails after the editor opened; `{ $0 == 2 }` fails one read
+/// and then recovers. Writes always pass through.
+struct FailingFetchWindowRepository: ReminderWindowRepository {
     let wrapped: any ReminderWindowRepository
-    let counter: CallCounter
+    let failingCalls: @Sendable (Int) -> Bool
+    private let counter = CallCounter()
+
+    init(wrapped: any ReminderWindowRepository, failingCalls: @escaping @Sendable (Int) -> Bool) {
+        self.wrapped = wrapped
+        self.failingCalls = failingCalls
+    }
+
     func fetchGlobal() async throws -> ReminderWindow {
-        if await counter.next() == 1 { throw RepositoryFakeFailure() }
+        if failingCalls(await counter.next()) { throw RepositoryFakeFailure() }
         return try await wrapped.fetchGlobal()
     }
+
     func saveGlobal(_ window: ReminderWindow) async throws { try await wrapped.saveGlobal(window) }
 }

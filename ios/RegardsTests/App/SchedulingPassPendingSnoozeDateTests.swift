@@ -14,7 +14,7 @@ struct SchedulingPassPendingSnoozeDateTests {
     /// `fetchPending`'s result, which orders by `scheduledFor` ascending —
     /// picking the *earliest* pending cadence row, not the one that
     /// actually governs. `SchedulingPass.snooze` itself only ever keeps one
-    /// cadence row per contact (the deterministic `cadenceReminderID`), but
+    /// cadence row per contact (the deterministic `reminderID(contactId:kind:)`), but
     /// `SchedulingPassCaughtUpTests.caughtUpNeverTouchesNonCanonicalCadenceRow`
     /// already proves a second, non-canonical cadence row can reach the
     /// table and survive untouched — so this is reachable, not
@@ -37,6 +37,8 @@ struct SchedulingPassPendingSnoozeDateTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
         let laterDate = now.addingTimeInterval(14 * 86_400)
@@ -54,7 +56,8 @@ struct SchedulingPassPendingSnoozeDateTests {
             contactId: contact.id,
             kind: .cadence,
             scheduledFor: laterDate,
-            osNotificationId: "contact-\(contact.id.uuidString)-stray-later-cadence"
+            osNotificationId: "contact-\(contact.id.uuidString)-stray-later-cadence",
+            snoozedUntil: laterDate
         )
         try await repositories.reminders.upsert(laterRow)
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).count == 2)
@@ -62,5 +65,36 @@ struct SchedulingPassPendingSnoozeDateTests {
         let resolved = try await scheduler.pendingSnoozeDate(contactId: contact.id)
 
         #expect(resolved == laterDate)
+    }
+
+    /// A pending cadence row without a floor is the pass's own computed row
+    /// for an overdue contact, not a snooze (TF-07c). Reading its
+    /// `scheduledFor` as a snooze would hide the contact from Overdue.
+    @Test(
+        "pendingSnoozeDate ignores a pending cadence row that carries no snooze floor",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func pendingSnoozeDateIgnoresRowWithoutFloor(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(523), suffix: "pending-no-floor", tracked: true)
+        try await repositories.contacts.upsert(contact)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let scheduler = SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
+            clock: { now }
+        )
+        try await repositories.reminders.upsert(ScheduledReminder(
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: now.addingTimeInterval(86_400),
+            osNotificationId: "contact-\(contact.id.uuidString)-cadence"
+        ))
+
+        let resolved = try await scheduler.pendingSnoozeDate(contactId: contact.id)
+
+        #expect(resolved == nil)
     }
 }

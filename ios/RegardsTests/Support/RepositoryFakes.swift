@@ -438,3 +438,32 @@ struct StubReminderWindowRepository: ReminderWindowRepository {
 
     func saveGlobal(_ window: ReminderWindow) async throws {}
 }
+
+/// A readable, writable global window for tests that build a `SchedulingPass`
+/// from individual fakes rather than a repository bundle. `saveGlobal`
+/// replaces the window, so a test can change it between runs (R55).
+actor FixedReminderWindowRepository: ReminderWindowRepository {
+    private var window: ReminderWindow
+
+    /// America/Los_Angeles, not the machine's zone: the expectations of every
+    /// suite that takes this default must not depend on where it runs (CI is
+    /// UTC; a developer's Mac is not).
+    static let defaultTimeZone = TimeZone(identifier: "America/Los_Angeles") ?? .gmt
+
+    /// Every day, 00:00-23:59, no quiet hours, in `timeZone`: Snooze lands on
+    /// the first local midnight at or after its floor.
+    init(timeZone: TimeZone = FixedReminderWindowRepository.defaultTimeZone) {
+        self.window = ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: .midnight, end: .endOfDay)],
+            quietHours: nil,
+            timezoneIdentifier: timeZone.identifier
+        )
+    }
+
+    func fetchGlobal() async throws -> ReminderWindow { window }
+
+    func saveGlobal(_ window: ReminderWindow) async throws {
+        self.window = window
+    }
+}

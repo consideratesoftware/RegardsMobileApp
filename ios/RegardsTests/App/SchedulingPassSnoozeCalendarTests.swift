@@ -2,10 +2,12 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// `SchedulingPass.snooze`'s calendar-boundary coverage, split out of
-/// `SchedulingPassTests.swift` to keep that file under SwiftLint's 500-line
-/// limit — the same reason `ContactObservationContractTests` was split from
-/// `RepositoriesTests.swift`. Shares `RepositoriesTests.swift`'s
+/// `SchedulingPass.snooze`'s calendar-boundary coverage. The calendar math
+/// is the stored floor (`snoozedUntil`); `scheduledFor` is that floor resolved
+/// into the contact's window slot, covered in `SchedulingPassSnoozeWindowTests`.
+/// Split out of `SchedulingPassTests.swift` to keep that file under
+/// SwiftLint's 500-line limit, the same reason `ContactObservationContractTests`
+/// was split from `RepositoriesTests.swift`. Shares that file's
 /// `RepositoryContractBackend` / `contractContact` / `contractUUID` helpers.
 struct SchedulingPassSnoozeCalendarTests {
 
@@ -48,14 +50,15 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        let landed = try #require(pending.first).scheduledFor
+        let landed = try #require(pending.first?.snoozedUntil)
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: landed)
         #expect(components.year == 2027)
         #expect(components.month == 3)
@@ -82,8 +85,9 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -92,7 +96,7 @@ struct SchedulingPassSnoozeCalendarTests {
             year: 2028, month: 3, day: 3, hour: 8, minute: 0
         )))
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
+        #expect(pending[0].snoozedUntil == expected)
     }
 
     /// The non-leap half of the same gap: 2027 is not a leap year, so
@@ -111,8 +115,9 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -121,7 +126,7 @@ struct SchedulingPassSnoozeCalendarTests {
             year: 2027, month: 3, day: 1, hour: 8, minute: 0
         )))
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
+        #expect(pending[0].snoozedUntil == expected)
     }
 
     // MARK: - Wall-clock snooze (DST)
@@ -148,8 +153,9 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -158,10 +164,10 @@ struct SchedulingPassSnoozeCalendarTests {
             year: 2027, month: 3, day: 15, hour: 8, minute: 0
         )))
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
+        #expect(pending[0].snoozedUntil == expected)
         // The bug's own value, named explicitly: proves this is a real
         // discriminator, not incidentally true either way.
-        #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].snoozedUntil != now.addingTimeInterval(7 * 86_400))
     }
 
     /// Mirrors `snoozeAcrossSpringForwardStaysOnWallClock` for the other
@@ -181,8 +187,9 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -191,8 +198,8 @@ struct SchedulingPassSnoozeCalendarTests {
             year: 2027, month: 11, day: 8, hour: 8, minute: 0
         )))
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
-        #expect(pending[0].scheduledFor != now.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].snoozedUntil == expected)
+        #expect(pending[0].snoozedUntil != now.addingTimeInterval(7 * 86_400))
     }
 
     /// Additional wall-clock coverage (staged review round 8): a snooze from
@@ -215,8 +222,9 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -225,7 +233,7 @@ struct SchedulingPassSnoozeCalendarTests {
             year: 2028, month: 1, day: 4, hour: 8, minute: 0
         )))
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
+        #expect(pending[0].snoozedUntil == expected)
     }
 
     /// Additional wall-clock coverage (staged review round 8): every DST
@@ -248,8 +256,9 @@ struct SchedulingPassSnoozeCalendarTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
-            clock: { now },
-            calendar: calendar
+            window: FixedReminderWindowRepository(timeZone: calendar.timeZone),
+            occasions: { _ in [] },
+            clock: { now }
         )
 
         try await scheduler.snooze(contactId: contact.id)
@@ -258,6 +267,6 @@ struct SchedulingPassSnoozeCalendarTests {
             year: 2027, month: 6, day: 8, hour: 8, minute: 15
         )))
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expected)
+        #expect(pending[0].snoozedUntil == expected)
     }
 }

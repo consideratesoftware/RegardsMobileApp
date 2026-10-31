@@ -31,9 +31,9 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     public var osNotificationId: String
     public var state: ReminderState
     /// The raw floor Snooze set (§7 v3, §9): `scheduledFor` is that floor
-    /// resolved into a window slot. SchedulingPass will read it only from
-    /// a pending cadence row (TF-07c). A row in another state may still carry
-    /// a stale floor until the reschedule rewrites the row.
+    /// resolved into a window slot. SchedulingPass reads it only from a
+    /// pending cadence row whose slot hasn't started. A row in another state
+    /// may still carry a stale floor until the reschedule rewrites the row.
     public var snoozedUntil: Date?
 
     public init(
@@ -56,5 +56,24 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
         self.osNotificationId = osNotificationId
         self.state = state
         self.snoozedUntil = snoozedUntil
+    }
+}
+
+/// One annual occasion for a contact (§9 "Annual recurrence"), as the
+/// occasion source hands it to SchedulingPass. Regards never stores these
+/// (§7); the pass re-reads them on every run and writes the next occurrence
+/// as a `ScheduledReminder`.
+public struct ContactOccasion: Sendable, Equatable {
+    public let contactId: UUID
+    /// `.birthday`, `.anniversary`, or `.customOccasion`.
+    public let kind: ReminderKind
+    public let monthDay: MonthDay
+    public let label: String?
+
+    public init(contactId: UUID, kind: ReminderKind, monthDay: MonthDay, label: String? = nil) {
+        self.contactId = contactId
+        self.kind = kind
+        self.monthDay = monthDay
+        self.label = label
     }
 }

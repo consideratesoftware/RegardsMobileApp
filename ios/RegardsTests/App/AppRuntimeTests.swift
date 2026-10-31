@@ -9,6 +9,9 @@ struct AppRuntimeTests {
     func mockCompositionSharesClockAndWindow() async throws {
         let runtime = AppRuntime.makeMock()
         let viewModel = RegardsTabRoot.makeUpcomingViewModel(runtime: runtime)
+        // The seed cast's birthday and anniversary come from the occasion
+        // provider; the pass writes their rows.
+        try await runtime.scheduler.runFull()
 
         await viewModel.load()
 
@@ -126,11 +129,15 @@ struct AppRuntimeTests {
             timezoneIdentifier: losAngeles.identifier
         )
 
+        // The pass reads the persisted window on each call (R55), so this is
+        // the zone that must win over `userCalendar`.
+        try await seedEnvironment.window.saveGlobal(window)
         let runtime = AppRuntime(
             environment: seedEnvironment,
             window: window,
             userCalendar: deviceCalendar,
-            clock: { now }
+            clock: { now },
+            occasions: { _ in [] }
         )
         try await runtime.scheduler.snooze(contactId: contact.id)
 
@@ -141,10 +148,10 @@ struct AppRuntimeTests {
             year: 2027, month: 3, day: 15, hour: 8, minute: 0
         )))
         let pending = try await seedEnvironment.reminders.fetchPending(forContact: contact.id)
-        #expect(pending[0].scheduledFor == expectedFromWindowTimezone)
+        #expect(pending[0].snoozedUntil == expectedFromWindowTimezone)
         // The bug's own value, named explicitly: proves this is a real
         // discriminator, not incidentally true either way.
-        #expect(pending[0].scheduledFor != wrongIfUsingDeviceCalendar)
+        #expect(pending[0].snoozedUntil != wrongIfUsingDeviceCalendar)
     }
 
     @Test("Production composition uses the persisted digest horizon", arguments: [7, 30])
@@ -244,6 +251,25 @@ struct AppRuntimeTests {
         #expect(launch.phase == .onboarding)
         #expect(launch.runtime != nil)
         #expect(await runtimeFactory.attemptCount() == 1)
+    }
+
+    /// `start()` runs the pass before the coordinator flips to `.ready`, so
+    /// the tab root's first Upcoming load already has the seed cast's
+    /// birthday and anniversary. Born `.ready`, the first load raced the pass
+    /// and could show neither.
+    @Test("The mock launch's first Upcoming load includes the seed cast's birthday and anniversary")
+    @MainActor
+    func mockLaunchFirstUpcomingLoadHasOccasions() async throws {
+        let coordinator = AppLaunchCoordinator(mockRuntime: .makeMock(), notifications: nil)
+        #expect(coordinator.phase == .loading)
+
+        await coordinator.start()
+
+        #expect(coordinator.phase == .ready)
+        let viewModel = RegardsTabRoot.makeUpcomingViewModel(runtime: try #require(coordinator.runtime))
+        await viewModel.load()
+        let kinds = Set(viewModel.groups.flatMap(\.rows).map(\.kind))
+        #expect(kinds.isSuperset(of: [.birthday, .anniversary]))
     }
 
     private func environment(window: any ReminderWindowRepository) -> AppEnvironment {

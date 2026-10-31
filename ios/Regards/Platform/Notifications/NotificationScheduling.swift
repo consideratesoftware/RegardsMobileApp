@@ -2,13 +2,13 @@ import Foundation
 import UserNotifications
 
 // R57 gate (ARCHITECTURE.md §19, owner ruling 2026-08-22): TF-06 must not
-// ship notification scheduling. `SchedulingPass.snooze` writes `now + 7 days`
-// without resolving the user's reminder window, so a notification scheduled
-// from that row could fire outside the window, which §9 forbids. This file
-// therefore carries permission and actions only: it builds no notification
-// request and has no path that hands one to the system notification center.
-// TF-07 restores request building plus `schedule`, `cancel`, and
-// `pendingIdentifiers` in the PR that resolves R57.
+// ship notification scheduling. Snooze now resolves through the contact's
+// effective window, with a floor of the tap time plus 7 calendar days, so a
+// snoozed row is already in-window. The gate stays until request building
+// returns: this file carries permission and actions only, builds no
+// notification request, and has no path that hands one to the system
+// notification center. TF-07e restores request building plus `schedule`,
+// `cancel`, and `pendingIdentifiers` in the PR that resolves R57.
 //
 // `NotificationSchedulingGateTests` enforces this on raw source text:
 // G1, no other app file names the center type; G2, this file never

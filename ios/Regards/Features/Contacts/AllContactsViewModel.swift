@@ -90,5 +90,13 @@ final class AllContactsViewModel {
         }
     }
 
+    /// The row's cadence text, or nil to leave the segment out. A cadence
+    /// under 1 day gets no reminders (`isCadenceEligible`), so the row says
+    /// nothing about it (owner ruling 6, PR #66).
+    nonisolated static func cadenceSegment(days: Int?) -> String? {
+        guard let days, days >= 1 else { return nil }
+        return CadenceDescriptor.describe(days: days)
+    }
+
     private static let log = RegardsLogger.feature("AllContacts")
 }

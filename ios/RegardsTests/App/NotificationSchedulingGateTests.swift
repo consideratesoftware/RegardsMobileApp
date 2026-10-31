@@ -1,16 +1,16 @@
 import Foundation
 import Testing
 
-/// R57 gate (ARCHITECTURE.md §19). `SchedulingPass.snooze` writes `now + 7 days` without resolving the user's
-/// reminder window, so any notification scheduled from that row could fire outside the window, which §9 forbids.
-/// Until TF-07 resolves R57, this test keeps the notification center inside
+/// R57 gate (ARCHITECTURE.md §19). `SchedulingPass.snooze` now resolves through the contact's effective window, with
+/// a floor of the tap time plus 7 calendar days, so a snoozed row is already in-window. The OS request arrives in
+/// TF-07e. Until then, this test keeps the notification center inside
 /// `Platform/Notifications/NotificationScheduling.swift`, keeps `add` out of that file, and pins how many times that
 /// file names the center, so any new route to it fails here.
 ///
 /// This test scans raw source text, comments included. It catches accidental wiring. It can't prove that arbitrary
 /// source changes are safe: a selector string, reflection, or a deliberate rewrite of one of the 3 pinned call sites
 /// can get past it. Deliberate evasion is for code review to catch, and a reviewer should treat any edit to this
-/// file's patterns or counts as wiring notification scheduling. TF-07 deletes this file in the PR that resolves R57,
+/// file's patterns or counts as wiring notification scheduling. TF-07e deletes this file in the PR that resolves R57,
 /// and removes the request-building rule (G4) along with the rest of it.
 struct NotificationSchedulingGateTests {
     private static let adapterRelativePath = "Platform/Notifications/NotificationScheduling.swift"

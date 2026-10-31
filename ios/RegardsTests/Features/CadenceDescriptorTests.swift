@@ -15,4 +15,19 @@ struct CadenceDescriptorTests {
     func positiveCadencesKeepTheirWording(days: Int, expected: String) {
         #expect(CadenceDescriptor.describe(days: days) == expected)
     }
+
+    /// Owner ruling 6 on PR #66: a corrupt 0-day cadence reads like no cadence
+    /// on All Contacts, since such a contact gets no reminders.
+    @Test("The All Contacts row leaves out the cadence segment for no cadence or one under 1 day",
+          arguments: [Int?.none, 0, -1, -14])
+    func allContactsRowOmitsTheSegmentWithoutAWorkableCadence(days: Int?) {
+        #expect(AllContactsViewModel.cadenceSegment(days: days) == nil)
+    }
+
+    @Test("The All Contacts row shows the cadence wording from 1 day up", arguments: [
+        (1, "daily"), (7, "weekly"), (10, "every 10 days"), (365, "yearly"),
+    ])
+    func allContactsRowShowsThePositiveCadence(days: Int, expected: String) {
+        #expect(AllContactsViewModel.cadenceSegment(days: days) == expected)
+    }
 }

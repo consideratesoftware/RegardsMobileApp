@@ -2,23 +2,37 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// `SchedulingPass.snooze` mock/GRDB parity (ARCHITECTURE.md §14 PR22's
-/// DB-only stub). Shares `RepositoriesTests.swift`'s `RepositoryContractBackend`
-/// / `contractContact` / `contractUUID` helpers.
+/// `SchedulingPass.snooze` on both backends: the floor and its window-resolved
+/// slot, replacement instead of duplication, concurrent taps, and the
+/// precondition checks (unknown, untracked and no-cadence contacts). Shares
+/// `RepositoriesTests.swift`'s `RepositoryContractBackend` / `contractContact`
+/// / `contractUUID` helpers.
 struct SchedulingPassTests {
 
+    /// The global window, so the 7 calendar days count in UTC on any machine.
+    /// `contractContact` carries its own UTC override (every day 10:00-11:00),
+    /// which resolves the floor into a slot: 2 hours after an 08:00 floor.
+    static let utcWindow = ReminderWindow(
+        allowedDays: .allDays,
+        allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))],
+        timezoneIdentifier: "Etc/UTC"
+    )
+
     @Test(
-        "Snooze writes a pending cadence reminder 7 days from the call's clock",
+        "Snooze floors a cadence reminder 7 days from the call's clock and resolves it into the window",
         arguments: RepositoryContractBackend.allCases
     )
     func snoozeWritesSevenDaysOut(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
+        try await repositories.window.saveGlobal(Self.utcWindow)
         let contact = contractContact(id: try contractUUID(501), suffix: "snooze-fresh", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -28,25 +42,29 @@ struct SchedulingPassTests {
         #expect(pending.count == 1)
         #expect(pending[0].kind == .cadence)
         #expect(pending[0].state == .pending)
-        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].snoozedUntil == now.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400 + 2 * 3_600))
     }
 
-    /// v3 (§7): a snooze row carries its raw floor. Until the pass resolves
-    /// `scheduledFor` into a window slot the two are equal, and the v3
-    /// backfill never runs again, so the write itself has to set it. Without
-    /// it a snoozed contact looks un-snoozed to every reader of the floor.
+    /// v3 (§7): a snooze row carries its raw floor, tap time plus 7 calendar
+    /// days, and `scheduledFor` is that floor resolved into a window slot. The
+    /// floor is what every reader (Overdue, Upcoming, the pass itself) counts
+    /// as "snoozed", so the write has to set it.
     @Test(
-        "Snooze writes snoozedUntil equal to scheduledFor",
+        "Snooze writes snoozedUntil as the raw floor, before the window resolves scheduledFor",
         arguments: RepositoryContractBackend.allCases
     )
-    func stubSnoozeWritesFloor(backend: RepositoryContractBackend) async throws {
+    func snoozeWritesRawFloor(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
+        try await repositories.window.saveGlobal(Self.utcWindow)
         let contact = contractContact(id: try contractUUID(510), suffix: "snooze-floor", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -55,7 +73,7 @@ struct SchedulingPassTests {
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
         #expect(pending[0].snoozedUntil == now.addingTimeInterval(7 * 86_400))
-        #expect(pending[0].snoozedUntil == pending[0].scheduledFor)
+        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400 + 2 * 3_600))
     }
 
     @Test(
@@ -64,19 +82,32 @@ struct SchedulingPassTests {
     )
     func secondSnoozeReplacesNotDuplicates(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
+        try await repositories.window.saveGlobal(Self.utcWindow)
         let contact = contractContact(id: try contractUUID(502), suffix: "snooze-repeat", tracked: true)
         try await repositories.contacts.upsert(contact)
         let first = Date(timeIntervalSince1970: 1_800_000_000)
         let second = first.addingTimeInterval(3 * 86_400)
 
-        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { first })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
+            clock: { first }
+        )
             .snooze(contactId: contact.id)
-        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { second })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
+            clock: { second }
+        )
             .snooze(contactId: contact.id)
 
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
-        #expect(pending[0].scheduledFor == second.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].scheduledFor == second.addingTimeInterval(7 * 86_400 + 2 * 3_600))
         #expect(pending[0].snoozedUntil == second.addingTimeInterval(7 * 86_400))
     }
 
@@ -95,12 +126,15 @@ struct SchedulingPassTests {
     )
     func concurrentSnoozeResolvesToOneRow(backend: RepositoryContractBackend) async throws {
         let repositories = try backend.makeRepositories()
+        try await repositories.window.saveGlobal(Self.utcWindow)
         let contact = contractContact(id: try contractUUID(503), suffix: "snooze-concurrent", tracked: true)
         try await repositories.contacts.upsert(contact)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -123,7 +157,7 @@ struct SchedulingPassTests {
         let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.count == 1)
         #expect(pending[0].kind == .cadence)
-        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400))
+        #expect(pending[0].scheduledFor == now.addingTimeInterval(7 * 86_400 + 2 * 3_600))
     }
 
     @Test("Snooze never logs an interaction or reads lastInteractedAt", arguments: RepositoryContractBackend.allCases)
@@ -141,7 +175,13 @@ struct SchedulingPassTests {
         let storedBeforeSnooze = try #require(try await repositories.contacts.fetch(id: contact.id)).lastInteractedAt
         let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-        try await SchedulingPass(reminders: repositories.reminders, contacts: repositories.contacts, clock: { now })
+        try await SchedulingPass(
+            reminders: repositories.reminders,
+            contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
+            clock: { now }
+        )
             .snooze(contactId: contact.id)
 
         let interactions = try await repositories.interactions.fetchRecent(forContact: contact.id, limit: 100)
@@ -171,6 +211,8 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -204,6 +246,8 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -243,6 +287,8 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -266,6 +312,8 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -289,6 +337,8 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 
@@ -316,6 +366,8 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            window: repositories.window,
+            occasions: { _ in [] },
             clock: { now }
         )
 

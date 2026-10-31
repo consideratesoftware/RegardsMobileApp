@@ -12,7 +12,7 @@ struct OccasionFireDateDSTTests {
     /// The occasion fire date for `occurrence` under `quiet`, in `zone`. The
     /// zone comes from `TimeZone(identifier:)`, not from the window, as in
     /// production, where the global window supplies it.
-    private static func fire(
+    static func fire(
         _ occurrence: String, quiet: TimeRange?, zone: String
     ) throws -> (occurrence: Date, fire: Date?) {
         let timeZone = try #require(TimeZone(identifier: zone))
@@ -27,7 +27,7 @@ struct OccasionFireDateDSTTests {
     /// What every non-nil result must satisfy: not before the occurrence, on
     /// the occurrence's local day, and reading a wall-clock time outside quiet
     /// hours.
-    private static func expectValid(
+    static func expectValid(
         _ fire: Date, occurrence: Date, quiet: TimeRange, zone: String, _ note: String = ""
     ) {
         var calendar = Calendar(identifier: .gregorian)

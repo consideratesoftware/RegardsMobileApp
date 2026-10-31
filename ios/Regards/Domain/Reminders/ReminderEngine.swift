@@ -31,8 +31,7 @@ public struct ReminderEngine: Sendable {
 
     /// Morning-of notification time for birthdays + anniversaries
     /// (default 09:00 local per §9). Passed explicitly to keep the engine pure;
-    /// TF-07 wires the persisted `ReminderWindow.occasionTime` into the
-    /// production scheduling pass.
+    /// SchedulingPass passes the global window's `occasionTime`.
     public let occasionNotificationTime: TimeOfDay
 
     /// Injected clock — tests pass a fixed date.
@@ -205,11 +204,31 @@ public struct ReminderEngine: Sendable {
                     && slot.start <= dateWallClock
                     && dateWallClock < slot.end
                 // The same half-open re-validation as the future branch below.
-                if includingContainingSlot, containsDate,
-                   let activeSlotStart = candidateStarts.filter({ candidate in
-                       let time = wallClock(of: candidate, calendar: calendar)
-                       return candidate <= date && slot.start <= time && time < slot.end
-                   }).max() {
+                // A candidate is the start of the slot in progress only if
+                // the wall clock stays inside the slot all the way to `date`.
+                // In a fall-back fold Foundation's `.last` can hand back the
+                // earlier interval's start (Lord Howe, Antarctica/Troll,
+                // Pacific/Chatham); a transition between it and `date` whose
+                // wall clock leaves the slot on either side rejects it, so its
+                // slot start (the digest identity) can't collide with an
+                // earlier digest (R63).
+                let activeCandidates = candidateStarts.filter { candidate in
+                    let time = wallClock(of: candidate, calendar: calendar)
+                    guard candidate <= date, slot.start <= time, time < slot.end else { return false }
+                    // Between transitions the wall clock only moves forward,
+                    // so only the readings just before and at each transition
+                    // can leave the slot.
+                    var transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: candidate)
+                    while let current = transition, current <= date {
+                        for reading in [current.addingTimeInterval(-1), current] {
+                            let readingTime = wallClock(of: reading, calendar: calendar)
+                            guard slot.start <= readingTime, readingTime < slot.end else { return false }
+                        }
+                        transition = calendar.timeZone.nextDaylightSavingTimeTransition(after: current)
+                    }
+                    return true
+                }
+                if includingContainingSlot, containsDate, let activeSlotStart = activeCandidates.max() {
                     activeSlotStarts.append(activeSlotStart)
                 }
 
@@ -335,8 +354,8 @@ public struct ReminderEngine: Sendable {
     ///
     /// Occasions ignore allowed-day/range gating by design (they're morning-of
     /// events). This returns the earliest instant ignoring quiet hours too;
-    /// `occasionFireDate(for:in:timeZone:)` applies them. Nothing in
-    /// production calls that yet; TF-07c wires it into SchedulingPass.
+    /// `occasionFireDate(for:in:timeZone:)` applies them; SchedulingPass
+    /// calls both.
     public func nextOccasionOccurrence(
         monthDay: MonthDay,
         timezone: TimeZone
@@ -377,9 +396,14 @@ public struct ReminderEngine: Sendable {
     /// hours 22:30-07:30, a 07:00 occurrence fires at 07:30 and a 23:00 one
     /// returns nil.
     ///
-    /// The quiet end is materialized with wall-clock APIs (§9 contract 1):
-    /// the later of a repeated quiet end on a fall-back day, never before
-    /// `occurrence`, and the gap end on a spring-forward day.
+    /// The quiet end is materialized with wall-clock APIs (§9 contract 1).
+    /// On a fall-back day it tries `.last`, then `.first`, and keeps the first
+    /// one that reads the quiet end; Foundation's `.last` is wrong in some
+    /// zones, so that can be the first pass. It then moves by the fold length
+    /// when the occurrence is in the fold's second pass, or when the fold
+    /// re-enters quiet hours after it, so the fire waits for the last quiet
+    /// end of that stretch. On a spring-forward day a quiet end inside the
+    /// gap resolves to the gap end.
     ///
     /// Only `quietHours` is read from `window`. `timeZone` is the global
     /// window's zone, the one `nextOccasionOccurrence` used (§9 contract 4).
@@ -413,14 +437,25 @@ public struct ReminderEngine: Sendable {
             return wallClock(of: transition.addingTimeInterval(-1), calendar: calendar) < quiet.end
                 && quiet.end < wallClock(of: transition, calendar: calendar)
         }
+        // The transition itself is the last candidate: in Pacific/Chatham's
+        // spring gap Foundation gives 04:00 for a quiet end inside the gap
+        // instead of the 03:45 gap end (R63).
         let candidates = [Calendar.RepeatedTimePolicy.last, .first].compactMap {
             materialize(quiet.end, onDay: dayStart, calendar: calendar, repeatedTimePolicy: $0)
-        }
+        } + [transition].compactMap { $0 }
         guard var end = candidates.first(where: readsQuietEnd) else { return nil }
         // An occurrence in a fold's second pass needs the second quiet end,
         // one fold length later (Lord Howe's 30-minute fold, 2026-04-05).
         if end < occurrence {
             end += timeZone.daylightSavingTimeOffset(for: end) - timeZone.daylightSavingTimeOffset(for: occurrence)
+        }
+        // A fold after this end whose clock reads inside quiet hours re-enters
+        // them, so they last until the second pass of the quiet end (Lord
+        // Howe 2026-04-05: quiet 22:00-01:45 ends at 01:45 +10:30).
+        if let transition, transition > end,
+           timeZone.daylightSavingTimeOffset(for: end) > timeZone.daylightSavingTimeOffset(for: transition),
+           quiet.contains(wallClock(of: transition, calendar: calendar)) {
+            end += timeZone.daylightSavingTimeOffset(for: end) - timeZone.daylightSavingTimeOffset(for: transition)
         }
         // On the occurrence's day, not before it, outside quiet hours (§9).
         guard end >= occurrence, calendar.isDate(end, inSameDayAs: occurrence),
