@@ -12,7 +12,7 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-10-29
+- Updated: 2026-10-31
 - Baseline: `main` at `0b784d7` (merge of PR #66, `TF-07a`, the engine,
   merged 2026-10-28). PR #65, `TF-07b` (schema v3 and `observeSchedule`),
   merged as `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06`
@@ -22,10 +22,11 @@ never pick up Android work.
   `TF-07g` follow it in the same lane. `TF-11` is in progress on `claude/tf-11-onboarding` in its own lane.
   Owner ruling 8 moved every device-only check to the pre-release device pass (see `Owner gates`), so TF-03's
   device acceptance no longer blocks `TF-07` or `TF-11`. `TF-03`'s code is merged in PR #48.
-- Next ready work: none. `TF-07d` through `TF-07g` wait for `TF-07c`.
+- Next ready work: none. `TF-07d` is in progress on `claude/tf-07d-interactions`,
+  and `TF-07e` through `TF-07g` follow it.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`). Checked with `gh pr list --state open` on 2026-10-29.
+- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`). Checked with `gh pr list --state open` on 2026-10-31.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
