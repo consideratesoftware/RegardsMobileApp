@@ -21,6 +21,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -62,6 +63,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -100,6 +102,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
@@ -145,6 +148,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -181,6 +185,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -213,6 +218,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { Date(timeIntervalSince1970: 1_800_000_000) }
@@ -243,6 +249,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { firstNow }
@@ -255,6 +262,7 @@ struct SchedulingPassCaughtUpTests {
         try await SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { secondNow }
@@ -300,6 +308,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            interactions: repositories.interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { now }
@@ -338,6 +347,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            interactions: repositories.interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { now }
@@ -367,6 +377,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -411,6 +422,7 @@ struct SchedulingPassCaughtUpTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: GatedFetchByIDContactRepository(wrapped: repositories.contacts, gate: gate),
+            interactions: repositories.interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { now }
@@ -440,6 +452,7 @@ struct SchedulingPassCaughtUpTests {
         let free = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }

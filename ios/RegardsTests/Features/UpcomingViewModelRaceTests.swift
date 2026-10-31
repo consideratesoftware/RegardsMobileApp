@@ -42,6 +42,7 @@ struct UpcomingViewModelRaceTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -102,6 +103,7 @@ struct UpcomingViewModelRaceTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -162,6 +164,7 @@ struct UpcomingViewModelRaceTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: gatedContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -236,6 +239,7 @@ struct UpcomingViewModelRaceTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }

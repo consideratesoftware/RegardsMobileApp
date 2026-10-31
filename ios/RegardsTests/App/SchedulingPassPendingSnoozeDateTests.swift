@@ -37,6 +37,7 @@ struct SchedulingPassPendingSnoozeDateTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -82,6 +83,7 @@ struct SchedulingPassPendingSnoozeDateTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }

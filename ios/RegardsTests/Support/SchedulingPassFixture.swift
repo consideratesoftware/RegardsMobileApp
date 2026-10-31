@@ -84,7 +84,8 @@ struct PassFixture {
         now: String = "2026-06-10 10:00",
         window: ReminderWindow = PassFixture.eveningWindow(),
         occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion] = { _ in [] },
-        upsertGate: AsyncGate? = nil
+        upsertGate: AsyncGate? = nil,
+        interactions: (any InteractionRepository)? = nil
     ) async throws {
         let repositories = try backend.makeRepositories()
         try await repositories.window.saveGlobal(window)
@@ -96,6 +97,7 @@ struct PassFixture {
         self.pass = SchedulingPass(
             reminders: reminders,
             contacts: repositories.contacts,
+            interactions: interactions ?? repositories.interactions,
             window: repositories.window,
             occasions: occasions,
             clock: { clock.now() }
@@ -191,6 +193,7 @@ extension MockRepositories {
         SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: self.window,
             occasions: MockRepositories.occasionProvider(now: now, window: window),
             clock: { now }
@@ -204,11 +207,13 @@ extension MockRepositories {
 func makeScheduler(
     reminders: any ReminderRepository,
     contacts: any ContactRepository,
+    interactions: any InteractionRepository,
     clock: @escaping @Sendable () -> Date
 ) -> SchedulingPass {
     SchedulingPass(
         reminders: reminders,
         contacts: contacts,
+        interactions: interactions,
         window: FixedReminderWindowRepository(),
         occasions: { _ in [] },
         clock: clock

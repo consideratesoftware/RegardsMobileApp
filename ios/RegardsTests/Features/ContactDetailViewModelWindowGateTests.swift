@@ -54,6 +54,7 @@ struct ContactDetailViewModelWindowGateTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { gateNow }
@@ -83,6 +84,7 @@ struct ContactDetailViewModelWindowGateTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { gateNow }

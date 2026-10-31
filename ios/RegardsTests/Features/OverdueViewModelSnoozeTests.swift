@@ -66,6 +66,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -103,6 +104,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -139,6 +141,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -195,6 +198,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -280,6 +284,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: gatedContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -341,6 +346,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: baseContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }

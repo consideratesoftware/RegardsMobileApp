@@ -48,6 +48,7 @@ struct ContactDetailViewModelFailurePathTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -102,6 +103,7 @@ struct ContactDetailViewModelFailurePathTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -160,6 +162,7 @@ struct ContactDetailViewModelFailurePathTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -204,6 +207,7 @@ struct ContactDetailViewModelFailurePathTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -258,6 +262,7 @@ struct ContactDetailViewModelFailurePathTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -289,6 +294,7 @@ struct ContactDetailViewModelFailurePathTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -333,6 +339,7 @@ struct ContactDetailViewModelFailurePathTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: base,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }

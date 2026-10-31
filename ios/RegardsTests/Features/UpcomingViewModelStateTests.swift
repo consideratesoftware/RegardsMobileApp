@@ -22,6 +22,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -56,6 +57,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository.failing(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -82,6 +84,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: loadedContacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -99,6 +102,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: failingContacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -130,6 +134,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository([reminder]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -164,6 +169,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -221,6 +227,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository([reminder]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -259,6 +266,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository([reminder]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -287,6 +295,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -327,6 +336,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository([occasion]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),
@@ -369,6 +379,7 @@ struct UpcomingViewModelStateTests {
             scheduler: makeScheduler(
                 reminders: StubReminderRepository([visible, orphaned]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 clock: { UpcomingFixtures.now }
             ),
             interactions: StubInteractionRepository(),

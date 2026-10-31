@@ -63,6 +63,7 @@ struct SchedulingPassCancellationTests {
         let withoutBirthday = SchedulingPass(
             reminders: withBirthday.repositories.reminders,
             contacts: withBirthday.repositories.contacts,
+            interactions: withBirthday.repositories.interactions,
             window: withBirthday.repositories.window,
             occasions: { _ in [] },
             clock: { clock.now() })

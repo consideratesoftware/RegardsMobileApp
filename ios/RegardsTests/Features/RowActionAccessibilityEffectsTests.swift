@@ -186,6 +186,7 @@ struct RowActionAccessibilityEffectsTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Date(timeIntervalSince1970: 1_800_000_000) }
@@ -239,6 +240,7 @@ struct RowActionAccessibilityEffectsTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Date(timeIntervalSince1970: 1_800_000_000) }

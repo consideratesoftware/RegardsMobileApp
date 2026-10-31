@@ -45,6 +45,7 @@ struct OverdueViewModelActionTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock
@@ -140,6 +141,7 @@ struct OverdueViewModelActionTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -197,6 +199,7 @@ struct OverdueViewModelActionTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -263,6 +266,7 @@ struct OverdueViewModelActionTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: gatedContacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -378,6 +382,7 @@ struct OverdueViewModelActionTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: gatedContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }

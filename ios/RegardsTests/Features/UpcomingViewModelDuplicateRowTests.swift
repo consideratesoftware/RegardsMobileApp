@@ -40,6 +40,7 @@ struct UpcomingViewModelDuplicateRowTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository([occasion]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { UpcomingFixtures.now }
@@ -98,6 +99,7 @@ struct UpcomingViewModelDuplicateRowTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(occasions),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { UpcomingFixtures.now }
@@ -142,6 +144,7 @@ struct UpcomingViewModelDuplicateRowTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository([laterOccasion]),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { UpcomingFixtures.now }

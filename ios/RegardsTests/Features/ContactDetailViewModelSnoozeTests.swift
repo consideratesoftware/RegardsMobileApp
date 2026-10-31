@@ -37,6 +37,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -73,6 +74,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -112,6 +114,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -155,6 +158,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -194,6 +198,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -232,6 +237,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -281,6 +287,7 @@ struct ContactDetailViewModelSnoozeTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: StubInteractionRepository(),
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }

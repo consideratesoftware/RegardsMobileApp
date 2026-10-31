@@ -31,6 +31,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -63,6 +64,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -91,6 +93,7 @@ struct SchedulingPassTests {
         try await SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { first }
@@ -99,6 +102,7 @@ struct SchedulingPassTests {
         try await SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { second }
@@ -133,6 +137,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -178,6 +183,7 @@ struct SchedulingPassTests {
         try await SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -211,6 +217,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -246,6 +253,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -287,6 +295,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -312,6 +321,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -337,6 +347,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }
@@ -366,6 +377,7 @@ struct SchedulingPassTests {
         let scheduler = SchedulingPass(
             reminders: repositories.reminders,
             contacts: repositories.contacts,
+            interactions: repositories.interactions,
             window: repositories.window,
             occasions: { _ in [] },
             clock: { now }

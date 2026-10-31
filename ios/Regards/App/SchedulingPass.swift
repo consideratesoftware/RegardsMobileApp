@@ -44,6 +44,7 @@ import Foundation
 public actor SchedulingPass {
     private let reminders: any ReminderRepository
     private let contacts: any ContactRepository
+    private let interactions: any InteractionRepository
     private let window: any ReminderWindowRepository
     private let occasions: @Sendable ([Contact]) async -> [ContactOccasion]
     private let clock: @Sendable () -> Date
@@ -92,12 +93,14 @@ public actor SchedulingPass {
     public init(
         reminders: any ReminderRepository,
         contacts: any ContactRepository,
+        interactions: any InteractionRepository,
         window: any ReminderWindowRepository,
         occasions: @escaping @Sendable ([Contact]) async -> [ContactOccasion],
         clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.reminders = reminders
         self.contacts = contacts
+        self.interactions = interactions
         self.window = window
         self.occasions = occasions
         self.clock = clock
