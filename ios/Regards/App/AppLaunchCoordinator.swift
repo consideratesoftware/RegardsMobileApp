@@ -55,9 +55,8 @@ final class AppLaunchCoordinator {
     private(set) var statusMessage: String?
     private(set) var canContinueWithoutContacts = false
     private(set) var onboardingCompletionPending = false
-    /// TF-11. Never persisted: `start()` derives it from Contacts authorization
-    /// and the import, so a relaunch resumes. Not `private(set)`, since
-    /// AppLaunchCoordinator+Onboarding.swift sets it.
+    /// TF-11. Derived by `start()` on every launch, never persisted. Not
+    /// `private(set)`: AppLaunchCoordinator+Onboarding.swift sets it.
     var onboardingStep: OnboardingStep = .concept
     /// The import that reached `.starter` ran under limited Contacts access.
     private(set) var starterAccessIsLimited = false
@@ -381,8 +380,7 @@ final class AppLaunchCoordinator {
         let wasPending = onboardingCompletionPending
         do {
             try await completeOnboarding(runtime: runtime, clock: dependencies.clock)
-            // After the starter step (Done, Skip, or a "Finish setup" retry)
-            // the Contacts app may have changed, so reconcile once.
+            // After the starter step, reconcile once for Contacts changed meanwhile.
             if wasPending { await reconcileNow(runtime: runtime, dependencies: dependencies) }
         } catch {
             statusMessage = onboardingCompletionPending
@@ -403,9 +401,7 @@ final class AppLaunchCoordinator {
         canContinueWithoutContacts = false
         onboardingCompletionPending = false
         phase = .ready
-        // Store-change and foreground triggers cover everything from here on.
-        // `finishOnboarding()` also reconciles once: the Contacts app may have
-        // changed during the starter step, before this listener existed.
+        // Store-change and foreground triggers cover what changes from here on.
         if let dependencies {
             beginObservingContactStoreChanges(dependencies: dependencies)
         }
@@ -484,10 +480,8 @@ final class AppLaunchCoordinator {
         result.failed > 0 && result.imported == 0 && result.skipped == 0
     }
 
-    /// The starter step's Done and Skip (TF-11): `onboardingCompletedAt` is
-    /// onboarding's last write, through the same path as the "Finish setup"
-    /// retry, so both reconcile once after it. A failed save returns to the
-    /// Contacts step's "Finish setup".
+    /// The starter step's Done and Skip (TF-11), through the "Finish setup"
+    /// path. A failed save returns to the Contacts step's "Finish setup".
     func finishOnboarding() async {
         guard phase == .onboarding, onboardingStep == .starter, runtime != nil, !isImporting else { return }
         onboardingCompletionPending = true
