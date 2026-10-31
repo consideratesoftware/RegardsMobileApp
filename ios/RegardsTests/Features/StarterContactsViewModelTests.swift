@@ -53,7 +53,7 @@ struct StarterContactsViewModelTests {
         _ repository: any ContactRepository,
         _ announcements: Announcements = Announcements()
     ) -> StarterContactsViewModel {
-        StarterContactsViewModel(contacts: repository, announce: { announcements.record($0) })
+        StarterContactsViewModel(contacts: repository, announce: { announcements.record($0) }, onSaved: { _ in })
     }
 
     // MARK: Offering contacts

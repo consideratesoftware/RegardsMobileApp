@@ -67,6 +67,7 @@ final class StarterContactsViewModel {
     private(set) var statusIsProblem = false
 
     private let repository: any ContactRepository
+    private let onSaved: @MainActor ([UUID]) async -> Void
     private let announce: @MainActor (String) -> Void
     /// What was tracked when the list last loaded or saved. Save writes the
     /// difference between this and `selection`.
@@ -75,12 +76,23 @@ final class StarterContactsViewModel {
     @ObservationIgnored private var loadGeneration = 0
     private static let log = RegardsLogger.feature("StarterContacts")
 
+    /// `onSaved` is deliberately undefaulted, like `ReminderWindowsViewModel`'s:
+    /// it is how a tracking write reaches SchedulingPass (§9: starter tracking
+    /// is a cadence edit), and a defaulted no-op is how a picker ends up
+    /// tracking contacts nothing schedules. A `save()` that lands at least 1
+    /// write calls it exactly once, before returning, with exactly the ids
+    /// whose `updateTracking` returned true in that call, including when a
+    /// later write throws. Skip and a save with nothing to write never call
+    /// it. `isSaving` stays true while it runs, so Done reads "Saving…" and the
+    /// screen can't finish before it returns.
     init(
         contacts: any ContactRepository,
-        announce: @escaping @MainActor (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
+        announce: @escaping @MainActor (String) -> Void = { AccessibilityNotification.Announcement($0).post() },
+        onSaved: @escaping @MainActor ([UUID]) async -> Void
     ) {
         self.repository = contacts
         self.announce = announce
+        self.onSaved = onSaved
     }
 
     // MARK: - Reading
@@ -203,16 +215,25 @@ final class StarterContactsViewModel {
 
         let target = selection
         var vanished: [Contact] = []
+        var landedIds: [UUID] = []
+        var saveError: (any Error)?
         do {
             for contact in contacts where target[contact.id] != baseline[contact.id] {
                 let landed = try await repository.updateTracking(id: contact.id, cadenceDays: target[contact.id])
                 if landed {
                     baseline[contact.id] = target[contact.id]
+                    landedIds.append(contact.id)
                 } else {
                     vanished.append(contact)
                 }
             }
         } catch {
+            saveError = error
+        }
+        // Writes that landed stay landed (no rollback), so they are scheduled
+        // even when a later write threw.
+        if !landedIds.isEmpty { await onSaved(landedIds) }
+        if let error = saveError {
             Self.log.error("failed to save starter contacts: \(error, privacy: .private)")
             // Best effort: take the store's word for what is tracked. If this
             // read fails too, `baseline` already holds every write that landed.

@@ -144,6 +144,7 @@
 		97D93B3E55D20BC901F91697 /* ContactFetchDiagnosticsContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565827678B12CA83C5B0984B /* ContactFetchDiagnosticsContractTests.swift */; };
 		99AB35948075A597695E82D5 /* DispatchWaitHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04097B13A504DF68A9CEAD6E /* DispatchWaitHelpers.swift */; };
 		9AA9F15F0AED8E093BF899FA /* ContactDetailViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ECBEE4461B73A577811E570 /* ContactDetailViewModelTests.swift */; };
+		9B5B50E84C27E718BAB9279D /* RegardsTabRoot+StarterContacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F96EB014374551D674F554BF /* RegardsTabRoot+StarterContacts.swift */; };
 		9C21800EF35738C4209D8A07 /* RegardsTabRoot+ReminderWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8726A1F1905B5171325F4C3C /* RegardsTabRoot+ReminderWindows.swift */; };
 		9CE96DB402E3799B9C5B7003 /* NotificationPermissionViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D724A1BF06AFB2F71F85CA2 /* NotificationPermissionViewModelTests.swift */; };
 		9D872359157DA01ECDBB62A0 /* RepositoryFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0ABE512E2B05FB378890460 /* RepositoryFakes.swift */; };
@@ -485,6 +486,7 @@
 		F310E3AAD43D5A0F07C6D191 /* ContactObservationContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactObservationContractTests.swift; sourceTree = "<group>"; };
 		F40F36D00920F373317A664A /* AppLaunchCoordinatorImportFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchCoordinatorImportFailureTests.swift; sourceTree = "<group>"; };
 		F5B5CB400E9AC786E916B015 /* ScreensAccessibilityTests+RepresentativeStates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+RepresentativeStates.swift"; sourceTree = "<group>"; };
+		F96EB014374551D674F554BF /* RegardsTabRoot+StarterContacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RegardsTabRoot+StarterContacts.swift"; sourceTree = "<group>"; };
 		FC1EDE1581885F647407E537 /* ObservationSubscriptionToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationSubscriptionToken.swift; sourceTree = "<group>"; };
 		FC7E29F54453C73EEE9AF609 /* SchedulingPassCadenceCycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassCadenceCycleTests.swift; sourceTree = "<group>"; };
 		FD23D49A80EFB8405D107012 /* CadenceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceDescriptor.swift; sourceTree = "<group>"; };
@@ -980,6 +982,7 @@
 				C1D7968D3C4F277905163294 /* RegardsApp+ViewModifiers.swift */,
 				843338B9ADB21D66831CBD33 /* RegardsNavigation.swift */,
 				8726A1F1905B5171325F4C3C /* RegardsTabRoot+ReminderWindows.swift */,
+				F96EB014374551D674F554BF /* RegardsTabRoot+StarterContacts.swift */,
 				D90D9B286906C7E1333B0DD6 /* SchedulingPass.swift */,
 				BBCD234F80BF387EA1EC9CA6 /* SplashView.swift */,
 			);
@@ -1343,6 +1346,7 @@
 				E92FA084FCF3967029B0A2B4 /* RegardsSegment.swift in Sources */,
 				6C557EB0EBEA7FD4A7C058BB /* RegardsSegmentedControl.swift in Sources */,
 				9C21800EF35738C4209D8A07 /* RegardsTabRoot+ReminderWindows.swift in Sources */,
+				9B5B50E84C27E718BAB9279D /* RegardsTabRoot+StarterContacts.swift in Sources */,
 				DB0FB5301322714764DC1671 /* RegardsTypography.swift in Sources */,
 				EFA9DAB6C0C427FB91D046B7 /* ReminderEngine.swift in Sources */,
 				FD93025B908FC944215CA8CD /* ReminderWindow.swift in Sources */,

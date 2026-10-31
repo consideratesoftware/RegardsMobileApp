@@ -50,7 +50,7 @@ struct StarterContactsViewModelSaveTests {
         for person in [ana, cy] { try await store.upsert(person) }
         let gate = AsyncGate()
         let repository = ScriptedTrackingContactRepository(store, gate: gate)
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in }, onSaved: { _ in })
         await viewModel.load()
         viewModel.toggle(cy.id)
 
@@ -83,7 +83,7 @@ struct StarterContactsViewModelSaveTests {
         for person in [ana, cy] { try await store.upsert(person) }
         let gate = AsyncGate()
         let repository = ScriptedTrackingContactRepository(store, gate: gate)
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in }, onSaved: { _ in })
         await viewModel.load()
         viewModel.toggle(cy.id)
         let picksAtSaveStart = viewModel.selection
@@ -121,7 +121,8 @@ struct StarterContactsViewModelSaveTests {
         let gate = AsyncGate()
         let viewModel = StarterContactsViewModel(
             contacts: ScriptedTrackingContactRepository(store, gate: gate),
-            announce: { _ in }
+            announce: { _ in },
+            onSaved: { _ in }
         )
         await viewModel.load()
         viewModel.toggle(ana.id)
@@ -150,7 +151,7 @@ struct StarterContactsViewModelSaveTests {
         let cy = Self.person("Cy")
         for person in [ana, cy] { try await store.upsert(person) }
         let repository = ScriptedTrackingContactRepository(store)
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in }, onSaved: { _ in })
         await viewModel.load()
         viewModel.toggle(ana.id)
         #expect(await viewModel.save())
@@ -177,7 +178,7 @@ struct StarterContactsViewModelSaveTests {
         let ana = Self.person("Ana")
         try await store.upsert(ana)
         let repository = ScriptedTrackingContactRepository(store)
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in }, onSaved: { _ in })
         await viewModel.load()
         viewModel.toggle(ana.id)
 
@@ -207,7 +208,11 @@ struct StarterContactsViewModelSaveTests {
         for person in [ana, ben] { try await store.upsert(person) }
         let repository = ScriptedTrackingContactRepository(store, failOnCall: 2)
         let announcements = Announcements()
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { announcements.record($0) })
+        let viewModel = StarterContactsViewModel(
+            contacts: repository,
+            announce: { announcements.record($0) },
+            onSaved: { _ in }
+        )
         await viewModel.load()
         viewModel.toggle(ana.id)
         viewModel.toggle(ben.id)
@@ -244,7 +249,11 @@ struct StarterContactsViewModelSaveTests {
         let han = Self.person("Han Solo")
         for person in [leia, han] { try await store.upsert(person) }
         let announcements = Announcements()
-        let viewModel = StarterContactsViewModel(contacts: store, announce: { announcements.record($0) })
+        let viewModel = StarterContactsViewModel(
+            contacts: store,
+            announce: { announcements.record($0) },
+            onSaved: { _ in }
+        )
         await viewModel.load()
         viewModel.toggle(leia.id)
         viewModel.toggle(han.id)
@@ -281,7 +290,11 @@ struct StarterContactsViewModelSaveTests {
         #expect(try await store.updateTracking(id: han.id, cadenceDays: 30))
         let repository = ScriptedTrackingContactRepository(store)
         let announcements = Announcements()
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { announcements.record($0) })
+        let viewModel = StarterContactsViewModel(
+            contacts: repository,
+            announce: { announcements.record($0) },
+            onSaved: { _ in }
+        )
         await viewModel.load()
         #expect(viewModel.selection.count == 2)
         viewModel.toggle(leia.id)
@@ -309,7 +322,7 @@ struct StarterContactsViewModelSaveTests {
         for person in [ana, cy] { try await store.upsert(person) }
         let readGate = AsyncGate()
         let repository = ScriptedTrackingContactRepository(store, readGate: readGate)
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in }, onSaved: { _ in })
         let slowLoad = Task { await viewModel.load() }
         // The first read has Ana and Cy in hand and is held.
         await readGate.waitUntilArrived()
@@ -332,7 +345,7 @@ struct StarterContactsViewModelSaveTests {
         for person in [ana, ben] { try await store.upsert(person) }
         // Read 1 is the load. Every read after it throws, the re-read included.
         let repository = ScriptedTrackingContactRepository(store, failOnCall: 2, failReadsFromCall: 2)
-        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in })
+        let viewModel = StarterContactsViewModel(contacts: repository, announce: { _ in }, onSaved: { _ in })
         await viewModel.load()
         viewModel.toggle(ana.id)
         viewModel.toggle(ben.id)

@@ -440,7 +440,7 @@ struct RegardsTabRoot: View {
         case .starterContacts:
             let access = contactsAccessVM?.status
             StarterContactsScreen(
-                viewModel: StarterContactsViewModel(contacts: runtime.environment.contacts),
+                viewModel: Self.makeStarterContactsViewModel(runtime: runtime),
                 showsLimitedAccessNote: access == .limited,
                 contactsAccessIsOff: access == .denied || access == .restricted || access == .notDetermined,
                 onFinish: {

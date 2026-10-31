@@ -284,7 +284,7 @@ extension AppLaunchCoordinatorTests {
         #expect(try await environment.profile.fetch().onboardingCompletedAt == nil)
         #expect(try await environment.contacts.fetchAll().count == 3)
         #expect(await secondSource.counts() == .init(current: 2, requests: 0, fetches: 1))
-        let picker = StarterContactsViewModel(contacts: environment.contacts)
+        let picker = StarterContactsViewModel(contacts: environment.contacts, onSaved: { _ in })
         await picker.load()
         #expect(picker.selection == [leia.id: 7, han.id: 30])
     }
@@ -304,7 +304,7 @@ extension AppLaunchCoordinatorTests {
         #expect(launch.phase == .onboarding)
         #expect(launch.onboardingStep == .starter)
         #expect(launch.starterAccessIsLimited)
-        let picker = StarterContactsViewModel(contacts: environment.contacts)
+        let picker = StarterContactsViewModel(contacts: environment.contacts, onSaved: { _ in })
         await picker.load()
         #expect(picker.contacts.map(\.displayName) == ["Han Solo", "Leia Organa"])
     }
@@ -332,7 +332,7 @@ extension AppLaunchCoordinatorTests {
 
         #expect(second.onboardingStep == .starter)
         #expect(second.starterAccessIsLimited)
-        let picker = StarterContactsViewModel(contacts: environment.contacts)
+        let picker = StarterContactsViewModel(contacts: environment.contacts, onSaved: { _ in })
         await picker.load()
         #expect(picker.contacts.map(\.displayName) == ["Han Solo", "Leia Organa", "Luke Skywalker"])
     }
@@ -367,7 +367,7 @@ extension AppLaunchCoordinatorTests {
         #expect(launch.onboardingStep == .starter)
         #expect(launch.starterAccessIsLimited)
         #expect(launch.statusMessage == nil)
-        let picker = StarterContactsViewModel(contacts: environment.contacts)
+        let picker = StarterContactsViewModel(contacts: environment.contacts, onSaved: { _ in })
         await picker.load()
         #expect(picker.loadState == .loaded)
         #expect(picker.contacts.isEmpty)

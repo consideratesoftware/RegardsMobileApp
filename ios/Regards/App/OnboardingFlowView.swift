@@ -37,7 +37,11 @@ struct OnboardingFlowView: View {
                 // Its own stack: the screen's search field needs one.
                 NavigationStack {
                     StarterContactsScreen(
-                        viewModel: StarterContactsViewModel(contacts: runtime.environment.contacts),
+                        viewModel: StarterContactsViewModel(
+                            contacts: runtime.environment.contacts,
+                            // No pass here: completion's `runFull()` schedules the starters.
+                            onSaved: { _ in }
+                        ),
                         showsSkip: true,
                         showsLimitedAccessNote: launch.starterAccessIsLimited,
                         onFinish: { Task { await launch.finishOnboarding() } }
