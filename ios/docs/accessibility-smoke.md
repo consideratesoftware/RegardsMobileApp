@@ -154,6 +154,10 @@ Reminder window row.
       save-latency step in the pre-release pass is where the cue is judged. No
       device fixture can force a pass failure, so the failure sentence is
       covered by unit tests.
+- [ ] With VoiceOver on, activate Save (or "Use default window") on a valid
+      window. VoiceOver announces "Saving" once when the pass starts. Save
+      reads "Saving…" dimmed, then the editor closes, or the error banner
+      speaks if the pass fails.
 - [ ] Change a day, leave without Save, and reopen the editor. The change is
       gone, and nothing asks for confirmation.
 - [ ] Open Contact Detail for a tracked contact with a cadence. "Reminder
