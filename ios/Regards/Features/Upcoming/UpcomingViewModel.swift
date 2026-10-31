@@ -85,6 +85,7 @@ public final class UpcomingViewModel {
     private let contacts: any ContactRepository
     private let reminders: (any ReminderRepository)?
     private let scheduler: SchedulingPass
+    // Unused since TF-07d (the pass logs interactions); TF-07f removes it.
     private let interactions: any InteractionRepository
     private let engine: ReminderEngine
     private(set) var window: ReminderWindow
@@ -248,9 +249,8 @@ public final class UpcomingViewModel {
     /// Returns whether the write succeeded so the screen can gate its
     /// VoiceOver announcement on it — mirrors `OverdueViewModel.markCaughtUp`.
     ///
-    /// Also clears any pending snooze through `SchedulingPass.caughtUp`
-    /// *before* the interaction log runs — see `OverdueViewModel.markCaughtUp`'s
-    /// doc comment for why: without it a short-cadence contact's stale
+    /// The writes are one `SchedulingPass.recordInteraction` call, which
+    /// clears any snooze first: otherwise a short-cadence contact's stale
     /// snoozed date keeps winning `buildRows`'
     /// `max(now, overdueAt, snoozedUntil)` over the freshly computed one.
     ///
@@ -270,11 +270,6 @@ public final class UpcomingViewModel {
     /// `performLoad()` on success below masks the race most of the time
     /// (correct data lands moments later), but the stale row can still
     /// flash back for a frame before that happens.
-    ///
-    /// The catch block also restores a snooze `scheduler.caughtUp` genuinely
-    /// cleared before `InteractionLogging` then failed (staged review round
-    /// 7) — see `OverdueViewModel.markCaughtUp`'s doc comment for why this
-    /// matters and why it's a state-revert, not a fresh `snooze()` call.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         loadGeneration += 1
@@ -282,32 +277,16 @@ public final class UpcomingViewModel {
             (header, rows.filter { !($0.contactId == contactId && $0.kind == .cadence) })
         }.filter { !$0.rows.isEmpty }
         totalCount = groups.reduce(0) { $0 + $1.rows.count }
-        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
-        var clearedPendingSnooze = false
         do {
-            clearedPendingSnooze = try await scheduler.caughtUp(contactId: contactId)
-            try await logging.markCaughtUp(contactId: contactId, at: clock())
+            try await scheduler.recordInteraction(contactId: contactId, .caughtUp)
             await performLoad()
             return true
         } catch {
             Self.log.error(
                 "failed to mark caught up for \(contactId, privacy: .private): \(error, privacy: .private)"
             )
-            if clearedPendingSnooze {
-                await restorePendingSnooze(contactId: contactId)
-            }
             await performLoad()
             return false
-        }
-    }
-
-    private func restorePendingSnooze(contactId: UUID) async {
-        do {
-            try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
-        } catch {
-            Self.log.error(
-                "failed to restore snooze for \(contactId, privacy: .private): \(error, privacy: .private)"
-            )
         }
     }
 

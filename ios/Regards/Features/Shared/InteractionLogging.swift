@@ -6,9 +6,10 @@ import Foundation
 ///
 /// Deliberately **not** a scheduling component: it never reads or writes
 /// `ScheduledReminder`, never resolves a reminder window, and never calls
-/// `ReminderEngine`. Rescheduling `ScheduledReminder` rows stays exclusively
-/// `SchedulingPass`'s job once TF-07 (PR25) builds it (decision #36) — this
-/// type only ever touches `ContactRepository` and `InteractionRepository`.
+/// `ReminderEngine`; it only touches `ContactRepository` and
+/// `InteractionRepository`. Only `SchedulingPass.recordInteraction` builds
+/// one, inside the pass's lock, so the caught-up transition, these writes,
+/// and the reschedule run as one span (decision #36, R60).
 ///
 /// Snooze is out of scope for this helper for the same reason: decision #31
 /// requires pushing a *pending reminder's* `scheduledFor`, which only a
@@ -16,6 +17,10 @@ import Foundation
 struct InteractionLogging {
     let contacts: any ContactRepository
     let interactions: any InteractionRepository
+
+    /// `markCaughtUp(requireCadenceEligible: true)` refused before any write:
+    /// the contact is missing or isn't `isCadenceEligible`.
+    struct NotCadenceEligible: Error {}
 
     /// "Caught up": logs a `.reminderCaughtUp` interaction against the
     /// contact's own preferred channel and moves `lastInteractedAt` to
@@ -34,9 +39,23 @@ struct InteractionLogging {
     /// fetch through, matches the point `OverdueViewModel.snooze` and
     /// `ContactDetailViewModel.snooze` already gate at for the identical
     /// archived-mid-session race.
+    ///
+    /// `requireCadenceEligible` is for Caught up from a notification, which
+    /// can outlive the contact's tracking: it throws `NotCadenceEligible`
+    /// before any write, checked on the same read the writes use. A Contacts
+    /// write landing between this read and `append` can still log one
+    /// interaction, the same window the `isActive` check has.
     @discardableResult
-    func markCaughtUp(contactId: UUID, at occurredAt: Date) async throws -> Contact {
-        guard let contact = try await contacts.fetch(id: contactId), contact.isActive else {
+    func markCaughtUp(
+        contactId: UUID,
+        at occurredAt: Date,
+        requireCadenceEligible: Bool = false
+    ) async throws -> Contact {
+        let fetched = try await contacts.fetch(id: contactId)
+        if requireCadenceEligible, fetched?.isCadenceEligible != true {
+            throw NotCadenceEligible()
+        }
+        guard let contact = fetched, contact.isActive else {
             throw DataError.notFound
         }
         return try await record(
@@ -73,10 +92,8 @@ struct InteractionLogging {
     /// self-heals the next time this contact is caught up successfully.
     /// Reordering to move-then-append would trade this for the opposite
     /// drift (the contact reads caught-up with no log entry to show for it)
-    /// rather than removing it — a stub that doesn't touch
-    /// `ScheduledReminder` has no transactional primitive spanning two
-    /// repositories to close the gap with; that arrives with SchedulingPass's
-    /// full write surface (TF-07 / PR25).
+    /// rather than removing it: there is no transactional primitive spanning
+    /// the two repositories to close the gap with.
     ///
     /// `contacts.updateLastInteractedAt`, not `contacts.upsert` from the
     /// `contact` snapshot passed in: that snapshot was fetched at the start

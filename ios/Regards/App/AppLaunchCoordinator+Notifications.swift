@@ -45,53 +45,19 @@ extension AppLaunchCoordinator {
         }
         switch action {
         case .caughtUp(let contactId):
-            // The same sequence as the view models' Caught up: clear any pending
-            // snooze through `SchedulingPass.caughtUp`, log the interaction, and
-            // restore the snooze if logging fails (see
-            // `SchedulingPass.restorePendingAfterFailedCaughtUp`).
-            //
-            // This is the 4th inline copy, after `OverdueViewModel`,
-            // `UpcomingViewModel`, and `ContactDetailViewModel`. Extracting a shared
-            // helper would mean editing those 3 locked view-model files, which
-            // TF-07 rewrites anyway for R10; the extraction belongs there.
-            //
-            // The eligibility check comes first because neither later step has it:
-            // `caughtUp` has no precondition by design, and `InteractionLogging`
-            // checks only `isActive`. A notification can outlive the contact's
-            // tracking, so an ineligible contact must write nothing.
-            // The check is best-effort. `markCaughtUp` re-checks `isActive` and
-            // throws for an inactive contact, and the handler restores a snooze
-            // it cleared. R60 covers the restore race: a restore after a failed
-            // `markCaughtUp` can set `.pending` over a newer catch-up. A contact
-            // untracked between this fetch and the write still gets the
-            // interaction logged, the same as the in-app Caught up with a stale
-            // row; TF-07's queue row records tightening that case.
-            let contacts = runtime.environment.contacts
             do {
-                guard let contact = try await contacts.fetch(id: contactId), contact.isCadenceEligible else {
-                    Self.notificationLog.info("ignored Caught up from a notification for an ineligible contact")
-                    return
-                }
-            } catch {
-                Self.notificationLog.error(
-                    "Caught up from a notification couldn't read the contact: \(error, privacy: .private)"
+                // The pass checks eligibility itself, on the read its writes
+                // use, and returns false rather than writing for a contact
+                // the notification outlived.
+                let logged = try await runtime.scheduler.recordInteraction(
+                    contactId: contactId,
+                    .caughtUpFromNotification
                 )
-                return
-            }
-
-            let logging = InteractionLogging(contacts: contacts, interactions: runtime.environment.interactions)
-            var clearedPendingSnooze = false
-            do {
-                clearedPendingSnooze = try await runtime.scheduler.caughtUp(contactId: contactId)
-                try await logging.markCaughtUp(contactId: contactId, at: runtime.clock())
+                if !logged {
+                    Self.notificationLog.info("ignored Caught up from a notification for an ineligible contact")
+                }
             } catch {
                 Self.notificationLog.error("Caught up from a notification failed: \(error, privacy: .private)")
-                guard clearedPendingSnooze else { return }
-                do {
-                    try await runtime.scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
-                } catch {
-                    Self.notificationLog.error("couldn't restore the cleared snooze: \(error, privacy: .private)")
-                }
             }
         case .snooze(let contactId):
             do {

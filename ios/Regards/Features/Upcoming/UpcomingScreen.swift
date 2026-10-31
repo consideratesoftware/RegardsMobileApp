@@ -261,9 +261,9 @@ struct UpcomingRow: View {
         // 12, matching the tap-target reasoning `OverdueRow` carries and
         // the pre-existing `row.kind == .cadence` gate this button already
         // had as an inline control): `markCaughtUp`/`SchedulingPass
-        // .caughtUp` only ever clear a *cadence* reminder, so an occasion
-        // row (birthday/anniversary/custom) has nothing true for this
-        // action to do. No "swipe left" action here — unlike Overdue,
+        // .recordInteraction` only ever clear a *cadence* reminder, so an
+        // occasion row (birthday/anniversary/custom) has nothing true for
+        // this action to do. No "swipe left" action here — unlike Overdue,
         // Upcoming has never had a Snooze control of its own (§10); adding
         // one now would be new functionality nobody asked for, not part of
         // this redesign.

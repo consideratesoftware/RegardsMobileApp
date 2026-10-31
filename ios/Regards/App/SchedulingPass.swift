@@ -3,8 +3,8 @@ import Foundation
 /// The sole writer of `ScheduledReminder` rows (§9a, decision #36). TF-07c
 /// builds the DB half: `runFull()` and `run(for:)` derive every pending row
 /// from the contacts, the global window, per-contact overrides and the
-/// injected occasions; Snooze and the caught-up transition write through the
-/// same lock. OS notifications arrive in TF-07e.
+/// injected occasions; Snooze and `recordInteraction` write through the same
+/// lock. OS notifications arrive in TF-07e.
 ///
 /// **Derivation (§9).** A cadence row's `scheduledFor` is
 /// `nextAllowedSlot(max(now, overdueAt, snoozedUntil))` in the contact's
@@ -16,9 +16,8 @@ import Foundation
 /// hours run past its day (owner ruling 9: the row stays, no notification).
 ///
 /// **Per-pass window (R55).** Every run reads the global window and builds
-/// its calendar from that window's timezone. Nothing is cached between runs,
-/// so a window edit never leaves this actor on a stale zone, and nothing
-/// needs a second `SchedulingPass`.
+/// its calendar from that window's timezone. Nothing is cached, so a window
+/// edit never leaves the pass on a stale zone or needs a second pass.
 ///
 /// **No re-nag (§9 "Notification fired", owner ruling 5).** A cadence row
 /// whose time has come (fired, or pending at or before `now`) is left alone
@@ -27,20 +26,12 @@ import Foundation
 /// due pending row. Until TF-07e marks rows fired from the OS, a due pending
 /// row stands in for a fired one.
 ///
-/// **Corrupt rows.** `runFull()` and `run(for:)` read one
-/// `ReminderRepository.observeSchedule()` snapshot, which drops an
-/// undecodable contact (with its rows) or row. The pass follows that policy:
-/// it never cancels what it can't decode, and one bad row never stops
-/// scheduling for everyone else. An undecodable row at an id the pass writes
-/// (a decodable contact's cadence or occasion id) is replaced by that write.
-/// The orphan sweep's reads fail closed and skip only the sweep: `runFull()`
-/// reads `fetchAllPending()`, so it skips the sweep while any undecodable
-/// pending row exists that no run replaces; `run(for:)` reads
-/// `fetchPending(forContact:)`, so it skips only when that contact has one.
-///
-/// **Snooze precondition (R54).** `snooze(contactId:)` checks
-/// `isCadenceEligible` itself, here rather than at each caller, because a
-/// caller can act on a stale contact.
+/// **Corrupt rows.** Runs read one `observeSchedule()` snapshot, which drops
+/// an undecodable contact (with its rows) or row. The pass never cancels what
+/// it can't decode, one bad row never stops scheduling for everyone else, and
+/// a write at an undecodable row's id replaces it. The orphan sweep's reads
+/// fail closed and skip only the sweep: `runFull()` over any undecodable
+/// pending row, `run(for:)` only over that contact's.
 public actor SchedulingPass {
     private let reminders: any ReminderRepository
     private let contacts: any ContactRepository
@@ -54,11 +45,10 @@ public actor SchedulingPass {
     /// TF-07g shows the Settings badge from this.
     public private(set) var zeroCapacityContactIds: Set<UUID> = []
 
-    /// One FIFO lock over every mutation (R59, collapsed to a single key in
-    /// TF-07c because `runFull()` touches every contact). Each mutation
-    /// suspends between its reads and its writes, and an actor is reentrant
-    /// at every suspension; the lock keeps a decision made before a
-    /// suspension from being applied after someone else's write.
+    /// One FIFO lock over every mutation (R59). Each mutation suspends
+    /// between its reads and its writes, and an actor is reentrant at every
+    /// suspension; the lock keeps a decision made before a suspension from
+    /// being applied after someone else's write.
     ///
     /// **Load-bearing premise: one instance.** The lock is actor state, so it
     /// serialises only callers sharing this `SchedulingPass`. `AppRuntime`
@@ -86,10 +76,9 @@ public actor SchedulingPass {
         lockWaiters.removeFirst().resume()
     }
 
-    /// `window` and `occasions` have no default: Snooze resolves through the
-    /// persisted window on every call, and a silent fallback is the R9 bug.
-    /// Production passes an `occasions` that returns `[]` until PR30 reads
-    /// Contacts and Calendar.
+    /// `interactions`, `window` and `occasions` have no default: a silent
+    /// fallback is the R9 bug. Production passes an `occasions` that returns
+    /// `[]` until PR30 reads Contacts and Calendar.
     public init(
         reminders: any ReminderRepository,
         contacts: any ContactRepository,
@@ -116,7 +105,7 @@ public actor SchedulingPass {
         try await reschedule(only: nil)
     }
 
-    /// One contact's reconcile: an override edit, and (TF-07d) a caught-up.
+    /// One contact's reconcile, after an override edit.
     public func run(for contactId: UUID) async throws {
         await lock()
         defer { unlock() }
@@ -190,9 +179,8 @@ public actor SchedulingPass {
                 occurrences: occurrences.map(\.1),
                 context: context
             ) else {
-                // The sweep below cancels the pending row, floor and all: a
-                // snooze set before the window lost capacity doesn't come
-                // back when capacity returns. Accepted, since the editors
+                // The sweep below cancels the pending row, floor and all, so a
+                // snooze doesn't survive a capacity loss. Accepted: the editors
                 // refuse to save a zero-capacity window (PR #67 review).
                 zeroCapacity.insert(contact.id)
                 continue
@@ -243,14 +231,11 @@ public actor SchedulingPass {
                 pending = try await reminders.fetchAllPending()
             }
         } catch {
-            // The fail-closed read hit an undecodable row, and it fails the
-            // same way on every run while that row exists, so orphans stay
-            // pending until the row is fixed or replaced. The orphans
-            // themselves never show (every screen filters to tracked
-            // contacts), but Overdue and Upcoming read the same
-            // fetchAllPending(), so until TF-07f moves them to the snapshot
-            // one undecodable row hides every snooze and every Upcoming
-            // occasion row.
+            // The fail-closed read hit an undecodable row and fails the same
+            // way every run until that row is fixed or replaced, so orphans
+            // stay pending (no screen shows them). Overdue and Upcoming read
+            // the same fetchAllPending() until TF-07f, so meanwhile that row
+            // hides every snooze and every Upcoming occasion row.
             // The type only: an error can carry row or contact values.
             let errorType = String(describing: type(of: error))
             Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
@@ -337,9 +322,8 @@ public actor SchedulingPass {
     ) -> [(ContactOccasion, Date)] {
         guard let zone = TimeZone(identifier: context.global.timezoneIdentifier) else { return [] }
         // Ties break on the month-day, then the label (nil before ""), so the
-        // row a run writes never depends on the order the source returns
-        // occasions in. The order is total up to canonical equivalence: two
-        // occasions with the same key compare equal.
+        // row never depends on the source's order. Two occasions with the
+        // same key are canonically equivalent.
         func key(_ entry: (ContactOccasion, Date)) -> (Date, String, Int, String) {
             (entry.1, entry.0.monthDay.isoString, entry.0.label == nil ? 0 : 1, entry.0.label ?? "")
         }
@@ -365,12 +349,10 @@ public actor SchedulingPass {
     /// transition at a different wall-clock time (§9 contract 1). Repeating a
     /// snooze replaces the floor with one week from this tap.
     ///
-    /// The row lives at the contact's deterministic cadence id, so two snoozes
-    /// race the same primary key and can never leave 2 pending rows.
-    ///
     /// Returns `false` without writing for a contact that isn't
-    /// `isCadenceEligible` (R54), a failed contact read, or a zero-capacity
-    /// window. Throws when the window read or the write fails.
+    /// `isCadenceEligible` (R54: checked here because a caller can act on a
+    /// stale contact), a failed contact read, or a zero-capacity window.
+    /// Throws when the window read or the write fails.
     @discardableResult
     public func snooze(contactId: UUID) async throws -> Bool {
         await lock()
@@ -414,38 +396,69 @@ public actor SchedulingPass {
         return true
     }
 
-    /// The "Caught up" transition (§9 re-evaluation triggers): moves the
-    /// contact's pending cadence row to `.userCaughtUp`. State only, by
-    /// tech-lead ruling: the floor stays on the row, so a failed caught-up's
-    /// restore brings the snooze back intact, and the next run rewrites a
-    /// caught-up row as pending with the new anchor and no floor.
+    /// What the user did: Caught up from a screen or from a notification, or
+    /// "Log other channel…" through `channel`.
+    public enum Interaction: Sendable, Equatable {
+        case caughtUp
+        case caughtUpFromNotification
+        case other(Channel)
+    }
+
+    /// Caught up and Log other (§9 re-evaluation triggers, R60) in one lock
+    /// span: `.pending` to `.userCaughtUp` on the cadence row (a
+    /// compare-and-set, never an insert, R59), log through
+    /// `InteractionLogging`, then `reschedule(only:)`, never `run(for:)`,
+    /// which would wait on this lock. The transition comes first so every
+    /// `lastInteractedAt` broadcast lands after the snooze is gone.
     ///
-    /// A compare-and-set (`transitionState`), so of two concurrent callers
-    /// only the one that actually moved the row gets `true` and may later
-    /// restore it. A bare transition, never an insert: this method has no
-    /// eligibility check, and an insert could write an orphan cadence row for
-    /// an untracked or archived contact (§19 R59).
-    ///
-    /// The restore can still revert a newer catch-up made between this call
-    /// and the caller's restore (R60); TF-07d closes that by running both in
-    /// one lock span.
+    /// If logging throws, a row this call cleared goes back to `.pending`
+    /// with its floor; the lock keeps anything else from moving it first.
+    /// Then it returns `false` for a notification whose contact isn't
+    /// `isCadenceEligible` (a notification can outlive tracking) and
+    /// rethrows anything else. A failed reschedule after a logged interaction
+    /// still returns `true`; the row stays `.userCaughtUp` until the next run.
     @discardableResult
-    public func caughtUp(contactId: UUID) async throws -> Bool {
+    public func recordInteraction(contactId: UUID, _ interaction: Interaction) async throws -> Bool {
         await lock()
         defer { unlock() }
-        return try await reminders.transitionState(
-            id: Self.reminderID(contactId: contactId, kind: .cadence),
-            from: .pending,
-            to: .userCaughtUp
-        )
+        let cadenceId = Self.reminderID(contactId: contactId, kind: .cadence)
+        let cleared = try await reminders.transitionState(id: cadenceId, from: .pending, to: .userCaughtUp)
+        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
+        do {
+            switch interaction {
+            case .caughtUp:
+                try await logging.markCaughtUp(contactId: contactId, at: clock())
+            case .caughtUpFromNotification:
+                try await logging.markCaughtUp(contactId: contactId, at: clock(), requireCadenceEligible: true)
+            case .other(let channel):
+                try await logging.logOther(contactId: contactId, channel: channel, at: clock())
+            }
+        } catch {
+            if cleared {
+                do {
+                    try await reminders.transitionState(id: cadenceId, from: .userCaughtUp, to: .pending)
+                } catch {
+                    let errorType = String(describing: type(of: error))
+                    Self.log.error("couldn't restore a cleared snooze: \(errorType, privacy: .public)")
+                }
+            }
+            if error is InteractionLogging.NotCadenceEligible { return false }
+            throw error
+        }
+        do {
+            try await reschedule(only: contactId)
+        } catch {
+            let errorType = String(describing: type(of: error))
+            Self.log.error("reschedule after an interaction failed: \(errorType, privacy: .public)")
+        }
+        return true
     }
 
     /// The active snooze's resolved instant for Contact Detail (R56): the
     /// pending cadence row's `scheduledFor` when it carries a floor and is
-    /// still ahead, so the screen and Overdue agree on when the snooze
-    /// lapses. `nil` when no snooze is still ahead: a spent floor can stay
-    /// on a due row, which the no-re-nag rule leaves alone. `.max()` so a
-    /// stray second row can't win by fetch order.
+    /// still ahead, so the screen and Overdue agree. `nil` when no snooze is
+    /// still ahead (a spent floor can stay on a due row, which the no-re-nag
+    /// rule leaves alone). `.max()` so a stray row can't win by fetch order.
     public func pendingSnoozeDate(contactId: UUID) async throws -> Date? {
         let now = clock()
         return try await reminders.fetchPending(forContact: contactId)
@@ -453,36 +466,22 @@ public actor SchedulingPass {
             .map(\.scheduledFor)
             .max()
     }
+}
 
-    /// Compensates a `caughtUp(contactId:)` whose caller's own later write
-    /// failed: reverts the transition so the user's snooze comes back with its
-    /// floor and date. A compare-and-set from `.userCaughtUp` to `.pending`,
-    /// so it leaves alone a row something else already moved. Call only when
-    /// `caughtUp` returned `true` for this same action.
-    public func restorePendingAfterFailedCaughtUp(contactId: UUID) async throws {
-        await lock()
-        defer { unlock() }
-        try await reminders.transitionState(
-            id: Self.reminderID(contactId: contactId, kind: .cadence),
-            from: .userCaughtUp,
-            to: .pending
-        )
-    }
+// MARK: - Identity
 
-    // MARK: - Identity
-
+// An extension only to keep the actor body under `type_body_length`.
+extension SchedulingPass {
     private static func notificationId(contactId: UUID, kind: ReminderKind) -> String {
         "contact-\(contactId.uuidString)-\(kind.rawValue)"
     }
 
     /// A contact's row of one kind always lives at this id, so writers race
-    /// one primary key instead of inserting duplicates (R54/R59). The
-    /// contact's UUID bytes XORed with a 16-byte salt from the kind:
-    /// deterministic across launches (unlike `Hasher`), and distinct per kind
-    /// because the salts differ. The cadence salt is exactly
+    /// one primary key instead of inserting duplicates (R54/R59): the UUID's
+    /// bytes XORed with a 16-byte salt from the kind, deterministic across
+    /// launches (unlike `Hasher`) and distinct per kind. The cadence salt is
     /// "cadence-reminder", the TF-04 derivation, so existing rows keep their
-    /// ids. `uuid_t` is always 16 bytes, so the indexing below can't go out
-    /// of bounds.
+    /// ids. `uuid_t` is 16 bytes, so the indexing can't go out of bounds.
     static func reminderID(contactId: UUID, kind: ReminderKind) -> UUID {
         let salt = Array("\(kind.rawValue)-reminder".utf8.prefix(16))
         var bytes = withUnsafeBytes(of: contactId.uuid) { Array($0) }
