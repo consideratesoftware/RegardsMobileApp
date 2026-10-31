@@ -47,6 +47,9 @@ public final class ReminderWindowsViewModel {
     /// Counts refusals so the screen can announce a repeat of the same message.
     public private(set) var failureCount = 0
     public private(set) var isSaving = false
+    /// Reschedules started through `onSaved`, so the screen can tell
+    /// VoiceOver "Saving" once per pass (a refusal starts none).
+    public private(set) var reschedulesStarted = 0
     /// The Save button's label: text only, no spinner.
     public var saveButtonTitle: String { isSaving ? "Saving\u{2026}" : "Save" }
     public private(set) var timezoneIdentifier = TimeZone.current.identifier
@@ -270,6 +273,7 @@ public final class ReminderWindowsViewModel {
                 }
                 hasStoredOverride = true
             }
+            reschedulesStarted += 1
             guard await onSaved(candidate) else {
                 rescheduleOwed = true
                 fail(Self.notRescheduledMessage)
@@ -330,6 +334,7 @@ public final class ReminderWindowsViewModel {
             rescheduleOwed = true
             return false
         }
+        reschedulesStarted += 1
         let rescheduled = await onSaved(global)
         rescheduleOwed = !rescheduled
         return rescheduled

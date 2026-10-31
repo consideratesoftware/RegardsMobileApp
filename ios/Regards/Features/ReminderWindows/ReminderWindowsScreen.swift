@@ -66,6 +66,13 @@ public struct ReminderWindowsScreen: View {
                 proxy.scrollTo(Self.errorBannerID, anchor: .center)
                 speak(message) { errorFocused = true }
             }
+            // The pass after a save or reset can take a moment. Only its
+            // start is spoken: the end is the dismissal or the banner above.
+            // Posted directly, not through `speak`, so a banner that follows
+            // at once can't drop it; the banner's focus move cuts it short.
+            .onChange(of: viewModel.reschedulesStarted) {
+                announce("Saving")
+            }
         }
         .background(RegardsDS.background.ignoresSafeArea())
         .scrollContentBackground(.hidden)
