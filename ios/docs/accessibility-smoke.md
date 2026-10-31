@@ -57,8 +57,9 @@ These steps belong to the pre-release device pass. They are not merge gates
 - [ ] Done with picks: VoiceOver hears "Saved. Keeping in touch with N people."
       Note whether the announcement survives the change to the tab root in
       onboarding.
-- [ ] Settings → Choose people to keep in touch with: Done announces the same
-      "Saved" text, and Settings shows again.
+- [ ] Settings → Choose people to keep in touch with: Done reads "Saving…"
+      through the reschedule, announces the same "Saved" text, then Settings
+      pops.
 - [ ] Settings → Choose people with Contacts access off (not determined, denied,
       or restricted) and no contacts: the empty state reads "Regards can't see
       your contacts. Go back and turn on Contacts access to choose people."
