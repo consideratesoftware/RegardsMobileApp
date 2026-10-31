@@ -85,4 +85,58 @@ struct ReminderWindowsScreenAnnouncementTests {
         #expect(await eventuallyPumpingRunLoop { recorder.announcements.count == 1 })
         #expect(recorder.announcements == [ReminderWindowsViewModel.notRescheduledMessage])
     }
+
+    enum Starts: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case save
+        case reset
+
+        var testDescription: String { rawValue }
+    }
+
+    /// The pass can take a moment, and the screen dims Save with no spoken
+    /// change, so VoiceOver gets one "Saving" when the work starts. The end is
+    /// already spoken (the editor closes, or the error banner announces), so
+    /// nothing more is said when the pass finishes. The pass is held open on a
+    /// gate, so the announcement is read while the editor is still saving.
+    @Test(
+        "A save or a reset announces Saving once when the pass starts, and nothing when it ends",
+        arguments: Starts.allCases
+    )
+    func savingAnnouncesOnceWhenThePassStarts(starts: Starts) async throws {
+        let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
+        let gate = AsyncGate()
+        let viewModel = ReminderWindowsViewModel(
+            target: .contact(world.target.id),
+            window: world.environment.window,
+            contacts: world.environment.contacts,
+            clock: { Fixtures.now },
+            onSaved: { _ in
+                await gate.wait()
+                return true
+            })
+        let recorder = Recorder()
+        let window = await Self.host(viewModel, recorder: recorder)
+        defer { window.isHidden = true }
+        #expect(viewModel.loadState == .loaded)
+        viewModel.draft.allowedDays = .saturday
+
+        let running = Task { @MainActor in
+            switch starts {
+            case .save: await viewModel.save()
+            case .reset: await viewModel.resetToDefault()
+            }
+        }
+        await gate.waitUntilArrived()
+
+        #expect(viewModel.isSaving)
+        #expect(await eventuallyPumpingRunLoop { recorder.announcements.count == 1 })
+        #expect(recorder.announcements == ["Saving"])
+
+        await gate.open()
+        #expect(await running.value)
+        // Give a late announcement time to land before asserting there is none.
+        await settleViewUpdate(iterations: 20)
+
+        #expect(recorder.announcements == ["Saving"])
+    }
 }

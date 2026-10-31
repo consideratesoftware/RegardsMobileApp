@@ -286,9 +286,10 @@ struct ReminderWindowsViewModelRescheduleTests {
     /// The screen reads `saveButtonTitle` for Save's label and dims the form
     /// and the reset button while `isSaving`. A hosted SwiftUI button exposes
     /// no accessibility element to a unit test (see
-    /// `SettingsNotificationsHostingTests`), so the dimming is checked at the
-    /// view-model level through `isSaving` and by the XCUI audits; the label
-    /// text is checked here.
+    /// `SettingsNotificationsHostingTests`), so this test checks the label
+    /// text and `isSaving` at the view-model level. The spoken cue is checked
+    /// in `ReminderWindowsScreenAnnouncementTests`; the dimming itself is not
+    /// covered by an automated test and is on the pre-release device pass.
     @Test("Save reads Saving… while the pass runs, then Save again", arguments: Action.allCases)
     func savingCueShowsWhileThePassRuns(action: Action) async throws {
         let world = try await Fixtures.makeWorld(targetOverride: Fixtures.bystanderOverride)
