@@ -9,6 +9,8 @@ import Testing
 /// `observeSchedule()` forwards too: the pass reads its snapshot from it.
 /// `upsertGate`, when set, holds the first `upsert` open until the gate opens:
 /// the run has read its snapshot and decided, and is parked before writing.
+/// `setObserveFails(true)` makes `observeSchedule()` finish without a value, as
+/// a failed snapshot read does, until it is set back to `false`.
 actor CountingReminderRepository: ReminderRepository {
     private let wrapped: any ReminderRepository
     private var upsertGate: AsyncGate?
@@ -16,6 +18,7 @@ actor CountingReminderRepository: ReminderRepository {
     private(set) var transitions = 0
     private(set) var stateUpdates = 0
     private(set) var deletes = 0
+    private var observeFails = false
 
     init(_ wrapped: any ReminderRepository, upsertGate: AsyncGate? = nil) {
         self.wrapped = wrapped
@@ -56,8 +59,13 @@ actor CountingReminderRepository: ReminderRepository {
         try await wrapped.delete(id: id)
     }
 
+    func setObserveFails(_ fails: Bool) {
+        observeFails = fails
+    }
+
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot> {
-        await wrapped.observeSchedule()
+        if observeFails { return AsyncStream { $0.finish() } }
+        return await wrapped.observeSchedule()
     }
 }
 
@@ -201,13 +209,15 @@ extension MockRepositories {
     }
 }
 
-/// The pass the view-model tests hand a screen: no occasions and an every-day,
+/// The pass the view-model tests hand a screen. A test that injects a failing
+/// interactions repository must pass it here too, or the pass never sees the
+/// failure. No occasions and an every-day,
 /// all-day window in America/Los_Angeles (`FixedReminderWindowRepository`'s
 /// default), so Snooze lands on the first local midnight at or after its floor.
 func makeScheduler(
     reminders: any ReminderRepository,
     contacts: any ContactRepository,
-    interactions: any InteractionRepository,
+    interactions: any InteractionRepository = StubInteractionRepository(),
     clock: @escaping @Sendable () -> Date
 ) -> SchedulingPass {
     SchedulingPass(

@@ -57,89 +57,132 @@ struct SchedulingPassCadenceCycleTests {
 
     // MARK: - Caught up
 
-    enum Entry: String, CaseIterable, Sendable {
-        case runFull
-        case runForContact
-    }
-
-    /// `transitionState` leaves a `userCaughtUp` row out of every snapshot, so
-    /// the next run writes a fresh pending row for the next cycle: the new
-    /// anchor plus the cadence, resolved into the window.
+    /// `recordInteraction` reschedules inside its own lock span, so the next
+    /// cycle's row exists the moment the call returns: the new anchor plus
+    /// the cadence, resolved into the window, with the old floor gone. No
+    /// run is needed, and the run that follows has nothing to write.
     @Test(
-        "After Caught up the next run writes the next cadence row from the new anchor",
-        arguments: RepositoryContractBackend.allCases, Entry.allCases
+        "Caught up and Log other write the next cadence row in the same call",
+        arguments: RepositoryContractBackend.allCases, [SchedulingPass.Interaction.caughtUp, .other(.sms)]
     )
-    func caughtUpWritesNextCadenceRow(backend: RepositoryContractBackend, entry: Entry) async throws {
+    func caughtUpReschedulesInTheSameCall(
+        backend: RepositoryContractBackend, interaction: SchedulingPass.Interaction
+    ) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1, cadenceDays: 14)
+        // Gives the mock backend's seed cast their rows, so the run below has
+        // nothing left to write for anyone.
         try await fixture.pass.runFull()
-        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
 
-        let cleared = try await fixture.pass.caughtUp(contactId: contact.id)
-        _ = try await fixture.repositories.contacts.updateLastInteractedAt(
-            id: contact.id, at: PassFixture.at("2026-06-10 10:00"))
-        #expect(cleared)
-        #expect(try await fixture.cadenceRow(contact) == nil)
-        switch entry {
-        case .runFull: try await fixture.pass.runFull()
-        case .runForContact: try await fixture.pass.run(for: contact.id)
-        }
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, interaction))
 
         let row = try #require(try await fixture.cadenceRow(contact))
         #expect(row.state == .pending)
         #expect(row.scheduledFor == PassFixture.at("2026-06-24 18:00"))
         #expect(row.snoozedUntil == nil)
+        let writes = await fixture.reminders.writeCount
+        try await fixture.pass.runFull()
+        #expect(await fixture.reminders.writeCount == writes)
+        #expect(try await fixture.cadenceRow(contact) == row)
     }
 
-    /// Tech-lead ruling: `caughtUp` is state-only, so a failed caught-up's
-    /// restore brings the snooze back with its floor, and the next run keeps
-    /// it. If the transition cleared the floor, `runFull` would pull the
-    /// contact back to the overdue slot and lose the snooze.
+    /// A failed log restores the snooze with its floor, and the next run
+    /// keeps it. Passes on the old two-step code too; it fails if the restore
+    /// is dropped, because the row would stay `userCaughtUp` and the run
+    /// would then write a floorless row at the overdue slot.
     @Test(
-        "A failed Caught up restores the snooze and the next run keeps its floor",
+        "A failed Caught up throws, leaves the snoozed row as it was, and the next run keeps its floor",
         arguments: RepositoryContractBackend.allCases
     )
     func failedCaughtUpKeepsSnoozeFloor(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(backend: backend)
+        let fixture = try await PassFixture(backend: backend, interactions: StubInteractionRepository.failing())
         let contact = try await fixture.addContact(1)
         #expect(try await fixture.pass.snooze(contactId: contact.id))
         let snoozed = try #require(try await fixture.cadenceRow(contact))
         #expect(snoozed.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        #expect(snoozed.scheduledFor == PassFixture.at("2026-06-17 18:00"))
 
-        #expect(try await fixture.pass.caughtUp(contactId: contact.id))
-        let logging = InteractionLogging(
-            contacts: fixture.repositories.contacts, interactions: StubInteractionRepository.failing())
-        await #expect(throws: (any Error).self) {
-            try await logging.markCaughtUp(contactId: contact.id, at: PassFixture.at("2026-06-10 10:00"))
+        await #expect(throws: RepositoryFakeFailure.self) {
+            try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp)
         }
-        try await fixture.pass.restorePendingAfterFailedCaughtUp(contactId: contact.id)
+        #expect(try await fixture.cadenceRow(contact) == snoozed)
         try await fixture.pass.runFull()
 
         #expect(try await fixture.cadenceRow(contact) == snoozed)
-        #expect(snoozed.scheduledFor == PassFixture.at("2026-06-17 18:00"))
     }
 
-    /// Accepted until TF-07d (R60) runs the transition, the log write and the
-    /// reschedule in one lock span: a run that lands between `caughtUp` and a
-    /// failed action's restore writes a fresh pending row without the floor,
-    /// and the restore then finds nothing to put back. The snooze is lost.
-    /// This pins today's behavior; the R60 interleaving test replaces it.
+    /// The reschedule is the last step of the span and the interaction has
+    /// already landed, so a snapshot that fails to read must not turn the
+    /// action into a failure the caller would retry (and log twice). The row
+    /// stays `userCaughtUp` until the next run writes the next cycle's.
     @Test(
-        "A run between Caught up and its restore loses the snooze floor (accepted until TF-07d)",
+        "A logged interaction survives a failed reschedule, and the next run writes the next row",
         arguments: RepositoryContractBackend.allCases
     )
-    func runFullBetweenCaughtUpAndRestoreLosesTheFloor(backend: RepositoryContractBackend) async throws {
+    func loggedInteractionSurvivesAFailedReschedule(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
-        let contact = try await fixture.addContact(1)
+        let contact = try await fixture.addContact(1, cadenceDays: 14)
         #expect(try await fixture.pass.snooze(contactId: contact.id))
-        #expect(try await fixture.pass.caughtUp(contactId: contact.id))
+        await fixture.reminders.setObserveFails(true)
+
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
+
+        let logs = try await fixture.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+        #expect(logs.map(\.source) == [.reminderCaughtUp])
+        let stored = try #require(try await fixture.repositories.contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == PassFixture.at("2026-06-10 10:00"))
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        await fixture.reminders.setObserveFails(false)
 
         try await fixture.pass.runFull()
-        try await fixture.pass.restorePendingAfterFailedCaughtUp(contactId: contact.id)
 
         let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.scheduledFor == PassFixture.at("2026-06-24 18:00"))
         #expect(row.snoozedUntil == nil)
-        #expect(row.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+    }
+
+    /// Owner ruling 11: only a notification's Caught up needs a cadence-
+    /// eligible contact. The in-app actions work for any active contact, so
+    /// an untracked one can still be logged against from Contact Detail.
+    /// Fails if the eligibility check leaks into the in-app kinds.
+    @Test(
+        "In-app actions log for an untracked active contact; the notification kind refuses and logs nothing",
+        arguments: RepositoryContractBackend.allCases,
+        [SchedulingPass.Interaction.caughtUp, .other(.sms), .caughtUpFromNotification]
+    )
+    func inAppActionsStayOpenForUntrackedActiveContact(
+        backend: RepositoryContractBackend, interaction: SchedulingPass.Interaction
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1, cadenceDays: 14, tracked: false)
+        let expectLogged = interaction != .caughtUpFromNotification
+
+        let result = try await fixture.pass.recordInteraction(contactId: contact.id, interaction)
+
+        #expect(result == expectLogged)
+        let logs = try await fixture.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+        #expect(logs.count == (expectLogged ? 1 : 0))
+        let stored = try #require(try await fixture.repositories.contacts.fetch(id: contact.id))
+        let expectedAnchor = expectLogged ? PassFixture.at("2026-06-10 10:00") : contact.lastInteractedAt
+        #expect(stored.lastInteractedAt == expectedAnchor)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+    }
+
+    /// Log other records `.manual` against the channel the user picked, for
+    /// every channel, and Caught up uses the contact's own preferred one.
+    @Test("Log other logs .manual against each channel", arguments: Channel.allCases)
+    func recordInteractionLogsEveryChannel(channel: Channel) async throws {
+        let fixture = try await PassFixture(backend: .mock)
+        let contact = try await fixture.addContact(1)
+
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .other(channel)))
+
+        let logs = try await fixture.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+        #expect(logs.count == 1)
+        #expect(logs.first?.source == .manual)
+        #expect(logs.first?.channel == channel)
     }
 
     /// Plain no-re-nag with a floor: the snoozed slot has started, the contact
@@ -189,9 +232,11 @@ struct SchedulingPassCadenceCycleTests {
     /// the snapshot, so the no-re-nag guard never sees them, however far the
     /// clock has moved past the old `scheduledFor`. If the snapshot ever
     /// returned them, the guard (`anchor <= old scheduledFor`) would keep a
-    /// stale row here and the contact would get no reminder.
+    /// stale row here and the contact would get no reminder. A caught-up row
+    /// only lingers when the reschedule inside `recordInteraction` failed, so
+    /// this sets that up.
     @Test(
-        "A contact caught up from Upcoming, with the old slot still ahead, gets a new pending row when overdue again",
+        "A caught-up row left by a failed reschedule is replaced by a new pending row when overdue again",
         arguments: RepositoryContractBackend.allCases
     )
     func caughtUpWithTheOldSlotAheadGetsAFreshRowLater(backend: RepositoryContractBackend) async throws {
@@ -199,9 +244,10 @@ struct SchedulingPassCadenceCycleTests {
         let contact = try await fixture.addContact(1, cadenceDays: 7)
         try await fixture.pass.runFull()
         #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
-        #expect(try await fixture.pass.caughtUp(contactId: contact.id))
-        _ = try await fixture.repositories.contacts.updateLastInteractedAt(
-            id: contact.id, at: PassFixture.at("2026-06-10 10:00"))
+        await fixture.reminders.setObserveFails(true)
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
+        await fixture.reminders.setObserveFails(false)
+        #expect(try await fixture.cadenceRow(contact) == nil)
         // Past the old 06-10 18:00 slot and past the new due date, 06-17 10:00.
         fixture.setNow("2026-06-18 10:00")
 

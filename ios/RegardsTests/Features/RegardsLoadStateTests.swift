@@ -124,12 +124,7 @@ struct RegardsLoadStateTests {
             contacts: repository,
             interactions: StubInteractionRepository(),
             reminders: StubReminderRepository(),
-            scheduler: makeScheduler(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(),
-                clock: { Self.now }
-            ),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: repository, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -157,12 +152,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
-            scheduler: makeScheduler(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(),
-                clock: { Self.now }
-            ),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: repository, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(),
             clock: { Self.now }
@@ -211,11 +201,8 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
-            scheduler: SchedulingPass(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(
-            ),
+            scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: repository,
+                                      interactions: StubInteractionRepository(),
                                       window: FixedReminderWindowRepository(), occasions: { _ in [] }, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),
@@ -276,12 +263,7 @@ struct RegardsLoadStateTests {
             contacts: repository,
             interactions: StubInteractionRepository(),
             reminders: StubReminderRepository(),
-            scheduler: makeScheduler(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(),
-                clock: { Self.now }
-            ),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: repository, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -305,12 +287,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
-            scheduler: makeScheduler(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(),
-                clock: { Self.now }
-            ),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: repository, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(),
             clock: { Self.now }
@@ -379,12 +356,7 @@ struct RegardsLoadStateTests {
             contacts: repository,
             interactions: StubInteractionRepository(),
             reminders: StubReminderRepository(),
-            scheduler: makeScheduler(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(),
-                clock: { Self.now }
-            ),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: repository, clock: { Self.now }),
             clock: { Self.now }
         )
 
@@ -410,12 +382,7 @@ struct RegardsLoadStateTests {
         let viewModel = UpcomingViewModel(
             contacts: repository,
             reminders: nil,
-            scheduler: makeScheduler(
-                reminders: StubReminderRepository(),
-                contacts: repository,
-                interactions: StubInteractionRepository(),
-                clock: { Self.now }
-            ),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: repository, clock: { Self.now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(),
             clock: { Self.now }

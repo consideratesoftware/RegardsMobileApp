@@ -35,6 +35,14 @@ actor AsyncGate {
         }
     }
 
+    /// How many calls to `wait()` have been made. Lets a test poll, with a
+    /// bound, for an arrival that only reverted code would make.
+    var arrivalCount: Int { waiterCount }
+
+    /// Whether `open()` has been called and the gate has not been closed
+    /// since. Lets a test poll, with a bound, for a task that finishes.
+    var isOpened: Bool { isOpen }
+
     /// Releases every call currently suspended in `wait()`, and every future
     /// one, immediately.
     func open() {
@@ -229,5 +237,36 @@ struct GatedFetchByIDContactRepository: ContactRepository {
     @discardableResult
     func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
         try await wrapped.updateReminderWindowOverride(id: id, window: window)
+    }
+}
+
+/// Wraps an `InteractionRepository` so the **first** `append` parks on `gate`
+/// and then throws, which is a log write that is still in flight when a
+/// competing mutation arrives and then fails. Every later `append` passes
+/// straight through, except that, when `secondGate` is set, the second one
+/// parks on it first and then succeeds. R60 needs both: the first append is
+/// the failing action whose compensation must not revert anything newer, the
+/// second is the newer catch-up that must survive it.
+struct GatedFailingAppendInteractionRepository: InteractionRepository {
+    let wrapped: any InteractionRepository
+    let gate: AsyncGate
+    var secondGate: AsyncGate?
+    let counter = CallCounter()
+
+    func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
+        try await wrapped.fetchRecent(forContact: contactId, limit: limit)
+    }
+
+    func append(_ log: InteractionLog) async throws {
+        switch await counter.next() {
+        case 1:
+            await gate.wait()
+            throw RepositoryFakeFailure()
+        case 2:
+            if let secondGate { await secondGate.wait() }
+            try await wrapped.append(log)
+        default:
+            try await wrapped.append(log)
+        }
     }
 }
