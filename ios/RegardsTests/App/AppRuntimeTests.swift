@@ -202,6 +202,44 @@ struct AppRuntimeTests {
         #expect(after.occasionTime == before.occasionTime)
     }
 
+    /// Composition seam (§9: starter tracking is a cadence edit): the Settings
+    /// starter picker's save reaches the runtime's one pass, so an untracked
+    /// contact's pending row is cancelled and a newly tracked one is
+    /// scheduled before the screen closes. The production runtime uses the real
+    /// clock, so both contacts are long overdue rather than due at a set time.
+    @Test("The Settings starter picker schedules and cancels through the pass, and a second full run changes nothing")
+    @MainActor
+    func settingsStarterPickerSchedulesAndCancelsThroughThePass() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let longAgo = Date(timeIntervalSince1970: 1_600_000_000)
+        let xena = Contact(
+            systemContactRef: "starter-xena", displayName: "Xena",
+            tracked: true, cadenceDays: 7, lastInteractedAt: longAgo)
+        let yara = Contact(systemContactRef: "starter-yara", displayName: "Yara", lastInteractedAt: longAgo)
+        try await environment.contacts.upsert(xena)
+        try await environment.contacts.upsert(yara)
+        let runtime = try await AppRuntime.makeProduction(environment: environment)
+        try await runtime.scheduler.runFull()
+        func hasCadenceRow(_ contact: Contact) async throws -> Bool {
+            try await environment.reminders.fetchPending(forContact: contact.id).contains { $0.kind == .cadence }
+        }
+        #expect(try await hasCadenceRow(xena), "Setup: the tracked contact is scheduled.")
+        #expect(try await hasCadenceRow(yara) == false)
+        let picker = RegardsTabRoot.makeStarterContactsViewModel(runtime: runtime)
+        await picker.load()
+        picker.toggle(xena.id)
+        picker.toggle(yara.id)
+
+        #expect(await picker.save())
+
+        #expect(try await hasCadenceRow(xena) == false, "Untracking cancels the pending row.")
+        #expect(try await hasCadenceRow(yara), "Tracking schedules a row.")
+        let pending = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
+        try await runtime.scheduler.runFull()
+        let afterFull = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(afterFull == pending, "A second full run is a no-op.")
+    }
+
     @Test("Production runtime propagates a missing persisted window")
     func productionRuntimeRejectsMissingWindow() async throws {
         let environment = environment(window: StubReminderWindowRepository.missing())

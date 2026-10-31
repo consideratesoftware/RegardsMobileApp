@@ -14,25 +14,25 @@ import Testing
 /// deterministic.
 @MainActor
 struct StarterContactsViewModelSaveTests {
-    private static let importedAt = Date(timeIntervalSince1970: 1_790_000_000)
+    static let importedAt = Date(timeIntervalSince1970: 1_790_000_000)
 
     @MainActor
-    private final class Announcements {
+    final class Announcements {
         private(set) var messages: [String] = []
         func record(_ message: String) { messages.append(message) }
     }
 
-    private static func person(_ name: String) -> Contact {
+    static func person(_ name: String) -> Contact {
         Contact(systemContactRef: "save-\(name)", displayName: name, createdAt: importedAt)
     }
 
-    private static func store() throws -> any ContactRepository {
+    static func store() throws -> any ContactRepository {
         ProductionRepositoryFactory.makeEnvironment(database: try DatabaseFactory.makeInMemoryDatabase()).contacts
     }
 
     /// The store's tracked set as `[id: cadenceDays]`, the shape of
     /// `StarterContactsViewModel.selection`.
-    private static func trackedInStore(_ store: any ContactRepository) async throws -> [UUID: Int] {
+    static func trackedInStore(_ store: any ContactRepository) async throws -> [UUID: Int] {
         var tracked: [UUID: Int] = [:]
         for contact in try await store.fetchAll() where contact.isCadenceEligible {
             tracked[contact.id] = contact.cadenceDays
@@ -369,7 +369,7 @@ struct StarterContactsViewModelSaveTests {
 
 /// Wraps a repository so a test can hold the first `updateTracking` write open
 /// on a gate, or make one numbered call throw. Everything else passes through.
-private actor ScriptedTrackingContactRepository: ContactRepository {
+actor ScriptedTrackingContactRepository: ContactRepository {
     private let wrapped: any ContactRepository
     private let gate: AsyncGate?
     private let failOnCall: Int?

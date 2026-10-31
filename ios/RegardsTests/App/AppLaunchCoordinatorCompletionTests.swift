@@ -92,9 +92,14 @@ extension AppLaunchCoordinatorRecoveryTests {
 
         #expect(launch.phase == .ready)
         #expect(try await profile.fetch().onboardingCompletedAt == Self.now)
-        let refs = try await environment.contacts.fetchAll().map(\.systemContactRef)
-        #expect(Set(refs) == [Self.systemContact.identifier, Self.han.identifier])
+        let imported = try await environment.contacts.fetchAll()
+        #expect(Set(imported.map(\.systemContactRef)) == [Self.systemContact.identifier, Self.han.identifier])
         #expect(source.fetchCountValue() == 2, "The launch import plus one reconcile after the retry.")
+        // The reconcile only imports: Han is untracked, so the pass has nothing
+        // to schedule for him, and the reconcile ran no pass of its own.
+        let han = try #require(imported.first { $0.systemContactRef == Self.han.identifier })
+        #expect(han.tracked == false)
+        #expect(try await environment.reminders.fetchPending(forContact: han.id).isEmpty)
     }
 
     @Test("Done after onboarding is already complete writes nothing")

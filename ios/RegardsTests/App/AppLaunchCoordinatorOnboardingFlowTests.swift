@@ -187,6 +187,37 @@ extension AppLaunchCoordinatorTests {
         #expect(source.fetchCountValue() == 2, "The import at launch plus one reconcile after Done.")
     }
 
+    @Test("A starter picked in onboarding is scheduled when onboarding finishes, and a second full run is a no-op")
+    func onboardingStarterIsScheduledWhenOnboardingFinishes() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let source = ScriptedLaunchContactsSource(
+            status: .authorized, contacts: [Self.systemContact, Self.han, Self.luke])
+        let launch = coordinator(environment: environment, source: source)
+        await launch.start()
+        #expect(launch.onboardingStep == .starter)
+        // The onboarding picker, as OnboardingFlowView builds it: no pass of its own.
+        let picker = StarterContactsViewModel(contacts: environment.contacts, onSaved: { _ in })
+        await picker.load()
+        let leia = try #require(picker.contacts.first { $0.displayName == "Leia Organa" })
+        let han = try #require(picker.contacts.first { $0.displayName == "Han Solo" })
+        picker.toggle(leia.id)
+        #expect(await picker.save())
+        func pendingCadence(_ contact: Contact) async throws -> Bool {
+            try await environment.reminders.fetchPending(forContact: contact.id).contains { $0.kind == .cadence }
+        }
+        #expect(try await pendingCadence(leia) == false, "Nothing is scheduled before onboarding finishes.")
+
+        await launch.finishOnboarding()
+
+        #expect(launch.phase == .ready)
+        #expect(try await pendingCadence(leia), "Completion's full pass schedules the starter.")
+        #expect(try await pendingCadence(han) == false)
+        let pending = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
+        try await #require(launch.runtime).scheduler.runFull()
+        let afterFull = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(afterFull == pending)
+    }
+
     // The launch flips .loading to .onboarding only if nothing else decided
     // the phase while it read the authorization.
     @Test("Browsing without contacts during the authorization read is not undone when the read returns")
