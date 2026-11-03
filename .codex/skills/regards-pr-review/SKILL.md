@@ -18,14 +18,18 @@ Treat the literal target `worktree` as all tracked and untracked changes against
    - Branch/ref: `git diff --stat <target>` and `git diff <target>`.
    - Worktree: `git status --short`, `git diff HEAD`, and every untracked file.
 3. Stop if the target is empty.
-4. Run the mechanical gates before spawning reviewers:
+4. Run the mechanical gates before spawning reviewers. These 4 are the whole
+   set:
    - Copy `ios/` into a temporary directory, run `xcodegen generate` inside the
-     temporary `ios/`, and compare its `Regards.xcodeproj` with the working
-     tree. Do not generate into the working tree during a review.
+     temporary `ios/`, compare its `Regards.xcodeproj` with the working tree,
+     and remove the temporary directory on both paths. Do not generate into
+     the working tree during a review.
    - Run SwiftLint from the repo root, never from `ios/` (`.swiftlint.yml`
      lives at the root): `(cd "<worktree root>" && swiftlint --strict)`.
-   - Run the privacy and domain-purity checks defined in
-     `.github/workflows/guards.yml`.
+   - Run the 2 guard scripts CI runs, from the repo root:
+     `scripts/check-no-network.sh` (the privacy grep) and
+     `scripts/check-domain-purity.sh`. Each is its own check; a nonzero exit
+     from either fails the gates.
 5. If a gate fails, return `REQUEST_CHANGES` with the gate evidence and do not
    dispatch reviewers.
 
