@@ -13,12 +13,13 @@ never pick up Android work.
 ## Current checkpoint
 
 - Updated: 2026-10-31
-- Baseline: `main` at `0b784d7` (merge of PR #66, `TF-07a`, the engine,
-  merged 2026-10-28). PR #65, `TF-07b` (schema v3 and `observeSchedule`),
+- Baseline: `main` at `55c3d16` (merge of PR #67, `TF-07c`, the pass core,
+  merged 2026-10-30 Pacific). PR #66, `TF-07a`, the engine, merged as `0b784d7`
+  on 2026-10-28. PR #65, `TF-07b` (schema v3 and `observeSchedule`),
   merged as `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06`
   fast-follow, merged as `3ebe90e`. `TF-05` merged as PR #63 (`a887ece`),
   and `TF-06` merged as PR #62 (`de33098`).
-- Active work: `TF-07c` is done (PR #67, merged as `55c3d16` on 2026-10-31). `TF-07d` through
+- Active work: `TF-07c` is done (PR #67, merged as `55c3d16` on 2026-10-30 Pacific). `TF-07d` through
   `TF-07g` follow it in the same lane. `TF-11` is in progress on `claude/tf-11-onboarding` in its own lane.
   Owner ruling 8 moved every device-only check to the pre-release device pass (see `Owner gates`), so TF-03's
   device acceptance no longer blocks `TF-07` or `TF-11`. `TF-03`'s code is merged in PR #48.
