@@ -80,6 +80,10 @@ line. If your prompt names no such file, it is missing, or its sha differs,
 report STATE CODEX STALE; the engineering manager reruns Codex. `/org` and `ENGINEERING_ORG.md` point here; they don't
 restate the rule.
 
+Lane files (`codex-<short sha>.md`, `owner-answers.md`): use the absolute paths
+the engineering manager's prompt gives. You don't run from the root checkout,
+so a `../RegardsMobileApp-lanes/...` path would resolve somewhere else.
+
 Title `TF-##: <row scope, short>`. Body
 must name the `TF-##`, §14 alias, and R-items. `--draft` when the item
 depends on an unmerged parent. Push with explicit branch name; never force.

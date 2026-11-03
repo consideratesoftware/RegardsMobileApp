@@ -215,8 +215,9 @@ report.
 ## Stage 4: ship
 
 Save the PR body draft to `pr-body.md` in the lane's folder, then launch
-`release-manager` with every report from the lane, the path of
-`owner-answers.md` if it exists, and the path of the Codex review file. It opens the PR,
+`release-manager` with every report from the lane, plus the absolute paths
+(the release manager runs elsewhere) of `owner-answers.md`, if it exists, and
+of the Codex review file. It opens the PR,
 watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
