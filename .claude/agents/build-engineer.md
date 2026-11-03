@@ -106,18 +106,21 @@ the run before step 5.
      ```
    - Any other nonzero exit: FAIL with the script's output.
    - Output `<udid> <runtime>`: FAIL with `empty runtime` if `<runtime>` is
-     empty. If `<runtime>` is `<rt>`, note `<udid>`. If it differs, the name
-     may also exist on `<rt>` (the resolver prefers the newest runtime), so
-     list every copy, one `<runtime> <udid>` line each:
+     empty. Otherwise list every copy of the name, one `<runtime> <udid>`
+     line each, whether or not the resolver's runtime is `<rt>` (the resolver
+     prefers the newest runtime, so it can hide a copy on `<rt>`):
      ```
      xcrun simctl list devices available -j | jq -r --arg n "<simulator>" '.devices | to_entries[] | .key as $r | .value[] | select(.name == $n) | "\($r) \(.udid)"'
      ```
-     A copy on `<rt>` exists: note its UDID, delete each copy on another
-     runtime (`xcrun simctl delete "<udid>"`; the name belongs to this lane,
-     and deleting beats recreating it), and say so on the `SIMULATOR` line.
-     No copy is on `<rt>`: FAIL with `simulator is on <runtime>, the CI rule
-     resolves <rt>`. The engineering manager deletes it and reruns; don't
-     recreate it in a loop yourself.
+     - More than one copy: clean up now, every time. If one is on `<rt>`,
+       note its UDID, delete each copy on another runtime
+       (`xcrun simctl delete "<udid>"`; the name belongs to this lane, and
+       deleting beats recreating it), and say so on the `SIMULATOR` line. If
+       none is on `<rt>`, FAIL with `no copy on <rt>` and the lines.
+     - One copy: if it is on `<rt>`, note its UDID. Otherwise FAIL with
+       `simulator is on <runtime>, the CI rule resolves <rt>`. The
+       engineering manager deletes it, and the next run creates it on `<rt>`;
+       don't recreate it in a loop yourself.
 
    Then boot it and wait. This boots only if needed and can take several
    minutes on a cold start. If it reports Busy, run `xcrun simctl shutdown

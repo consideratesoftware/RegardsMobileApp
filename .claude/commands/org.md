@@ -106,6 +106,10 @@ For each READY item in queue order, up to the budget:
 3. Create the lane:
    `git worktree add ../RegardsMobileApp-TF## -b claude/tf-##-<slug> origin/main`.
    Simulator `RegardsTF##`, DerivedData `/tmp/RegardsTF##DerivedData`.
+   After an Xcode update adds a runtime, a lane's simulator can sit on an older
+   one. If every copy of it is on an older runtime than `build-engineer`
+   resolves, delete it (`xcrun simctl delete`); the build engineer recreates
+   it on its next run.
 
 Stage 2 runs for all READY items before Stage 3 starts any lane, so lock
 conflicts are decided with full information.
@@ -159,8 +163,8 @@ a comment; the full review stays in the lane's report.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits the files, which makes a new head, so the
-rerun is the first run on that head; never discard them without asking
-Sid), then run it once more on the same head. That is the one automatic
+rerun is the first run on the head the commit produces; never discard them
+without asking Sid), then run it once more on the same head. That is the one automatic
 rerun. A second RETRY on the same head, a timeout included, is an owner gate:
 record it as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs
 origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
