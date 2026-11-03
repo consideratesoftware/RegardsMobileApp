@@ -254,13 +254,9 @@ public final class UpcomingViewModel {
     /// snoozed date keeps winning `buildRows`'
     /// `max(now, overdueAt, snoozedUntil)` over the freshly computed one.
     ///
-    /// Reloads explicitly on success too, unlike `OverdueViewModel`: the
-    /// optimistic update above only *removes* the cadence row, but a
-    /// freshly caught-up contact can legitimately owe a *new* one inside
-    /// the horizon — Overdue skips this since its `overdueDays` is always 0
-    /// once caught up. This reload also used to be the only fix for a
-    /// stale-snooze race the write-order change above now closes at the
-    /// source, so it stays for the "new row owed" case only.
+    /// Reloads on success too, as `OverdueViewModel` does: the optimistic
+    /// update above only *removes* the cadence row, but a freshly caught-up
+    /// contact can legitimately owe a *new* one inside the horizon.
     ///
     /// `loadGeneration` is bumped synchronously with the optimistic mutation
     /// below, mirroring `OverdueViewModel.markCaughtUp` — a `load()` already
