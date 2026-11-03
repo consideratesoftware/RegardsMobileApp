@@ -184,8 +184,9 @@ reviewers that ran and one `CARRIED:` line per reviewer whose earlier
 approval stands, as `CARRIED: <reviewer> APPROVE from <sha>`.
 
 An approval carries to a new head only when every commit since it changes
-docs or comments only: no non-comment line in any `.swift`, `.yml`, `.sh`,
-`.py`, `.toml`, or project file. The release manager checks each `CARRIED:`
+docs or comments only: every path is `.md`, `.swift`, `.yml`, `.sh`, `.py`, or
+`.toml` (never `project.yml`, the Xcode project, a plist, json, or any other
+type), and no non-comment line changed. The release manager checks each `CARRIED:`
 line mechanically (`release-manager.md`, Merge conditions) and rejects one
 that fails, so if you aren't sure, rerun the reviewer. `pr-security-privacy`
 never carries: it reruns on every head the release manager checks. Codex

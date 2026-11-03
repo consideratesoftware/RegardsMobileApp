@@ -159,22 +159,53 @@ PR, never in the root checkout.
   hold:
   1. The reviewer is not `pr-security-privacy` (it reruns on every head and
      never carries) and the line is not about Codex.
-  2. `<sha>` is an ancestor of the head
-     (`git merge-base --is-ancestor <sha> <head sha>`).
-  3. `git diff --name-only <sha> <head sha>` lists only `*.md` files and
-     source files that pass check 4.
-  4. Both of these print nothing. The first covers Swift (comments are `//`),
-     the second the `#`-comment languages and project files:
-     ```
-     git diff --unified=0 --no-color <sha> <head sha> -- '*.swift' \
-       | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) (a/|b/|/dev/null)' \
-       | grep -vE '^[+-][[:space:]]*(//|$)'
-     git diff --unified=0 --no-color <sha> <head sha> -- '*.yml' '*.sh' '*.py' '*.toml' \
-       | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) (a/|b/|/dev/null)' \
-       | grep -vE '^[+-][[:space:]]*(#|$)'
-     ```
-     A change under `ios/Regards.xcodeproj` or to `project.yml` is never
-     comment-only, so a carry fails if either appears in the file list.
+  2. `<sha>` is an ancestor of the head.
+  3. Every path in `git diff --name-only <sha> <head sha>` ends in `.md`,
+     `.swift`, `.yml`, `.sh`, `.py`, or `.toml`, and is neither `project.yml`
+     nor under `ios/Regards.xcodeproj`. Any other path fails the carry: a
+     plist, `.xcprivacy`, json, `.kts`, properties, `Package.resolved`, or an
+     extensionless script all fail.
+  4. The non-`.md` files change comments and blank lines only. A shebang
+     (`#!`) line never counts as a comment, and neither does any change to
+     line 1 of a `.sh` file, a mode change, or an added, deleted, or renamed
+     file.
+  Run checks 2 to 4 as one script, with `<lane>` the absolute lane worktree
+  path from your prompt. Any git error fails the carry. It prints `CARRY
+  PASSES` or `CARRY FAILS` with the reason:
+  ```
+  lane="<lane>"; from="<sha>"; head="<head sha>"
+  fail() { echo "CARRY FAILS: $1"; exit 1; }
+  git -C "$lane" merge-base --is-ancestor "$from" "$head" || fail "not an ancestor, or a git error"
+  names=$(git -C "$lane" diff --name-only "$from" "$head") || fail "git error listing files"
+  for f in $names; do
+    case "$f" in
+      project.yml|*/project.yml|ios/Regards.xcodeproj/*) fail "project file: $f" ;;
+      *.md|*.swift|*.yml|*.sh|*.py|*.toml) ;;
+      *) fail "path outside the allowlist: $f" ;;
+    esac
+  done
+  diff=$(git -C "$lane" diff --unified=0 --no-color "$from" "$head" -- '*.swift' '*.yml' '*.sh' '*.py' '*.toml') || fail "git error reading the diff"
+  bad=$(printf '%s\n' "$diff" | awk '
+    /^diff --git / { hdr = 1; file = $NF; sub(/^b\//, "", file); next }
+    hdr && /^(old mode|new mode|new file mode|deleted file mode|rename |similarity )/ { print "mode/add/delete/rename: " file; next }
+    /^@@ / {
+      hdr = 0
+      if (file ~ /\.sh$/ && ($0 ~ /^@@ -1( |,[1-9])/ || $0 ~ /^@@ -0,0 / || $0 ~ / \+1( |,[1-9])/)) print "line 1 of " file
+      next
+    }
+    hdr { next }
+    /^[+-]/ {
+      body = substr($0, 2)
+      if (body ~ /^[[:space:]]*$/) next
+      if (file ~ /\.swift$/) { if (body ~ /^[[:space:]]*\/\//) next }
+      else if (body ~ /^#!/) { print "shebang in " file ": " $0; next }
+      else if (body ~ /^[[:space:]]*#/) next
+      print file ": " $0
+    }
+  ')
+  [ -z "$bad" ] || fail "non-comment change: $bad"
+  echo "CARRY PASSES"
+  ```
   If any check fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.
