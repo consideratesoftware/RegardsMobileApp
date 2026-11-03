@@ -43,6 +43,10 @@ the engineer reads from it.
 
 ## Steps, in order; stop at the first hard failure unless told to continue
 
+Steps 2 to 4 are the exception: they run in parallel (see after step 7), so
+all 3 report even when one fails. A hard failure in any of them still stops
+the run before step 5.
+
 1. **Stray copies.** Any output at all: FAIL. No output: pass. Judge the
    output text, never the exit status. `find` exits 0 either way. In a
    linked worktree `<worktree>/.git` is a file, so the last 2 commands scan
@@ -84,7 +88,9 @@ the engineer reads from it.
    `simctl`'s device list on stdin and picks the newest installed runtime
    that holds the named device. First get the runtime the CI rule resolves,
    by naming the stock device. It prints `<udid> <runtime>`; note the
-   runtime as `<rt>`:
+   runtime as `<rt>`. If this command fails or prints an empty runtime, FAIL
+   with `no <rt>` and the script's output, and go no further: with no `<rt>`
+   the create command below would use whatever runtime is newest.
    ```
    xcrun simctl list devices available -j | "<worktree>/scripts/prepare-audit-simulator.sh" "iPhone 17 Pro" --resolve-only
    ```
@@ -100,9 +106,18 @@ the engineer reads from it.
      ```
    - Any other nonzero exit: FAIL with the script's output.
    - Output `<udid> <runtime>`: FAIL with `empty runtime` if `<runtime>` is
-     empty, and with `simulator is on <runtime>, the CI rule resolves <rt>`
-     if it differs from `<rt>`; the engineering manager deletes or recreates
-     it. Otherwise note `<udid>`.
+     empty. If `<runtime>` is `<rt>`, note `<udid>`. If it differs, the name
+     may also exist on `<rt>` (the resolver prefers the newest runtime), so
+     list every copy, one `<runtime> <udid>` line each:
+     ```
+     xcrun simctl list devices available -j | jq -r --arg n "<simulator>" '.devices | to_entries[] | .key as $r | .value[] | select(.name == $n) | "\($r) \(.udid)"'
+     ```
+     A copy on `<rt>` exists: note its UDID, delete each copy on another
+     runtime (`xcrun simctl delete "<udid>"`; the name belongs to this lane,
+     and deleting beats recreating it), and say so on the `SIMULATOR` line.
+     No copy is on `<rt>`: FAIL with `simulator is on <runtime>, the CI rule
+     resolves <rt>`. The engineering manager deletes it and reruns; don't
+     recreate it in a loop yourself.
 
    Then boot it and wait. This boots only if needed and can take several
    minutes on a cold start. If it reports Busy, run `xcrun simctl shutdown
