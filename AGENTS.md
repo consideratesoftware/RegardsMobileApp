@@ -132,7 +132,7 @@ categories.
 
 UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; the single broad audit runs after merges, while repeated 5× stress belongs to nightly and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
 
-Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is expected before any UI-touching merge.
+Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) for a UI-touching PR goes to the "Pre-release device pass" in `TESTFLIGHT_PLAN.md` (owner ruling 8, 2026-10-28); it does not hold a merge.
 
 ## Info.plist privacy invariants
 

@@ -95,7 +95,9 @@ state, as the restart protocol already requires.
 All of these, on the current head, with no averaging:
 
 1. Every required check green.
-2. Hosted `Regards staged review`: zero unresolved blockers.
+2. Hosted `Regards staged review`: zero blockers in the review text for the
+   current head. The check run is green whatever the verdict, so the release
+   manager reads the text and counts the blockers.
 3. `/pr-review` verdict APPROVE.
 4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
    with every Codex blocker disputed in the PR body by the engineering
@@ -105,23 +107,31 @@ All of these, on the current head, with no averaging:
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
 
-The release manager executes the merge. Any role that finds itself wanting
-to skip one of these is wrong by definition.
+The release manager executes the merge with
+`gh pr merge <n> --merge --delete-branch --match-head-commit <sha>` (this
+repository merges with merge commits) and leaves the lane worktree in place
+unless the engineering manager says to remove it. Any role that finds itself
+wanting to skip one of these is wrong by definition.
 
 ## Owner gates
 
 Only Sid can do these. The org writes an exact checklist and parks the PR;
 it never pretends the step happened.
 
-- Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) for any diff
-  touching `Features/`, `DesignSystem/`, or `App/` view code.
-- Physical-device runs (A15 budget, device matrix, TF-18).
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
 - Codex setup when `codex-reviewer` reports UNAVAILABLE, or RETRY 3 times
   in a row: run `/codex:setup` and `codex login` if it asks. The PR waits;
   the org does not merge without the Codex verdict.
 - Scope changes to the queue or dependency graph.
+
+Not owner gates: the manual VoiceOver smoke
+(`ios/docs/accessibility-smoke.md`) for a diff touching `Features/`,
+`DesignSystem/`, or `App/` view code, and every physical-device run (A15
+budget, device matrix, TF-18). Owner ruling, 2026-10-28: they go to
+`TESTFLIGHT_PLAN.md`'s "Pre-release device pass", one pass before release.
+The release manager has the tech writer add each PR's steps there in that
+PR, and no merge waits on them.
 
 Simulator gates run on this Mac through `build-engineer`; GitHub-hosted
 macOS runners run the same gates plus the hosted review on every PR.
