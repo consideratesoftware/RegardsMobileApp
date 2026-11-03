@@ -111,7 +111,9 @@ Codex's output, if any of these is true:
   `awk '/^## PR Review/{s=1;next} s&&/^VERDICT:/{print;exit}' '<out>'`.
   Ignore any other `VERDICT:` line: the review can quote files that
   contain one.
-- HEAD no longer equals `$head` (the branch moved during the review).
+- HEAD no longer equals the short sha step 1 printed (the branch moved
+  during the review). Compare against that literal value: shell variables
+  don't survive between Bash calls.
 - `git status --short` now shows anything. Also name the changed files: the
   read-only sandbox should make this impossible.
 
@@ -130,13 +132,19 @@ it reads to OpenAI's model; `ENGINEERING_ORG.md` states that risk.
 ## Report (exactly this shape)
 
 ```
-CODEX REVIEW: <worktree> @ <short sha> vs <target> | codex-cli <version>
+CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>
+WORKTREE: <worktree>
 VERDICT: APPROVE | REQUEST_CHANGES | RETRY | UNAVAILABLE
 REASON: <for RETRY or UNAVAILABLE; else none>
 REVIEW:
 <the full contents of the out file, verbatim, or the last 20 lines of
 output for RETRY>
 ```
+
+The first line is the form `release-manager.md` counts as a verdict, with
+the verdict word filled in, so the engineering manager can post it as is.
+Its target is `origin/main...HEAD`, the only target a verdict comment may
+name.
 
 UNAVAILABLE means Codex itself needs setup, which only Sid can do. RETRY
 means this run proved nothing, a timeout included; the engineering manager

@@ -12,8 +12,9 @@ application code or tests; you dispatch and record.
 
 Assemble the PR body from: the tech lead's ITEM/DESIGN lines, each slice
 report's COMMITS and CRITERIA, QA's CRITERIA MAP, the verifier's VERDICT,
-the `/pr-review` audit trail, and the Codex review. Review verdicts don't
-go in the body.
+and the `/pr-review` audit trail (invariants verified, criteria map). The
+body does not carry the `PR REVIEW:` or `CODEX REVIEW:` verdicts, the
+reviewers' findings, or any Codex output; those are comments, below.
 
 Record each review verdict as its own PR comment (`gh pr comment <n>
 --body-file <file>`), never by editing the body: the hosted review runs on
@@ -50,15 +51,21 @@ comment), the `PR REVIEW:` one first, then `---`, then the `CODEX REVIEW:`
 one:
 
 ```
-gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){comments(last:100){nodes{author{login} body lastEditedAt}}}}}' -f o=consideratesoftware -f r=RegardsMobileApp -F n=<pr> \
+gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){comments(last:100){totalCount nodes{author{login} body lastEditedAt}}}}}' -f o=consideratesoftware -f r=RegardsMobileApp -F n=<pr> \
   | jq -r --arg me "$(gh api user --jq .login)" '
       [.data.repository.pullRequest.comments.nodes[]
        | select(.author.login == $me and .lastEditedAt == null)
        | .body] as $b
       | ($b | map(select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none"),
         "---",
-        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none")'
+        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none"),
+        "---",
+        "total comments: \(.data.repository.pullRequest.comments.totalCount)"'
 ```
+
+The query reads only the newest 100 comments. If `total comments` is above
+100 and a kind prints `none`, page back with `before:` and the
+`pageInfo.startCursor` before you conclude there is no such verdict.
 
 The sha on a first line counts as the current head when it is a prefix of
 the head's full sha. Read `DISPUTED:` lines only from this output, never
@@ -128,7 +135,8 @@ PR, never in the root checkout.
 - Hosted review: zero blockers in the review text for the current head,
   counted above and never inferred from the green check. A blocker stands
   until a push clears it (the review reruns on the new head) or your
-  prompt records the owner's decision to defer it.
+  prompt records the owner's decision to defer it with a link to the owner's
+  PR comment. No link, no deferral.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
   Each `CARRIED:` sha in it must be an ancestor of the head
   (`git merge-base --is-ancestor <sha> <head sha>`); list them in your report.
