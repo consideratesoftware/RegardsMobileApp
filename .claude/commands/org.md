@@ -174,15 +174,21 @@ can't launch agents.
 
 Scoped rechecks. Owner ruling, 2026-11-02 (PR #68 comment 6597940023): after
 a round with no blockers, you may recheck the fixes without asking Sid.
-Rerun only the `/pr-review` reviewers whose areas the new commits touch
-(routing table in `pr-review.md`), plus `codex-reviewer`, which always
-reviews the whole `origin/main...HEAD` diff at the current head. Ask Sid
-only if a blocker survives 2 rounds or a fix needs a product decision. The
-`PR REVIEW:` comment for a scoped recheck adds a `RERAN:` line naming the
+Rerun the `/pr-review` reviewers whose areas the new commits touch (routing
+table in `pr-review.md`), plus `codex-reviewer`, which always reviews the
+whole `origin/main...HEAD` diff at the current head. Ask Sid only if a
+blocker survives 2 rounds or a fix needs a product decision. The `PR
+REVIEW:` comment for a scoped recheck adds a `RERAN:` line naming the
 reviewers that ran and one `CARRIED:` line per reviewer whose earlier
-approval stands, as `CARRIED: <reviewer> APPROVE from <sha>`. Carry an
-approval only from a head where that reviewer ran, and only when no commit
-since then touched the paths it covers.
+approval stands, as `CARRIED: <reviewer> APPROVE from <sha>`.
+
+An approval carries to a new head only when every commit since it changes
+docs or comments only: no non-comment line in any `.swift`, `.yml`, `.sh`,
+`.py`, `.toml`, or project file. The release manager checks each `CARRIED:`
+line mechanically (`release-manager.md`, Merge conditions) and rejects one
+that fails, so if you aren't sure, rerun the reviewer. `pr-security-privacy`
+never carries: it reruns on every head the release manager checks. Codex
+never carries either.
 
 Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
 and Stage 3 alike. Don't start a general-purpose agent and tell it to read

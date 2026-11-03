@@ -139,7 +139,10 @@ fixes without asking Sid: the `/pr-review` reviewers whose areas the new
 commits touch, plus `codex-reviewer` on the whole `origin/main...HEAD` diff
 at the current head. Sid is asked only if a blocker survives 2 rounds or a
 fix needs a product decision. The `PR REVIEW:` comment lists which
-reviewers reran and which approvals carry from which sha.
+reviewers reran and which approvals carry from which sha. An approval
+carries only when every commit since it changes docs or comments only, and
+the release manager checks that mechanically. `pr-security-privacy` and
+Codex never carry; they run again on every head.
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his

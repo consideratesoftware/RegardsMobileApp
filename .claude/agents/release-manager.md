@@ -149,8 +149,30 @@ PR, never in the root checkout.
   prompt records the owner's decision to defer it with a link to the owner's
   PR comment. No link, no deferral.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
-  Each `CARRIED:` sha in it must be an ancestor of the head
-  (`git merge-base --is-ancestor <sha> <head sha>`); list them in your report.
+  Check each `CARRIED: <reviewer> APPROVE from <sha>` line mechanically,
+  and list the results in your report. A carry stands only if all of these
+  hold:
+  1. The reviewer is not `pr-security-privacy` (it reruns on every head and
+     never carries) and the line is not about Codex.
+  2. `<sha>` is an ancestor of the head
+     (`git merge-base --is-ancestor <sha> <head sha>`).
+  3. `git diff --name-only <sha> <head sha>` lists only `*.md` files and
+     source files that pass check 4.
+  4. Both of these print nothing. The first covers Swift (comments are `//`),
+     the second the `#`-comment languages and project files:
+     ```
+     git diff --unified=0 --no-color <sha> <head sha> -- '*.swift' \
+       | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) (a/|b/|/dev/null)' \
+       | grep -vE '^[+-][[:space:]]*(//|$)'
+     git diff --unified=0 --no-color <sha> <head sha> -- '*.yml' '*.sh' '*.py' '*.toml' \
+       | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) (a/|b/|/dev/null)' \
+       | grep -vE '^[+-][[:space:]]*(#|$)'
+     ```
+     A change under `ios/Regards.xcodeproj` or to `project.yml` is never
+     comment-only, so a carry fails if either appears in the file list.
+  If any check fails, reject the carry: report STATE CODEX STALE with
+  "carry rejected: <reviewer>", and the engineering manager reruns that
+  reviewer.
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
   `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check
