@@ -38,11 +38,12 @@ echo "head $head prompt $prompt out $out"
   of the error only.
 - `git status --short` not empty: report RETRY with reason "dirty tree"
   and the list. The review target is committed history, so uncommitted
-  files would go unreviewed; whoever owns the lane commits or discards
-  them before the rerun.
+  files would go unreviewed; whoever owns the lane commits them before the
+  rerun, which makes a new head. Nobody discards them without asking Sid.
 
-**Step 2. Prompt.** Use the Write tool to write this text to the `$prompt`
-path from step 1, filling in the 3 placeholders. Writing it with the Write
+**Step 2. Prompt.** Use the Write tool to write this text to the prompt path
+step 1 printed (the literal path, not `$prompt`: shell variables don't
+survive between Bash calls), filling in the 3 placeholders. Writing it with the Write
 tool keeps the §14 row and other pasted text away from the shell.
 
 ```

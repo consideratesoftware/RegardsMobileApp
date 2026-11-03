@@ -157,11 +157,12 @@ counts, and the `DISPUTED:` lines only. Never paste a reviewer's output into
 a comment; the full review stays in the lane's report.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
-dirty tree: the lane's owner commits or discards the files), then run it
-once more on the same head. That is the one automatic rerun. A second
-RETRY on the same head, a timeout included, is an owner gate: record it
-as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs <target>
-| codex-cli <version>`, so a restart sees the gate instead of rerunning
+dirty tree: the lane's owner commits the files, which makes a new head, so
+the rerun is the first RETRY-eligible run on that head; never discard them
+without asking Sid), then run it once more on the same head. That is the one
+automatic rerun. A second RETRY on the same head, a timeout included, is an
+owner gate: record it as `CODEX REVIEW: UNAVAILABLE (second RETRY:
+<reason>) @ <sha> vs origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead of rerunning
 again. A RETRY after a repair moved the head is the first RETRY on the new
 head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate
 in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up
