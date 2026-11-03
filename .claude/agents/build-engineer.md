@@ -45,11 +45,12 @@ the engineer reads from it.
 
 1. **Stray copies.** Any output at all: FAIL. No output: pass. Judge the
    output text, never the exit status. `find` exits 0 either way. In a
-   linked worktree `<worktree>/.git` is a file, so the second command scans
-   the real git directory instead.
+   linked worktree `<worktree>/.git` is a file, so the last 2 commands scan
+   the worktree's own git directory and the shared one instead.
    ```
    find "<worktree>" -name "* 2.*" -not -path "*/.git/*"
-   find "$(git -C "<worktree>" rev-parse --git-dir)" -maxdepth 1 -name "* 2*"
+   find "$(git -C "<worktree>" rev-parse --absolute-git-dir)" -maxdepth 1 -name "* 2*"
+   find "$(git -C "<worktree>" rev-parse --path-format=absolute --git-common-dir)" -maxdepth 1 -name "* 2*"
    ```
 2. **XcodeGen determinism.** Generate in a temp copy, never in the worktree.
    Exit 0 is pass; anything else is FAIL, and the diff output is the report.
@@ -63,13 +64,14 @@ the engineer reads from it.
 3. **SwiftLint.** Run from the worktree root, as `lint.yml` does, never from
    `ios/`. `.swiftlint.yml` lives at the root; from `ios/` it isn't loaded.
    ```
-   (cd "<worktree>" && swiftlint --strict)
+   (cd "<worktree>" && swiftlint --strict); echo "swiftlint exit $?"
    ```
-   Sanity check before reporting: if the violation count is in the hundreds and
-   includes `trailing_comma` or `identifier_name`, the config wasn't loaded.
-   Those results are false. Rerun the exact command above, and report both
-   counts (`first run N, rerun M`) so a real config regression isn't hidden.
-   The rerun decides pass or fail.
+   Exit 0 is pass. Rerun only for this signature: the violation count is in
+   the hundreds and includes `trailing_comma` or `identifier_name`, which
+   means the config wasn't loaded and those results are false. Then rerun the
+   exact command above once, and report both counts (`first run N, rerun M`)
+   so a real config regression isn't hidden. The rerun decides pass or fail.
+   Any other nonzero exit is a FAIL as reported; don't rerun it.
 4. **Guards.** Run both, even if the first fails. A nonzero exit from either
    is FAIL; name the script and paste its matches.
    ```
@@ -108,69 +110,69 @@ the engineer reads from it.
    ```
    xcrun simctl bootstatus "<udid>" -b
    ```
-6. **Build.** Run for every scope, including `none`. `pipefail` makes the
-   `echo` report `xcodebuild`'s status, not `tail`'s: 0 is pass. The full
-   output is in `<log dir>/build.log`.
+6. **Build.** Run for every scope, including `none`. The output goes to a
+   log file and nothing is piped, so the echoed status is `xcodebuild`'s own:
+   0 is pass.
    ```
-   set -o pipefail
    (cd "<worktree>/ios" && xcodebuild -project Regards.xcodeproj -scheme Regards \
      -destination 'platform=iOS Simulator,id=<udid>' \
      -derivedDataPath "<derived data>" \
-     -onlyUsePackageVersionsFromResolvedFile build) 2>&1 \
-     | tee "<log dir>/build.log" | tail -n 30
+     -onlyUsePackageVersionsFromResolvedFile build) > "<log dir>/build.log" 2>&1
    echo "xcodebuild exit $?"
+   tail -n 30 "<log dir>/build.log"
    ```
 7. **Tests**, skipped for scope `none`. Run exactly one of these three
-   blocks, not a splice of the step 6 command.
+   blocks, not a splice of the step 6 command. Each writes `<log dir>/test.log`
+   and echoes `xcodebuild`'s own exit status.
 
    `unit`:
    ```
-   set -o pipefail
    (cd "<worktree>/ios" && xcodebuild -project Regards.xcodeproj -scheme Regards \
      -destination 'platform=iOS Simulator,id=<udid>' \
      -derivedDataPath "<derived data>" \
      -onlyUsePackageVersionsFromResolvedFile \
-     -only-testing:RegardsTests test) 2>&1 \
-     | tee "<log dir>/test.log" | xcbeautify
+     -only-testing:RegardsTests test) > "<log dir>/test.log" 2>&1
    echo "xcodebuild exit $?"
    ```
 
    `full`:
    ```
-   set -o pipefail
    (cd "<worktree>/ios" && xcodebuild -project Regards.xcodeproj -scheme Regards \
      -destination 'platform=iOS Simulator,id=<udid>' \
      -derivedDataPath "<derived data>" \
-     -onlyUsePackageVersionsFromResolvedFile test) 2>&1 \
-     | tee "<log dir>/test.log" | xcbeautify
+     -onlyUsePackageVersionsFromResolvedFile test) > "<log dir>/test.log" 2>&1
    echo "xcodebuild exit $?"
    ```
 
    A list of ids is one invocation with one repeated flag per id, never one
    run per id:
    ```
-   set -o pipefail
    (cd "<worktree>/ios" && xcodebuild -project Regards.xcodeproj -scheme Regards \
      -destination 'platform=iOS Simulator,id=<udid>' \
      -derivedDataPath "<derived data>" \
      -onlyUsePackageVersionsFromResolvedFile \
-     -only-testing:<id 1> -only-testing:<id 2> test) 2>&1 \
-     | tee "<log dir>/test.log" | xcbeautify
+     -only-testing:<id 1> -only-testing:<id 2> test) > "<log dir>/test.log" 2>&1
    echo "xcodebuild exit $?"
    ```
 
-   The full output is in `<log dir>/test.log`. If `xcbeautify` isn't
-   installed, replace `xcbeautify` with
-   `awk '/Test Suite .* (passed|failed)|error:|\*\* TEST (SUCCEEDED|FAILED) \*\*/'`.
+   Then summarize the log with `xcbeautify` if it is installed, and report
+   its own exit status on a separate line:
+   ```
+   xcbeautify < "<log dir>/test.log"; echo "xcbeautify exit $?"
+   ```
+   Otherwise use `awk '/Test Suite .* (passed|failed)|error:|\*\* TEST (SUCCEEDED|FAILED) \*\*/' "<log dir>/test.log"`.
    Don't use `grep` there: it exits 1 when nothing matches.
 
-   `xcodebuild`'s own exit status decides BUILD and TESTS, never the
-   formatter's. With `pipefail`, the `echo` prints the first nonzero status
-   in the pipeline, so 0 means `xcodebuild` passed. Read the `** BUILD
-   SUCCEEDED **` or `** TEST SUCCEEDED **` line as a second signal, not a
-   replacement for the exit status.
+   `xcodebuild`'s exit status decides BUILD and TESTS. A nonzero
+   `xcbeautify` status is a formatter failure: report it on the `FORMATTER`
+   line and read the raw log instead; it never turns a passing
+   `xcodebuild` into a FAIL or the reverse. Read the `** BUILD SUCCEEDED **`
+   or `** TEST SUCCEEDED **` line as a second signal, not a replacement for
+   the exit status.
 
-Steps 2 to 4 are independent; run them together.
+Steps 2 to 4 are independent: run each as its own Bash call, in parallel in
+one message. Don't join them into one call, where only the last status
+shows.
 
 ## Report (exactly this shape)
 
@@ -185,6 +187,7 @@ SWIFTLINT: pass | fail (violations verbatim)
 GUARDS: pass | fail (script + matches)
 BUILD: pass | fail (first error with file:line)
 TESTS: scope; "n tests in m suites passed" or failing ids with assertion text
+FORMATTER: ok | xcbeautify exit n (raw log read instead) | not installed (awk used)
 DURATION: per step, seconds
 ```
 
