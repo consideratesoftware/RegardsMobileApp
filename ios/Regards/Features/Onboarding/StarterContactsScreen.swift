@@ -73,6 +73,12 @@ struct StarterContactsScreen: View {
         .task {
             if viewModel.loadState == .loading { await viewModel.load() }
         }
+        // Done can hold "Saving…" through the writes and, from Settings, the
+        // reschedule. Only the start is spoken: the end is the "Saved…"
+        // announcement or the message.
+        .onChange(of: viewModel.savesStarted) {
+            AccessibilityNotification.Announcement("Saving").post()
+        }
     }
 
     // MARK: - Header

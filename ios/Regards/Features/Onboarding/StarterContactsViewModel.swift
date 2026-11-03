@@ -52,6 +52,10 @@ final class StarterContactsViewModel {
     /// Picked contact ids with the cadence chosen for each.
     private(set) var selection: [UUID: Int] = [:]
     private(set) var isSaving = false
+    /// Counts saves that started with something to write, so the screen can
+    /// say "Saving" once per save while Done waits on the writes and the
+    /// reschedule (PR #67's `reschedulesStarted` precedent).
+    private(set) var savesStarted = 0
     /// Set once Done or Skip has finished the screen, so nothing can change
     /// or write after the caller starts leaving (onboarding completes, or
     /// Settings pops). A partial save that leaves unsaved changes doesn't set
@@ -209,6 +213,7 @@ final class StarterContactsViewModel {
     @discardableResult
     func save() async -> Bool {
         guard canSave else { return false }
+        savesStarted += 1
         isSaving = true
         defer { isSaving = false }
         statusMessage = nil
