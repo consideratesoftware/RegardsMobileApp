@@ -263,8 +263,8 @@ conclusive. `ScreensAccessibilityTests+RowActions.swift`'s
 `.elementDetection` only (the other three structural categories still
 gate) with this paragraph cited at the call site. Resolve by a real-device
 VoiceOver pass confirming the alert's title, message, and Done button are
-each announced correctly — part of the pre-release device pass
-(`accessibility-smoke.md`) — and update this entry with the result either
+each announced correctly (part of the pre-release device pass in
+`accessibility-smoke.md`), and update this entry with the result either
 way rather than leaving it open indefinitely.
 
 ## Sensory-audit carve-outs
