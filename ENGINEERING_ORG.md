@@ -88,8 +88,9 @@ restarts.
 - Each lane gets `../RegardsMobileApp-TF##`, branch `claude/tf-##-<slug>`,
   simulator `RegardsTF##`, and `/tmp/RegardsTF##DerivedData`. Lanes never
   share a simulator or DerivedData. `build-engineer` resolves the simulator
-  name to one UDID on the runtime CI pins and passes `id=<udid>` to
-  `xcodebuild`, because a `name=RegardsTF##` destination can fall back to
+  name to one UDID with `scripts/prepare-audit-simulator.sh --resolve-only`,
+  the rule CI uses (newest installed runtime holding the device), and
+  passes `id=<udid>` to `xcodebuild`, because a `name=RegardsTF##` destination can fall back to
   My Mac or to another iOS runtime. It also writes its logs to a fresh
   per-run directory, never to a shared file.
 - Lane notes live in `../RegardsMobileApp-lanes/` relative to the root

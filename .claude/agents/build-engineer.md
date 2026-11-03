@@ -15,7 +15,7 @@ path (`/tmp/RegardsTF##DerivedData`), and a test scope (`none`, `unit`,
 Never put the simulator name in an `xcodebuild -destination`. A custom
 name such as `RegardsTF##` can fail to resolve, and `xcodebuild` then
 falls back to My Mac or to a same-named device on another iOS runtime (it
-has picked iOS 27.0 when CI pins 26.5). Step 5 resolves the name to one
+has picked an iOS 27.0 device for a lane simulator on 26.5). Step 5 resolves the name to one
 UDID, and every `xcodebuild` below uses `id=<udid>`.
 
 ## Working directory
@@ -77,29 +77,30 @@ the engineer reads from it.
    (cd "<worktree>" && scripts/check-domain-purity.sh); echo "check-domain-purity exit $?"
    ```
 5. **Simulator.** Resolve `<simulator>` to one UDID and note it as `<udid>`.
-   First find the runtime CI pins, the newest one that holds the stock
-   `iPhone 17 Pro`, and note it as `<rt>`:
+   Use the repo's own resolver, `scripts/prepare-audit-simulator.sh
+   --resolve-only`, which CI uses and which `scripts/tests` covers; it reads
+   `simctl`'s device list on stdin and picks the newest installed runtime
+   that holds the named device. First get the runtime the CI rule resolves,
+   by naming the stock device. It prints `<udid> <runtime>`; note the
+   runtime as `<rt>`:
    ```
-   xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | select(.value[] | .name == "iPhone 17 Pro") | .key] | unique | last'
+   xcrun simctl list devices available -j | "<worktree>/scripts/prepare-audit-simulator.sh" "iPhone 17 Pro" --resolve-only
    ```
-   Then list the available devices with that name, one `<runtime> <udid>`
-   line each:
+   Then resolve the lane simulator the same way:
    ```
-   xcrun simctl list devices available -j | jq -r --arg n "<simulator>" \
-     '.devices | to_entries[] | .key as $r | .value[] | select(.name == $n) | "\($r) \(.udid)"'
+   xcrun simctl list devices available -j | "<worktree>/scripts/prepare-audit-simulator.sh" "<simulator>" --resolve-only
    ```
-   - 0 lines: create it on `<rt>` and note the UDID it prints. Leave the
-     runtime out and `simctl create` uses the newest installed runtime,
-     which can be a different one.
+   - Exit 1 with `No available simulator named`: create it on `<rt>` and note
+     the UDID it prints. Leave the runtime out and `simctl create` uses the
+     newest installed runtime, which can be a different one.
      ```
      xcrun simctl create "<simulator>" "iPhone 17 Pro" "<rt>"
      ```
-   - 2 or more lines: FAIL with `ambiguous simulator` and the lines. Don't
-     pick one.
-   - 1 line on a runtime other than `<rt>`: FAIL with `simulator is on
-     <runtime>, CI pins <rt>`. The engineering manager deletes or
-     recreates it.
-   - 1 line on `<rt>`: note its UDID.
+   - Any other nonzero exit: FAIL with the script's output.
+   - Output `<udid> <runtime>`: FAIL with `empty runtime` if `<runtime>` is
+     empty, and with `simulator is on <runtime>, the CI rule resolves <rt>`
+     if it differs from `<rt>`; the engineering manager deletes or recreates
+     it. Otherwise note `<udid>`.
 
    Then boot it and wait. This boots only if needed and can take several
    minutes on a cold start. If it reports Busy, run `xcrun simctl shutdown
