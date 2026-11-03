@@ -79,13 +79,13 @@ struct ContactDetailViewModelFailurePathTests {
     /// for. One `scheduler.recordInteraction` span clears the snooze, then
     /// logs, and "only the last write fails" means
     /// `contacts.updateLastInteractedAt` — `InteractionLogging`'s second
-    /// internal write, failed through the stub's `failingUpsert` — fails
-    /// after `append` landed. A transition failure ends the span before anything is logged,
-    /// so it can't produce a partial-persistence case. This sets up a real
-    /// pending snooze first, specifically so "the snooze is restored" is
-    /// provable rather than assumed: with nothing pending the transition
-    /// moves no row, which wouldn't discriminate "ran and cleared something"
-    /// from "was skipped."
+    /// internal write, failed through the stub's `failingUpsert` — fails after
+    /// `append` landed. A transition failure ends the span before anything is
+    /// logged, so it can't produce a partial-persistence case. This sets up a
+    /// real pending snooze first, specifically so "the snooze is restored" is
+    /// provable rather than assumed: with nothing pending the transition moves
+    /// no row, which wouldn't discriminate "ran and cleared something" from
+    /// "was skipped."
     ///
     /// Superseded assertion, staged review round 7: this test used to assert
     /// the pending snooze stayed cleared through the failure — the bug the
