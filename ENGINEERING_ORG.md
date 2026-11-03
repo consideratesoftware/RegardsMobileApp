@@ -164,9 +164,10 @@ wanting to skip one of these is wrong by definition.
 Only Sid can do these, and the org never pretends one happened. Sid's
 standing rule is that questions for him are asked in the session as an
 interview, and his answers are recorded as PR comments. So when a gate, an
-OPEN FOR OWNER ruling, a reviewer's "Questions for Sid" item, or a rule the
-org would have to bend comes up, the engineering manager interviews him and
-comments each answer on the PR, paraphrased: no raw pasted text, and never
+OPEN FOR OWNER ruling, a reviewer's "Owner questions" item (the hosted
+review still titles it "Questions for Sid"), or a rule the org would have to
+bend comes up, the engineering manager interviews him and comments each
+answer on the PR, paraphrased: no raw pasted text, and never
 `@claude` in any comment the org posts, because `claude.yml` runs on it. An
 answer given before the PR exists is
 paraphrased into the lane's `owner-answers.md` at once. When the PR opens it

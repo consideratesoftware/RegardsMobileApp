@@ -60,7 +60,8 @@ a cache for the next session: when they disagree with the branch, the PR, or
    dispatch into it; mention it in the report.
 
 Owner questions never wait in a PR body or a checklist. Whenever a role
-returns a question only Sid can answer (OPEN FOR OWNER, "Questions for Sid",
+returns a question only Sid can answer (OPEN FOR OWNER, a review's "Owner
+questions" section, which the hosted review still titles "Questions for Sid",
 an owner gate, a rule you'd need to bend), interview Sid in the session as
 `ENGINEERING_ORG.md` (Owner gates) describes, and comment each answer on
 the PR. Paraphrase the answer in your own words; never paste Sid's raw text
@@ -132,8 +133,8 @@ review batch starts only when `git status --short` in the lane is empty.
 Write the target, the §14 row, and the claimed R-numbers to
 `review-context.md` in the lane's folder. Fetch, then in one batch run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch
-the `codex-reviewer` agent type (`subagent_type: codex-reviewer`) with the worktree, the same target `origin/main...HEAD`,
-the item's §14 row, and its claimed R-numbers. The three-dot target
+the `codex-reviewer` agent type (`subagent_type: codex-reviewer`) with the
+worktree, the same target `origin/main...HEAD`, the item's §14 row, and its claimed R-numbers. The three-dot target
 compares against the merge base, so commits that landed on `main` after the
 lane branched don't show up as reversions. Treat blockers from both the same way:
 they go to the slice owner (design questions to `tech-lead` first), one
@@ -246,5 +247,6 @@ NEXT RUN: what /org will find next time
 
 Never delete a worktree or branch except Stage 1's temporary review
 worktrees and a merged lane's worktree, which the release manager removes
-only when your prompt says to (it keeps it by default). Never edit `TESTFLIGHT_PLAN.md` in the root checkout. Never merge
+only when your prompt says to (it keeps it by default). Never edit
+`TESTFLIGHT_PLAN.md` in the root checkout. Never merge
 with a blocker, a red check, or an outstanding owner gate.

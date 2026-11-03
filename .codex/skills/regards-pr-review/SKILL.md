@@ -63,7 +63,7 @@ VERDICT: APPROVE | REQUEST_CHANGES
 
 ### Nits (take or leave)
 
-### Questions for Sid
+### Owner questions (interview in session)
 
 ### Audit trail
 - Invariants verified (from pr-security-privacy, verbatim)
