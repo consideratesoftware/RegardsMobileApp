@@ -25,7 +25,7 @@ never pick up Android work.
 - Next ready work: none. `TF-07e` through `TF-07g` wait for `TF-07d`.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`), #69 (`claude/build-engineer-cwd`), and #70 (`TF-07d`, `claude/tf-07d-interactions`). Checked with `gh pr list --state open` on 2026-10-31.
+- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`), #69 (`claude/build-engineer-cwd`), and #70 (`TF-07d`, `claude/tf-07d-interactions`). Checked with `gh pr list --state open` on 2026-11-02.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
