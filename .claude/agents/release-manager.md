@@ -157,7 +157,10 @@ PR, never in the root checkout.
   counted above and never inferred from the green check. A blocker stands
   until a push clears it (the review reruns on the new head) or your
   prompt records Sid's decision to defer it with a link to his PR comment.
-  Only Sid can defer a hosted blocker. No link, no deferral.
+  Only Sid can defer a hosted blocker. No link, no deferral. His comment
+  must name the blocker text and the head sha. It is void when the head
+  moves, except for a blocker whose text reappears unchanged in the new
+  head's review; compare the text.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
   Check each `CARRIED: <reviewer> APPROVE from <sha>` line mechanically,
   and list the results in your report. A carry stands only if all of these

@@ -145,7 +145,9 @@ merge condition in `ENGINEERING_ORG.md` holds (required checks green is only
 the first). The `Regards staged review` check passes whenever a valid review
 ran for the current head, including one that requests changes, so green is not
 the same as approved: read the check output and clear every blocker, or
-record Sid's deferral of it with a link to his PR comment, before merging. It
+record Sid's deferral of it with a link to his PR comment (which names the
+blocker text and the head sha, and is void when the head moves unless the same
+blocker text reappears), before merging. It
 must not:
 
 - weaken the privacy, accessibility, data-integrity, or layer-purity gates;

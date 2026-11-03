@@ -122,7 +122,10 @@ All of these, on the current head, with no averaging:
    current head. The check run is green whatever the verdict, so the release
    manager reads the text, counts the blockers, and treats a malformed review
    (no Blockers section) as unresolved. Only Sid can defer a hosted blocker,
-   and the deferral is recorded with a link to his PR comment.
+   and the deferral is recorded with a link to his PR comment. That comment
+   names the blocker text and the head sha. It is void when the head moves,
+   except for a blocker whose text reappears unchanged in the new head's
+   review.
 3. `/pr-review` verdict APPROVE.
 4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
    with every Codex blocker disputed in that verdict's PR comment by the

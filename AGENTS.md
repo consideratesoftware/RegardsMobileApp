@@ -167,7 +167,8 @@ dedicated App's identity), but it gates on *evidence, not agreement*: it fails
 when no valid review ran for the current head, and passes when a review ran,
 including one that requests changes. The blockers are published in the check
 summary and output. Whether a blocker must be cleared is the repo's rule for a
-human author (clear or consciously defer it); the Claude Code org holds itself
+human author (clear it, or record Sid's deferral with a link to his PR
+comment); the Claude Code org holds itself
 to the stricter policy in `ENGINEERING_ORG.md` (zero hosted blockers on the
 current head). Path filters were
 deliberately removed (PR #15) so required checks always report. The
@@ -205,7 +206,8 @@ The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions
 job cannot satisfy it. A blocker still means `REQUEST_CHANGES`, but the check
 reports whether a valid review ran, not whether it approved; read the check
-output and clear or consciously defer each blocker before merging. The workflow
+output and clear each blocker, or record Sid's deferral of it with a link to
+his PR comment, before merging. The workflow
 runs only when a PR targets the default branch, so a stacked draft stays on its
 parent until the parent merges. Retarget and rebase the child, publish it, then
 push the rebased head to trigger the hosted review against the final base.
