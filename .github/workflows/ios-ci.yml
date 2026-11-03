@@ -246,7 +246,7 @@ jobs:
           path: ios/build/RegardsAccessibilityTests.xcresult
 
   # Snapshot tests (swift-snapshot-testing) are deferred out of Phase 0.
-  # The a11y audit gates the UI shell today (the manual VoiceOver smoke,
-  # `ios/docs/accessibility-smoke.md`, runs in the pre-release device pass);
-  # snapshotting lands when we have a real design
-  # pass and baseline images are worth maintaining.
+  # The a11y audit, which runs after each merge to `main`, gates the UI shell
+  # today (the manual VoiceOver smoke, `ios/docs/accessibility-smoke.md`, runs
+  # in the pre-release device pass); snapshotting lands when we have a real
+  # design pass and baseline images are worth maintaining.
