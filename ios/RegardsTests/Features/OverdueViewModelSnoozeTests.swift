@@ -159,19 +159,19 @@ struct OverdueViewModelSnoozeTests {
 
         // 4 days later: genuinely overdue again at this 3-day cadence, and
         // still short of the stale snooze's day-7 mark — the window where a
-        // missing `caughtUp` clear would still hide the row.
+        // missing caught-up clear would still hide the row.
         clock.advance(by: 4 * 86_400)
         await viewModel.load()
 
-        // `waitUntil`, not a bare `#expect`: `markCaughtUp`'s
-        // `logging.markCaughtUp` call broadcasts through `contacts.upsert`,
-        // which can still have a background `observeTracked()`-driven
-        // reload in flight from earlier in this test — correctness fix
-        // (staged review #7) reordered `markCaughtUp` to run
-        // `scheduler.recordInteraction` first specifically so that broadcast always
-        // fires *after* the snooze is cleared, but the broadcast's own
-        // reload is still a separate, unawaited Task racing this explicit
-        // `load()` above. Harmless once it resolves to the same correct
+        // `waitUntil`, not a bare `#expect`: the `viewModel.markCaughtUp`
+        // call goes through `scheduler.recordInteraction` to
+        // `InteractionLogging`, whose `contacts.updateLastInteractedAt`
+        // broadcasts. That broadcast can still have a background
+        // `observeTracked()`-driven reload in flight from earlier in this
+        // test. The transition inside `recordInteraction` runs first
+        // specifically so the broadcast always fires *after* the snooze is
+        // cleared, but the broadcast's own reload is still a separate,
+        // unawaited Task racing this explicit `load()` above. Harmless once it resolves to the same correct
         // state — mirrors `UpcomingViewModelActionTests`'s
         // `caughtUpAfterSnoozeShowsFreshDateWithShortCadence`, which polls
         // for the identical reason.

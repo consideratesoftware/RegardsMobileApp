@@ -183,10 +183,9 @@ struct GatedFirstFetchContactRepository: ContactRepository {
 /// Holds `upsert(_:)` open — the write `SchedulingPass.snooze` makes.
 /// `GatedTransitionStateReminderRepository` gates the *transition* that
 /// `recordInteraction(.caughtUp)` makes; this gates the *insert* that
-/// `snooze` makes, which is
-/// what R61(a) needed and did not have: without it there was no way to hold
-/// a snooze open at its write and land a competing reload inside that
-/// window.
+/// `snooze` makes, which is what R61(a) needed and did not have: without it
+/// there was no way to hold a snooze open at its write and land a competing
+/// reload inside that window.
 struct GatedUpsertReminderRepository: ReminderRepository {
     let wrapped: any ReminderRepository
     let gate: AsyncGate
@@ -214,8 +213,8 @@ struct GatedUpsertReminderRepository: ReminderRepository {
 /// the *list* read a screen load makes; this gates the *single-contact* read
 /// `SchedulingPass.snooze` makes for its R54 precondition, which is the
 /// suspension R59's caught-up race interleaves at. Lets a test put a
-/// `caughtUp` inside that exact window instead of hoping a real race
-/// reproduces.
+/// `recordInteraction(.caughtUp)` inside that exact window instead of hoping
+/// a real race reproduces.
 struct GatedFetchByIDContactRepository: ContactRepository {
     let wrapped: any ContactRepository
     let gate: AsyncGate
