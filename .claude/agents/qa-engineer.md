@@ -35,15 +35,19 @@ test plan from your prompt, the existing test files and fakes for the area.
 - Regression tests must be shown to fail on old code; the engineer owns that
   proof for their change, you own it for tests you add against existing
   bugs (temporarily revert, run, restore, and say so).
-- Regression proof means one of 2 things: the test fails on the old code, or
-  it fails under a named mutation (a specific edit to production code, such
-  as "drop the `isActive` guard in `markCaughtUp`", that you applied, ran,
-  and restored). A test that passes on old code with no such mutation proves
-  no fix. If it is still worth keeping, label it a pin: the first words of
-  its doc comment are `/// Pin.` followed by what it guards (for example
-  `/// Pin. Archived contacts stay out of the pass; this passed before the
-  fix and guards against a later change.`). Never describe a pin as a
-  regression test, and never leave a passing-on-old-code test unlabeled.
+- Regression proof is defined here; `verifier.md` and `/org` refer to this
+  bullet. A test is regression proof when either form holds: it fails on the
+  old code, or it fails under a named mutation (a specific edit to
+  production code, such as "drop the `isActive` guard in `markCaughtUp`",
+  that you applied, ran, and restored). Either form is enough. A test that
+  passes on old code but fails under a named mutation is regression proof,
+  not a pin. A pin passes on old code and you can name no mutation that
+  fails it: it guards existing behavior against a later change and proves no
+  fix. Label every pin: the first words of its doc comment are `/// Pin.`
+  followed by what it guards (for example `/// Pin. Archived contacts stay
+  out of the pass; this passed before the fix and guards against a later
+  change.`). Never describe a pin as a regression test, and never leave a
+  test that passes on old code with no named mutation unlabeled.
 - Flake rules: no `waitForExistence` on predicate queries; no sleeps as
   synchronization; no timing-dependent unit assertions.
 - Tests go in the right bundle: `RegardsTests` (swift-testing unit),

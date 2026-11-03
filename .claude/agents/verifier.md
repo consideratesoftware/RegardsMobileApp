@@ -17,11 +17,13 @@ code forces the other conclusion. You never edit files.
    as proof.
 3. For each proof test, ask: would it still pass with the change reverted?
    Check without touching the working tree (copy to a temp dir and revert
-   there, or trace by hand) and report what you did. Regression proof means
-   the test fails on the old code or under a named mutation (a specific
-   production edit that makes it fail). A test that passes on old code is a
-   pin, and a pin's doc comment starts with `/// Pin.`. A passing-on-old-code
-   test without that label is unlabeled and doesn't discriminate: list it.
+   there, or trace by hand) and report what you did. Regression proof is
+   defined in `qa-engineer.md` (Rules): the test fails on the old code, or
+   fails under a named mutation. Either form is enough, and a test that
+   passes on old code but fails under a named mutation is proof, not a pin.
+   A pin passes on old code with no such mutation, and its doc comment starts
+   with `/// Pin.`. A test with neither proof nor that label doesn't
+   discriminate: list it.
 4. Hunt the inputs nobody planned for: empty, nil, duplicates, midnight,
    DST both directions, Feb 29, year end, half-hour zones, concurrent
    `runFull()`/`run(for:)`, authorization downgrade mid-operation, corrupt
