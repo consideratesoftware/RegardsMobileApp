@@ -17,6 +17,8 @@ struct OnboardingConceptScreen: View {
                             .kerning(1.5)
                             .foregroundStyle(RegardsDS.muted)
                             .multilineTextAlignment(.center)
+                            // Spoken in natural case: VoiceOver can read all-caps text letter by letter.
+                            .accessibilityLabel("Keep your people in your regards")
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, proxy.safeAreaInsets.top + 24)
