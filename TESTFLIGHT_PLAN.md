@@ -591,14 +591,7 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
   3. Snooze return: snooze from Overdue and from Contact Detail. Overdue and Upcoming agree on when a snooze outside window hours lapses.
   A cadence under 1 day has no device check: no device fixture can produce a 0-day cadence. `AllContactsViewModel.cadenceSegment` is covered by `allContactsRowOmitsTheSegmentWithoutAWorkableCadence` and `allContactsRowShowsThePositiveCadence`.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
-- PR #68 (TF-11, PR29 slices 1 to 4), seven device steps, one result line. The steps are in `ios/docs/accessibility-smoke.md`.
-  1. Fresh install: grant, deny, and limited. Relaunch mid-starter.
-  2. The "Saved" announcement ("Saved. Keeping in touch with N people."): whether it survives the screen change, in onboarding and after Settings pops.
-  3. The limited note (`starter.limited-note`) is visible on the starter step and on Settings → Choose people under Limited access, and VoiceOver reads it.
-  4. Where VoiceOver focus lands after each onboarding step change: concept to Contacts, Contacts to starter, starter to tabs.
-  5. Settings Contacts access row shapes: restricted, limited, not determined, and denied. Check the title, subtitle, button trait, and VoiceOver reading of each.
-  6. Settings scene-active refresh after returning from iOS Settings: the row and VoiceOver focus.
-  7. Settings → Choose people: how long Done reads Saving… on a real-sized list.
+- PR #68 (TF-11, PR29 slices 1 to 4). The device steps are in `ios/docs/accessibility-smoke.md`, under "Onboarding steps and starter contacts" and "Settings Contacts access". That file is the one source for the list. Record each step's result in its smoke record.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
 Standing notes:

@@ -400,7 +400,7 @@ Snooze, and Caught up from a notification, refuse a contact that is not eligible
 - "Caught up" → log interaction, set `lastInteractedAt`, and move the contact's pending cadence row to `user_caught_up`. That move changes state only, so the snooze floor stays on the row, and a failed log restores the row with its floor. The next run rewrites a caught-up row as the next cycle's pending row, with no floor and the new anchor. TF-07c doesn't run that rewrite inside the caught-up call. TF-07d moves it into the same lock span.
 - Snooze (1 week) → the raw floor `snoozedUntil` is the tap time plus 7 calendar days, in the global window's timezone. `scheduledFor` is `nextAllowedSlot(from: max(now, overdueAt, snoozedUntil))` in the contact's effective window, with `includingContainingSlot: false`, moved past any occasion day (contract 6). The result is never earlier than the floor. The row stays `pending`. No interaction is logged, and `lastInteractedAt` does **not** move (decision #31).
 - Cadence/channel change → `run(for:)` for that contact. TF-09 adds the call to its cadence and channel writes (`TESTFLIGHT_PLAN.md`).
-- Starter tracking (TF-11) is a cadence edit. Settings → Choose people runs `run(for:)` for each contact whose tracking write landed, before the screen closes. A failed run is logged, and the next foreground `runFull()` repairs it. An onboarding starter save runs no pass; the `runFull()` at onboarding completion covers it. Completion runs the pass before its one reconcile, which writes no pass input until PR30 reads occasions from Contacts.
+- Starter tracking (TF-11) is a cadence edit. Settings → Choose people runs `run(for:)` for each contact whose tracking write landed, before the screen closes. A failed run is logged, and the next foreground `runFull()` repairs it. An onboarding starter save runs no pass; the `runFull()` at onboarding completion covers it. Completion runs the pass before its one reconcile. That reconcile cannot archive (archiving needs 2 consecutive misses, and no reconcile runs during onboarding), so it writes no pass input until PR30 reads occasions from Contacts.
 - Override save or reset → `run(for:)` for that contact (TF-07c).
 - Global window change → `runFull()` (TF-07c), which reschedules every tracked contact (bounded by tracked count; cheap).
 - App launch/foreground → `runFull()` after the Contacts reconcile (TF-07c). The OS half, which cancels orphaned `UNNotificationRequest`s and checks fire times against the pending set, is TF-07e.
@@ -1021,8 +1021,7 @@ flows do not persist. Reminder Windows is a live editor as of TF-05 (see above).
 
 ### What does not exist at all
 
-`SchedulingPass`'s `runFull()`/general `run(for contactId:)` reconciliation
-(§9a) — only its narrow Snooze stub exists (TF-04) — notification scheduling (R57, TF-07), deep-link
+notification scheduling (R57, TF-07), deep-link
 execution, reconciliation/re-import, write-back, merge persistence, the onboarding
 notification step (TF-11 slice 5), calendar
 ingestion, widgets, StoreKit/paywall enforcement,

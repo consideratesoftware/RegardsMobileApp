@@ -50,16 +50,16 @@ These steps belong to the pre-release device pass. They are not merge gates
       is no starter step.
 - [ ] Fresh install, limited: the starter step shows the limited note
       (`starter.limited-note`), and VoiceOver reads it.
-- [ ] Relaunch mid-starter: picks saved earlier stay on the starter step after
-      relaunch, with no duplicate rows. Only Done saves, so picks chosen but not
-      saved are gone after force-quit. Record what the step shows after
-      relaunch.
+- [ ] Relaunch mid-starter: pick 2 people without pressing Done, then
+      force-quit and relaunch. The step opens with no picks, because only Done
+      saves. A save that fails part way (the screen stays, and the picks that
+      landed show after relaunch) is covered by unit tests, not on the device.
 - [ ] Done with picks: VoiceOver hears "Saved. Keeping in touch with N people."
       Note whether the announcement survives the change to the tab root in
-      onboarding.
+      onboarding, and the pop back to Settings from Choose people.
 - [ ] Settings → Choose people to keep in touch with: Done reads "Saving…"
       through the reschedule, announces the same "Saved" text, then Settings
-      pops.
+      pops. On a real-sized contact list, note how long Done reads "Saving…".
 - [ ] Settings → Choose people with Contacts access off (not determined, denied,
       or restricted) and no contacts: the empty state reads "Regards can't see
       your contacts. Go back and turn on Contacts access to choose people."
@@ -80,8 +80,8 @@ These steps belong to the pre-release device pass. They are not merge gates
       access is restricted on this iPhone." It has no button.
 - [ ] Settings order: Reminders first, then People (Contacts access, then Choose
       people).
-- [ ] Return from iOS Settings after changing access. Note whether the row
-      updates and where VoiceOver focus lands.
+- [ ] Scene-active refresh: return from iOS Settings after changing access.
+      Note whether the row updates and where VoiceOver focus lands.
 
 ## Settings notifications
 
