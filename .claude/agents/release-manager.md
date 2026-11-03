@@ -28,6 +28,8 @@ always `origin/main...HEAD`; a comment with another target doesn't count.
 Further lines are the blocker and should-fix counts, and one line per
 disputed Codex blocker:
 `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. A `PR REVIEW:`
+comment lists the reviewers that ran: `REVIEWERS: <reviewer> <APPROVE|
+REQUEST_CHANGES>, ...`, one entry per reviewer that ran for that comment. A
 comment for a scoped recheck (`/org` Stage 3) also has a `RERAN:` line naming
 the reviewers that ran and one `CARRIED: <reviewer> APPROVE from <sha>` line
 per earlier approval that stands. Never paste review or
@@ -209,6 +211,30 @@ PR, never in the root checkout.
   If any check fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.
+
+  Two more checks apply to a scoped `PR REVIEW:` comment (one with a `RERAN:`
+  line), and a failure of either is STATE CODEX STALE:
+  - Completeness. `pr-security-privacy` must be in `RERAN`. Every reviewer
+    the routing table in `.claude/commands/pr-review.md` runs for this PR must
+    be in `RERAN` or on a `CARRIED:` line that passed: `pr-correctness`,
+    `pr-security-privacy`, `pr-code-quality`, `pr-tests` when
+    `origin/main...HEAD` changes code or tests, and `pr-accessibility` and
+    `pr-fit-finish` when their path rules match that diff
+    (`git -C <lane> diff --name-only origin/main...HEAD`). A missing one is
+    "reviewer missing: <name>".
+  - Newest verdict. A carried approval must be that reviewer's newest
+    recorded verdict, so there is no carry past a later REQUEST_CHANGES.
+    Print every counting `PR REVIEW:` comment's first line and `REVIEWERS:`
+    line, oldest first, with this filter on the same GraphQL output:
+    ```
+    jq -r --arg me "$(gh api user --jq .login)" '
+      .data.repository.pullRequest.comments.nodes[]
+      | select(.author.login == $me and .lastEditedAt == null) | .body
+      | select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
+      | split("\n")[] | select(test("^(PR REVIEW:|REVIEWERS:)"))'
+    ```
+    The reviewer's last `REVIEWERS:` entry in that output must be APPROVE
+    and must sit in the comment whose sha is the `CARRIED:` line's `<sha>`.
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
   `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check
@@ -269,6 +295,7 @@ STATE: MERGED | GREEN, WAITING ON OWNER | CODEX STALE | RED (parked after 2 roun
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n (counted from the review text for <head sha>), blockers verbatim
 /pr-review: verdict
+CARRIED: <reviewer>: pass | carry rejected (<why>)   (one line per carried reviewer, or none)
 CODEX REVIEW: APPROVE | REQUEST_CHANGES | RETRY | UNAVAILABLE | STALE @ reviewed sha vs target, codex-cli version | disputed blockers with ARCHITECTURE.md §, or none
 OWNER QUESTIONS: what Sid must decide or do, with exact steps for any physical task, or none
 DEVICE PASS: steps added to TESTFLIGHT_PLAN.md Pre-release device pass, or none

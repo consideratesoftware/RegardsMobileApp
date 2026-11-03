@@ -179,9 +179,12 @@ Rerun the `/pr-review` reviewers whose areas the new commits touch (routing
 table in `pr-review.md`), plus `codex-reviewer`, which always reviews the
 whole `origin/main...HEAD` diff at the current head. Ask Sid only if a
 blocker survives 2 rounds or a fix needs a product decision. The `PR
-REVIEW:` comment for a scoped recheck adds a `RERAN:` line naming the
-reviewers that ran and one `CARRIED:` line per reviewer whose earlier
-approval stands, as `CARRIED: <reviewer> APPROVE from <sha>`.
+REVIEW:` comment lists every reviewer that ran on a `REVIEWERS:` line with
+its verdict. A scoped recheck adds a `RERAN:` line naming the reviewers that
+ran, which must include `pr-security-privacy`, and one `CARRIED:` line per
+reviewer whose earlier approval stands, as `CARRIED: <reviewer> APPROVE from
+<sha>`. Every reviewer the routing table runs for the PR must be reran or
+carried, and a carry can't pass a later REQUEST_CHANGES from that reviewer.
 
 An approval carries to a new head only when every commit since it changes
 docs or comments only: every path is `.md`, `.swift`, `.yml`, `.sh`, `.py`, or
