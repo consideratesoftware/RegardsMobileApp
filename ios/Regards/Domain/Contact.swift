@@ -64,8 +64,7 @@ public struct Contact: Sendable, Codable, Equatable, Hashable, Identifiable {
 
     /// Whether this contact gets cadence reminders: active, tracked, and a
     /// cadence of at least 1 day. `> 0`, not `!= nil`, so a 0 or negative
-    /// cadence from corrupt data is ineligible too, as the engine's
-    /// `.missingCadence` skip already treats it.
+    /// cadence from corrupt data is ineligible too.
     public var isCadenceEligible: Bool { isActive && tracked && (cadenceDays ?? 0) > 0 }
 }
 

@@ -45,7 +45,8 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts,
+                                 interactions: interactions, clock: { Self.now }),
             interactions: interactions,
             window: window,
             clock: { Self.now }
@@ -94,7 +95,8 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: reminders,
-            scheduler: makeScheduler(reminders: reminders, contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: reminders, contacts: contacts,
+                                 interactions: interactions, clock: { Self.now }),
             interactions: interactions,
             window: window,
             clock: { Self.now }
@@ -119,7 +121,8 @@ struct UpcomingViewModelActionTests {
         let viewModel = UpcomingViewModel(
             contacts: contacts,
             reminders: nil,
-            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts, clock: { Self.now }),
+            scheduler: makeScheduler(reminders: StubReminderRepository(), contacts: contacts,
+                                 interactions: StubInteractionRepository.failing(), clock: { Self.now }),
             interactions: StubInteractionRepository.failing(),
             window: .allDayEveryDay(timezone: UpcomingFixtures.utc),
             clock: { Self.now }
@@ -136,7 +139,7 @@ struct UpcomingViewModelActionTests {
     /// above doesn't reach: that test fails `interactions.append` itself
     /// (via `StubInteractionRepository.failing()`), so nothing persists at
     /// all. Correctness fix (staged review #7) reordered `markCaughtUp` to
-    /// run `scheduler.caughtUp` *before* `InteractionLogging` — see its doc
+    /// run `scheduler.recordInteraction` *before* `InteractionLogging` — see its doc
     /// Rerouted off a hand-rolled `contacts.upsert(...)` (staged review round
     /// 6) — see `OverdueViewModelActionTests`'s sibling test for why: it
     /// used to prove `observeTracked()` fires on a write method production no

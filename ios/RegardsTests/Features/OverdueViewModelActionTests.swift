@@ -45,6 +45,7 @@ struct OverdueViewModelActionTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock
@@ -115,22 +116,24 @@ struct OverdueViewModelActionTests {
     /// The three-write partial-failure shape `markCaughtUpFailureReloads`
     /// above doesn't reach: that test fails `interactions.append` itself, so
     /// nothing persists at all. Correctness fix (staged review #7) reordered
-    /// `markCaughtUp` to run `scheduler.caughtUp` *before*
-    /// `InteractionLogging` — see its doc comment — so "only the last write
-    /// fails" now means `InteractionLogging`'s own second write
-    /// (`contacts.upsert`), not the scheduler: a scheduler failure now blocks
-    /// everything after it by construction, so it can no longer produce a
-    /// partial-persistence case. This sets up a real pending snooze first,
-    /// specifically so "the snooze is restored" is provable rather than
-    /// assumed — `caughtUp` against a contact with nothing pending returns
-    /// `false`, which wouldn't discriminate "ran and cleared something" from
-    /// "was skipped."
+    /// `markCaughtUp` to clear the snooze *before* `InteractionLogging`,
+    /// and TF-07d moved both into `scheduler.recordInteraction`'s one lock
+    /// span — so "only the last write fails" means `InteractionLogging`'s own
+    /// second write (`contacts.updateLastInteractedAt`; the stub injects its
+    /// failure through `failingUpsert`), not the transition: a transition
+    /// failure blocks everything after it by construction, so it can't
+    /// produce a partial-persistence case. This sets up a real pending snooze
+    /// first, specifically so "the snooze is restored" is provable rather
+    /// than assumed — with nothing pending the transition moves no row,
+    /// which wouldn't discriminate "ran and cleared something" from "was
+    /// skipped."
     ///
     /// Superseded assertion, staged review round 7: this test used to assert
     /// the pending snooze stayed cleared through the failure — the bug the
-    /// coordinator's own round-4 instruction introduced (`caughtUp` before
-    /// `InteractionLogging`, uncompensated). It now asserts the corrected
-    /// behavior: the catch block restores the exact row `caughtUp` cleared.
+    /// coordinator's own round-4 instruction introduced (the transition ran
+    /// before `InteractionLogging`, uncompensated). It now asserts the
+    /// corrected behavior: `recordInteraction` restores the exact row the
+    /// transition cleared before it rethrows.
     @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
     func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
@@ -140,6 +143,7 @@ struct OverdueViewModelActionTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -165,7 +169,8 @@ struct OverdueViewModelActionTests {
         #expect(pending[0].kind == .cadence)
         #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
         // The second write's first half (interactions.append) still truly
-        // persisted — only its second half (contacts.upsert) threw.
+        // persisted — only its second half (contacts.updateLastInteractedAt,
+        // failed through the stub's `failingUpsert`) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)
@@ -181,9 +186,9 @@ struct OverdueViewModelActionTests {
     }
 
     /// The double-failure this pins (staged review round 8, "untested in
-    /// all three ViewModels' restore helpers"): `caughtUp` clears a real
-    /// snooze, `InteractionLogging` then fails, and the compensating
-    /// `restorePendingAfterFailedCaughtUp` *also* fails. The method must
+    /// all three ViewModels' restore helpers"): `recordInteraction` clears a
+    /// real snooze, `InteractionLogging` then fails, and the compensating
+    /// restore inside the same lock span *also* fails. The method must
     /// still return cleanly — not crash, not throw past its own catch
     /// block — and the reload after it must show the screen's true,
     /// currently-persisted state rather than a state this failed restore
@@ -197,6 +202,7 @@ struct OverdueViewModelActionTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -210,8 +216,8 @@ struct OverdueViewModelActionTests {
         )
         await viewModel.load()
         #expect(viewModel.rows.map(\.contactId) == [contact.id])
-        try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
-        // Armed after the snooze above, not at construction: `caughtUp`'s own
+        try await scheduler.snooze(contactId: contact.id) // a real row for `recordInteraction` to clear
+        // Armed after the snooze above, not at construction: the
         // `.pending → .userCaughtUp` transition must still succeed so there
         // is something genuine for the restore to fail at reverting.
         await reminders.armTransitionFailure(from: .userCaughtUp)
@@ -263,6 +269,7 @@ struct OverdueViewModelActionTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: gatedContacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -281,7 +288,7 @@ struct OverdueViewModelActionTests {
         await gate.waitUntilArrived()
 
         let action = Task { await viewModel.markCaughtUp(contactId: contact.id) }
-        // Parked inside `scheduler.caughtUp`: the optimistic removal has
+        // Parked inside `scheduler.recordInteraction`'s transition: the optimistic removal has
         // applied, its trailing reload has not run yet.
         await schedulerGate.waitUntilArrived()
         #expect(viewModel.rows.isEmpty)
@@ -378,6 +385,7 @@ struct OverdueViewModelActionTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: gatedContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }

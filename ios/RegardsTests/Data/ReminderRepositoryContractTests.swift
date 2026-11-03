@@ -133,8 +133,8 @@ struct ReminderRepositoryContractTests {
         #expect(try await repositories.reminders.fetchPending(forContact: contact.id).isEmpty)
     }
 
-    /// The compare-and-set contract `SchedulingPass.caughtUp`/
-    /// `restorePendingAfterFailedCaughtUp` depend on (staged review round
+    /// The compare-and-set contract `SchedulingPass.recordInteraction`'s
+    /// transition and restore depend on (staged review round
     /// 10): a `transitionState(from:to:)` call whose `from` does not match
     /// the row's *actual* current state must report `false` and leave the
     /// row untouched — on both backends — not silently apply the write or
@@ -212,10 +212,9 @@ struct ReminderRepositoryContractTests {
     }
 
     /// `transitionState` is a compare-and-set on `state` alone. A Snooze row
-    /// that is caught up and then restored by
-    /// `restorePendingAfterFailedCaughtUp` must come back with the floor it
-    /// had, or the contact reads as un-snoozed. Read back through
-    /// `fetchPending`.
+    /// that is caught up and then restored by a failed
+    /// `recordInteraction` must come back with the floor it had, or the
+    /// contact reads as un-snoozed. Read back through `fetchPending`.
     @Test(
         "transitionState leaves snoozedUntil untouched when a row leaves pending and comes back",
         arguments: RepositoryContractBackend.allCases, [ReminderState.userCaughtUp, .fired]

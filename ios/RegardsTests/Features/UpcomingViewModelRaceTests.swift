@@ -16,22 +16,21 @@ struct UpcomingViewModelRaceTests {
         UpcomingViewModelActionTests.contact(lastInteractedAt: lastInteractedAt)
     }
 
-    /// The three-write partial-failure shape `markCaughtUp`'s doc comment
-    /// added a reload for, updated for correctness #4's write-order fix
-    /// (`scheduler.caughtUp` now runs *before* `InteractionLogging`, not
-    /// after — see its doc comment) — so "only the last write fails" now
-    /// means `InteractionLogging`'s own second write (`contacts.upsert`),
-    /// not the scheduler: a scheduler failure now blocks everything after it
-    /// by construction, so it can no longer produce a partial-persistence
-    /// case. This sets up a real pending snooze first, specifically so "the
-    /// snooze is restored" is provable rather than assumed — `caughtUp`
-    /// against a contact with nothing pending returns `false`, which
+    /// The partial-failure shape `markCaughtUp`'s doc comment added a reload
+    /// for. One `scheduler.recordInteraction` span clears the snooze, then
+    /// logs, so "only the last write fails" means `InteractionLogging`'s own
+    /// second write (`contacts.updateLastInteractedAt`; the stub injects its
+    /// failure through `failingUpsert`), not the transition: a transition
+    /// failure ends the span before anything is logged, so it can't produce
+    /// a partial-persistence case. This sets up a real pending snooze first,
+    /// specifically so "the snooze is restored" is provable rather than
+    /// assumed — with nothing pending the transition moves no row, which
     /// wouldn't discriminate "ran and cleared something" from "was skipped."
     ///
     /// Superseded assertion, staged review round 7: this test used to assert
     /// the pending snooze stayed cleared through the failure. It now asserts
-    /// the corrected behavior — the catch block restores the exact row
-    /// `caughtUp` cleared, mirroring `OverdueViewModelActionTests
+    /// the corrected behavior — `recordInteraction` restores the exact row
+    /// the transition cleared, mirroring `OverdueViewModelActionTests
     /// .markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows`.
     @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
     func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
@@ -42,6 +41,7 @@ struct UpcomingViewModelRaceTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -69,7 +69,8 @@ struct UpcomingViewModelRaceTests {
         #expect(pending[0].kind == .cadence)
         #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
         // The second write's first half (interactions.append) still truly
-        // persisted — only its second half (contacts.upsert) threw.
+        // persisted — only its second half (contacts.updateLastInteractedAt,
+        // failed through the stub's `failingUpsert`) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)
@@ -88,9 +89,9 @@ struct UpcomingViewModelRaceTests {
     /// The double-failure this pins (staged review round 8) — see
     /// `OverdueViewModelActionTests
     /// .markCaughtUpDoubleFailureOnRestoreStillReportsFailure`'s sibling
-    /// doc comment for the full shape. `caughtUp` clears a real snooze,
-    /// `InteractionLogging` then fails, and the compensating
-    /// `restorePendingAfterFailedCaughtUp` also fails — the method must
+    /// doc comment for the full shape. `recordInteraction` clears a real
+    /// snooze, `InteractionLogging` then fails, and the compensating restore
+    /// (inside the same lock span) also fails — the method must
     /// still return cleanly, and the reload must show the truthfully
     /// still-overdue contact, not a state the failed restore only wished for.
     @Test("A caught-up write whose own restore also fails does not crash and still reports failure")
@@ -102,6 +103,7 @@ struct UpcomingViewModelRaceTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: interactions,
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -117,7 +119,7 @@ struct UpcomingViewModelRaceTests {
         )
         await viewModel.load()
         #expect(viewModel.totalCount == 1)
-        try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
+        try await scheduler.snooze(contactId: contact.id) // a real row for `recordInteraction` to clear
         await reminders.armTransitionFailure(from: .userCaughtUp)
 
         let succeeded = await viewModel.markCaughtUp(contactId: contact.id)
@@ -142,7 +144,7 @@ struct UpcomingViewModelRaceTests {
     /// and only checks the final state would pass whether or not the fix
     /// is present, since that trailing reload eventually self-corrects
     /// either way. `GatedTransitionStateReminderRepository` closes that
-    /// hole: it holds `scheduler.caughtUp`'s write open, so this test can
+    /// hole: it holds `scheduler.recordInteraction`'s write open, so this test can
     /// inspect `totalCount` in the exact window *before* `markCaughtUp`
     /// reaches its own reload — the only place the bug is actually
     /// observable.
@@ -162,6 +164,7 @@ struct UpcomingViewModelRaceTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: gatedContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -181,7 +184,7 @@ struct UpcomingViewModelRaceTests {
         await contactsGate.waitUntilArrived()
 
         // markCaughtUp: its optimistic mutation runs immediately, then it
-        // blocks inside `scheduler.caughtUp` before it can reach its own
+        // blocks inside `scheduler.recordInteraction` before it can reach its own
         // trailing `performLoad()`.
         let action = Task { await viewModel.markCaughtUp(contactId: contact.id) }
         await schedulerGate.waitUntilArrived()
@@ -236,6 +239,7 @@ struct UpcomingViewModelRaceTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
