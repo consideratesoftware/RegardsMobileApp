@@ -13,12 +13,38 @@ Argument `$ARGUMENTS`: empty (run), `status` (standup only, no dispatch),
 a list of item ids to restrict to, or `merge #n` (re-evaluate one PR's merge
 conditions).
 
+## Lane notes
+
+The session scratchpad is wiped when a session restarts, and that has lost
+lane plans mid-lane. Keep every lane plan, review context, and PR body
+draft in the lanes folder instead: `../RegardsMobileApp-lanes/` relative to
+the root checkout (the first entry of `git worktree list`), a sibling of the
+`../RegardsMobileApp-TF##` worktrees. It sits outside the repo, so nothing in
+it is committed or shows up in `git status`. Create it with `mkdir -p` if
+it is missing. One subfolder per lane:
+
+```
+../RegardsMobileApp-lanes/TF##/plan.md            tech lead's approved plan, verbatim
+../RegardsMobileApp-lanes/TF##/review-context.md  review target, §14 row, claimed R-numbers
+../RegardsMobileApp-lanes/TF##/pr-body.md         the PR body draft, and later its current text
+```
+
+Write each file as soon as the role returns, before dispatching the next
+role, and rewrite `pr-body.md` whenever you change the PR body. Never use
+the scratchpad or `/tmp` for these. Never put real contact data, tokens, or
+anything else in this folder that you wouldn't put in a PR. The files are
+a cache for the next session: when they disagree with the branch, the PR, or
+`TESTFLIGHT_PLAN.md`, those win.
+
 ## Stage 0: state (yourself, no agents)
 
 1. `git fetch --prune origin`. The root checkout must be on `main` and clean
    or you stop and report; you never work in it.
 2. `git worktree list`; note each `RegardsMobileApp-TF##` and whether it is
    dirty. A dirty worktree is a lane in progress even if no agent is running.
+   Read the matching folder under `../RegardsMobileApp-lanes/` for each lane
+   (plan, review context, PR body draft) before asking a role to redo any
+   of it.
 3. `gh pr list --state open --json number,title,headRefName,isDraft`. Any PR
    with a `TF-##` marker is an occupied lane.
 4. Read `Current checkpoint` and `Work queue` in `TESTFLIGHT_PLAN.md`, and
@@ -53,8 +79,9 @@ For each open TF PR:
 For each READY item in queue order, up to the budget:
 
 1. Launch `tech-lead` with the queue row and §14 criteria verbatim. Wait
-   for the plan. If OPEN FOR OWNER is non-empty, park the item under OWNER
-   NEEDED and move on.
+   for the plan, and write it verbatim to
+   `../RegardsMobileApp-lanes/TF##/plan.md`. If OPEN FOR OWNER is non-empty,
+   park the item under OWNER NEEDED and move on.
 2. Check the plan's locks against other lanes' locks. Two lanes may not
    both own `AppEnvironment`, `RegardsApp`, migrations, `project.yml`,
    SchedulingPass, shared a11y helpers, or the execution docs. On a
@@ -85,7 +112,8 @@ For each slice in the tech lead's plan:
 After the last slice: launch `tech-writer` with the DOC SIBLINGS list and
 the facts from the slice reports. The tech writer commits its files; the
 review batch starts only when `git status --short` in the lane is empty.
-Fetch, then in one batch run
+Write the target, the §14 row, and the claimed R-numbers to
+`review-context.md` in the lane's folder. Fetch, then in one batch run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch
 `codex-reviewer` with the worktree, the same target `origin/main...HEAD`,
 the item's §14 row, and its claimed R-numbers. The three-dot target
@@ -122,7 +150,8 @@ report.
 
 ## Stage 4: ship
 
-Launch `release-manager` with every report from the lane. It opens the PR,
+Save the PR body draft to `pr-body.md` in the lane's folder, then launch
+`release-manager` with every report from the lane. It opens the PR,
 watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.

@@ -70,7 +70,10 @@ TF-## READY
 Handoffs are the structured report blocks at the end of each agent file.
 The engineering manager pastes them forward verbatim; nothing is retold from
 memory. Branch, worktree, PR body, and `TESTFLIGHT_PLAN.md` are the durable
-state, as the restart protocol already requires.
+state, as the restart protocol already requires. Lane plans, review
+contexts, and PR body drafts also live in a persistent folder outside the
+repo (see Lanes), because the session scratchpad is wiped when a session
+restarts.
 
 ## Lanes
 
@@ -84,6 +87,15 @@ state, as the restart protocol already requires.
   `xcodebuild`, because a `name=RegardsTF##` destination can fall back to
   My Mac or to another iOS runtime. It also writes its logs to a fresh
   per-run directory, never to a shared file.
+- Lane notes live in `../RegardsMobileApp-lanes/` relative to the root
+  checkout, next to the lane worktrees: one `TF##/` folder per lane with
+  `plan.md` (the tech lead's plan, verbatim), `review-context.md` (review
+  target, §14 row, claimed R-numbers), and `pr-body.md` (the PR body
+  draft). The folder is outside the repo, so nothing in it is committed.
+  The engineering manager never keeps these in the session scratchpad or
+  `/tmp`, and a restart reads the folder before asking a role to redo its
+  work. The branch, the PR, and `TESTFLIGHT_PLAN.md` win when a file
+  disagrees with them.
 - Lock files (from `TESTFLIGHT_PLAN.md`): `AppEnvironment`, `RegardsApp`,
   repository and migration files, `project.yml` and the generated project,
   SchedulingPass, Upcoming/Overdue/Contact Detail, Onboarding/Settings,
