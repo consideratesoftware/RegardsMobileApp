@@ -115,12 +115,12 @@ Navigation uses **one `NavigationStack` per tab** with per-tab `NavigationPath` 
 
 `RegardsAccessibilityTests` runs `XCUIApplication.performAccessibilityAudit()`
 across the registered screens. Pull requests run focused regressions for
-changed flows (the manual smoke goes to the pre-release device pass); the one-run audit after merges plus nightly and
-pre-release 5× stress workflows are release-blocking. See
-`ios/docs/accessibility.md` for the standing rules (VoiceOver label
-completeness, Dynamic Type through `accessibility5`, WCAG AA contrast, Reduce
-Motion, 44×44pt touch targets, focus order). Every new screen gets a row in the
-"screens audited" table in that doc.
+changed flows (the manual smoke goes to the pre-release device pass); the
+one-run audit after merges plus nightly and pre-release 5× stress workflows
+are release-blocking. See `ios/docs/accessibility.md` for the standing rules
+(VoiceOver label completeness, Dynamic Type through `accessibility5`, WCAG AA
+contrast, Reduce Motion, 44×44pt touch targets, focus order). Every new screen
+gets a row in the "screens audited" table in that doc.
 
 The active release audit currently uses the **structural** categories
 (`elementDetection`, `sufficientElementDescription`, `trait`) through the
@@ -132,7 +132,9 @@ categories.
 
 UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; the single broad audit runs after merges, while repeated 5× stress belongs to nightly and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
 
-Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) for a UI-touching PR goes to the "Pre-release device pass" in `TESTFLIGHT_PLAN.md` (owner ruling 8, 2026-10-28); it does not hold a merge.
+Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) for a UI-touching
+PR goes to the "Pre-release device pass" in `TESTFLIGHT_PLAN.md` (owner ruling
+8, 2026-10-28); it does not hold a merge.
 
 ## Info.plist privacy invariants
 

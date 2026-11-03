@@ -42,17 +42,18 @@ starts.
 The analysis job receives a read-only GitHub token, cannot call Bash or mutate
 GitHub, and returns a typed JSON artifact. The workflow has no mechanical
 preflight: XcodeGen determinism, SwiftLint, and the privacy/Domain guards are
-their own required checks. The publisher requires analysis, validates the artifact against the event's head, base, PR,
-and run identity, and publishes it through the dedicated App bot. The check
-asserts that a valid review ran for the current head, not that the reviewer
-agreed: a missing, malformed or stale-head artifact fails it, while a
-`REQUEST_CHANGES` verdict publishes the findings and passes, with the verdict
-and blocker count in the check summary. For a human author, acting on a
-blocker is their call; the Claude Code org's merge policy, in
-`ENGINEERING_ORG.md`, is zero hosted blockers on the current head. The publisher uses that App credential from the
-`hosted-review` environment to create the head-bound `Regards staged review`
-check. Branch protection binds that context to the dedicated App's identity, so
-a same-repository PR cannot satisfy it with an identically named Actions job.
+their own required checks. The publisher requires analysis, validates the
+artifact against the event's head, base, PR, and run identity, and publishes
+it through the dedicated App bot. The check asserts that a valid review ran
+for the current head, not that the reviewer agreed: a missing, malformed or
+stale-head artifact fails it, while a `REQUEST_CHANGES` verdict publishes the
+findings and passes, with the verdict and blocker count in the check summary.
+For a human author, acting on a blocker is their call; the Claude Code org's
+merge policy, in `ENGINEERING_ORG.md`, is zero hosted blockers on the current
+head. The publisher uses that App credential from the `hosted-review`
+environment to create the head-bound `Regards staged review` check. Branch
+protection binds that context to the dedicated App's identity, so a
+same-repository PR cannot satisfy it with an identically named Actions job.
 The preparer, validators, and fixtures live under `scripts/`.
 
 For a stacked PR, keep the child draft on its parent. After the parent merges,

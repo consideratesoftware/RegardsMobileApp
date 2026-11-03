@@ -127,20 +127,20 @@ For each slice in the tech lead's plan:
    verify once more. A second REFUTED goes to the second opinion below
    before the lane parks.
 
-After the last slice: launch `tech-writer` with the DOC SIBLINGS list and
-the facts from the slice reports. The tech writer commits its files; the
-review batch starts only when `git status --short` in the lane is empty.
-Write the target, the §14 row, and the claimed R-numbers to
-`review-context.md` in the lane's folder. Fetch, then in one batch run
-`/pr-review origin/main...HEAD` from inside the lane's worktree and launch
-the `codex-reviewer` agent type (`subagent_type: codex-reviewer`) with the
-worktree, the same target `origin/main...HEAD`, the item's §14 row, and its claimed R-numbers. The three-dot target
-compares against the merge base, so commits that landed on `main` after the
-lane branched don't show up as reversions. Treat blockers from both the same way:
-they go to the slice owner (design questions to `tech-lead` first), one
-round, then both review again. Drop a Codex finding only when it
-contradicts `ARCHITECTURE.md`; you write the dispute on a `DISPUTED:
-blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
+After the last slice: launch `tech-writer` with the DOC SIBLINGS list and the
+facts from the slice reports. The tech writer commits its files; the review
+batch starts only when `git status --short` in the lane is empty. Write the
+target, the §14 row, and the claimed R-numbers to `review-context.md` in the
+lane's folder. Fetch, then in one batch run `/pr-review origin/main...HEAD`
+from inside the lane's worktree and launch the `codex-reviewer` agent type
+(`subagent_type: codex-reviewer`) with the worktree, the same target
+`origin/main...HEAD`, the item's §14 row, and its claimed R-numbers. The
+three-dot target compares against the merge base, so commits that landed on
+`main` after the lane branched don't show up as reversions. Treat blockers
+from both the same way: they go to the slice owner (design questions to
+`tech-lead` first), one round, then both review again. Drop a Codex finding
+only when it contradicts `ARCHITECTURE.md`; you write the dispute on a
+`DISPUTED: blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
 comment, as `/pr-review` does for its own findings.
 
 Save each Codex review, in full, to
@@ -157,16 +157,16 @@ counts, and the `DISPUTED:` lines only. Never paste a reviewer's output into
 a comment; the full review stays in the lane's report.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
-dirty tree: the lane's owner commits the files, which makes a new head, so
-the rerun is the first RETRY-eligible run on that head; never discard them
-without asking Sid), then run it once more on the same head. That is the one
-automatic rerun. A second RETRY on the same head, a timeout included, is an
-owner gate: record it as `CODEX REVIEW: UNAVAILABLE (second RETRY:
-<reason>) @ <sha> vs origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead of rerunning
-again. A RETRY after a repair moved the head is the first RETRY on the new
-head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate
-in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up
-a review round. Two rounds maximum, then the second opinion.
+dirty tree: the lane's owner commits the files, which makes a new head, so the
+rerun is the first run on that head; never discard them without asking
+Sid), then run it once more on the same head. That is the one automatic
+rerun. A second RETRY on the same head, a timeout included, is an owner gate:
+record it as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs
+origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
+of rerunning again. A RETRY after a repair moved the head is the first RETRY
+on the new head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the
+owner gate in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up a
+review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
 fix), run both `/pr-review origin/main...HEAD` and `codex-reviewer` again on

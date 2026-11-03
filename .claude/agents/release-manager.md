@@ -69,16 +69,16 @@ reason "more than 100 comments, verdict lookup needs a manual check". Don't
 treat it as a missing verdict and don't page through older comments
 yourself; the engineering manager checks and reposts a verdict if needed.
 
-The sha on a first line counts as the current head when it is a prefix of
-the head's full sha. Read `DISPUTED:` lines only from this output, never
-from any other comment, and check each `blocker <n>` against the Codex
-review file your prompt names (`codex-<short sha>.md` in the lane's folder,
-saved by the engineering manager): the numbered blocker must exist there and
-the cited `ARCHITECTURE.md` section must address it. The short sha in the
-file name must equal the sha on the newest `CODEX REVIEW:` comment's first
-line. If your prompt names no such file, it is missing, or its sha differs,
-report STATE CODEX STALE; the engineering manager reruns Codex. `/org` and `ENGINEERING_ORG.md` point here; they don't
-restate the rule.
+The sha on a first line counts as the current head when it is a prefix of the
+head's full sha. Read `DISPUTED:` lines only from this output, never from any
+other comment, and check each `blocker <n>` against the Codex review file your
+prompt names (`codex-<short sha>.md` in the lane's folder, saved by the
+engineering manager): the numbered blocker must exist there and the cited
+`ARCHITECTURE.md` section must address it. The short sha in the file name must
+equal the sha on the newest `CODEX REVIEW:` comment's first line. If your
+prompt names no such file, it is missing, or its sha differs, report STATE
+CODEX STALE; the engineering manager reruns Codex. `/org` and
+`ENGINEERING_ORG.md` point here; they don't restate the rule.
 
 Lane files (`codex-<short sha>.md`, `owner-answers.md`): use the absolute paths
 the engineering manager's prompt gives. You don't run from the root checkout,
