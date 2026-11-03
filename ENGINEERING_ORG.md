@@ -192,7 +192,8 @@ to find later.
   automatic rerun; a RETRY after the head moves is the first on the new
   head. If Codex needs setup, run `/codex:setup` and `codex login` if it
   asks. If the second RETRY was a timeout, rerun the review when OpenAI is
-  responsive, or split the diff. The PR waits; the org does not merge
+  responsive, or split the PR, which is a scope change for Sid; Codex always
+  reviews the whole `origin/main...HEAD` diff. The PR waits; the org does not merge
   without the Codex verdict.
 - Scope changes to the queue or dependency graph.
 

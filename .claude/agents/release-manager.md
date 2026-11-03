@@ -182,7 +182,8 @@ PR, never in the root checkout.
   and so is a second RETRY on the same head (the engineering manager
   records it as UNAVAILABLE): park it and say which. Codex needs setup
   (`/codex:setup`), or the second RETRY was a timeout: rerun when OpenAI is
-  responsive, or split the diff.
+  responsive, or split the PR, which is a scope change for Sid. Never review
+  part of the diff: Codex always reviews all of `origin/main...HEAD`.
 - If either review's newest verdict names a sha other than the current head,
   report STATE CODEX STALE and stop; the engineering manager reruns both
   reviews and relaunches you.
