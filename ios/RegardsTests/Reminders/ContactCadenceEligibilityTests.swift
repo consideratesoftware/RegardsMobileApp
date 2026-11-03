@@ -2,10 +2,10 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// `Contact.isCadenceEligible` gates Snooze and the Contact Detail window row:
-/// active, tracked, and a cadence of at least 1 day. `ReminderEngine
-/// .scheduleCadence` applies the same rule through its own guards, so the two
-/// must agree for every case below.
+/// `Contact.isCadenceEligible` gates Snooze, the Contact Detail window row,
+/// and the cadence rows `SchedulingPass` writes: active, tracked, and a
+/// cadence of at least 1 day. The pass must write a cadence row for exactly
+/// the cases below that the property accepts.
 struct ContactCadenceEligibilityTests {
 
     struct Case: Sendable, CustomTestStringConvertible {
@@ -42,24 +42,23 @@ struct ContactCadenceEligibilityTests {
         #expect(contact.isCadenceEligible == scenario.expected)
     }
 
-    @Test("The engine schedules a cadence reminder for exactly the contacts isCadenceEligible accepts",
-          arguments: cases)
-    func engineAgreesWithEligibility(scenario: Case) {
-        let contact = Contact(
-            systemContactRef: "engine-eligibility-\(scenario.name)",
-            displayName: "Eligibility",
-            tracked: scenario.tracked,
-            cadenceDays: scenario.cadenceDays,
-            archivedAt: scenario.archived ? Date(timeIntervalSince1970: 1_800_000_000) : nil
-        )
-        let window = EngineFixtures.allDaysWindow(
-            [TimeRange(start: TimeOfDay(hour: 9), end: TimeOfDay(hour: 17))], tz: "America/New_York")
+    /// The pass gives every eligible contact a row, due or not (the 365-day
+    /// case is due in 2027), so whether a row exists is the pass's answer.
+    @Test("runFull writes a cadence row for exactly the contacts isCadenceEligible accepts",
+          arguments: cases, RepositoryContractBackend.allCases)
+    func passWritesCadenceRowExactlyForEligibleContacts(
+        scenario: Case,
+        backend: RepositoryContractBackend
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(
+            1, cadenceDays: scenario.cadenceDays, tracked: scenario.tracked)
+        if scenario.archived {
+            try await fixture.repositories.contacts.archive(id: contact.id, at: PassFixture.at("2026-06-01 10:00"))
+        }
 
-        let outcome = EngineFixtures.engine(now: Date(timeIntervalSince1970: 1_800_000_000))
-            .scheduleCadence(for: contact, effectiveLastInteractedAt: nil, window: window)
+        try await fixture.pass.runFull()
 
-        var skipped = false
-        if case .skipped = outcome { skipped = true }
-        #expect(!skipped == scenario.expected)
+        #expect((try await fixture.cadenceRow(contact) != nil) == scenario.expected)
     }
 }

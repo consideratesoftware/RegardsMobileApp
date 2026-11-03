@@ -4,8 +4,9 @@ import Testing
 
 /// Launch-time behavior of the notification action consumer: what a buffered
 /// action meets when `start()` is still loading, fails, retries, or ends in
-/// onboarding, and that exactly one consumer runs. Shares the harness in
-/// `NotificationActionHandlingTests.swift`.
+/// onboarding, and that exactly one consumer runs; and what Caught up does
+/// when its contact changes while the action waits on the pass lock. Shares
+/// the harness in `NotificationActionHandlingTests.swift`.
 extension NotificationActionHandlingTests {
     // MARK: Single consumer and wiring
 
@@ -119,5 +120,72 @@ extension NotificationActionHandlingTests {
         let dependencies = try #require(AppLaunchCoordinator.production().dependencies)
 
         #expect((dependencies.notifications as AnyObject?) === UserNotificationsAdapter.shared)
+    }
+
+    // MARK: Eligibility is judged inside the pass lock
+
+    /// TF-06 gap, narrowed by TF-07d: the handler no longer reads the contact
+    /// itself. `recordInteraction(.caughtUpFromNotification)` checks
+    /// eligibility on the read its writes use, after the transition and
+    /// inside the lock. Parking the transition holds the action at the point
+    /// the old handler had already passed its own check; untracking the
+    /// contact there must stop the log, and the snooze it cleared comes back.
+    @Test(
+        "A contact untracked while its Caught up is in flight gets no interaction and keeps its snooze",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases
+    )
+    func notificationCaughtUpForContactUntrackedMidActionLogsNothing(backend: RepositoryContractBackend) async throws {
+        let gate = AsyncGate()
+        let harness = try await Self.readyHarness(
+            backend: backend,
+            reminders: GatedTransitionStateReminderRepository(wrapped: StubReminderRepository(), gate: gate)
+        )
+        let contact = try await Self.seed(harness, id: 631, suffix: "untracked-mid-action")
+        try await harness.scheduler.snooze(contactId: contact.id)
+        let snoozed = try await harness.repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(snoozed.count == 1)
+
+        harness.fake.send(.caughtUp(contact.id))
+        await gate.waitUntilArrived()
+        var untracked = contact
+        untracked.tracked = false
+        try await harness.repositories.contacts.upsert(untracked)
+        await gate.open()
+
+        let handled = await Self.waitFor { harness.launch.handledNotificationActionCount == 1 }
+        #expect(handled, "the action was never handled")
+        #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
+        let after = try #require(try await harness.repositories.contacts.fetch(id: contact.id))
+        #expect(after.lastInteractedAt == contact.lastInteractedAt)
+        #expect(try await harness.repositories.reminders.fetchPending(forContact: contact.id) == snoozed)
+    }
+
+    /// The read now fails after the transition has cleared the snooze, so the
+    /// end state includes the restore. Writing nothing is not enough: the
+    /// snooze the action cleared must be back.
+    @Test("A contact read that throws after the transition leaves the snooze as it was")
+    func contactReadFailureAfterTheTransitionRestoresTheSnooze() async throws {
+        let contacts = StubContactRepository()
+        let harness = try await Self.readyHarness(
+            backend: .mock,
+            contacts: contacts,
+            reminders: StubReminderRepository(),
+            interactions: StubInteractionRepository()
+        )
+        let contact = try await Self.seed(harness, id: 632, suffix: "read-fails-after-transition")
+        try await harness.scheduler.snooze(contactId: contact.id)
+        let snoozed = try await harness.repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(snoozed.count == 1)
+        await contacts.armFetchFailures(1)
+
+        harness.fake.send(.caughtUp(contact.id))
+
+        let handled = await Self.waitFor { harness.launch.handledNotificationActionCount == 1 }
+        #expect(handled, "the action was never handled")
+        #expect(try await harness.repositories.reminders.fetchPending(forContact: contact.id) == snoozed)
+        #expect(try await harness.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10).isEmpty)
+        let after = try #require(try await harness.repositories.contacts.fetchAll().first { $0.id == contact.id })
+        #expect(after.lastInteractedAt == contact.lastInteractedAt)
     }
 }

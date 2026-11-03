@@ -43,6 +43,7 @@ struct UpcomingViewModelWindowTests {
             scheduler: SchedulingPass(
                 reminders: remindersRepository,
                 contacts: contactsRepository,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { now }

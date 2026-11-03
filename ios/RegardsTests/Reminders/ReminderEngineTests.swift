@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// Shared fixtures for the engine suites. Kept in one place so the cadence and
+/// Shared fixtures for the engine suites. Kept in one place so the window and
 /// DST suites can't drift on window shapes or date parsing.
 enum EngineFixtures {
 
@@ -62,136 +62,11 @@ enum EngineFixtures {
     }
 }
 
-/// Core ReminderEngine algorithm from ARCHITECTURE.md §9 — cadence resolution,
-/// window walking, degenerate handling, slot-start snapping, batching.
+/// Core ReminderEngine algorithm from ARCHITECTURE.md §9: window walking,
+/// degenerate handling, slot-start snapping, batching. Cadence derivation
+/// (eligibility, the never-contacted anchor) is the pass's, so its tests are
+/// in `SchedulingPassRunFullTests` and `ContactCadenceEligibilityTests`.
 struct ReminderEngineTests {
-
-    // MARK: - Basic cadence
-
-    @Test("Contact overdue right now schedules in the next in-window slot")
-    func cadenceOverdueNow() {
-        // Wed 2026-04-15 14:00 local (between 13:00-18:00 gap) — not in window.
-        let now = EngineFixtures.date("2026-04-15 14:00", tz: "Asia/Kolkata")
-        let last = EngineFixtures.date("2026-03-29 09:00", tz: "Asia/Kolkata")  // 17 days ago
-        let contact = Contact(
-            systemContactRef: "x", displayName: "Test",
-            tracked: true, cadenceDays: 14,
-            priorityTier: .regular, preferredChannel: .whatsapp,
-            preferredChannelValue: "+15551234567",
-            lastInteractedAt: last)
-
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: last, window: EngineFixtures.indiaWindow)
-
-        guard case .scheduled(let fires) = outcome else {
-            Issue.record("expected scheduled outcome, got \(outcome)"); return
-        }
-        // Next slot opens 18:00 the same Wed.
-        #expect(fires == EngineFixtures.date("2026-04-15 18:00", tz: "Asia/Kolkata"))
-    }
-
-    @Test("Not-yet-overdue contact is still scheduled, not marked overdue")
-    func cadenceNotYetOverdue() {
-        let now = EngineFixtures.date("2026-04-15 14:00", tz: "Asia/Kolkata")
-        let last = EngineFixtures.date("2026-04-14 09:00", tz: "Asia/Kolkata")
-        let contact = Contact(
-            systemContactRef: "x", displayName: "Test",
-            tracked: true, cadenceDays: 14, preferredChannel: .whatsapp,
-            preferredChannelValue: "+15551234567",
-            lastInteractedAt: last)
-
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: last, window: EngineFixtures.indiaWindow)
-        if case .notOverdue = outcome { return }
-        Issue.record("expected notOverdue, got \(outcome)")
-    }
-
-    @Test("Skipped when contact not tracked")
-    func cadenceSkippedWhenNotTracked() {
-        let now = Date()
-        var contact = Contact(systemContactRef: "x", displayName: "A",
-                              preferredChannel: .whatsapp, preferredChannelValue: "")
-        contact.tracked = false
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: nil, window: EngineFixtures.indiaWindow)
-        #expect(outcome == .skipped(reason: .notTracked))
-    }
-
-    @Test("Skipped when cadence is missing")
-    func cadenceSkippedWhenMissing() {
-        let contact = Contact(systemContactRef: "x", displayName: "A",
-                              tracked: true, cadenceDays: nil,
-                              preferredChannel: .whatsapp, preferredChannelValue: "")
-        let outcome = EngineFixtures.engine(now: Date()).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: nil, window: EngineFixtures.indiaWindow)
-        #expect(outcome == .skipped(reason: .missingCadence))
-    }
-
-    @Test("Archived contacts are skipped")
-    func cadenceSkippedWhenArchived() {
-        var contact = Contact(systemContactRef: "x", displayName: "A",
-                              tracked: true, cadenceDays: 7,
-                              preferredChannel: .whatsapp, preferredChannelValue: "")
-        contact.archivedAt = Date()
-        let outcome = EngineFixtures.engine(now: Date()).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: nil, window: EngineFixtures.indiaWindow)
-        #expect(outcome == .skipped(reason: .archived))
-    }
-
-    // MARK: - Never-contacted anchor = createdAt (decision #29, R8)
-
-    @Test("Never-contacted contact is NOT instantly overdue — due one cadence after createdAt")
-    func cadenceNeverContactedNotYetDue() {
-        // Created 5 hours ago; cadence 7 days. Must not flood the first-run
-        // Overdue screen. Anchor is createdAt, so it's notOverdue.
-        let created = EngineFixtures.date("2026-04-15 09:00", tz: "Asia/Kolkata")
-        let now = EngineFixtures.date("2026-04-15 14:00", tz: "Asia/Kolkata")
-        let contact = Contact(
-            systemContactRef: "x", displayName: "Test", tracked: true,
-            cadenceDays: 7, preferredChannel: .whatsapp,
-            preferredChannelValue: "+15551234567",
-            lastInteractedAt: nil, createdAt: created)
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: nil, window: EngineFixtures.indiaWindow)
-        if case .notOverdue = outcome { return }
-        Issue.record("expected notOverdue (createdAt anchor), got \(outcome)")
-    }
-
-    @Test("Never-contacted contact becomes overdue exactly one cadence after createdAt")
-    func cadenceNeverContactedOverdue() {
-        // Created 14 days ago, cadence 7 → overdue since createdAt + 7d.
-        let created = EngineFixtures.date("2026-04-01 09:00", tz: "Asia/Kolkata")
-        let now = EngineFixtures.date("2026-04-15 14:00", tz: "Asia/Kolkata")
-        let contact = Contact(
-            systemContactRef: "x", displayName: "Test", tracked: true,
-            cadenceDays: 7, preferredChannel: .whatsapp,
-            preferredChannelValue: "+15551234567",
-            lastInteractedAt: nil, createdAt: created)
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: nil, window: EngineFixtures.indiaWindow)
-        guard case .scheduled(let fires) = outcome else {
-            Issue.record("expected scheduled, got \(outcome)"); return
-        }
-        #expect(fires == EngineFixtures.date("2026-04-15 18:00", tz: "Asia/Kolkata"))
-    }
-
-    // MARK: - Degenerate window → skipped (R4)
-
-    @Test("Zero-capacity window skips with windowHasNoCapacity instead of scheduling illegally")
-    func cadenceZeroCapacityWindowSkips() {
-        let deadWindow = ReminderWindow(
-            allowedDays: .weekdays, allowedTimeRanges: [],
-            quietHours: nil, timezoneIdentifier: "Asia/Kolkata")
-        let last = EngineFixtures.date("2026-03-01 09:00", tz: "Asia/Kolkata")
-        let contact = Contact(
-            systemContactRef: "x", displayName: "Test", tracked: true,
-            cadenceDays: 7, preferredChannel: .whatsapp,
-            preferredChannelValue: "+15551234567", lastInteractedAt: last)
-        let now = EngineFixtures.date("2026-04-15 14:00", tz: "Asia/Kolkata")
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact, effectiveLastInteractedAt: last, window: deadWindow)
-        #expect(outcome == .skipped(reason: .windowHasNoCapacity))
-    }
 
     // MARK: - Window walking
 
@@ -261,34 +136,6 @@ struct ReminderEngineTests {
             let target = EngineFixtures.date(clockString, tz: tz)
             #expect(engine.nextAllowedSlot(from: target, in: window) == slotStart)
         }
-    }
-
-    @Test("A future cadence expiry inside a slot never fires before it is due")
-    func futureCadenceExpiryWalksToNextSlot() {
-        let timezone = "Asia/Kolkata"
-        let now = EngineFixtures.date("2026-04-15 12:00", tz: timezone)
-        let createdAt = EngineFixtures.date("2026-04-14 18:05", tz: timezone)
-        let contact = Contact(
-            systemContactRef: "future-inside-slot",
-            displayName: "Future",
-            tracked: true,
-            cadenceDays: 1,
-            createdAt: createdAt
-        )
-        let window = ReminderWindow(
-            allowedDays: [.wednesday, .thursday],
-            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 18), end: TimeOfDay(hour: 22))],
-            timezoneIdentifier: timezone
-        )
-
-        let outcome = EngineFixtures.engine(now: now).scheduleCadence(
-            for: contact,
-            effectiveLastInteractedAt: nil,
-            window: window
-        )
-
-        #expect(outcome == .notOverdue(
-            firesAt: EngineFixtures.date("2026-04-16 18:00", tz: timezone)))
     }
 
     @Test("Contiguous ranges collapse into one slot")

@@ -66,6 +66,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -103,6 +104,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -125,7 +127,7 @@ struct OverdueViewModelSnoozeTests {
     /// suppressing this row until day 7 even once the contact was genuinely
     /// overdue again — cadence 3 days puts that moment well before the
     /// stale snooze's day-7 mark, exactly where a missing
-    /// `SchedulingPass.caughtUp` call would still hide the row.
+    /// `SchedulingPass.recordInteraction` call would still hide the row.
     @Test("A contact caught up after a snooze reappears at the fresh short cadence, not the stale snooze")
     func caughtUpAfterSnoozeReappearsAtFreshCadence() async throws {
         let contact = Self.overdueContact(cadenceDays: 3, lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))
@@ -139,6 +141,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -156,19 +159,19 @@ struct OverdueViewModelSnoozeTests {
 
         // 4 days later: genuinely overdue again at this 3-day cadence, and
         // still short of the stale snooze's day-7 mark — the window where a
-        // missing `caughtUp` clear would still hide the row.
+        // missing caught-up clear would still hide the row.
         clock.advance(by: 4 * 86_400)
         await viewModel.load()
 
-        // `waitUntil`, not a bare `#expect`: `markCaughtUp`'s
-        // `logging.markCaughtUp` call broadcasts through `contacts.upsert`,
-        // which can still have a background `observeTracked()`-driven
-        // reload in flight from earlier in this test — correctness fix
-        // (staged review #7) reordered `markCaughtUp` to run
-        // `scheduler.caughtUp` first specifically so that broadcast always
-        // fires *after* the snooze is cleared, but the broadcast's own
-        // reload is still a separate, unawaited Task racing this explicit
-        // `load()` above. Harmless once it resolves to the same correct
+        // `waitUntil`, not a bare `#expect`: the `viewModel.markCaughtUp`
+        // call goes through `scheduler.recordInteraction` to
+        // `InteractionLogging`, whose `contacts.updateLastInteractedAt`
+        // broadcasts. That broadcast can still have a background
+        // `observeTracked()`-driven reload in flight from earlier in this
+        // test. The transition inside `recordInteraction` runs first
+        // specifically so the broadcast always fires *after* the snooze is
+        // cleared, but the broadcast's own reload is still a separate,
+        // unawaited Task racing this explicit `load()` above. Harmless once it resolves to the same correct
         // state — mirrors `UpcomingViewModelActionTests`'s
         // `caughtUpAfterSnoozeShowsFreshDateWithShortCadence`, which polls
         // for the identical reason.
@@ -195,6 +198,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -280,6 +284,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: gatedContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -341,6 +346,7 @@ struct OverdueViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: gatedReminders,
                 contacts: baseContacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }

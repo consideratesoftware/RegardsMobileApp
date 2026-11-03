@@ -287,8 +287,8 @@ public protocol ReminderRepository: Sendable {
     /// *current* state is still `from`, atomically with that check. Returns
     /// whether the transition actually happened.
     ///
-    /// `SchedulingPass.caughtUp` used to pair a separate `fetchPending` read
-    /// with `updateState` to learn whether a pending row existed (staged
+    /// The pre-TF-07d caught-up path used to pair a separate `fetchPending`
+    /// read with `updateState` to learn whether a pending row existed (staged
     /// review round 7); that left a window between the check and the write
     /// where two concurrent callers could both observe the same
     /// pre-transition state and each believe *it* was the one responsible

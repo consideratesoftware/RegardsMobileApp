@@ -1,32 +1,10 @@
 import Foundation
 
-/// Result of a cadence scheduling pass for a single contact / group.
-public enum CadenceSchedulingOutcome: Sendable, Equatable {
-    /// Contact is not yet overdue and has no pending reminder.
-    case notOverdue(firesAt: Date)
-    /// Contact is overdue (or becomes overdue when `now` reaches `targetFireTime`)
-    /// and the engine has picked a next window to fire in.
-    case scheduled(firesAt: Date)
-    /// Contact is not tracked, has no cadence set, or its effective window can
-    /// never fire (`windowHasNoCapacity`).
-    case skipped(reason: SkipReason)
-
-    public enum SkipReason: String, Sendable, Equatable {
-        case notTracked
-        case missingCadence
-        case archived
-        /// The effective window has zero firing capacity (no allowed days, no
-        /// usable ranges, or quiet hours consume every slot). SchedulingPass
-        /// surfaces this as a Settings badge rather than firing anyway
-        /// (§9 contract 2, R4).
-        case windowHasNoCapacity
-    }
-}
-
-/// Pure-function reminder scheduler (ARCHITECTURE.md §9). Takes no dependency
-/// on Apple platform frameworks — the platform adapter calls `schedule(for:)`
-/// and translates the `Date` result into a calendar trigger
-/// up-call.
+/// Pure-function slot math for reminders (ARCHITECTURE.md §9), with no
+/// dependency on Apple platform frameworks. `SchedulingPass` applies cadence
+/// eligibility and the never-contacted anchor (§9 contract 3, §9a), then
+/// calls the engine for every row's `scheduledFor`. The engine has no
+/// cadence entry point.
 public struct ReminderEngine: Sendable {
 
     /// Morning-of notification time for birthdays + anniversaries
@@ -43,54 +21,6 @@ public struct ReminderEngine: Sendable {
     ) {
         self.occasionNotificationTime = occasionNotificationTime
         self.clock = clock
-    }
-
-    // MARK: - Cadence scheduling
-
-    /// Computes when a cadence reminder should fire for a given contact.
-    ///
-    /// - Parameters:
-    ///   - contact: the target contact (`archivedAt`, `tracked`, `cadenceDays`
-    ///     are inspected).
-    ///   - effectiveLastInteractedAt: either the contact's own
-    ///     `lastInteractedAt`, or, for a contact that belongs to a virtual-
-    ///     merge group, the *max* of `lastInteractedAt` across the group's
-    ///     members (ARCHITECTURE.md §7 "Scheduling under virtual merges").
-    ///     Caller is responsible for the max computation.
-    ///   - window: the effective reminder window (per-contact override, or
-    ///     global).
-    public func scheduleCadence(
-        for contact: Contact,
-        effectiveLastInteractedAt: Date?,
-        window: ReminderWindow
-    ) -> CadenceSchedulingOutcome {
-        guard contact.archivedAt == nil else { return .skipped(reason: .archived) }
-        guard contact.tracked else        { return .skipped(reason: .notTracked) }
-        guard let cadenceDays = contact.cadenceDays, cadenceDays > 0 else {
-            return .skipped(reason: .missingCadence)
-        }
-
-        let now = clock()
-
-        // Never-contacted anchor is `createdAt`, not `now` (decision #29, R8):
-        // a newly tracked contact becomes due one full cadence after tracking
-        // started, not instantly. This matches the Overdue/Upcoming ViewModels'
-        // `?? createdAt`; the old "due now" branch here disagreed with the UI.
-        let anchor = effectiveLastInteractedAt ?? contact.createdAt
-        let overdueAt = anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
-
-        let isAlreadyOverdue = overdueAt <= now
-        let target = max(now, overdueAt)
-        guard let fires = nextAllowedSlot(
-            from: target,
-            in: window,
-            includingContainingSlot: isAlreadyOverdue
-        ) else {
-            // Zero-capacity window — never fire, never schedule at a disallowed
-            // instant (R4). SchedulingPass badges this in Settings.
-            return .skipped(reason: .windowHasNoCapacity)
-        }
-        return overdueAt > now ? .notOverdue(firesAt: fires) : .scheduled(firesAt: fires)
     }
 
     // MARK: - Window walking

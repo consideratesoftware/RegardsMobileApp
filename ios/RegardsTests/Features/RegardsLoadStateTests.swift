@@ -202,6 +202,7 @@ struct RegardsLoadStateTests {
             contacts: repository,
             reminders: nil,
             scheduler: SchedulingPass(reminders: StubReminderRepository(), contacts: repository,
+                                      interactions: StubInteractionRepository(),
                                       window: FixedReminderWindowRepository(), occasions: { _ in [] }, clock: { now }),
             interactions: StubInteractionRepository(),
             window: .defaultV1(timezone: timezone),

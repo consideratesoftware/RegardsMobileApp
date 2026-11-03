@@ -258,16 +258,16 @@ actor StubReminderRepository: ReminderRepository {
     private let upsertFailure: RepositoryFakeFailure?
     /// Independent of both above, and mutable rather than init-time (unlike
     /// `upsertFailure`): a test needs a *real* `scheduler.snooze()` /
-    /// `caughtUp()` transition to succeed first, to set up the genuinely
-    /// pending row a later restore attempts to touch, and only THEN wants
-    /// the *restore's* own transition to fail — `armTransitionFailure`
-    /// lets a test flip this on partway through, after that setup, rather
-    /// than needing it armed from construction. Proves the double-failure
-    /// case none of the three ViewModels' restore call sites had before
-    /// (staged review round 8): `caughtUp` clears a real snooze, the
-    /// caller's own next write then fails, and the compensating restore
-    /// *also* fails — the method must still return cleanly, not throw
-    /// past its own catch block.
+    /// `recordInteraction(.caughtUp)` transition to succeed first, to set up
+    /// the genuinely pending row a later restore attempts to touch, and only
+    /// THEN wants the *restore's* own transition to fail —
+    /// `armTransitionFailure` lets a test flip this on partway through, after
+    /// that setup, rather than needing it armed from construction. Proves the
+    /// double-failure case none of the three ViewModels' restore call sites had
+    /// before (staged review round 8): `recordInteraction(.caughtUp)` clears a
+    /// real snooze, the log write then fails, and the compensating restore
+    /// *also* fails — the method must still return cleanly, not throw past its
+    /// own catch block.
     private var transitionFailureFrom: ReminderState?
 
     init(
