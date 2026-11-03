@@ -272,6 +272,15 @@ extension ScreensAccessibilityTests {
     }
 
     @MainActor
+    func testOnboardingConceptPassesAuditAtAccessibility5() throws {
+        let app = launchFirstLaunch(dynamicTypeSize: "accessibility5")
+        let concept = app.descendants(matching: .any)[Self.conceptScreenID]
+        XCTAssertTrue(concept.waitForExistence(timeout: 10), "A fresh launch should stop at the concept screen.")
+
+        try app.performAccessibilityAudit(for: Self.structuralAuditCategories)
+    }
+
+    @MainActor
     func testOnboardingGetStartedShowsContactsPrePrompt() {
         let app = launchFirstLaunch()
 

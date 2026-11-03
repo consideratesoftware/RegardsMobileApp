@@ -207,14 +207,15 @@ struct AppRuntimeTests {
     /// `run(for:)` for the contacts it changed, so an untracked contact's
     /// pending row is cancelled and a newly tracked one is scheduled before the
     /// screen closes. An unrelated tracked contact (Zoe) holds a stale row that
-    /// only a full run would rewrite: the save must leave it alone. The
-    /// production runtime uses the real clock, so contacts are long overdue
-    /// rather than due at a set time.
+    /// only a full run would rewrite: the save must leave it alone. The runtime
+    /// has a fixed clock and a UTC calendar, so the contacts are 100 days
+    /// overdue at a known `now`.
     @Test("The Settings starter picker reschedules only the contacts it changed, through the pass")
     @MainActor
     func settingsStarterPickerSchedulesAndCancelsThroughThePass() async throws {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
-        let longAgo = Date(timeIntervalSince1970: 1_600_000_000)
+        let runtime = try await Self.fixedClockRuntime(environment)
+        let longAgo = runtime.clock().addingTimeInterval(-100 * 86_400)
         let xena = Contact(
             systemContactRef: "starter-xena", displayName: "Xena",
             tracked: true, cadenceDays: 7, lastInteractedAt: longAgo)
@@ -223,7 +224,6 @@ struct AppRuntimeTests {
             systemContactRef: "starter-zoe", displayName: "Zoe",
             tracked: true, cadenceDays: 7, lastInteractedAt: longAgo)
         for contact in [xena, yara, zoe] { try await environment.contacts.upsert(contact) }
-        let runtime = try await AppRuntime.makeProduction(environment: environment)
         try await runtime.scheduler.runFull()
         func cadenceRow(_ contact: Contact) async throws -> ScheduledReminder? {
             try await environment.reminders.fetchPending(forContact: contact.id).first { $0.kind == .cadence }
@@ -234,9 +234,7 @@ struct AppRuntimeTests {
         // due row is kept as is, so the stale row sits in the future, where a
         // full run moves it back to her overdue slot.
         var stale = try #require(try await cadenceRow(zoe))
-        // Whole seconds, so the stored value reads back equal.
-        let nextMonth = runtime.clock().timeIntervalSince1970 + 30 * 86_400
-        stale.scheduledFor = Date(timeIntervalSince1970: nextMonth.rounded())
+        stale.scheduledFor = runtime.clock().addingTimeInterval(30 * 86_400)
         try await environment.reminders.upsert(stale)
         let picker = RegardsTabRoot.makeStarterContactsViewModel(runtime: runtime)
         await picker.load()
@@ -255,6 +253,55 @@ struct AppRuntimeTests {
         try await runtime.scheduler.runFull()
         let afterFull = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
         #expect(afterFull == pending, "A second full run is a no-op.")
+    }
+
+    /// A failed run for one contact must not stop the rest: the save logs it
+    /// and goes on, and the next foreground full run repairs the one that failed.
+    @Test("When the pass fails for one saved contact, the other is still scheduled and the save succeeds")
+    @MainActor
+    func settingsStarterSaveReschedulesRemainingContactsWhenOneRunThrows() async throws {
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let probe = try await Self.fixedClockRuntime(base)
+        let longAgo = probe.clock().addingTimeInterval(-100 * 86_400)
+        let ana = Contact(systemContactRef: "starter-ana", displayName: "Ana", lastInteractedAt: longAgo)
+        let ben = Contact(systemContactRef: "starter-ben", displayName: "Ben", lastInteractedAt: longAgo)
+        for contact in [ana, ben] { try await base.contacts.upsert(contact) }
+        // Writes of Ana's reminder row fail; everything else is the real store.
+        let environment = AppEnvironment(
+            contacts: base.contacts, groups: base.groups,
+            reminders: CountingReminderRepository(base.reminders, failUpsertsForContact: ana.id),
+            interactions: base.interactions, window: base.window, profile: base.profile)
+        let runtime = try await Self.fixedClockRuntime(environment)
+        let picker = RegardsTabRoot.makeStarterContactsViewModel(runtime: runtime)
+        await picker.load()
+        picker.toggle(ana.id)
+        picker.toggle(ben.id)
+
+        let saved = await picker.save()
+
+        #expect(saved, "A failed reschedule is logged, not shown: the tracking writes landed.")
+        let tracked = try await base.contacts.fetchAll().filter(\.tracked).map(\.id)
+        #expect(Set(tracked) == [ana.id, ben.id])
+        #expect(try await base.reminders.fetchPending(forContact: ana.id).isEmpty, "Ana's run threw.")
+        #expect(
+            try await base.reminders.fetchPending(forContact: ben.id).contains { $0.kind == .cadence },
+            "Ben is rescheduled although Ana's run came first and threw."
+        )
+    }
+
+    /// A runtime with a fixed clock (2026-09-21 UTC) and an explicit UTC
+    /// calendar over `environment`, with no occasions.
+    private static func fixedClockRuntime(_ environment: AppEnvironment) async throws -> AppRuntime {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        return AppRuntime(
+            environment: environment,
+            window: try await environment.window.fetchGlobal(),
+            userCalendar: calendar,
+            clock: { now },
+            occasions: { _ in [] }
+        )
     }
 
     @Test("Production runtime propagates a missing persisted window")

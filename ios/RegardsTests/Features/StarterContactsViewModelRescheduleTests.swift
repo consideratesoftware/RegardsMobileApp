@@ -123,6 +123,57 @@ extension StarterContactsViewModelSaveTests {
         #expect(saved.calls.isEmpty)
     }
 
+    /// The screen speaks "Saving" once per `savesStarted` change, because Done
+    /// can hold "Saving…" through the writes and the reschedule with nothing
+    /// else announced. The counter must move exactly once for a save that will
+    /// write, and never for Skip, a no-op save, or a save the view model refuses.
+    @Test("A save with writes starts exactly one announcement, even when a write fails")
+    func saveWithWritesCountsOneStart() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        let ben = Self.person("Ben")
+        for person in [ana, ben] { try await store.upsert(person) }
+        let viewModel = Self.picker(ScriptedTrackingContactRepository(store, failOnCall: 2), SavedCalls())
+        await viewModel.load()
+        viewModel.toggle(ana.id)
+        viewModel.toggle(ben.id)
+        #expect(viewModel.savesStarted == 0)
+
+        _ = await viewModel.save()
+        #expect(viewModel.savesStarted == 1, "One save with two writes, the second throwing, starts once.")
+
+        // The retry is a new save with a write to make.
+        #expect(await viewModel.save())
+        #expect(viewModel.savesStarted == 2)
+    }
+
+    @Test("Skip, a save with nothing to write, a save before load and a save after finishing start nothing")
+    func nothingToSaveCountsNoStart() async throws {
+        let store = try Self.store()
+        let ana = Self.person("Ana")
+        try await store.upsert(ana)
+        let beforeLoad = Self.picker(store, SavedCalls())
+        _ = await beforeLoad.save()
+        let viewModel = Self.picker(store, SavedCalls())
+        await viewModel.load()
+
+        _ = await viewModel.save()
+        viewModel.toggle(ana.id)
+        #expect(viewModel.skip())
+        _ = await viewModel.save()
+
+        #expect(beforeLoad.savesStarted == 0)
+        #expect(viewModel.savesStarted == 0)
+
+        // A finished screen refuses a second save without announcing.
+        let done = Self.picker(store, SavedCalls())
+        await done.load()
+        done.toggle(ana.id)
+        #expect(await done.save())
+        _ = await done.save()
+        #expect(done.savesStarted == 1)
+    }
+
     /// Guards against calling `onSaved` when nothing landed (an empty call).
     /// It passes if `save()` never calls `onSaved` at all, so it cannot detect
     /// that; `settingsStarterSaveRunsThePassForChangedContacts` covers it.

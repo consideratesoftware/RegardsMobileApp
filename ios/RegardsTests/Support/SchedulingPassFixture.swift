@@ -12,14 +12,18 @@ import Testing
 actor CountingReminderRepository: ReminderRepository {
     private let wrapped: any ReminderRepository
     private var upsertGate: AsyncGate?
+    /// Every `upsert` of a row for this contact throws, as a failed write for
+    /// one contact in an otherwise healthy store.
+    private let failUpsertsForContact: UUID?
     private(set) var upserts = 0
     private(set) var transitions = 0
     private(set) var stateUpdates = 0
     private(set) var deletes = 0
 
-    init(_ wrapped: any ReminderRepository, upsertGate: AsyncGate? = nil) {
+    init(_ wrapped: any ReminderRepository, upsertGate: AsyncGate? = nil, failUpsertsForContact: UUID? = nil) {
         self.wrapped = wrapped
         self.upsertGate = upsertGate
+        self.failUpsertsForContact = failUpsertsForContact
     }
 
     /// Every write of any kind since construction.
@@ -33,6 +37,7 @@ actor CountingReminderRepository: ReminderRepository {
 
     func upsert(_ reminder: ScheduledReminder) async throws {
         upserts += 1
+        if reminder.contactId == failUpsertsForContact { throw RepositoryFakeFailure() }
         if let gate = upsertGate {
             upsertGate = nil
             await gate.wait()
