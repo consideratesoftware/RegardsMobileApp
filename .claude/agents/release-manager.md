@@ -68,8 +68,10 @@ PR, never in the root checkout.
   or REQUEST_CHANGES with every one of its blockers disputed with an
   `ARCHITECTURE.md` section; check each cited section exists and
   addresses the finding. A missing line, RETRY, STALE, or UNAVAILABLE
-  never passes. UNAVAILABLE, or RETRY three times in a row, is an owner
-  gate: park with "run `/codex:setup`".
+  never passes. UNAVAILABLE, or RETRY three times in a row on the same
+  head, is an owner gate: park it and say which. UNAVAILABLE means Codex
+  needs setup (`/codex:setup`); repeated timeouts mean rerun when OpenAI is
+  responsive, or split the diff.
 - If either review's verdict names a sha other than the current head,
   report STATE CODEX STALE and stop; the engineering manager reruns both
   reviews and relaunches you.

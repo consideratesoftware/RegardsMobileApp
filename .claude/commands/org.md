@@ -124,9 +124,13 @@ round, then both review again. Drop a Codex finding only when it
 contradicts `ARCHITECTURE.md`; you write the dispute in the PR body with
 the section, as `/pr-review` does for its own findings.
 
-A `codex-reviewer` RETRY proves nothing: run it again, at most twice more.
-After that, or on UNAVAILABLE, carry on to Stage 4; the PR waits on the
-owner gate in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up
+A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
+dirty tree: the lane's owner commits or discards the files), then run it
+again, at most twice more on the same head. The count is per head: a RETRY
+after a repair moved the head is the first RETRY on the new head. After the
+third RETRY on one head, or on UNAVAILABLE, carry on to Stage 4; the PR
+waits on the owner gate in `ENGINEERING_ORG.md`, and your report says
+whether the RETRYs were timeouts or something else. RETRY and UNAVAILABLE runs don't use up
 a review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
