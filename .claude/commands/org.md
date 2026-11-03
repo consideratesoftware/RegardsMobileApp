@@ -122,7 +122,8 @@ For each slice in the tech lead's plan:
    `tech-lead` and relay the ruling; one repair round.
 3. Launch `verifier` with the claim "slice <name> on <branch> meets <its
    criteria> and its regression tests are regression proof as `qa-engineer.md`
-   defines it (they fail on the old code or under a named mutation)". On
+   defines it (a bug fix needs a test that fails on the old code; a named
+   mutation counts only for new behavior the old code can't run)". On
    REFUTED: send the refutation to the slice owner, one repair round, then
    verify once more. A second REFUTED goes to the second opinion below
    before the lane parks.

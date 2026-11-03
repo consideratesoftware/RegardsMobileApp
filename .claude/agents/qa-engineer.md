@@ -37,14 +37,19 @@ test plan from your prompt, the existing test files and fakes for the area.
   add against existing bugs (temporarily revert or mutate, run, restore, and
   say so).
 - Regression proof is defined here; `verifier.md` and `/org` refer to this
-  bullet. A test is regression proof when either form holds: it fails on the
-  old code, or it fails under a named mutation (a specific edit to
-  production code, such as "drop the `isActive` guard in `markCaughtUp`",
-  that you applied, ran, and restored). Either form is enough. A test that
-  passes on old code but fails under a named mutation is regression proof,
-  not a pin. A pin passes on old code and you can name no mutation that
-  fails it: it guards existing behavior against a later change and proves no
-  fix. Label every pin: the first words of its doc comment are `/// Pin.`
+  bullet. A test is regression proof in one of 2 forms: it fails on the old
+  code, or it fails under a named mutation (a specific edit to production
+  code, such as "drop the `isActive` guard in `markCaughtUp`", that you
+  applied, ran, and restored). Which form counts depends on the change. A
+  slice that fixes existing behavior needs a test that fails on the old
+  code; a mutation does not stand in for it. Mutation proof counts only for
+  new behavior the old code cannot run (a new method or code path), where
+  "fails on the old code" can't be shown. A test that passes on old code but
+  fails under a named mutation is regression proof for new behavior and a
+  pin for a bug fix. A pin passes on old code and you can name no mutation
+  that fails it, or it is the mutation-only test of a bug fix: it guards
+  existing behavior against a later change and proves no fix. Label every
+  pin: the first words of its doc comment are `/// Pin.`
   followed by what it guards (for example `/// Pin. Archived contacts stay
   out of the pass; this passed before the fix and guards against a later
   change.`). Never describe a pin as a regression test, and never leave a
