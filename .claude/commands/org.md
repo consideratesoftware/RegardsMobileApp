@@ -127,12 +127,20 @@ watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
 
+Owner direction, 2026-11-02: a PR whose merge conditions all hold is
+merged. Don't ask Sid "ready to merge?" and don't hold a green PR for his
+review. Sid hears only about PRs that need him: a blocking owner gate, an
+OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a scope change, or a PR parked
+after its repair rounds.
+
 If it reports CODEX STALE (the PR body's `CODEX REVIEW:` sha is not the
 head), run both reviews on the new head as in Stage 3 and relaunch
 `release-manager` with the new verdicts. Blockers go to the slice owner as
 in Stage 3. After 3 stale rounds on one PR, park it and say why.
 
 ## Stage 5: report
+
+A merged PR is one line under LANES or RESUMED, never under OWNER NEEDED.
 
 ```
 ## /org: <date>
@@ -142,7 +150,7 @@ LANES (n/3 occupied):
 RESUMED:
 - PR #n: release-manager STATE | Codex: verdict @ sha
 WAITED: READY items not started, with lock or budget reason
-OWNER NEEDED: merged checklist across lanes, exact steps
+OWNER NEEDED: only PRs that need Sid, one exact checklist each; "none" otherwise
 DISPUTED: findings dropped against ARCHITECTURE.md, with §
 NEXT RUN: what /org will find next time
 ```

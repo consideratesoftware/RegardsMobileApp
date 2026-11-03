@@ -63,7 +63,8 @@ TF-## READY
   → tech-writer: doc siblings, register, a11y rows
   → /pr-review (review board) + codex-reviewer, in parallel
   → release-manager: PR, CI, hosted review, on-call repairs, checkpoint
-  → merge when every condition below holds, else parked with an owner checklist
+  → merge as soon as every condition below holds; a PR that needs Sid is
+    parked with an owner checklist
 ```
 
 Handoffs are the structured report blocks at the end of each agent file.
@@ -106,6 +107,13 @@ All of these, on the current head, with no averaging:
    finding. RETRY and UNAVAILABLE never satisfy this condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
+
+When all 6 hold, the PR merges. Owner direction, 2026-11-02: the org
+doesn't ask Sid whether to merge and doesn't hold a green PR for his
+review. It notifies Sid only about PRs that need him: a blocking owner gate
+(below), a Codex UNAVAILABLE, or a PR parked after its repair rounds. A
+merged PR appears in the engineering manager's report as one line, not as a
+notification.
 
 The release manager executes the merge with
 `gh pr merge <n> --merge --delete-branch --match-head-commit <sha>` (this
