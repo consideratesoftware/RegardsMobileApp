@@ -136,10 +136,11 @@ gh pr merge <n> --merge --delete-branch --match-head-commit <head sha>
 The repository uses merge commits; never `--squash` or `--rebase`. Leave
 the lane worktree in place and report `LANE: merged, worktree kept`. Remove
 it (`git worktree remove <lane path>`) only when the engineering manager's
-prompt says to. Don't arm auto-merge (`gh pr merge --auto`) before every
-non-check condition above holds: the hosted review check is green whatever
-its verdict, so GitHub would merge a PR with blockers. Otherwise report
-what is missing. Anything only Sid can do goes to the engineering manager
+prompt says to. Never arm auto-merge (`gh pr merge --auto`); merge
+directly with the command above once every condition holds. The hosted
+review check is green whatever its verdict, so GitHub's auto-merge would
+fire before the non-check conditions are met. Otherwise report what is
+missing. Anything only Sid can do goes to the engineering manager
 as OWNER QUESTIONS, never into the PR body.
 
 ## Report (exactly this shape)
