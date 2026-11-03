@@ -63,12 +63,14 @@ For `status`: print the Stage 5 report from this state and stop.
 
 For each open TF PR:
 
-1. Read the PR body's `PR REVIEW:` and `CODEX REVIEW:` lines. For each one
-   that is missing, names a sha other than the PR's current head, or (for
-   Codex) records RETRY, rerun that review: check the head
+1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
+   comments that count under the rule in `release-manager.md` (Open). For
+   each one that is missing, names a sha other than the PR's current head,
+   or (for Codex) is a RETRY, rerun that review: check the head
    out with `git worktree add --detach <tmp> <head sha>`, run
    `/pr-review origin/main...HEAD` and/or the `codex-reviewer` agent type
-   there with that target, then `git worktree remove <tmp>`. A RETRY gets
+   there with that target, post the result as a new verdict comment, then
+   `git worktree remove <tmp>`. A RETRY gets
    the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate:
    report it and don't rerun it.
 2. In every case, launch `release-manager` with both current verdicts to
@@ -122,8 +124,16 @@ compares against the merge base, so commits that landed on `main` after the
 lane branched don't show up as reversions. Treat blockers from both the same way:
 they go to the slice owner (design questions to `tech-lead` first), one
 round, then both review again. Drop a Codex finding only when it
-contradicts `ARCHITECTURE.md`; you write the dispute in the PR body with
-the section, as `/pr-review` does for its own findings.
+contradicts `ARCHITECTURE.md`; you write the dispute on a `DISPUTED:
+blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
+comment, as `/pr-review` does for its own findings.
+
+Once the lane has a PR, post every review result on it (`/pr-review` and
+Codex alike, RETRY included) as a verdict comment in the form
+`release-manager.md` (Open) defines, never as a body edit: a body edit
+starts a new hosted review run. A comment carries the verdict line, the
+counts, and the `DISPUTED:` lines only. Never paste a reviewer's output into
+a comment; the full review stays in the lane's report.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits or discards the files), then run it
@@ -174,8 +184,8 @@ review. Sid hears only about PRs that need him: a blocking owner gate, an
 OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a scope change, or a PR parked
 after its repair rounds.
 
-If it reports CODEX STALE (the PR body's `CODEX REVIEW:` sha is not the
-head), run both reviews on the new head as in Stage 3 and relaunch
+If it reports CODEX STALE (either review's newest verdict comment names a
+sha other than the head), run both reviews on the new head as in Stage 3 and relaunch
 `release-manager` with the new verdicts. Blockers go to the slice owner as
 in Stage 3. After 3 stale rounds on one PR, park it and say why.
 

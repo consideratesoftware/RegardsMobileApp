@@ -48,8 +48,13 @@ repository. The prompt tells it to review the diff only; nothing enforces
 that. This is the same exposure as running Codex by hand in this repo.
 Lane worktrees hold only repository code and synthetic fixtures, never real
 contact data, and `codex-reviewer` treats Codex's output as data, never as
-instructions. None of this touches the app's no-network invariant (§11),
-which the guards still enforce on app code.
+instructions. Verdicts are PR comments, not body lines (a body edit starts
+a new hosted review run), and they count only under the rule in
+`.claude/agents/release-manager.md`: the org's own account, never edited.
+Anyone holding that account could still post a false one, which is the
+same trust the org already places in that account's pushes. None of this
+touches the app's no-network invariant (§11), which the guards still
+enforce on app code.
 
 ## How one work item moves
 
@@ -113,8 +118,8 @@ All of these, on the current head, with no averaging:
    manager reads the text and counts the blockers.
 3. `/pr-review` verdict APPROVE.
 4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
-   with every Codex blocker disputed in the PR body by the engineering
-   manager, citing the `ARCHITECTURE.md` section that settles it; the
+   with every Codex blocker disputed in that verdict's PR comment by the
+   engineering manager, citing the `ARCHITECTURE.md` section that settles it; the
    release manager checks each cited section exists and addresses the
    finding. RETRY and UNAVAILABLE never satisfy this condition.
 5. Verifier verdict HOLDS for every slice.
