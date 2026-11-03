@@ -241,6 +241,7 @@ DISPUTED: findings dropped against ARCHITECTURE.md, with §
 NEXT RUN: what /org will find next time
 ```
 
-Never delete a worktree or branch except the release manager's post-merge
-cleanup and Stage 1's temporary review worktrees. Never edit `TESTFLIGHT_PLAN.md` in the root checkout. Never merge
+Never delete a worktree or branch except Stage 1's temporary review
+worktrees and a merged lane's worktree, which the release manager removes
+only when your prompt says to (it keeps it by default). Never edit `TESTFLIGHT_PLAN.md` in the root checkout. Never merge
 with a blocker, a red check, or an outstanding owner gate.

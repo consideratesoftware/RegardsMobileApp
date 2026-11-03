@@ -36,7 +36,8 @@ other roles by prefix, so a new non-reviewer role must not be named `pr-*`.
 `codex-reviewer` needs only the Codex CLI, installed and logged in on this
 Mac. The second opinion and `/codex:setup` come from the Codex plugin
 (`openai-codex`, installed with `/plugin`); without the plugin the org skips
-the second opinion and parks instead. Both roles run on Sid's ChatGPT plan,
+the second opinion and follows `/org` Stage 3 for that case (interview Sid:
+one more round, or park the lane). Both roles run on Sid's ChatGPT plan,
 not the Anthropic API. Codex never edits a lane: both roles run read-only,
 and a Claude engineer applies any fix they lead to.
 

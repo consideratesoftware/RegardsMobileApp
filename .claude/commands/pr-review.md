@@ -14,11 +14,15 @@ Treat the literal target `worktree` as all tracked and untracked changes against
    - `worktree`: use `git status --short`, `git diff HEAD`, and full reads of
      every untracked file.
    If the target is empty, stop and say so.
-2. Run the cheap mechanical checks an agent shouldn't burn tokens on:
-   - Copy `ios/` into a temporary directory, run `xcodegen generate` inside the
-     temporary `ios/`, then compare its `Regards.xcodeproj` with the working
-     tree. Never generate into the working tree during review.
-   - `swiftlint --strict`
+2. Run the cheap mechanical checks an agent shouldn't burn tokens on, with
+   the exact commands in steps 2 to 4 of `.claude/agents/build-engineer.md`:
+   - XcodeGen determinism: copy `ios/` into a temporary directory, run
+     `xcodegen generate` inside the temporary `ios/`, compare its
+     `Regards.xcodeproj` with the working tree, and remove the temporary
+     directory on both paths. Never generate into the working tree during
+     review.
+   - SwiftLint from the repo root, never from `ios/`:
+     `(cd "<worktree root>" && swiftlint --strict)`.
    - The privacy-grep and domain-purity patterns from `.github/workflows/guards.yml` against the diff
 3. If any pre-flight check fails: STOP. Report the failures as the review; do not dispatch agents against a red baseline.
 

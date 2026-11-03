@@ -20,7 +20,8 @@ close.
 
 **Step 1. Check.** Run these in Bash, with the worktree path in single
 quotes. Org worktree paths never contain a quote; if yours does, report
-UNAVAILABLE and stop.
+RETRY with reason "quoted worktree path" and stop. Codex isn't at fault, so
+it isn't UNAVAILABLE; the engineering manager fixes the path and reruns.
 
 ```bash
 wt='<worktree>'
