@@ -7,12 +7,13 @@ import Testing
 /// 300-line type body limit. Fixtures (`now`, `contact(...)`) stay shared
 /// from that type rather than being duplicated here.
 ///
-/// What these pin: `markCaughtUp` and `logOther` are each two writes now
-/// (`SchedulingPass.recordInteraction`, then `InteractionLogging`, in that order —
-/// see `markCaughtUp`'s doc comment for why the reminder-state write goes
-/// first), so the first can persist while the second throws or partially
-/// applies. Both catch blocks reload unconditionally so the screen ends up
-/// agreeing with whatever actually landed.
+/// What these pin: `markCaughtUp` and `logOther` each make one
+/// `SchedulingPass.recordInteraction` call, which runs the reminder-state
+/// transition, the `InteractionLogging` writes and the reschedule in one
+/// lock span. The log's `append` can persist while its `lastInteractedAt`
+/// write throws, and a failure restores the snooze the transition cleared.
+/// Both catch blocks reload unconditionally so the screen ends up agreeing
+/// with whatever actually landed.
 @MainActor
 struct ContactDetailViewModelFailurePathTests {
 
@@ -60,9 +61,9 @@ struct ContactDetailViewModelFailurePathTests {
 
         await viewModel.markCaughtUp()
 
-        // `scheduler.recordInteraction` runs first now and succeeds (a no-op — this
-        // contact has no pending snooze). `interactions.append` then
-        // succeeds too; `upsert` throws right after (documented on
+        // Inside `scheduler.recordInteraction` the transition finds no pending
+        // snooze (this contact has none) and `interactions.append` succeeds;
+        // `upsert` throws right after (documented on
         // `InteractionLogging.record`), so the catch block's `load()` fires.
         // That reload re-reads the same contact whose `upsert` just failed,
         // so `lastInteractedAt` comes back nil — the same value already on
@@ -73,24 +74,23 @@ struct ContactDetailViewModelFailurePathTests {
         #expect(viewModel.contact?.lastInteractedAt == nil)
     }
 
-    /// The three-write partial-failure shape `markCaughtUp`'s doc comment
-    /// added a reload for, updated for correctness #4's write-order fix
-    /// (`scheduler.recordInteraction` now runs *before* `InteractionLogging`, not
-    /// after — see `markCaughtUp`'s doc comment): with the reminder-state
-    /// write first, "only the last write fails" now means `contacts.upsert`
-    /// — `InteractionLogging`'s second internal write — not
-    /// `scheduler.recordInteraction` (a scheduler failure now blocks everything after
-    /// it by construction, so it can't produce a partial-persistence case at
-    /// all). This sets up a real pending snooze first, specifically so
-    /// "the snooze is restored" is provable rather than assumed: `caughtUp`
-    /// against a contact with nothing pending returns `false`, which
-    /// wouldn't discriminate "ran and cleared something" from "was skipped."
+    /// The partial-failure shape `markCaughtUp`'s doc comment added a reload
+    /// for. One `scheduler.recordInteraction` span clears the snooze, then
+    /// logs, and "only the last write fails" means `contacts.upsert` —
+    /// `InteractionLogging`'s second internal write — fails after `append`
+    /// landed. A transition failure ends the span before anything is logged,
+    /// so it can't produce a partial-persistence case. This sets up a real
+    /// pending snooze first, specifically so "the snooze is restored" is
+    /// provable rather than assumed: with nothing pending the transition
+    /// moves no row, which wouldn't discriminate "ran and cleared something"
+    /// from "was skipped."
     ///
     /// Superseded assertion, staged review round 7: this test used to assert
     /// the pending snooze stayed cleared through the failure — the bug the
-    /// coordinator's own round-4 instruction introduced (`caughtUp` before
-    /// `InteractionLogging`, uncompensated). It now asserts the corrected
-    /// behavior: the catch block restores the exact row `caughtUp` cleared.
+    /// coordinator's own round-4 instruction introduced (the transition ran
+    /// before `InteractionLogging`, uncompensated). It now asserts the
+    /// corrected behavior: `recordInteraction` restores the exact row it
+    /// cleared before it rethrows.
     @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
     func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.contact(
@@ -167,7 +167,7 @@ struct ContactDetailViewModelFailurePathTests {
             occasions: { _ in [] },
             clock: { Self.now }
         )
-        try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
+        try await scheduler.snooze(contactId: contact.id) // a real row for `recordInteraction` to clear
         await reminders.armTransitionFailure(from: .userCaughtUp)
         let viewModel = ContactDetailViewModel(
             contactId: contact.id,
@@ -237,13 +237,12 @@ struct ContactDetailViewModelFailurePathTests {
         #expect(viewModel.interactions.count == 1)
     }
 
-    /// The doc comments on `markCaughtUp`/`logOther` claim `scheduler
-    /// .caughtUp` runs first and a failure there "blocks everything after
-    /// it by construction" — nothing tested that claim directly. Every
-    /// other failure test in this file fails a *later* write, so a
-    /// scheduler failure always had something already persisted to check.
-    /// This is the missing case: the reminder-state write itself throws,
-    /// and `InteractionLogging` must never run at all — proved here by
+    /// `scheduler.recordInteraction` runs the reminder-state transition
+    /// first, and a failure there ends the span before anything is logged —
+    /// nothing tested that directly. Every other failure test in this file
+    /// fails a *later* write, so a failure always had something already
+    /// persisted to check. This is the missing case: the transition itself
+    /// throws, and `InteractionLogging` must never run at all — proved here by
     /// asserting no interaction was logged and `lastInteractedAt` never
     /// moved, not just that the final state "looks" untouched.
     /// `.failing()`, not a narrower toggle: `ContactDetailViewModel.load()`

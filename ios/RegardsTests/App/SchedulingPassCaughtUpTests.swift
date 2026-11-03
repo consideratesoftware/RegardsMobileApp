@@ -346,6 +346,10 @@ struct SchedulingPassCaughtUpTests {
             clock: { now }
         )
 
+        // The 12 calls' results are dropped with `try?` on purpose: this test
+        // asserts that all of them finish (liveness) and the end state below,
+        // not what any one call returned. A call that threw would leave fewer
+        // than 6 interactions logged or no row, which the assertions catch.
         await withTaskGroup(of: Void.self) { group in
             for index in 0..<12 {
                 group.addTask {

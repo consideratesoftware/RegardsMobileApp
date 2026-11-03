@@ -209,11 +209,15 @@ extension MockRepositories {
     }
 }
 
-/// The pass the view-model tests hand a screen. A test that injects a failing
-/// interactions repository must pass it here too, or the pass never sees the
-/// failure. No occasions and an every-day,
-/// all-day window in America/Los_Angeles (`FixedReminderWindowRepository`'s
-/// default), so Snooze lands on the first local midnight at or after its floor.
+/// The pass the view-model tests hand a screen. `SchedulingPass.init` has no
+/// default for `interactions` (a silent fallback is the R9 bug). This helper
+/// has one only because most view-model tests never read the interaction log,
+/// and ~25 of their call sites would otherwise each need 4 lines for a value
+/// that doesn't matter. A test that injects a failing or inspected
+/// interactions repository must pass it here too, or the pass never sees it.
+/// No occasions and an every-day, all-day window in America/Los_Angeles
+/// (`FixedReminderWindowRepository`'s default), so Snooze lands on the first
+/// local midnight at or after its floor.
 func makeScheduler(
     reminders: any ReminderRepository,
     contacts: any ContactRepository,

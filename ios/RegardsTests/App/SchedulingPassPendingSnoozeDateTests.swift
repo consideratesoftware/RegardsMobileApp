@@ -15,7 +15,7 @@ struct SchedulingPassPendingSnoozeDateTests {
     /// picking the *earliest* pending cadence row, not the one that
     /// actually governs. `SchedulingPass.snooze` itself only ever keeps one
     /// cadence row per contact (the deterministic `reminderID(contactId:kind:)`), but
-    /// `SchedulingPassCaughtUpTests.caughtUpNeverTouchesNonCanonicalCadenceRow`
+    /// `SchedulingPassCaughtUpTests.caughtUpSweepsANonCanonicalCadenceRow`
     /// already proves a second, non-canonical cadence row can reach the
     /// table and survive untouched — so this is reachable, not
     /// hypothetical. Fixed to `.map(\.scheduledFor).max()`, matching
@@ -48,7 +48,7 @@ struct SchedulingPassPendingSnoozeDateTests {
 
         // A second, non-canonical cadence row further out — constructed
         // directly, never produced by `SchedulingPass` itself, mirroring
-        // `caughtUpNeverTouchesNonCanonicalCadenceRow`'s own setup. Written
+        // `caughtUpSweepsANonCanonicalCadenceRow`'s own setup. Written
         // *after* the canonical (earlier) row, so `fetchPending`'s
         // ascending-`scheduledFor` order places this one last — the
         // opposite of "whichever came first," to keep the assertion honest

@@ -16,22 +16,20 @@ struct UpcomingViewModelRaceTests {
         UpcomingViewModelActionTests.contact(lastInteractedAt: lastInteractedAt)
     }
 
-    /// The three-write partial-failure shape `markCaughtUp`'s doc comment
-    /// added a reload for, updated for correctness #4's write-order fix
-    /// (`scheduler.recordInteraction` now runs *before* `InteractionLogging`, not
-    /// after — see its doc comment) — so "only the last write fails" now
-    /// means `InteractionLogging`'s own second write (`contacts.upsert`),
-    /// not the scheduler: a scheduler failure now blocks everything after it
-    /// by construction, so it can no longer produce a partial-persistence
-    /// case. This sets up a real pending snooze first, specifically so "the
-    /// snooze is restored" is provable rather than assumed — `caughtUp`
-    /// against a contact with nothing pending returns `false`, which
+    /// The partial-failure shape `markCaughtUp`'s doc comment added a reload
+    /// for. One `scheduler.recordInteraction` span clears the snooze, then
+    /// logs, so "only the last write fails" means `InteractionLogging`'s own
+    /// second write (`contacts.upsert`), not the transition: a transition
+    /// failure ends the span before anything is logged, so it can't produce
+    /// a partial-persistence case. This sets up a real pending snooze first,
+    /// specifically so "the snooze is restored" is provable rather than
+    /// assumed — with nothing pending the transition moves no row, which
     /// wouldn't discriminate "ran and cleared something" from "was skipped."
     ///
     /// Superseded assertion, staged review round 7: this test used to assert
     /// the pending snooze stayed cleared through the failure. It now asserts
-    /// the corrected behavior — the catch block restores the exact row
-    /// `caughtUp` cleared, mirroring `OverdueViewModelActionTests
+    /// the corrected behavior — `recordInteraction` restores the exact row
+    /// the transition cleared, mirroring `OverdueViewModelActionTests
     /// .markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows`.
     @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
     func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
@@ -119,7 +117,7 @@ struct UpcomingViewModelRaceTests {
         )
         await viewModel.load()
         #expect(viewModel.totalCount == 1)
-        try await scheduler.snooze(contactId: contact.id) // a real row for `caughtUp` to clear
+        try await scheduler.snooze(contactId: contact.id) // a real row for `recordInteraction` to clear
         await reminders.armTransitionFailure(from: .userCaughtUp)
 
         let succeeded = await viewModel.markCaughtUp(contactId: contact.id)

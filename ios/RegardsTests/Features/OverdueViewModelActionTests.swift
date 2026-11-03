@@ -129,9 +129,10 @@ struct OverdueViewModelActionTests {
     ///
     /// Superseded assertion, staged review round 7: this test used to assert
     /// the pending snooze stayed cleared through the failure — the bug the
-    /// coordinator's own round-4 instruction introduced (`caughtUp` before
-    /// `InteractionLogging`, uncompensated). It now asserts the corrected
-    /// behavior: the catch block restores the exact row the transition cleared.
+    /// coordinator's own round-4 instruction introduced (the transition ran
+    /// before `InteractionLogging`, uncompensated). It now asserts the
+    /// corrected behavior: `recordInteraction` restores the exact row the
+    /// transition cleared before it rethrows.
     @Test("A caught-up write that fails at the final upsert step restores the cleared snooze and still logs it")
     func markCaughtUpRestoresSnoozeAndLogsEvenWhenContactUpsertThrows() async throws {
         let contact = Self.overdueContact(lastInteractedAt: Self.now.addingTimeInterval(-30 * 86_400))

@@ -115,6 +115,81 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.cadenceRow(contact) == snoozed)
     }
 
+    /// A `userCaughtUp` row can linger: the reschedule after a catch-up failed,
+    /// or the contact lost capacity. The restore is for a row this call
+    /// cleared, so a later failed log must not turn that lingering row back
+    /// into a pending one, which would notify for a catch-up the user already
+    /// made. Fails if the restore runs without `cleared`.
+    @Test(
+        "A failed log does not turn a lingering caught-up row back into a pending one",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases
+    )
+    func failedLogDoesNotResurrectALingeringCaughtUpRow(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, interactions: StubInteractionRepository.failing())
+        let contact = try await fixture.addContact(1, cadenceDays: 14)
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        #expect(try await fixture.repositories.reminders.transitionState(
+            id: fixture.cadenceID(contact), from: .pending, to: .userCaughtUp))
+        #expect(try await fixture.cadenceRow(contact) == nil)
+
+        await #expect(throws: RepositoryFakeFailure.self) {
+            try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp)
+        }
+
+        #expect(try await fixture.cadenceRow(contact) == nil)
+    }
+
+    enum LostCover: String, CaseIterable, Sendable {
+        case zeroCapacity, untracked
+    }
+
+    /// Pin of today's behavior, not a goal. When the contact has no capacity or
+    /// is no longer tracked by the time of an in-app catch-up, the interaction
+    /// is logged, the snooze is cleared, and no pending row replaces it: the
+    /// row stays `userCaughtUp`, which notifies nothing. For zero capacity the
+    /// contact is recorded in `zeroCapacityContactIds`, and once capacity
+    /// returns the next run writes the next cycle's row.
+    @Test(
+        "A catch-up for a contact with no capacity or eligibility logs and leaves no pending row",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases, LostCover.allCases
+    )
+    func recordInteractionLeavesNoPendingRowWithoutCapacityOrEligibility(
+        backend: RepositoryContractBackend, cover: LostCover
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        var contact = try await fixture.addContact(1, cadenceDays: 14)
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        switch cover {
+        case .zeroCapacity:
+            // Quiet hours 17:00-20:00 cover the whole 18:00-19:00 range.
+            let quiet = TimeRange(start: TimeOfDay(hour: 17), end: TimeOfDay(hour: 20))
+            _ = try await fixture.repositories.contacts.updateReminderWindowOverride(
+                id: contact.id, window: PassFixture.eveningWindow(quiet: quiet))
+        case .untracked:
+            contact.tracked = false
+            try await fixture.repositories.contacts.upsert(contact)
+        }
+
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
+
+        let logs = try await fixture.repositories.interactions.fetchRecent(forContact: contact.id, limit: 10)
+        #expect(logs.count == 1)
+        let stored = try #require(try await fixture.repositories.contacts.fetch(id: contact.id))
+        #expect(stored.lastInteractedAt == PassFixture.at("2026-06-10 10:00"))
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        guard cover == .zeroCapacity else { return }
+        #expect(await fixture.pass.zeroCapacityContactIds.contains(contact.id))
+        _ = try await fixture.repositories.contacts.updateReminderWindowOverride(id: contact.id, window: nil)
+
+        try await fixture.pass.runFull()
+
+        let row = try #require(try await fixture.cadenceRow(contact))
+        #expect(row.scheduledFor == PassFixture.at("2026-06-24 18:00"))
+        #expect(row.snoozedUntil == nil)
+    }
+
     /// The reschedule is the last step of the span and the interaction has
     /// already landed, so a snapshot that fails to read must not turn the
     /// action into a failure the caller would retry (and log twice). The row
