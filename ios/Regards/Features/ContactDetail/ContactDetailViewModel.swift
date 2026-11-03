@@ -226,10 +226,11 @@ public final class ContactDetailViewModel {
         do {
             // `SchedulingPass.snooze` checks tracked, cadence, and active
             // itself (R54); the `isActive` guard above is the screen's own
-            // check for the archived-after-`load()` race. This screen offers Snooze only for a contact that was
-            // `isCadenceEligible` at its last load, so `wrote` is false when
-            // tracking or cadence changed since, the contact was archived
-            // after the check above, or `snooze`'s own fetch failed.
+            // check for the archived-after-`load()` race. This screen offers
+            // Snooze only for a contact that was `isCadenceEligible` at its
+            // last load, so `wrote` is false when tracking or cadence changed
+            // since, the contact was archived after the check above, or
+            // `snooze`'s own fetch failed.
             // Propagated rather than assumed, so those cases and any future
             // caller get an honest `false`.
             let wrote = try await scheduler.snooze(contactId: contactId)

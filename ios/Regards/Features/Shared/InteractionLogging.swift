@@ -8,8 +8,9 @@ import Foundation
 /// `ScheduledReminder`, never resolves a reminder window, and never calls
 /// `ReminderEngine`; it only touches `ContactRepository` and
 /// `InteractionRepository`. In production code only
-/// `SchedulingPass.recordInteraction` builds one, inside the pass's lock, so the caught-up transition, these writes,
-/// and the reschedule run as one span (decision #36, R60).
+/// `SchedulingPass.recordInteraction` builds one, inside the pass's lock, so
+/// the caught-up transition, these writes, and the reschedule run as one
+/// span (decision #36, R60).
 ///
 /// Snooze is out of scope for this helper for the same reason: decision #31
 /// requires pushing a *pending reminder's* `scheduledFor`, which only a
