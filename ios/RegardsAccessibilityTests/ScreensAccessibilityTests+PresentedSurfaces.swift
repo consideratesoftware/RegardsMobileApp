@@ -112,7 +112,7 @@ extension ScreensAccessibilityTests {
     /// (element traced into OS UI), there is no element-level proof
     /// available in either direction here. Flagged to the reviewer as
     /// exactly that: unresolved, not dismissed. A real-device VoiceOver
-    /// pass on this alert (already required before merge, `ios/docs
+    /// pass on this alert (part of the pre-release device pass, `ios/docs
     /// /accessibility-smoke.md`) is the tie-breaker this suite cannot
     /// provide on its own.
     @MainActor
