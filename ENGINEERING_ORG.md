@@ -140,10 +140,12 @@ it never pretends the step happened.
 
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
-- Codex, when `codex-reviewer` reports UNAVAILABLE, or RETRY 3 times in a
-  row on the same head (a RETRY after the head moves is the first on the new
-  head). If Codex needs setup, run `/codex:setup` and `codex login` if it
-  asks. If the RETRYs were timeouts, rerun the review when OpenAI is
+- Codex, when a `CODEX REVIEW: UNAVAILABLE` verdict stands: either
+  `codex-reviewer` reported it (Codex needs setup) or the engineering
+  manager recorded it after a second RETRY on the same head. A RETRY gets 1
+  automatic rerun; a RETRY after the head moves is the first on the new
+  head. If Codex needs setup, run `/codex:setup` and `codex login` if it
+  asks. If the second RETRY was a timeout, rerun the review when OpenAI is
   responsive, or split the diff. The PR waits; the org does not merge
   without the Codex verdict.
 - Scope changes to the queue or dependency graph.

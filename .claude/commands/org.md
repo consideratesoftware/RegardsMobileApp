@@ -65,11 +65,12 @@ For each open TF PR:
 
 1. Read the PR body's `PR REVIEW:` and `CODEX REVIEW:` lines. For each one
    that is missing, names a sha other than the PR's current head, or (for
-   Codex) records RETRY or UNAVAILABLE, rerun that review: check the head
+   Codex) records RETRY, rerun that review: check the head
    out with `git worktree add --detach <tmp> <head sha>`, run
    `/pr-review origin/main...HEAD` and/or the `codex-reviewer` agent type
-   there with that target, then `git worktree remove <tmp>`. RETRY and UNAVAILABLE follow
-   Stage 3's limits.
+   there with that target, then `git worktree remove <tmp>`. A RETRY gets
+   the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate:
+   report it and don't rerun it.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. It will route red checks to `on-call-engineer`,
    park on owner gates, or merge when all conditions hold.
@@ -126,11 +127,13 @@ the section, as `/pr-review` does for its own findings.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits or discards the files), then run it
-again, at most twice more on the same head. The count is per head: a RETRY
-after a repair moved the head is the first RETRY on the new head. After the
-third RETRY on one head, or on UNAVAILABLE, carry on to Stage 4; the PR
-waits on the owner gate in `ENGINEERING_ORG.md`, and your report says
-whether the RETRYs were timeouts or something else. RETRY and UNAVAILABLE runs don't use up
+once more on the same head. That is the one automatic rerun. A second
+RETRY on the same head, a timeout included, is an owner gate: record it
+as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs <target>
+| codex-cli <version>`, so a restart sees the gate instead of rerunning
+again. A RETRY after a repair moved the head is the first RETRY on the new
+head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the owner gate
+in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up
 a review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call

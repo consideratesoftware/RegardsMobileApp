@@ -136,5 +136,5 @@ output for RETRY>
 ```
 
 UNAVAILABLE means Codex itself needs setup, which only Sid can do. RETRY
-means this run proved nothing and the engineering manager should run it
-again.
+means this run proved nothing, a timeout included; the engineering manager
+runs it once more, and a second RETRY on the same head is an owner gate.
