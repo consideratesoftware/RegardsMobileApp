@@ -100,23 +100,32 @@ Save it under `<scratch>`, a fresh `mktemp -d` directory, then count:
 
 ```
 gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs?check_name=Regards%20staged%20review&per_page=100" \
-  --jq '[.check_runs[] | select(.app.slug == "regards-staged-review")] | sort_by(.completed_at // .started_at) | last | .output.text // empty' > "<scratch>/hosted-review.txt"
-awk '
-  /^### Blockers/ { found = 1; s = 1; next }
-  /^### /         { s = 0 }
-  s && /^[[:space:]]*([-*]|[0-9]+[.)]) / { n++; next }
-  s && NF && !/^None\.?[[:space:]]*$/   { other++ }
-  END {
-    if (!found)                 print "MALFORMED: no Blockers section"
-    else if (n == 0 && other > 0) print "MALFORMED: Blockers section has text but no bullets"
-    else                        print "BLOCKERS " n + 0
-  }' "<scratch>/hosted-review.txt"
+  --jq '[.check_runs[] | select(.app.slug == "regards-staged-review")]
+        | sort_by(.completed_at // .started_at) | last | .output.text // empty' \
+  > "<scratch>/hosted-review.txt"
+if [ -s "<scratch>/hosted-review.txt" ]; then
+  awk '
+    /^### Blockers/ { found = 1; s = 1; next }
+    /^### /         { s = 0 }
+    s && /^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]+None\.?[[:space:]]*$/ { next }
+    s && /^[[:space:]]*([-*]|[0-9]+[.)]) / { n++; next }
+    s && NF && !/^None\.?[[:space:]]*$/ { other++ }
+    END {
+      if (NR == 0)                  print "PENDING: empty review text"
+      else if (!found)              print "MALFORMED: no Blockers section"
+      else if (n == 0 && other > 0) print "MALFORMED: Blockers section has text but no bullets"
+      else                          print "BLOCKERS " n + 0
+    }' "<scratch>/hosted-review.txt"
+else
+  echo "PENDING: no review text for this head yet"
+fi
 ```
 
-Only `BLOCKERS 0` counts as zero. An empty file means the review hasn't run
-on this head: wait, don't count it as zero. `MALFORMED` fails closed: treat
-it as unresolved blockers, quote the section, and report it. Bullets can be
-`-`, `*`, or numbered. Also check that the text's `HEAD SHA:` line equals
+`PENDING` means the review hasn't run on this head: wait and query again,
+and never count it as zero. Only `BLOCKERS 0` counts as zero. `MALFORMED`
+fails closed: treat it as unresolved blockers, quote the section, and report
+it. Bullets can be `-`, `*`, or numbered; a bullet that reads only `None`
+isn't a blocker. Also check that the text's `HEAD SHA:` line equals
 `<head sha>` and that `VERDICT:` is present. Quote the blockers verbatim in
 your report.
 
