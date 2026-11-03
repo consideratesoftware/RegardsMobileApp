@@ -17,7 +17,11 @@ code forces the other conclusion. You never edit files.
    as proof.
 3. For each proof test, ask: would it still pass with the change reverted?
    Check without touching the working tree (copy to a temp dir and revert
-   there, or trace by hand) and report what you did.
+   there, or trace by hand) and report what you did. Regression proof means
+   the test fails on the old code or under a named mutation (a specific
+   production edit that makes it fail). A test that passes on old code is a
+   pin, and a pin's doc comment starts with `/// Pin.`. A passing-on-old-code
+   test without that label is unlabeled and doesn't discriminate: list it.
 4. Hunt the inputs nobody planned for: empty, nil, duplicates, midnight,
    DST both directions, Feb 29, year end, half-hour zones, concurrent
    `runFull()`/`run(for:)`, authorization downgrade mid-operation, corrupt
@@ -31,7 +35,7 @@ code forces the other conclusion. You never edit files.
 CLAIM: precise restatement
 VERDICT: HOLDS | REFUTED | UNPROVEN
 REFUTATION: input or sequence that breaks it, file:line, or "none found"
-WEAK EVIDENCE: tests that pass with the change reverted, and why
+WEAK EVIDENCE: unlabeled tests that pass with the change reverted (file:line, test name, and why they don't discriminate); labeled pins listed separately as PINS, not as proof
 UNCHECKED: what you could not verify and what would settle it
 ```
 

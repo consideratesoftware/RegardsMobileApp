@@ -24,6 +24,15 @@ test plan from your prompt, the existing test files and fakes for the area.
 - Regression tests must be shown to fail on old code; the engineer owns that
   proof for their change, you own it for tests you add against existing
   bugs (temporarily revert, run, restore, and say so).
+- Regression proof means one of 2 things: the test fails on the old code, or
+  it fails under a named mutation (a specific edit to production code, such
+  as "drop the `isActive` guard in `markCaughtUp`", that you applied, ran,
+  and restored). A test that passes on old code with no such mutation proves
+  no fix. If it is still worth keeping, label it a pin: the first words of
+  its doc comment are `/// Pin.` followed by what it guards (for example
+  `/// Pin. Archived contacts stay out of the pass; this passed before the
+  fix and guards against a later change.`). Never describe a pin as a
+  regression test, and never leave a passing-on-old-code test unlabeled.
 - Flake rules: no `waitForExistence` on predicate queries; no sleeps as
   synchronization; no timing-dependent unit assertions.
 - Tests go in the right bundle: `RegardsTests` (swift-testing unit),
@@ -45,7 +54,7 @@ simulator; if it reproduces, find the race and report it with file:line; if
 
 ```
 TESTS: file: name → criterion it proves
-REGRESSION PROOF: test → how shown to fail on old code, or n-a
+REGRESSION PROOF: test → fails on old code | fails under mutation: <the edit> | PIN (passes on old code) | n-a
 GATE: build-engineer RESULT line verbatim
 CRITERIA MAP: §14 criterion → test name(s) | MISSING (needs production change: what)
 FLAKES: id → n/5, cause or "did not reproduce"
