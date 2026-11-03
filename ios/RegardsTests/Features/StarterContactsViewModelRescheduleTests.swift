@@ -123,6 +123,9 @@ extension StarterContactsViewModelSaveTests {
         #expect(saved.calls.isEmpty)
     }
 
+    /// Guards against calling `onSaved` when nothing landed (an empty call).
+    /// It passes if `save()` never calls `onSaved` at all, so it cannot detect
+    /// that; `settingsStarterSaveRunsThePassForChangedContacts` covers it.
     @Test("A save that lands no write reschedules nothing, whether the first write throws or every pick vanished")
     func noLandedWriteRunsNoPass() async throws {
         let store = try Self.store()
