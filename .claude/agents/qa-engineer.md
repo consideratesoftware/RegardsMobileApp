@@ -75,7 +75,8 @@ simulator; if it reproduces, find the race and report it with file:line; if
 
 ```
 TESTS: file: name → criterion it proves
-REGRESSION PROOF: test → fails on old code | fails under mutation: <the edit> | PIN (passes on old code) | n-a
+REGRESSION PROOF: test → fails on old code | fails under mutation: <the edit>
+  | PIN (passes on old code) | n-a
 GATE: build-engineer RESULT line verbatim
 CRITERIA MAP: §14 criterion → test name(s) | MISSING (needs production change: what)
 FLAKES: id → n/5, cause or "did not reproduce"

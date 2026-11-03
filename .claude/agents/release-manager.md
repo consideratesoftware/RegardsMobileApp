@@ -132,14 +132,13 @@ else
 fi
 ```
 
-`PENDING` means the review hasn't run on this head: wait and query again,
-and never count it as zero. Only `BLOCKERS 0` counts as zero, and the counter prints it only when the
-text also has `VERDICT: APPROVE`. `MALFORMED`
-fails closed: treat it as unresolved blockers, quote the section, and report
-it. Bullets can be `-`, `*`, or numbered; a bullet that reads only `None`
-isn't a blocker. Also check that the text's `HEAD SHA:` line equals
-`<head sha>` and that `VERDICT:` is present. Quote the blockers verbatim in
-your report.
+`PENDING` means the review hasn't run on this head: wait and query again, and
+never count it as zero. Only `BLOCKERS 0` counts as zero, and the counter
+prints it only when the text also has `VERDICT: APPROVE`. `MALFORMED` fails
+closed: treat it as unresolved blockers, quote the section, and report it.
+Bullets can be `-`, `*`, or numbered; a bullet that reads only `None` isn't a
+blocker. Also check that the text's `HEAD SHA:` line equals `<head sha>` and
+that `VERDICT:` is present. Quote the blockers verbatim in your report.
 
 Red or blockers: hand off to `on-call-engineer` with the findings, then watch
 again. At most 2 rounds, then park.

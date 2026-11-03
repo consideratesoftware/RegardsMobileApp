@@ -27,7 +27,7 @@ it is missing. One subfolder per lane:
 ../RegardsMobileApp-lanes/TF##/plan.md            tech lead's approved plan, verbatim
 ../RegardsMobileApp-lanes/TF##/review-context.md  review target, §14 row, claimed R-numbers
 ../RegardsMobileApp-lanes/TF##/pr-body.md         the PR body draft, and later its current text
-../RegardsMobileApp-lanes/TF##/owner-answers.md   Sid's answers given before the PR exists, paraphrased
+../RegardsMobileApp-lanes/TF##/owner-answers.md   Sid's answers from before the PR exists
 ../RegardsMobileApp-lanes/TF##/codex-<short sha>.md  each full Codex review, by short sha
 ```
 
@@ -188,7 +188,7 @@ REVIEW:` comment lists every reviewer that ran on a `REVIEWERS:` line with
 its verdict. A scoped recheck adds a `RERAN:` line naming the reviewers that
 ran, which must include `pr-security-privacy`, and one `CARRIED:` line per
 reviewer whose earlier approval stands, as `CARRIED: <reviewer> APPROVE from
-<sha>`. Every reviewer the routing table runs for the PR must be reran or
+<sha>`. Every reviewer the routing table runs for the PR must be rerun or
 carried, and a carry can't pass a later REQUEST_CHANGES from that reviewer.
 
 An approval carries to a new head only when every commit since it changes
@@ -257,7 +257,8 @@ LANES (n/3 occupied):
 RESUMED:
 - PR #n: release-manager STATE | Codex: verdict @ sha
 WAITED: READY items not started, with lock or budget reason
-OWNER NEEDED: the questions put to Sid and his answers, plus anything still waiting because he wasn't in the session; "none" otherwise
+OWNER NEEDED: the questions put to Sid and his answers, plus anything still
+  waiting because he wasn't in the session; "none" otherwise
 DISPUTED: findings dropped against ARCHITECTURE.md, with §
 NEXT RUN: what /org will find next time
 ```

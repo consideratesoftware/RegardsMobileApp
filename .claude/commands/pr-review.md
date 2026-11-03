@@ -84,7 +84,9 @@ VERDICT: APPROVE | REQUEST_CHANGES
 
 Merge rules:
 - Deduplicate: same file:line from multiple agents becomes one entry crediting both; keep the most severe rating.
-- Any single BLOCKER from any agent ⇒ overall REQUEST_CHANGES. So is any agent's own REQUEST_CHANGES verdict, including one caused by a `NOT CHECKED:` entry. No exceptions, no averaging.
+- Any single BLOCKER from any agent ⇒ overall REQUEST_CHANGES. So is any
+  agent's own REQUEST_CHANGES verdict, including one caused by a `NOT CHECKED:`
+  entry. No exceptions, no averaging.
 - An agent that contradicts ARCHITECTURE.md is wrong by definition; note it and drop the finding (then flag the doc §, in case the doc needs a look).
 - Cap the merged review at 10 nits total; drop the rest silently.
 - Do not soften findings. Do not add praise. The review is a work order, not a performance evaluation.

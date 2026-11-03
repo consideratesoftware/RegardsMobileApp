@@ -38,8 +38,10 @@ code forces the other conclusion. You never edit files.
 CLAIM: precise restatement
 VERDICT: HOLDS | REFUTED | UNPROVEN
 REFUTATION: input or sequence that breaks it, file:line, or "none found"
-WEAK EVIDENCE: unlabeled tests that pass with the change reverted (file:line, test name, and why they don't discriminate), or "none"
-PINS: tests labeled `/// Pin.` (file:line, test name); listed apart, never counted as proof, or "none"
+WEAK EVIDENCE: unlabeled tests that pass with the change reverted
+  (file:line, test name, and why they don't discriminate), or "none"
+PINS: tests labeled `/// Pin.` (file:line, test name); listed apart, never
+  counted as proof, or "none"
 UNCHECKED: what you could not verify and what would settle it
 ```
 
