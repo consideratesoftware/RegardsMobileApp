@@ -30,8 +30,9 @@ disputed Codex blocker:
 comment for a scoped recheck (`/org` Stage 3) also has a `RERAN:` line naming
 the reviewers that ran and one `CARRIED: <reviewer> APPROVE from <sha>` line
 per earlier approval that stands. Never paste review or
-diff text into a comment, and never write `@claude` in one:
-`.github/workflows/claude.yml` runs on comments that contain it. Never edit
+diff text into a comment. Never write `@claude` in any comment the org
+posts, verdicts and owner answers alike: `.github/workflows/claude.yml`
+runs on comments that contain it. Never edit
 a verdict comment; when a review produces a new verdict, post a new
 comment. Before the PR exists the verdicts live in the reports you were
 given; post them right after you open it. The engineering manager posts the

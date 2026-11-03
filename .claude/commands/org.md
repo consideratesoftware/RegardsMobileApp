@@ -61,7 +61,10 @@ Owner questions never wait in a PR body or a checklist. Whenever a role
 returns a question only Sid can answer (OPEN FOR OWNER, "Questions for Sid",
 an owner gate, a rule you'd need to bend), interview Sid in the session as
 `ENGINEERING_ORG.md` (Owner gates) describes, and comment each answer on
-the PR. Park only the work that needs the answer.
+the PR. Paraphrase the answer in your own words; never paste Sid's raw text
+or any reviewer's output into a comment, and never write `@claude` in any
+comment you post (`.github/workflows/claude.yml` runs on it). Park only the
+work that needs the answer.
 
 For `status`: print the Stage 5 report from this state and stop.
 

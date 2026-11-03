@@ -163,7 +163,9 @@ standing rule is that questions for him are asked in the session as an
 interview, and his answers are recorded as PR comments. So when a gate, an
 OPEN FOR OWNER ruling, a reviewer's "Questions for Sid" item, or a rule the
 org would have to bend comes up, the engineering manager interviews him and
-comments each answer on the PR. An answer given before the PR exists goes
+comments each answer on the PR, paraphrased: no raw pasted text, and never
+`@claude` in any comment the org posts, because `claude.yml` runs on it. An
+answer given before the PR exists goes
 into the lane's `pr-body.md` draft at once and into the PR description when
 the PR opens. Physical tasks are presented as exact steps, and Sid's result
 is recorded the same way. Only the work that needs the answer waits; if Sid
