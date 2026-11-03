@@ -129,6 +129,14 @@ All of these, on the current head, with no averaging:
    protection on `main` requires branches to be up to date, so a behind
    branch can't merge anyway.
 
+Scoped rechecks. Owner ruling, 2026-11-02 (PR #68 comment 6597940023):
+after a round with no blockers, the engineering manager may recheck the
+fixes without asking Sid: the `/pr-review` reviewers whose areas the new
+commits touch, plus `codex-reviewer` on the whole `origin/main...HEAD` diff
+at the current head. Sid is asked only if a blocker survives 2 rounds or a
+fix needs a product decision. The `PR REVIEW:` comment lists which
+reviewers reran and which approvals carry from which sha.
+
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
 review. It notifies Sid only about PRs that need him: a blocking owner gate

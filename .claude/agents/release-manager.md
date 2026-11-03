@@ -19,12 +19,17 @@ Record each review verdict as its own PR comment (`gh pr comment <n>
 --body-file <file>`), never by editing the body: the hosted review runs on
 `pull_request_target` `edited`, so every `gh pr edit` starts a new hosted
 run, and comments don't. The first line is
-`PR REVIEW: <APPROVE|REQUEST_CHANGES> @ <sha> vs <target>` or
+`PR REVIEW: <APPROVE|REQUEST_CHANGES> @ <sha> vs origin/main...HEAD` or
 `CODEX REVIEW: <APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE> @ <sha> vs
-<target> | codex-cli <version>` (an UNAVAILABLE from a second RETRY adds
-`(second RETRY: <reason>)` after the verdict). Further lines are the blocker
-and should-fix counts, and one line per disputed Codex blocker:
-`DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. Never paste review or
+origin/main...HEAD | codex-cli <version>` (an UNAVAILABLE from a second
+RETRY adds `(second RETRY: <reason>)` after the verdict). The target is
+always `origin/main...HEAD`; a comment with another target doesn't count.
+Further lines are the blocker and should-fix counts, and one line per
+disputed Codex blocker:
+`DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. A `PR REVIEW:`
+comment for a scoped recheck (`/org` Stage 3) also has a `RERAN:` line naming
+the reviewers that ran and one `CARRIED: <reviewer> APPROVE from <sha>` line
+per earlier approval that stands. Never paste review or
 diff text into a comment, and never write `@claude` in one:
 `.github/workflows/claude.yml` runs on comments that contain it. Never edit
 a verdict comment; when a review produces a new verdict, post a new
@@ -47,9 +52,9 @@ gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$
       [.data.repository.pullRequest.comments.nodes[]
        | select(.author.login == $me and .lastEditedAt == null)
        | .body] as $b
-      | ($b | map(select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs "))) | last // "none"),
+      | ($b | map(select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none"),
         "---",
-        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs "))) | last // "none")'
+        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none")'
 ```
 
 The sha on a first line counts as the current head when it is a prefix of
@@ -107,6 +112,8 @@ PR, never in the root checkout.
   until a push clears it (the review reruns on the new head) or your
   prompt records the owner's decision to defer it.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
+  Each `CARRIED:` sha in it must be an ancestor of the head
+  (`git merge-base --is-ancestor <sha> <head sha>`); list them in your report.
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
   `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check
