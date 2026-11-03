@@ -42,7 +42,8 @@ Read every changed file in full (not just hunks) plus any file whose functions t
 
 Keep every shell command bounded. A review of one diff should take about
 20 minutes. If you are not done by then, report what you have and name what
-you did not check.
+you did not check. Never APPROVE with a required check left unchecked: mark it
+`not checked: <why>` and return REQUEST_CHANGES.
 
 - No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
   over search results). Read changed files in full with the Read tool, and
