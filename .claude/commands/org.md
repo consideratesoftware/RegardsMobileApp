@@ -253,7 +253,8 @@ NEXT RUN: what /org will find next time
 ```
 
 Never delete a worktree or branch except Stage 1's temporary review
-worktrees and a merged lane's worktree, which the release manager removes
-only when your prompt says to (it keeps it by default). Never edit
+worktrees, the merged PR's head branch (`gh pr merge --delete-branch` removes
+it on the remote), and a merged lane's worktree, which the release manager
+removes only when your prompt says to (it keeps it by default). Never edit
 `TESTFLIGHT_PLAN.md` in the root checkout. Never merge
 with a blocker, a red check, or an outstanding owner gate.
