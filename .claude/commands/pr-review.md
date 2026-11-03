@@ -84,3 +84,12 @@ Merge rules:
 ## Stage 4 — register hygiene
 
 If the PR claims R-closures (§19): verify each acceptance check yourself against the diff and mark each claim CONFIRMED or NOT MET in the merged review. NOT MET is automatically a blocker (§17: never mark a remediation item done without meeting its acceptance check).
+
+## Cross-model review (Claude Code only)
+
+The Codex verdict comes from the `codex-reviewer` agent type
+(`subagent_type: codex-reviewer`), which runs `$regards-pr-review` read-only
+against the same target. It is not a stage of this command: `/org` launches
+it in the same batch as `/pr-review`, and the merge conditions in
+`ENGINEERING_ORG.md` need both verdicts. Launch it by that type name, never
+as a general-purpose agent told to read `.claude/agents/codex-reviewer.md`.

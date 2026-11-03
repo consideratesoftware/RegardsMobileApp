@@ -67,8 +67,8 @@ For each open TF PR:
    that is missing, names a sha other than the PR's current head, or (for
    Codex) records RETRY or UNAVAILABLE, rerun that review: check the head
    out with `git worktree add --detach <tmp> <head sha>`, run
-   `/pr-review origin/main...HEAD` and/or `codex-reviewer` there with that
-   target, then `git worktree remove <tmp>`. RETRY and UNAVAILABLE follow
+   `/pr-review origin/main...HEAD` and/or the `codex-reviewer` agent type
+   there with that target, then `git worktree remove <tmp>`. RETRY and UNAVAILABLE follow
    Stage 3's limits.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. It will route red checks to `on-call-engineer`,
@@ -115,7 +115,7 @@ review batch starts only when `git status --short` in the lane is empty.
 Write the target, the §14 row, and the claimed R-numbers to
 `review-context.md` in the lane's folder. Fetch, then in one batch run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch
-`codex-reviewer` with the worktree, the same target `origin/main...HEAD`,
+the `codex-reviewer` agent type (`subagent_type: codex-reviewer`) with the worktree, the same target `origin/main...HEAD`,
 the item's §14 row, and its claimed R-numbers. The three-dot target
 compares against the merge base, so commits that landed on `main` after the
 lane branched don't show up as reversions. Treat blockers from both the same way:
@@ -133,6 +133,11 @@ Whenever the head moves after a review (a repair, a rebase, an on-call
 fix), run both `/pr-review origin/main...HEAD` and `codex-reviewer` again on
 the new head before Stage 4 re-checks merge conditions; the release manager
 can't launch agents.
+
+Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
+and Stage 3 alike. Don't start a general-purpose agent and tell it to read
+`.claude/agents/codex-reviewer.md`: that was a workaround from before the
+type existed, and it runs without the contract's tool list and model.
 
 Second opinion: at most once per lane, before parking it on a second
 REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
