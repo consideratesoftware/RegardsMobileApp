@@ -196,11 +196,9 @@ public final class ContactDetailViewModel {
     /// doesn't filter `archivedAt`, so a contact this screen already has
     /// open can be archived out from under it by a concurrent
     /// `ContactsReconciler` pass mid-session, with Snooze staying tappable.
-    /// `SchedulingPass.snooze` itself has no such check (R54: it writes for
-    /// any contact that merely exists), so without this guard the write
-    /// would still land — a pending cadence row that no `fetchTracked()`
-    /// screen (Overdue, Upcoming) will ever surface, orphaned until PR25
-    /// gives the scheduler its own precondition.
+    /// `SchedulingPass.snooze` checks tracked, cadence, and active itself
+    /// (R54), so this guard covers only that archived-after-`load()` race,
+    /// on the screen's side, before the pass is asked.
     ///
     /// Re-fetches rather than checking the cached `self.contact` (staged
     /// review round 10, fixing what round 7 shipped): `self.contact` is a
@@ -226,11 +224,9 @@ public final class ContactDetailViewModel {
         }
         guard let freshContact, freshContact.isActive else { return false }
         do {
-            // `SchedulingPass.snooze` now carries its own tracked/cadence
-            // precondition (R54) — the `isActive` guard above stays because
-            // it catches something that precondition doesn't (an
-            // archived-after-`load()` race), not because it's redundant
-            // with it. This screen offers Snooze only for a contact that was
+            // `SchedulingPass.snooze` checks tracked, cadence, and active
+            // itself (R54); the `isActive` guard above is the screen's own
+            // check for the archived-after-`load()` race. This screen offers Snooze only for a contact that was
             // `isCadenceEligible` at its last load, so `wrote` is false when
             // tracking or cadence changed since, the contact was archived
             // after the check above, or `snooze`'s own fetch failed.
