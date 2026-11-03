@@ -416,7 +416,8 @@ public actor SchedulingPass {
     /// Then it returns `false` for a notification whose contact isn't
     /// `isCadenceEligible` (a notification can outlive tracking) and
     /// rethrows anything else. A failed reschedule after a logged interaction
-    /// still returns `true`; the row stays `.userCaughtUp` until the next run.
+    /// still returns `true`. It may have written the pending replacement
+    /// before a later cancellation threw; the next run finishes the job.
     @discardableResult
     public func recordInteraction(contactId: UUID, _ interaction: Interaction) async throws -> Bool {
         await lock()
