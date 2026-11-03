@@ -26,6 +26,24 @@ verify each hole against the actual tests.
 6. **Coverage direction.** The Domain coverage floor (≥95%, CI-enforced after PR19) must not be approached from above; if the diff adds uncovered Domain branches, name them. Deleted tests require justification in the PR body; migration tests may never be deleted (§13).
 7. **Test hygiene.** New tests live in the right bundle (unit vs a11y vs UI), reuse existing fakes rather than growing parallel fakes, and don't add helpers with fewer than 3 call sites (§17 abstraction rule applies to test code too).
 
+## Shell discipline
+
+Keep every shell command bounded. A review of one diff should take about
+20 minutes. If you are not done by then, report what you have and name what
+you did not check.
+
+- No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
+  over search results). Read changed files in full with the Read tool, and
+  search with one `grep -rn <pattern> <paths> | head -50`.
+- End any command that can print a lot with `| head -50` or another explicit
+  cap. Never `cat` a generated file or a whole log.
+- Search the changed paths, not the whole repo, unless a finding needs a
+  repo-wide check. Then use one pattern in one command.
+- Don't run builds, tests, or anything that waits on input or the network.
+  The orchestrator's pre-flight and CI run the gates.
+- If a command hasn't returned after about 2 minutes, stop it and list it
+  under what you did not check.
+
 ## Output format (exactly this)
 
 ```

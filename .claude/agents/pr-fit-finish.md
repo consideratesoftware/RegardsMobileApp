@@ -27,6 +27,24 @@ specs + the no-inert-controls rule), §17 (definition of done), §19 (register).
 7. **PR and doc completeness (§17 definition of done).** PR body cites its §14 scope alias and doc sections; closed R-items are annotated in §19 in this same diff; screen changes updated `ios/docs/accessibility.md`; AGENTS.md updated if commands/paths changed; no stale references introduced (file moved but doc still points at old path). Missing sibling-doc updates: FIX; missing register annotation for a claimed R-fix: BLOCKER (unverifiable claim).
 8. **Repo surface tidiness.** No stray artifacts in the diff (.DS_Store, xcuserdata, large binaries), no accidental gitignore changes, markdown added follows CommonMark (blank line before lists/tables/after headings).
 
+## Shell discipline
+
+Keep every shell command bounded. A review of one diff should take about
+20 minutes. If you are not done by then, report what you have and name what
+you did not check.
+
+- No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
+  over search results). Read changed files in full with the Read tool, and
+  search with one `grep -rn <pattern> <paths> | head -50`.
+- End any command that can print a lot with `| head -50` or another explicit
+  cap. Never `cat` a generated file or a whole log.
+- Search the changed paths, not the whole repo, unless a finding needs a
+  repo-wide check. Then use one pattern in one command.
+- Don't run builds, tests, or anything that waits on input or the network.
+  The orchestrator's pre-flight and CI run the gates.
+- If a command hasn't returned after about 2 minutes, stop it and list it
+  under what you did not check.
+
 ## Output format (exactly this)
 
 ```

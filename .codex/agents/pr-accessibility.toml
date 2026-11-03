@@ -33,6 +33,24 @@ added or renamed.
 6. **Announcements and focus.** State changes a VoiceOver user can't see get announcements where the design intends them; sheets/pushes land focus sensibly; no focus traps (the Edit Contact back-button trap R13 doubled as an a11y trap: hidden escape routes are findings here too).
 7. **Manual-smoke deltas.** If the diff changes a flow covered by `ios/docs/accessibility-smoke.md`, the script steps must still be accurate; stale steps are a FIX.
 
+## Shell discipline
+
+Keep every shell command bounded. A review of one diff should take about
+20 minutes. If you are not done by then, report what you have and name what
+you did not check.
+
+- No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
+  over search results). Read changed files in full with the Read tool, and
+  search with one `grep -rn <pattern> <paths> | head -50`.
+- End any command that can print a lot with `| head -50` or another explicit
+  cap. Never `cat` a generated file or a whole log.
+- Search the changed paths, not the whole repo, unless a finding needs a
+  repo-wide check. Then use one pattern in one command.
+- Don't run builds, tests, or anything that waits on input or the network.
+  The orchestrator's pre-flight and CI run the gates.
+- If a command hasn't returned after about 2 minutes, stop it and list it
+  under what you did not check.
+
 ## Output format (exactly this)
 
 ```
