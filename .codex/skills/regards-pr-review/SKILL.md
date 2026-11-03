@@ -74,10 +74,13 @@ VERDICT: APPROVE | REQUEST_CHANGES
 - Process line (from pr-accessibility, if run)
 - Docs line (from pr-fit-finish, if run)
 - Criteria map (from pr-tests, verbatim)
+- Not checked (every agent's `NOT CHECKED:` line that isn't `none`)
 ```
 
 Deduplicate identical file-and-line findings, credit all reporting agents, and
-keep the highest severity. Any blocker means `REQUEST_CHANGES`. Drop a finding
+keep the highest severity. Any blocker means `REQUEST_CHANGES`, and so does any
+agent's own `REQUEST_CHANGES` verdict, including one caused by a `NOT CHECKED:`
+entry. Drop a finding
 only when it contradicts `ARCHITECTURE.md`, and record the governing section in
 the audit trail. Cap nits at ten.
 

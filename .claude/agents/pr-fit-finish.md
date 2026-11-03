@@ -31,8 +31,8 @@ specs + the no-inert-controls rule), §17 (definition of done), §19 (register).
 
 Keep every shell command bounded. A review of one diff should take about
 20 minutes. If you are not done by then, report what you have and name what
-you did not check. Never APPROVE with a required check left unchecked: mark it
-`not checked: <why>` and return REQUEST_CHANGES.
+you did not check. Never APPROVE with a required check left unchecked: list it on the
+`NOT CHECKED:` line with why, and return REQUEST_CHANGES.
 
 - No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
   over search results). Read changed files in full with the Read tool, and
@@ -56,6 +56,7 @@ FIX: (n)
 NIT: (max 5)
 QUESTIONS: (max 3, taste-level, for the human)
 DOCS: register annotated? | a11y doc current? | PR cites §14? (yes/no each)
+NOT CHECKED: each required check you did not complete, with why; or none
 ```
 
 The DOCS line is mandatory even on APPROVE. No praise, no diff summary.

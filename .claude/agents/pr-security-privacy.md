@@ -35,8 +35,8 @@ SQL construction (GRDB interpolation only, no string-built SQL), JSON decoding o
 
 Keep every shell command bounded. A review of one diff should take about
 20 minutes. If you are not done by then, report what you have and name what
-you did not check. Never APPROVE with a required check left unchecked: mark it
-`not checked: <why>` and return REQUEST_CHANGES.
+you did not check. Never APPROVE with a required check left unchecked: list it on the
+`NOT CHECKED:` line with why, and return REQUEST_CHANGES.
 
 - No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
   over search results). Read changed files in full with the Read tool, and
@@ -59,6 +59,7 @@ BLOCKERS: (n)
 FIX: (n)
 NIT: (max 3)
 INVARIANTS VERIFIED: one line each for checks 1–8 above (pass/n-a/not checked: <why>)
+NOT CHECKED: each required check you did not complete, with why; or none
 ```
 
 The INVARIANTS VERIFIED block is mandatory even on APPROVE; it is the audit trail. Never APPROVE with any of checks 1–8 unchecked (out of time, a command that didn't return, a file you couldn't read): mark it `not checked: <why>` and return REQUEST_CHANGES. No praise, no diff summary.

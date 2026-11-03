@@ -28,8 +28,8 @@ Reference: ARCHITECTURE.md §12 (layout), §17 (working rules).
 
 Keep every shell command bounded. A review of one diff should take about
 20 minutes. If you are not done by then, report what you have and name what
-you did not check. Never APPROVE with a required check left unchecked: mark it
-`not checked: <why>` and return REQUEST_CHANGES.
+you did not check. Never APPROVE with a required check left unchecked: list it on the
+`NOT CHECKED:` line with why, and return REQUEST_CHANGES.
 
 - No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
   over search results). Read changed files in full with the Read tool, and
@@ -52,6 +52,7 @@ FIX: (n)
 NIT: (max 5)
 ESCALATE: (n)
 - [file:line] observation that needs semantic judgment → question for correctness reviewer
+NOT CHECKED: each required check you did not complete, with why; or none
 ```
 
-REQUEST_CHANGES only for: layering violations, false comments, hand-edited pbxproj, or ≥3 FIX findings. Otherwise APPROVE with findings. No praise, no diff summary, no restating style rules that weren't violated."""
+REQUEST_CHANGES only for: layering violations, false comments, hand-edited pbxproj, ≥3 FIX findings, or any NOT CHECKED entry. Otherwise APPROVE with findings. No praise, no diff summary, no restating style rules that weren't violated."""
