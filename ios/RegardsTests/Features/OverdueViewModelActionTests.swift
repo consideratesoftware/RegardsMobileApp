@@ -119,7 +119,8 @@ struct OverdueViewModelActionTests {
     /// `markCaughtUp` to clear the snooze *before* `InteractionLogging`,
     /// and TF-07d moved both into `scheduler.recordInteraction`'s one lock
     /// span — so "only the last write fails" means `InteractionLogging`'s own
-    /// second write (`contacts.upsert`), not the transition: a transition
+    /// second write (`contacts.updateLastInteractedAt`; the stub injects its
+    /// failure through `failingUpsert`), not the transition: a transition
     /// failure blocks everything after it by construction, so it can't
     /// produce a partial-persistence case. This sets up a real pending snooze
     /// first, specifically so "the snooze is restored" is provable rather
@@ -168,7 +169,8 @@ struct OverdueViewModelActionTests {
         #expect(pending[0].kind == .cadence)
         #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
         // The second write's first half (interactions.append) still truly
-        // persisted — only its second half (contacts.upsert) threw.
+        // persisted — only its second half (contacts.updateLastInteractedAt,
+        // failed through the stub's `failingUpsert`) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)

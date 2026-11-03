@@ -247,7 +247,8 @@ struct SchedulingPassCaughtUpTests {
     /// each other, which production cannot do.
     ///
     /// `GatedFetchByIDContactRepository` holds `snooze`'s precondition read
-    /// open, so `caughtUp` is issued while `snooze` is genuinely mid-flight.
+    /// open, so `recordInteraction(.caughtUp)` is issued while `snooze` is
+    /// genuinely mid-flight.
     /// Whichever order the lock grants, the caught-up must not be silently
     /// lost: no snooze may survive it, and the row left behind is the next
     /// cycle's, floorless.

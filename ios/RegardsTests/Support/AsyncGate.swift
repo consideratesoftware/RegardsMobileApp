@@ -182,7 +182,8 @@ struct GatedFirstFetchContactRepository: ContactRepository {
 
 /// Holds `upsert(_:)` open — the write `SchedulingPass.snooze` makes.
 /// `GatedTransitionStateReminderRepository` gates the *transition* that
-/// `caughtUp` makes; this gates the *insert* that `snooze` makes, which is
+/// `recordInteraction(.caughtUp)` makes; this gates the *insert* that
+/// `snooze` makes, which is
 /// what R61(a) needed and did not have: without it there was no way to hold
 /// a snooze open at its write and land a competing reload inside that
 /// window.

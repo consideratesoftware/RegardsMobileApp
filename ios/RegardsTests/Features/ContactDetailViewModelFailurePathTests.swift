@@ -63,9 +63,10 @@ struct ContactDetailViewModelFailurePathTests {
 
         // Inside `scheduler.recordInteraction` the transition finds no pending
         // snooze (this contact has none) and `interactions.append` succeeds;
-        // `upsert` throws right after (documented on
-        // `InteractionLogging.record`), so the catch block's `load()` fires.
-        // That reload re-reads the same contact whose `upsert` just failed,
+        // `contacts.updateLastInteractedAt` throws right after (the stub fails
+        // it through `failingUpsert`; `InteractionLogging.record` documents
+        // the append-then-move order), so the catch block's `load()` fires.
+        // That reload re-reads the same contact whose write just failed,
         // so `lastInteractedAt` comes back nil — the same value already on
         // screen. The stable-looking result below is the reload agreeing
         // with what's truly persisted, not evidence `load()` was skipped:
@@ -76,9 +77,10 @@ struct ContactDetailViewModelFailurePathTests {
 
     /// The partial-failure shape `markCaughtUp`'s doc comment added a reload
     /// for. One `scheduler.recordInteraction` span clears the snooze, then
-    /// logs, and "only the last write fails" means `contacts.upsert` —
-    /// `InteractionLogging`'s second internal write — fails after `append`
-    /// landed. A transition failure ends the span before anything is logged,
+    /// logs, and "only the last write fails" means
+    /// `contacts.updateLastInteractedAt` — `InteractionLogging`'s second
+    /// internal write, failed through the stub's `failingUpsert` — fails
+    /// after `append` landed. A transition failure ends the span before anything is logged,
     /// so it can't produce a partial-persistence case. This sets up a real
     /// pending snooze first, specifically so "the snooze is restored" is
     /// provable rather than assumed: with nothing pending the transition
@@ -128,7 +130,8 @@ struct ContactDetailViewModelFailurePathTests {
         #expect(pending[0].kind == .cadence)
         #expect(pending[0].scheduledFor == Self.now.addingTimeInterval(7 * 86_400))
         // The second write's first half (interactions.append) still truly
-        // persisted — only its second half (contacts.upsert) threw.
+        // persisted — only its second half (contacts.updateLastInteractedAt,
+        // failed through the stub's `failingUpsert`) threw.
         let logs = await interactions.appendedLogs()
         #expect(logs.count == 1)
         #expect(logs[0].source == .reminderCaughtUp)

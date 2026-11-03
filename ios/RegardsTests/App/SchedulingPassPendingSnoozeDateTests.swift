@@ -16,9 +16,9 @@ struct SchedulingPassPendingSnoozeDateTests {
     /// actually governs. `SchedulingPass.snooze` itself only ever keeps one
     /// cadence row per contact (the deterministic `reminderID(contactId:kind:)`), but
     /// `SchedulingPassCaughtUpTests.caughtUpSweepsANonCanonicalCadenceRow`
-    /// already proves a second, non-canonical cadence row can reach the
-    /// table and survive untouched — so this is reachable, not
-    /// hypothetical. Fixed to `.map(\.scheduledFor).max()`, matching
+    /// already shows a second, non-canonical cadence row can reach the table
+    /// and stays pending until a Caught up sweeps it — so this is reachable,
+    /// not hypothetical. Fixed to `.map(\.scheduledFor).max()`, matching
     /// `OverdueViewModel.makeOverdueRow`/`UpcomingViewModel.buildRows`'s own
     /// `max($0, $1)` tie-break for the identical shape. This test writes
     /// the *earlier* row first and the later one second, specifically so a
