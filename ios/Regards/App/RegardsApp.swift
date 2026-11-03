@@ -446,8 +446,8 @@ struct RegardsTabRoot: View {
                 onFinish: {
                     // Pops only when the starter picker is the top route, so a
                     // save that finishes after Back can't pop another screen.
-                    // Known gap (follow-up task): if the picker was popped and
-                    // pushed again, an older save can still pop the new one.
+                    // Known gap (R65): if the picker was popped and pushed
+                    // again, an older save can still pop the new one.
                     if navigation.settingsPath.last == .starterContacts { navigation.settingsPath.removeLast() }
                 }
             )

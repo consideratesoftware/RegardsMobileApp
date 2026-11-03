@@ -19,7 +19,8 @@ extension RegardsTabRoot {
                     do {
                         try await runtime.scheduler.run(for: contactId)
                     } catch {
-                        // The type only: an error can carry row or contact values.
+                        // The type only, as `.public`, on purpose: an error can
+                        // carry row or contact values, and a type name can't.
                         let errorType = String(describing: type(of: error))
                         starterSchedulingLog.error(
                             "reschedule after starter save failed: \(errorType, privacy: .public)"

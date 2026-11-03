@@ -164,8 +164,10 @@ final class StarterContactsViewModel {
 
     // MARK: - Picking
 
-    /// Picks or unpicks a contact. Returns `false` when a 4th pick is refused.
-    /// A newly picked contact starts at every 2 weeks.
+    /// Picks or unpicks a contact. Returns `false` when a 4th pick is refused,
+    /// and when the toggle is ignored: the list isn't loaded, a save is
+    /// writing, the screen is finished, or the contact isn't offered. A newly
+    /// picked contact starts at every 2 weeks.
     @discardableResult
     func toggle(_ id: UUID) -> Bool {
         guard loadState == .loaded, !isSaving, !isFinished,

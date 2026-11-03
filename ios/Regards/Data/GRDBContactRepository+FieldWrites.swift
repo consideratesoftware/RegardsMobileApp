@@ -34,9 +34,9 @@ extension GRDBContactRepository {
     /// `sqlite3_changes()` — the row count the statement actually matched,
     /// not an assumption that a well-formed `id` always exists.
     ///
-    /// `AND archivedAt IS NULL` (staged review round 8): without it, this
-    /// silently matches — and "succeeds" — a contact the reconciler archived
-    /// between an earlier fetch and this write, the identical race
+    /// `AND archivedAt IS NULL`: without it, this silently matches — and
+    /// "succeeds" — a contact the reconciler archived between an earlier
+    /// fetch and this write, the identical race
     /// `ContactDetailViewModel.snooze`'s `contact.isActive` guard already
     /// closes for Snooze. See the protocol doc comment for why "archived"
     /// counts as "no match" here.
