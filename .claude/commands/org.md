@@ -57,6 +57,12 @@ a cache for the next session: when they disagree with the branch, the PR, or
    plus recent mtimes). If one exists, treat that lane as staffed and do not
    dispatch into it; mention it in the report.
 
+Owner questions never wait in a PR body or a checklist. Whenever a role
+returns a question only Sid can answer (OPEN FOR OWNER, "Questions for Sid",
+an owner gate, a rule you'd need to bend), interview Sid in the session as
+`ENGINEERING_ORG.md` (Owner gates) describes, and comment each answer on
+the PR. Park only the work that needs the answer.
+
 For `status`: print the Stage 5 report from this state and stop.
 
 ## Stage 1: resume open work (parallel; does not consume lanes)
@@ -72,7 +78,7 @@ For each open TF PR:
    there with that target, post the result as a new verdict comment, then
    `git worktree remove <tmp>`. A RETRY gets
    the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate:
-   report it and don't rerun it.
+   interview Sid before rerunning it.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. It will route red checks to `on-call-engineer`,
    park on owner gates, or merge when all conditions hold.
@@ -84,6 +90,7 @@ For each READY item in queue order, up to the budget:
 1. Launch `tech-lead` with the queue row and §14 criteria verbatim. Wait
    for the plan, and write it verbatim to
    `../RegardsMobileApp-lanes/TF##/plan.md`. If OPEN FOR OWNER is non-empty,
+   interview Sid before staffing the item. If Sid isn't in the session,
    park the item under OWNER NEEDED and move on.
 2. Check the plan's locks against other lanes' locks. Two lanes may not
    both own `AppEnvironment`, `RegardsApp`, migrations, `project.yml`,
@@ -158,16 +165,18 @@ type existed, and it runs without the contract's tool list and model.
 
 Second opinion: at most once per lane, before parking it on a second
 REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
-Codex plugin) in the foreground (`--wait`) with the lane worktree, the
+Codex plugin) in the foreground (`--wait`), read-only (never `--write`),
+with the lane worktree, the
 slice, the refutation or blockers verbatim, and the instruction "read-only
 diagnosis: do not edit files; name the root cause and the smallest fix,
 with file:line". If it returns a background job instead of a diagnosis,
 fetch the result with `/codex:result` before going on. Send its diagnosis to
 `tech-lead` for a ruling. If the tech lead accepts it, the slice owner gets
 one last repair round, the only exception to the two-round limit, and the
-verifier or both reviews run once more. If Codex or the plugin is
-unavailable, the tech lead rejects the diagnosis, or that round fails, park
-the lane with the refutation, blockers, and any Codex diagnosis in the
+verifier or both reviews run once more. If the second opinion is already
+spent, Codex or the plugin is unavailable, the tech lead rejects the
+diagnosis, or that round fails, interview Sid: one more round, or park the
+lane with the refutation, blockers, and any Codex diagnosis in the
 report.
 
 ## Stage 4: ship
@@ -201,7 +210,7 @@ LANES (n/3 occupied):
 RESUMED:
 - PR #n: release-manager STATE | Codex: verdict @ sha
 WAITED: READY items not started, with lock or budget reason
-OWNER NEEDED: only PRs that need Sid, one exact checklist each; "none" otherwise
+OWNER NEEDED: the questions put to Sid and his answers, plus anything still waiting because he wasn't in the session; "none" otherwise
 DISPUTED: findings dropped against ARCHITECTURE.md, with §
 NEXT RUN: what /org will find next time
 ```

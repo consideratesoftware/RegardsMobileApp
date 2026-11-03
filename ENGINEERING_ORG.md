@@ -68,8 +68,8 @@ TF-## READY
   → tech-writer: doc siblings, register, a11y rows
   → /pr-review (review board) + codex-reviewer, in parallel
   → release-manager: PR, CI, hosted review, on-call repairs, checkpoint
-  → merge as soon as every condition below holds; a PR that needs Sid is
-    parked with an owner checklist
+  → merge as soon as every condition below holds; a PR that needs Sid waits
+    while the engineering manager interviews him in the session
 ```
 
 Handoffs are the structured report blocks at the end of each agent file.
@@ -124,8 +124,12 @@ All of these, on the current head, with no averaging:
    finding. RETRY and UNAVAILABLE never satisfy this condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
+7. The branch was up to date with `main` when conditions 3 and 4 were
+   reviewed, so both verdicts cover the commit that merges. Branch
+   protection on `main` requires branches to be up to date, so a behind
+   branch can't merge anyway.
 
-When all 6 hold, the PR merges. Owner direction, 2026-11-02: the org
+When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
 review. It notifies Sid only about PRs that need him: a blocking owner gate
 (below), a Codex UNAVAILABLE, or a PR parked after its repair rounds. A
@@ -140,8 +144,18 @@ wanting to skip one of these is wrong by definition.
 
 ## Owner gates
 
-Only Sid can do these. The org writes an exact checklist and parks the PR;
-it never pretends the step happened.
+Only Sid can do these, and the org never pretends one happened. Sid's
+standing rule is that questions for him are asked in the session as an
+interview, and his answers are recorded as PR comments. So when a gate, an
+OPEN FOR OWNER ruling, a reviewer's "Questions for Sid" item, or a rule the
+org would have to bend comes up, the engineering manager interviews him and
+comments each answer on the PR. An answer given before the PR exists goes
+into the lane's `pr-body.md` draft at once and into the PR description when
+the PR opens. Physical tasks are presented as exact steps, and Sid's result
+is recorded the same way. Only the work that needs the answer waits; if Sid
+isn't in the session, the rest continues and the interview happens when he
+is back. No role parks a question in a PR body or leaves a checklist for him
+to find later.
 
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.

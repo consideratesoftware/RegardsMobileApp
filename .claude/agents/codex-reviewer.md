@@ -35,8 +35,10 @@ echo "head $head prompt $prompt out $out"
 
 - `codex` missing or not logged in: report UNAVAILABLE with the first line
   of the error only.
-- `git status --short` not empty: report RETRY with the list. The review
-  target is committed history, so uncommitted files would go unreviewed.
+- `git status --short` not empty: report RETRY with reason "dirty tree"
+  and the list. The review target is committed history, so uncommitted
+  files would go unreviewed; whoever owns the lane commits or discards
+  them before the rerun.
 
 **Step 2. Prompt.** Use the Write tool to write this text to the `$prompt`
 path from step 1, filling in the 3 placeholders. Writing it with the Write

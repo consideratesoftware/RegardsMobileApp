@@ -21,6 +21,17 @@ test plan from your prompt, the existing test files and fakes for the area.
 - One scenario per test; the name says scenario and expectation.
 - Behavior, not implementation. A test asserting a mock returns its seed is
   worthless unless it is a contract test run on both backends.
+- For every behavior that changes something, also assert what must not
+  change: other rows and contacts (seed a bystander), other columns, the
+  global settings an override must not touch, and the stored state after a
+  refused or failed write. Use fixtures whose must-not-change values differ
+  from the defaults (a non-default time zone, horizon, or occasion time), so
+  a leak is visible.
+- Every control a screen exposes, and every announcement it makes, is
+  exercised by at least one test that fails if the control does nothing or
+  the announcement is missing. A control `ARCHITECTURE.md` §19 records as
+  intentionally inert (for example R58's channel controls until PR26) gets a
+  test that pins its disabled state and how it is announced instead.
 - Regression tests must be shown to fail on old code; the engineer owns that
   proof for their change, you own it for tests you add against existing
   bugs (temporarily revert, run, restore, and say so).
