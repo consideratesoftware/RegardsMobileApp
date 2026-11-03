@@ -164,7 +164,10 @@ is bound as a fourth required context (`Regards staged review`, pinned to the
 dedicated App's identity), but it gates on *evidence, not agreement*: it fails
 when no valid review ran for the current head, and passes when a review ran,
 including one that requests changes. The blockers are published in the check
-summary and output; acting on them is the author's call. Path filters were
+summary and output. Whether a blocker must be cleared is the repo's rule for a
+human author (clear or consciously defer it); the Claude Code org holds itself
+to the stricter policy in `ENGINEERING_ORG.md` (zero hosted blockers on the
+current head). Path filters were
 deliberately removed (PR #15) so required checks always report. The
 accessibility audits moved off the PR path on 2026-08-02 and are
 release-blocking rather than merge-blocking (ARCHITECTURE.md §10).
