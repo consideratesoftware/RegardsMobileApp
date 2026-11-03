@@ -64,8 +64,10 @@ gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$
 ```
 
 The query reads only the newest 100 comments. If `total comments` is above
-100 and a kind prints `none`, page back with `before:` and the
-`pageInfo.startCursor` before you conclude there is no such verdict.
+100 and a kind prints `none`, stop and report STATE CODEX STALE with the
+reason "more than 100 comments, verdict lookup needs a manual check". Don't
+treat it as a missing verdict and don't page through older comments
+yourself; the engineering manager checks and reposts a verdict if needed.
 
 The sha on a first line counts as the current head when it is a prefix of
 the head's full sha. Read `DISPUTED:` lines only from this output, never
