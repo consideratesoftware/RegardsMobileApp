@@ -114,6 +114,7 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
   > "<scratch>/hosted-review.txt"
 if [ -s "<scratch>/hosted-review.txt" ]; then
   awk '
+    /^VERDICT:/ && !v { v = $2 }
     /^### Blockers/ { found = 1; s = 1; next }
     /^### /         { s = 0 }
     s && /^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]+None\.?[[:space:]]*$/ { next }
@@ -123,6 +124,7 @@ if [ -s "<scratch>/hosted-review.txt" ]; then
       if (NR == 0)                  print "PENDING: empty review text"
       else if (!found)              print "MALFORMED: no Blockers section"
       else if (n == 0 && other > 0) print "MALFORMED: Blockers section has text but no bullets"
+      else if (n == 0 && v != "APPROVE") print "MALFORMED: no blockers listed but VERDICT is " (v == "" ? "missing" : v)
       else                          print "BLOCKERS " n + 0
     }' "<scratch>/hosted-review.txt"
 else
@@ -131,7 +133,8 @@ fi
 ```
 
 `PENDING` means the review hasn't run on this head: wait and query again,
-and never count it as zero. Only `BLOCKERS 0` counts as zero. `MALFORMED`
+and never count it as zero. Only `BLOCKERS 0` counts as zero, and the counter prints it only when the
+text also has `VERDICT: APPROVE`. `MALFORMED`
 fails closed: treat it as unresolved blockers, quote the section, and report
 it. Bullets can be `-`, `*`, or numbered; a bullet that reads only `None`
 isn't a blocker. Also check that the text's `HEAD SHA:` line equals
