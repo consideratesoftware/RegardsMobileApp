@@ -36,21 +36,30 @@ Which verdict comments count: written by the org's own account (`gh api
 user --jq .login`), never edited, and with a first line in the form above.
 A comment that only mentions those words (an owner answer, a dispute)
 doesn't count. The newest of each kind is current. REST comments have no
-edit field, so read them with GraphQL, and keep the newest line of each kind
-(`null` means none):
+edit field, so read them with GraphQL. The filter prints the full body of
+the newest counting comment of each kind (`none` when there is no such
+comment), the `PR REVIEW:` one first, then `---`, then the `CODEX REVIEW:`
+one:
 
 ```
 gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){comments(last:100){nodes{author{login} body lastEditedAt}}}}}' -f o=consideratesoftware -f r=RegardsMobileApp -F n=<pr> \
   | jq -r --arg me "$(gh api user --jq .login)" '
       [.data.repository.pullRequest.comments.nodes[]
        | select(.author.login == $me and .lastEditedAt == null)
-       | .body | split("\n")[0]] as $l
-      | ($l | map(select(test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs "))) | last),
-        ($l | map(select(test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs "))) | last)'
+       | .body] as $b
+      | ($b | map(select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs "))) | last // "none"),
+        "---",
+        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs "))) | last // "none")'
 ```
 
-The sha on a line counts as the current head when it is a prefix of the
-head's full sha. `/org` and `ENGINEERING_ORG.md` point here; they don't
+The sha on a first line counts as the current head when it is a prefix of
+the head's full sha. Read `DISPUTED:` lines only from this output, never
+from any other comment, and check each `blocker <n>` against the Codex
+review file your prompt names (`../RegardsMobileApp-lanes/<lane>/codex-<sha>.md`,
+saved by the engineering manager): the numbered blocker must exist there and
+the cited `ARCHITECTURE.md` section must address it. If your prompt names no
+such file, or it is missing, report STATE CODEX STALE; the engineering
+manager reruns Codex. `/org` and `ENGINEERING_ORG.md` point here; they don't
 restate the rule.
 
 Title `TF-##: <row scope, short>`. Body
@@ -100,8 +109,8 @@ PR, never in the root checkout.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
-  `DISPUTED:` line with an `ARCHITECTURE.md` section; check each cited
-  section exists and addresses the finding. A missing comment, a stale
+  `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check
+  each cited section exists and addresses the finding. A missing comment, a stale
   sha, RETRY, or UNAVAILABLE never passes. UNAVAILABLE is an owner gate,
   and so is a second RETRY on the same head (the engineering manager
   records it as UNAVAILABLE): park it and say which. Codex needs setup

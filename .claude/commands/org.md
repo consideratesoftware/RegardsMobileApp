@@ -72,7 +72,8 @@ For each open TF PR:
 1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
    comments that count under the rule in `release-manager.md` (Open). For
    each one that is missing, names a sha other than the PR's current head,
-   or (for Codex) is a RETRY, rerun that review: check the head
+   or (for Codex) is a RETRY or has no `codex-<short sha>.md` file in the
+   lane's folder, rerun that review: check the head
    out with `git worktree add --detach <tmp> <head sha>`, run
    `/pr-review origin/main...HEAD` and/or the `codex-reviewer` agent type
    there with that target, post the result as a new verdict comment, then
@@ -134,6 +135,12 @@ round, then both review again. Drop a Codex finding only when it
 contradicts `ARCHITECTURE.md`; you write the dispute on a `DISPUTED:
 blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
 comment, as `/pr-review` does for its own findings.
+
+Save each Codex review, in full, to
+`../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
+verdict, and give that path to `release-manager`; the release manager checks
+each `DISPUTED:` line against it. A resumed PR whose head has no such file
+gets a fresh Codex run (Stage 1).
 
 Once the lane has a PR, post every review result on it (`/pr-review` and
 Codex alike, RETRY included) as a verdict comment in the form
