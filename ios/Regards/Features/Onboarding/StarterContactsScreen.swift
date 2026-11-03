@@ -25,6 +25,8 @@ struct StarterContactsScreen: View {
     /// access row in Settings instead of saying nothing was imported.
     private let contactsAccessIsOff: Bool
     private let onFinish: () -> Void
+    /// Injectable so a test can host the screen and record what it posts.
+    private let announce: @MainActor (String) -> Void
     @State private var searchText = ""
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -33,12 +35,14 @@ struct StarterContactsScreen: View {
         showsSkip: Bool = false,
         showsLimitedAccessNote: Bool = false,
         contactsAccessIsOff: Bool = false,
-        onFinish: @escaping () -> Void
+        onFinish: @escaping () -> Void,
+        announce: @escaping @MainActor (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.showsSkip = showsSkip
         self.showsLimitedAccessNote = showsLimitedAccessNote
         self.contactsAccessIsOff = contactsAccessIsOff
+        self.announce = announce
         self.onFinish = onFinish
     }
 
@@ -77,7 +81,7 @@ struct StarterContactsScreen: View {
         // reschedule. Only the start is spoken: the end is the "Saved…"
         // announcement or the message.
         .onChange(of: viewModel.savesStarted) {
-            AccessibilityNotification.Announcement("Saving").post()
+            announce("Saving")
         }
     }
 
