@@ -78,7 +78,11 @@ state, as the restart protocol already requires.
   another Claude session is driving by hand.
 - Each lane gets `../RegardsMobileApp-TF##`, branch `claude/tf-##-<slug>`,
   simulator `RegardsTF##`, and `/tmp/RegardsTF##DerivedData`. Lanes never
-  share a simulator or DerivedData.
+  share a simulator or DerivedData. `build-engineer` resolves the simulator
+  name to one UDID on the runtime CI pins and passes `id=<udid>` to
+  `xcodebuild`, because a `name=RegardsTF##` destination can fall back to
+  My Mac or to another iOS runtime. It also writes its logs to a fresh
+  per-run directory, never to a shared file.
 - Lock files (from `TESTFLIGHT_PLAN.md`): `AppEnvironment`, `RegardsApp`,
   repository and migration files, `project.yml` and the generated project,
   SchedulingPass, Upcoming/Overdue/Contact Detail, Onboarding/Settings,
