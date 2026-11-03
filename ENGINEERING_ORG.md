@@ -137,8 +137,11 @@ merged PR appears in the engineering manager's report as one line, not as a
 notification.
 
 The release manager executes the merge with
-`gh pr merge <n> --merge --delete-branch --match-head-commit <sha>` (this
-repository merges with merge commits) and leaves the lane worktree in place
+`gh pr merge <n> --repo consideratesoftware/RegardsMobileApp --merge
+--delete-branch --match-head-commit <sha>` (this repository merges with merge
+commits; `--repo` skips the local branch delete that fails while the kept
+lane worktree has the branch checked out), then confirms with `gh pr view
+<n> --json state,mergeCommit` and leaves the lane worktree in place
 unless the engineering manager says to remove it. It never arms
 auto-merge: the hosted review check is green whatever its verdict, so
 GitHub would merge before the non-check conditions hold. Any role that finds itself

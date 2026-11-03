@@ -130,10 +130,16 @@ If all hold, merge the head you checked, so a push that lands in between
 can't ride along:
 
 ```
-gh pr merge <n> --merge --delete-branch --match-head-commit <head sha>
+gh pr merge <n> --repo consideratesoftware/RegardsMobileApp --merge --delete-branch --match-head-commit <head sha>
+gh pr view <n> --repo consideratesoftware/RegardsMobileApp --json state,mergeCommit
 ```
 
-The repository uses merge commits; never `--squash` or `--rebase`. Leave
+`--repo` makes `gh` skip the local branch delete, which would fail while the
+kept lane worktree has the branch checked out; the remote branch is still
+deleted. Don't trust the merge command's exit status alone: the merge
+succeeded only when the `gh pr view` output shows `"state":"MERGED"` and a
+non-null `mergeCommit`. Report that commit. The repository uses merge
+commits; never `--squash` or `--rebase`. Leave
 the lane worktree in place and report `LANE: merged, worktree kept`. Remove
 it (`git worktree remove <lane path>`) only when the engineering manager's
 prompt says to. Never arm auto-merge (`gh pr merge --auto`); merge
