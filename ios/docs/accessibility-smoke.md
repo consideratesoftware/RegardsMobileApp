@@ -1,7 +1,9 @@
 # VoiceOver manual smoke
 
-Run this before merging any UI-touching PR. Records go in the PR description
-under a **Manual accessibility smoke** heading.
+Run this in the pre-release device pass, not before each merge (owner ruling,
+2026-10-28). Each UI-touching PR adds its steps to `TESTFLIGHT_PLAN.md`'s
+"Pre-release device pass", and the result is recorded there. The automated
+accessibility audits still gate merges.
 
 ## Setup
 

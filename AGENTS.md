@@ -114,8 +114,8 @@ Navigation uses **one `NavigationStack` per tab** with per-tab `NavigationPath` 
 ## Accessibility is release-blocking
 
 `RegardsAccessibilityTests` runs `XCUIApplication.performAccessibilityAudit()`
-across the registered screens. Pull requests run focused regressions and the
-manual smoke for changed flows; the one-run audit after merges plus nightly and
+across the registered screens. Pull requests run focused regressions for
+changed flows (the manual smoke goes to the pre-release device pass); the one-run audit after merges plus nightly and
 pre-release 5× stress workflows are release-blocking. See
 `ios/docs/accessibility.md` for the standing rules (VoiceOver label
 completeness, Dynamic Type through `accessibility5`, WCAG AA contrast, Reduce
