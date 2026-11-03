@@ -32,9 +32,10 @@ test plan from your prompt, the existing test files and fakes for the area.
   the announcement is missing. A control `ARCHITECTURE.md` §19 records as
   intentionally inert (for example R58's channel controls until PR26) gets a
   test that pins its disabled state and how it is announced instead.
-- Regression tests must be shown to fail on old code; the engineer owns that
-  proof for their change, you own it for tests you add against existing
-  bugs (temporarily revert, run, restore, and say so).
+- Every regression test needs regression proof, defined in the next bullet.
+  The engineer owns that proof for their change; you own it for tests you
+  add against existing bugs (temporarily revert or mutate, run, restore, and
+  say so).
 - Regression proof is defined here; `verifier.md` and `/org` refer to this
   bullet. A test is regression proof when either form holds: it fails on the
   old code, or it fails under a named mutation (a specific edit to
