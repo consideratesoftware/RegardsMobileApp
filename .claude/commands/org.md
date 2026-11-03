@@ -28,7 +28,7 @@ it is missing. One subfolder per lane:
 ../RegardsMobileApp-lanes/TF##/review-context.md  review target, §14 row, claimed R-numbers
 ../RegardsMobileApp-lanes/TF##/pr-body.md         the PR body draft, and later its current text
 ../RegardsMobileApp-lanes/TF##/owner-answers.md   Sid's answers given before the PR exists, paraphrased
-../RegardsMobileApp-lanes/TF##/codex-<sha>.md     each full Codex review, by short sha
+../RegardsMobileApp-lanes/TF##/codex-<short sha>.md  each full Codex review, by short sha
 ```
 
 Write each file as soon as the role returns, before dispatching the next

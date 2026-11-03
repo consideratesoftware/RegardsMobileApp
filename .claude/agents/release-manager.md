@@ -72,11 +72,12 @@ yourself; the engineering manager checks and reposts a verdict if needed.
 The sha on a first line counts as the current head when it is a prefix of
 the head's full sha. Read `DISPUTED:` lines only from this output, never
 from any other comment, and check each `blocker <n>` against the Codex
-review file your prompt names (`../RegardsMobileApp-lanes/<lane>/codex-<sha>.md`,
+review file your prompt names (`codex-<short sha>.md` in the lane's folder,
 saved by the engineering manager): the numbered blocker must exist there and
-the cited `ARCHITECTURE.md` section must address it. If your prompt names no
-such file, or it is missing, report STATE CODEX STALE; the engineering
-manager reruns Codex. `/org` and `ENGINEERING_ORG.md` point here; they don't
+the cited `ARCHITECTURE.md` section must address it. The short sha in the
+file name must equal the sha on the newest `CODEX REVIEW:` comment's first
+line. If your prompt names no such file, it is missing, or its sha differs,
+report STATE CODEX STALE; the engineering manager reruns Codex. `/org` and `ENGINEERING_ORG.md` point here; they don't
 restate the rule.
 
 Title `TF-##: <row scope, short>`. Body

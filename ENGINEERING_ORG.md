@@ -99,7 +99,9 @@ restarts.
   `plan.md` (the tech lead's plan, verbatim), `review-context.md` (review
   target, §14 row, claimed R-numbers), `pr-body.md` (the PR body draft),
   `owner-answers.md` (Sid's answers given before the PR exists), and
-  `codex-<short sha>.md` (each full Codex review). The folder is outside the repo, so nothing in it is committed.
+  `codex-<short sha>.md` (each full Codex review, named by the short sha its
+  verdict comment shows). The folder is outside the repo, so nothing in it
+  is committed.
   The engineering manager never keeps these in the session scratchpad or
   `/tmp`, and a restart reads the folder before asking a role to redo its
   work. The branch, the PR, and `TESTFLIGHT_PLAN.md` win when a file
