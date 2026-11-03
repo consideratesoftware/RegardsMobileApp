@@ -27,6 +27,8 @@ it is missing. One subfolder per lane:
 ../RegardsMobileApp-lanes/TF##/plan.md            tech lead's approved plan, verbatim
 ../RegardsMobileApp-lanes/TF##/review-context.md  review target, §14 row, claimed R-numbers
 ../RegardsMobileApp-lanes/TF##/pr-body.md         the PR body draft, and later its current text
+../RegardsMobileApp-lanes/TF##/owner-answers.md   Sid's answers given before the PR exists, paraphrased
+../RegardsMobileApp-lanes/TF##/codex-<sha>.md     each full Codex review, by short sha
 ```
 
 Write each file as soon as the role returns, before dispatching the next
@@ -205,7 +207,8 @@ report.
 ## Stage 4: ship
 
 Save the PR body draft to `pr-body.md` in the lane's folder, then launch
-`release-manager` with every report from the lane. It opens the PR,
+`release-manager` with every report from the lane, the path of
+`owner-answers.md` if it exists, and the path of the Codex review file. It opens the PR,
 watches CI and the hosted review, routes repairs, records the checkpoint via
 `tech-writer`, and merges only when all merge conditions in
 `ENGINEERING_ORG.md` hold. Stacked items open as drafts.

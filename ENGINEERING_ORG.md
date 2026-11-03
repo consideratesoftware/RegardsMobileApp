@@ -96,8 +96,9 @@ restarts.
 - Lane notes live in `../RegardsMobileApp-lanes/` relative to the root
   checkout, next to the lane worktrees: one `TF##/` folder per lane with
   `plan.md` (the tech lead's plan, verbatim), `review-context.md` (review
-  target, §14 row, claimed R-numbers), and `pr-body.md` (the PR body
-  draft). The folder is outside the repo, so nothing in it is committed.
+  target, §14 row, claimed R-numbers), `pr-body.md` (the PR body draft),
+  `owner-answers.md` (Sid's answers given before the PR exists), and
+  `codex-<short sha>.md` (each full Codex review). The folder is outside the repo, so nothing in it is committed.
   The engineering manager never keeps these in the session scratchpad or
   `/tmp`, and a restart reads the folder before asking a role to redo its
   work. The branch, the PR, and `TESTFLIGHT_PLAN.md` win when a file
@@ -166,9 +167,10 @@ OPEN FOR OWNER ruling, a reviewer's "Questions for Sid" item, or a rule the
 org would have to bend comes up, the engineering manager interviews him and
 comments each answer on the PR, paraphrased: no raw pasted text, and never
 `@claude` in any comment the org posts, because `claude.yml` runs on it. An
-answer given before the PR exists goes
-into the lane's `pr-body.md` draft at once and into the PR description when
-the PR opens. Physical tasks are presented as exact steps, and Sid's result
+answer given before the PR exists is
+paraphrased into the lane's `owner-answers.md` at once. When the PR opens it
+goes in the description and is also posted as its own PR comment, which is
+the record the rule asks for. Physical tasks are presented as exact steps, and Sid's result
 is recorded the same way. Only the work that needs the answer waits; if Sid
 isn't in the session, the rest continues and the interview happens when he
 is back. No role parks a question in a PR body or leaves a checklist for him

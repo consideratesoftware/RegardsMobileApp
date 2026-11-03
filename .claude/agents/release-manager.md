@@ -35,8 +35,10 @@ posts, verdicts and owner answers alike: `.github/workflows/claude.yml`
 runs on comments that contain it. Never edit
 a verdict comment; when a review produces a new verdict, post a new
 comment. Before the PR exists the verdicts live in the reports you were
-given; post them right after you open it. The engineering manager posts the
-verdicts of later reruns the same way.
+given; post them right after you open it. If your prompt names an
+`owner-answers.md`, put its content in the PR description and post each
+answer in it as its own comment, right after the verdicts. The engineering
+manager posts the verdicts and owner answers of later reruns the same way.
 
 Which verdict comments count: written by the org's own account (`gh api
 user --jq .login`), never edited, and with a first line in the form above.
