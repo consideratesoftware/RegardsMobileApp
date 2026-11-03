@@ -22,7 +22,8 @@ Treat the literal target `worktree` as all tracked and untracked changes against
    - Copy `ios/` into a temporary directory, run `xcodegen generate` inside the
      temporary `ios/`, and compare its `Regards.xcodeproj` with the working
      tree. Do not generate into the working tree during a review.
-   - Run `swiftlint --strict`.
+   - Run SwiftLint from the repo root, never from `ios/` (`.swiftlint.yml`
+     lives at the root): `(cd "<worktree root>" && swiftlint --strict)`.
    - Run the privacy and domain-purity checks defined in
      `.github/workflows/guards.yml`.
 5. If a gate fails, return `REQUEST_CHANGES` with the gate evidence and do not
