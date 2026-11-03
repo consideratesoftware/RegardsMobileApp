@@ -57,7 +57,7 @@ BLOCKERS: (n)
 - [file:line] violation → which §11/§8 clause → fix
 FIX: (n)
 NIT: (max 3)
-INVARIANTS VERIFIED: one line each for checks 1–8 above (pass/n-a)
+INVARIANTS VERIFIED: one line each for checks 1–8 above (pass/n-a/not checked: <why>)
 ```
 
-The INVARIANTS VERIFIED block is mandatory even on APPROVE; it is the audit trail. No praise, no diff summary.
+The INVARIANTS VERIFIED block is mandatory even on APPROVE; it is the audit trail. Never APPROVE with any of checks 1–8 unchecked (out of time, a command that didn't return, a file you couldn't read): mark it `not checked: <why>` and return REQUEST_CHANGES. No praise, no diff summary.
