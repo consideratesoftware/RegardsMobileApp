@@ -144,8 +144,9 @@ open pull requests, address reviews, and merge a pull request once every
 merge condition in `ENGINEERING_ORG.md` holds (required checks green is only
 the first). The `Regards staged review` check passes whenever a valid review
 ran for the current head, including one that requests changes, so green is not
-the same as approved: read the check output and clear or consciously defer
-every blocker before merging. It must not:
+the same as approved: read the check output and clear every blocker, or
+record Sid's deferral of it with a link to his PR comment, before merging. It
+must not:
 
 - weaken the privacy, accessibility, data-integrity, or layer-purity gates;
 - discard user work or use destructive Git operations;
