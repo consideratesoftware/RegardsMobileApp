@@ -35,6 +35,14 @@ actor AsyncGate {
         }
     }
 
+    /// How many calls to `wait()` have been made. Lets a test poll, with a
+    /// bound, for an arrival that only reverted code would make.
+    var arrivalCount: Int { waiterCount }
+
+    /// Whether `open()` has been called and the gate has not been closed
+    /// since. Lets a test poll, with a bound, for a task that finishes.
+    var isOpened: Bool { isOpen }
+
     /// Releases every call currently suspended in `wait()`, and every future
     /// one, immediately.
     func open() {
@@ -91,7 +99,7 @@ struct GatedFetchTrackedContactRepository: ContactRepository {
 }
 
 /// Wraps a `ReminderRepository`, delaying `transitionState()` specifically —
-/// the call `SchedulingPass.caughtUp` makes (`updateState()` before staged
+/// the call `SchedulingPass.recordInteraction` makes (`updateState()` before staged
 /// review round 8's compare-and-set fix). Pairs with
 /// `GatedFetchTrackedContactRepository` in tests that need to hold
 /// `markCaughtUp` open *before* it reaches its own trailing `performLoad()`
@@ -174,10 +182,10 @@ struct GatedFirstFetchContactRepository: ContactRepository {
 
 /// Holds `upsert(_:)` open — the write `SchedulingPass.snooze` makes.
 /// `GatedTransitionStateReminderRepository` gates the *transition* that
-/// `caughtUp` makes; this gates the *insert* that `snooze` makes, which is
-/// what R61(a) needed and did not have: without it there was no way to hold
-/// a snooze open at its write and land a competing reload inside that
-/// window.
+/// `recordInteraction(.caughtUp)` makes; this gates the *insert* that
+/// `snooze` makes, which is what R61(a) needed and did not have: without it
+/// there was no way to hold a snooze open at its write and land a competing
+/// reload inside that window.
 struct GatedUpsertReminderRepository: ReminderRepository {
     let wrapped: any ReminderRepository
     let gate: AsyncGate
@@ -205,8 +213,8 @@ struct GatedUpsertReminderRepository: ReminderRepository {
 /// the *list* read a screen load makes; this gates the *single-contact* read
 /// `SchedulingPass.snooze` makes for its R54 precondition, which is the
 /// suspension R59's caught-up race interleaves at. Lets a test put a
-/// `caughtUp` inside that exact window instead of hoping a real race
-/// reproduces.
+/// `recordInteraction(.caughtUp)` inside that exact window instead of hoping
+/// a real race reproduces.
 struct GatedFetchByIDContactRepository: ContactRepository {
     let wrapped: any ContactRepository
     let gate: AsyncGate
@@ -229,5 +237,36 @@ struct GatedFetchByIDContactRepository: ContactRepository {
     @discardableResult
     func updateReminderWindowOverride(id: UUID, window: ReminderWindow?) async throws -> Bool {
         try await wrapped.updateReminderWindowOverride(id: id, window: window)
+    }
+}
+
+/// Wraps an `InteractionRepository` so the **first** `append` parks on `gate`
+/// and then throws, which is a log write that is still in flight when a
+/// competing mutation arrives and then fails. Every later `append` passes
+/// straight through, except that, when `secondGate` is set, the second one
+/// parks on it first and then succeeds. R60 needs both: the first append is
+/// the failing action whose compensation must not revert anything newer, the
+/// second is the newer catch-up that must survive it.
+struct GatedFailingAppendInteractionRepository: InteractionRepository {
+    let wrapped: any InteractionRepository
+    let gate: AsyncGate
+    var secondGate: AsyncGate?
+    let counter = CallCounter()
+
+    func fetchRecent(forContact contactId: UUID, limit: Int) async throws -> [InteractionLog] {
+        try await wrapped.fetchRecent(forContact: contactId, limit: limit)
+    }
+
+    func append(_ log: InteractionLog) async throws {
+        switch await counter.next() {
+        case 1:
+            await gate.wait()
+            throw RepositoryFakeFailure()
+        case 2:
+            if let secondGate { await secondGate.wait() }
+            try await wrapped.append(log)
+        default:
+            try await wrapped.append(log)
+        }
     }
 }

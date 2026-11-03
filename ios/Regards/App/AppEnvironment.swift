@@ -82,6 +82,7 @@ public struct AppRuntime: Sendable {
         self.scheduler = SchedulingPass(
             reminders: environment.reminders,
             contacts: environment.contacts,
+            interactions: environment.interactions,
             window: environment.window,
             occasions: occasions,
             clock: clock

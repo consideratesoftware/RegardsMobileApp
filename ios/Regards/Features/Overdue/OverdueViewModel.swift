@@ -44,6 +44,7 @@ public final class OverdueViewModel {
     private(set) var loadState: RegardsLoadState = .loading
 
     private let contacts: any ContactRepository
+    // Unused since TF-07d (the pass logs interactions); TF-07f removes it.
     private let interactions: any InteractionRepository
     private let reminders: any ReminderRepository
     private let scheduler: SchedulingPass
@@ -226,32 +227,9 @@ public final class OverdueViewModel {
     /// a write that then fails and reloads the row back in would tell a
     /// VoiceOver user something that didn't happen.
     ///
-    /// Also clears any pending snooze through `SchedulingPass.caughtUp`
-    /// *before* the interaction log runs (§9's caught-up trigger: "cancel
-    /// pending reminder(s)... reschedule") — without this, a short-cadence
-    /// contact's stale snoozed date would keep winning the `max(...)` in
-    /// `makeOverdueRow`/`UpcomingViewModel.buildRows` over the freshly
-    /// computed one (PR #49 hosted review; see `SchedulingPass.caughtUp`'s
-    /// doc comment for the exact mechanism).
-    ///
-    /// `scheduler.caughtUp` first, `InteractionLogging` second — not the
-    /// reverse: `InteractionLogging`'s `contacts.updateLastInteractedAt`
-    /// broadcasts through `observeTracked()` the moment it lands, and a
-    /// concurrently observing Upcoming (or Contact Detail) reloading off that
-    /// broadcast would compute its row before the reminder-state write had
-    /// cleared the snooze, briefly showing the stale date anyway. Doing the
-    /// reminder-state write first means every broadcast this method can
-    /// trigger only ever fires after the snooze is already gone.
-    ///
-    /// That ordering has its own failure mode (staged review round 7): if
-    /// `scheduler.caughtUp` clears a real pending snooze and
-    /// `InteractionLogging` then throws, the snooze was still silently
-    /// destroyed — the user hears only "Couldn't mark X caught up," and
-    /// nothing about a bare reload restores a reminder that was never
-    /// supposed to be touched by a failed action. The catch block below
-    /// re-issues `scheduler.restorePendingAfterFailedCaughtUp` — reverting
-    /// the same row, not fabricating a new date — whenever `caughtUp`
-    /// reported it actually cleared something.
+    /// The writes (clearing any snooze, the interaction, the reschedule) are
+    /// one `SchedulingPass.recordInteraction` call; its doc has the ordering
+    /// and the restore on failure.
     @discardableResult
     public func markCaughtUp(contactId: UUID) async -> Bool {
         // Bumped synchronously with the optimistic mutation below, not left
@@ -266,11 +244,8 @@ public final class OverdueViewModel {
         // `performLoad()` call would.
         loadGeneration += 1
         rows.removeAll { $0.contactId == contactId }
-        let logging = InteractionLogging(contacts: contacts, interactions: interactions)
-        var clearedPendingSnooze = false
         do {
-            clearedPendingSnooze = try await scheduler.caughtUp(contactId: contactId)
-            try await logging.markCaughtUp(contactId: contactId, at: clock())
+            try await scheduler.recordInteraction(contactId: contactId, .caughtUp)
             // Reload on success too, matching `UpcomingViewModel
             // .markCaughtUp` — which already did, and is why this bug was
             // only ever reachable here (staged review round 19). The
@@ -287,26 +262,8 @@ public final class OverdueViewModel {
             Self.log.error(
                 "failed to mark caught up for \(contactId, privacy: .private): \(error, privacy: .private)"
             )
-            if clearedPendingSnooze {
-                await restorePendingSnooze(contactId: contactId)
-            }
             await performLoad()
             return false
-        }
-    }
-
-    /// Shared by `markCaughtUp` above (Snooze has no `logOther` sibling on
-    /// this screen — see §10). Logs its own failure separately from the
-    /// caller's: a failure here means the user's snooze is genuinely lost,
-    /// not merely that this method didn't get to try — worth its own
-    /// diagnostic line rather than folding into the outer catch's message.
-    private func restorePendingSnooze(contactId: UUID) async {
-        do {
-            try await scheduler.restorePendingAfterFailedCaughtUp(contactId: contactId)
-        } catch {
-            Self.log.error(
-                "failed to restore snooze for \(contactId, privacy: .private): \(error, privacy: .private)"
-            )
         }
     }
 

@@ -26,6 +26,7 @@ struct SchedulingPassCorruptRowTests {
             pass = SchedulingPass(
                 reminders: repositories.reminders,
                 contacts: repositories.contacts,
+                interactions: repositories.interactions,
                 window: repositories.window,
                 occasions: { _ in [] },
                 clock: { clock.now() })

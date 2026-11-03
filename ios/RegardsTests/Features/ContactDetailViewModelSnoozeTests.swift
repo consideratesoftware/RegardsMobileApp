@@ -37,6 +37,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -73,6 +74,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -112,6 +114,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: StubReminderRepository(),
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: clock.now
@@ -155,6 +158,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: interactions,
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -194,6 +198,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -232,6 +237,7 @@ struct ContactDetailViewModelSnoozeTests {
             scheduler: SchedulingPass(
                 reminders: reminders,
                 contacts: contacts,
+                interactions: StubInteractionRepository(),
                 window: FixedReminderWindowRepository(),
                 occasions: { _ in [] },
                 clock: { Self.now }
@@ -250,7 +256,7 @@ struct ContactDetailViewModelSnoozeTests {
     }
 
     /// The hosted-review blocker this pins: `logOther` originally never
-    /// called `scheduler.caughtUp`, unlike `markCaughtUp` — both route
+    /// called `scheduler.recordInteraction`, unlike `markCaughtUp` — both route
     /// through `InteractionLogging`, which moves `lastInteractedAt` and
     /// never touches `ScheduledReminder`, so without the call a contact
     /// logged through another channel after a snooze kept showing the stale
@@ -281,6 +287,7 @@ struct ContactDetailViewModelSnoozeTests {
         let scheduler = SchedulingPass(
             reminders: reminders,
             contacts: contacts,
+            interactions: StubInteractionRepository(),
             window: FixedReminderWindowRepository(),
             occasions: { _ in [] },
             clock: { Self.now }
@@ -309,7 +316,7 @@ struct ContactDetailViewModelSnoozeTests {
         await viewModel.logOther(channel: .email)
 
         // The pending cadence row is gone outright — direct proof
-        // `scheduler.caughtUp` ran, independent of any Upcoming math.
+        // `scheduler.recordInteraction` ran, independent of any Upcoming math.
         let pending = try await reminders.fetchPending(forContact: contact.id)
         #expect(pending.isEmpty)
 

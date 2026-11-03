@@ -286,6 +286,7 @@ struct SchedulingPassOccasionTests {
         return SchedulingPass(
             reminders: fixture.reminders,
             contacts: fixture.repositories.contacts,
+            interactions: fixture.repositories.interactions,
             window: fixture.repositories.window,
             occasions: occasions,
             clock: { clock.now() })

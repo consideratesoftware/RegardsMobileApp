@@ -317,6 +317,44 @@ struct SchedulingPassRunFullTests {
         #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-30 18:00"))
     }
 
+    // MARK: - Cadence anchor and slot (§9 contract 3, R8, R48)
+
+    /// Both contacts were created 2026-01-01 10:00 and never contacted. A
+    /// 365-day cadence is due 2027-01-01 10:00, which is still ahead. A
+    /// 100-day cadence was due 04-11, so it is overdue now and joins today's
+    /// slot. The old engine's "never contacted is due now" rule would put
+    /// both at 06-10 18:00, and `?? now` would give 2027-06-10 and 09-18.
+    @Test(
+        "A never-contacted contact is due one cadence after createdAt",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func neverContactedAnchorIsCreatedAt(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let yearly = try await fixture.addContact(1, cadenceDays: 365, lastInteracted: nil)
+        let hundredDays = try await fixture.addContact(2, cadenceDays: 100, lastInteracted: nil)
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(yearly)?.scheduledFor == PassFixture.at("2027-01-01 18:00"))
+        #expect(try await fixture.cadenceRow(hundredDays)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+    }
+
+    /// R48: a contact who becomes due at 18:30, inside the 18:00-19:00 slot
+    /// that is already open at 18:10, must not fire at that slot's 18:00
+    /// start, which is before it is due. It waits for the next slot.
+    @Test(
+        "A cadence that comes due inside the slot in progress waits for the next slot",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func cadenceDueInsideTheCurrentSlotWaitsForTheNextSlot(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:10")
+        let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 18:30")
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-11 18:00"))
+    }
+
     /// R55: the window is read on every run. Moving the global window to
     /// another zone moves the same wall-clock slot with it.
     @Test(
