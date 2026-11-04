@@ -1,10 +1,9 @@
 import Foundation
 
-/// The sole writer of `ScheduledReminder` rows (§9a, decision #36). TF-07c
-/// builds the DB half: `runFull()` and `run(for:)` derive every pending row
-/// from the contacts, the global window, per-contact overrides and the
-/// injected occasions; Snooze and `recordInteraction` write through the same
-/// lock. OS notifications arrive in TF-07e.
+/// The sole writer of `ScheduledReminder` rows (§9a, decision #36).
+/// `runFull()` and `run(for:)` derive every pending row from the contacts,
+/// the global window, per-contact overrides and the injected occasions;
+/// Snooze and `recordInteraction` write through the same lock.
 ///
 /// **Derivation (§9).** A cadence row's `scheduledFor` is
 /// `nextAllowedSlot(max(now, overdueAt, snoozedUntil))` in the contact's
@@ -19,12 +18,10 @@ import Foundation
 /// its calendar from that window's timezone. Nothing is cached, so a window
 /// edit never leaves the pass on a stale zone or needs a second pass.
 ///
-/// **No re-nag (§9 "Notification fired", owner ruling 5).** A cadence row
-/// whose time has come (fired, or pending at or before `now`) is left alone
-/// while the contact is still overdue, its anchor hasn't moved past the row,
-/// and its window still has capacity; a zero-capacity window cancels even a
-/// due pending row. Until TF-07e marks rows fired from the OS, a due pending
-/// row stands in for a fired one.
+/// **Fired marking and no re-nag (§9 "Notification fired", owner ruling 5).**
+/// Each run first marks covered pending rows at or before `now` fired. Fired
+/// rows are history and never cancelled. A fired cadence row stays while its
+/// contact is overdue in the same cycle and its window has capacity.
 ///
 /// **Corrupt rows.** Runs read one `fetchSchedule()` snapshot, which drops
 /// an undecodable contact (with its rows) or row. The pass never cancels what
@@ -122,8 +119,18 @@ public actor SchedulingPass {
         let context = Context(now: clock(), global: snapshot.window)
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
+        let targetIds = Set(targets.map(\.id))
+        // §9 "Notification fired": a due covered pending row was delivered, so
+        // it becomes fired history. After this, no covered pending row is due
+        // except one this call writes into the slot in progress (next run's).
+        var rows = snapshot.reminders
+        for (index, row) in rows.enumerated()
+        where row.state == .pending && row.scheduledFor <= now && targetIds.contains(row.contactId) {
+            guard try await reminders.transitionState(id: row.id, from: .pending, to: .fired) else { continue }
+            rows[index].state = .fired
+        }
         let allOccasions = await occasions(targets)
-        let existingById = Dictionary(snapshot.reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let existingById = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         var desiredIds = Set<UUID>()
         var zeroCapacity = Set<UUID>()
@@ -136,9 +143,9 @@ public actor SchedulingPass {
             for (occasion, occurrence) in occurrences {
                 let id = Self.reminderID(contactId: contact.id, kind: occasion.kind)
                 desiredIds.insert(id)
-                // A same-day occasion that is already due stays put: its
-                // "fire now" occurrence would otherwise move with the clock.
-                if let existing = existingById[id], existing.scheduledFor <= now,
+                // A same-day occasion that has fired or is due stays put, so a
+                // "fire now" occurrence can't chase the clock or a rollback re-arm it.
+                if let existing = existingById[id], existing.state == .fired || existing.scheduledFor <= now,
                    calendar.isDate(existing.scheduledFor, inSameDayAs: occurrence) {
                     continue
                 }
@@ -166,8 +173,7 @@ public actor SchedulingPass {
             // The floor governs only while its slot is still ahead; once that
             // slot has started the snooze is spent.
             let floor = existing.flatMap { $0.state == .pending && $0.scheduledFor > now ? $0.snoozedUntil : nil }
-            // Capacity first: a zero-capacity window gets its id recorded and
-            // its pending row cancelled below, even when that row is due.
+            // Capacity first: zero capacity records the id, and the sweep below cancels the pending row.
             guard let slot = Self.cadenceSlot(
                 overdueAt: overdueAt,
                 floor: floor,
@@ -182,8 +188,14 @@ public actor SchedulingPass {
                 continue
             }
             desiredIds.insert(id)
-            if let existing, existing.state == .fired || existing.scheduledFor <= now,
-               overdueAt <= now, anchor <= existing.scheduledFor {
+            // No re-nag: a fired row stays while the contact is still overdue
+            // and the row is this cycle's: at or after the anchor, or at or
+            // after the start of the slot holding overdueAt. The second covers a
+            // 25-hour day, where a 1-day cadence's slot starts before its anchor.
+            if let existing, existing.state == .fired || existing.scheduledFor <= now, overdueAt <= now,
+               anchor <= existing.scheduledFor
+                || context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
+                    .map({ $0 <= existing.scheduledFor }) == true {
                 continue
             }
             let desired = ScheduledReminder(
@@ -200,8 +212,7 @@ public actor SchedulingPass {
         // Pending rows of covered contacts that no longer belong: a cadence
         // that went away, a zero-capacity window, an occasion that's gone, a
         // non-canonical id. Fired rows are history and stay.
-        let targetIds = Set(targets.map(\.id))
-        for row in snapshot.reminders
+        for row in rows
         where row.state == .pending && targetIds.contains(row.contactId) && !desiredIds.contains(row.id) {
             try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
         }
@@ -227,12 +238,10 @@ public actor SchedulingPass {
                 pending = try await reminders.fetchAllPending()
             }
         } catch {
-            // The fail-closed read hit an undecodable row and fails the same
-            // way every run until that row is fixed or replaced, so orphans
-            // stay pending (no screen shows them). Overdue and Upcoming read
-            // the same fetchAllPending() until TF-07f, so meanwhile that row
-            // hides every snooze and every Upcoming occasion row.
-            // The type only: an error can carry row or contact values.
+            // The fail-closed read hit an undecodable row and fails every run
+            // until that row is fixed or replaced, so orphans stay pending.
+            // Until TF-07f that row also hides every snooze and Upcoming
+            // occasion row. The type only: an error can carry row or contact values.
             let errorType = String(describing: type(of: error))
             Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
             return
@@ -450,9 +459,8 @@ public actor SchedulingPass {
 
     /// The active snooze's resolved instant for Contact Detail (R56): the
     /// pending cadence row's `scheduledFor` when it carries a floor and is
-    /// still ahead, so the screen and Overdue agree. `nil` when no snooze is
-    /// still ahead (a spent floor can stay on a due row, which the no-re-nag
-    /// rule leaves alone). `.max()` so a stray row can't win by fetch order.
+    /// still ahead, so the screen and Overdue agree, else `nil` (a spent floor
+    /// stays on its fired row). `.max()` so a stray row can't win by order.
     public func pendingSnoozeDate(contactId: UUID) async throws -> Date? {
         let now = clock()
         return try await reminders.fetchPending(forContact: contactId)

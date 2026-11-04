@@ -20,10 +20,10 @@ extension AppLaunchCoordinator {
     }
 
     /// `runFull()` for the `.ready` triggers (launch, retry, onboarding done,
-    /// the DEBUG mock launch) and foreground, each after its Contacts
-    /// reconcile (§9 "App launch/foreground"). A failure is logged, not
-    /// shown. Writes the failed run made before it stopped may already have
-    /// landed; the next trigger runs the pass again.
+    /// the DEBUG mock launch), foreground, and a Contacts store change, each
+    /// after its Contacts reconcile (§9 "App launch/foreground"). A failure
+    /// is logged, not shown. Writes the failed run made before it stopped may
+    /// already have landed; the next trigger runs the pass again.
     func runSchedulingPass(runtime: AppRuntime) async {
         do {
             try await runtime.scheduler.runFull()
@@ -49,6 +49,15 @@ extension AppLaunchCoordinator {
                     continue
                 }
                 await self.reconcileNow(runtime: runtime, dependencies: dependencies)
+                // The reconcile can archive or untrack a contact (an iCloud
+                // sync while the app is open), so the pass runs here too and
+                // cancels that contact's rows without waiting for a
+                // foreground. Only once `.ready`: onboarding's completion
+                // runs its own pass. A replayed change is followed by the
+                // `.ready` launch pass in `start()`.
+                if self.phase == .ready {
+                    await self.runSchedulingPass(runtime: runtime)
+                }
             }
         }
     }
