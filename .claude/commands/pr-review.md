@@ -2,7 +2,7 @@
 description: Run the staged multi-agent PR review (correctness, security/privacy, tests, accessibility, code quality, fit-and-finish) and merge the verdicts into one review.
 ---
 
-Review the current branch against `origin/main`, or use the target in `$ARGUMENTS`.
+Review the current branch against `origin/main...HEAD`, or use the target in `$ARGUMENTS`.
 Treat the literal target `worktree` as all tracked and untracked changes against
 `HEAD`. Follow this workflow exactly.
 
