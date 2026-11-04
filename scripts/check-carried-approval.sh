@@ -28,17 +28,19 @@
 # toml, anything. Renames are never detected, so a move is a delete plus an
 # add.
 #
-# Why Markdown alone is safe: the apps and their tests read files only from the
-# bundled trees, and those trees are excluded as a whole, so a Markdown file
-# added there (a future resource, say) never carries. The trees are the iOS
-# app and test targets (ios/Regards*/), every Android module's sources, assets
-# and tests (android/*/src/; the * crosses slashes, so android/feature/overdue/
-# src/ is covered, while android/docs/ and android/README.md stay eligible),
-# and shared/testvectors/, test-only data that the Android domain tests will
-# read (ANDROID_PORT.md A6). The last one is excluded to fail closed, since
-# the tests would read a Markdown file there as data. Elsewhere a Markdown
-# file is documentation, except the instruction files and ARCHITECTURE.md
-# named above, which agents read as instructions or as the contract.
+# Why Markdown alone is safe: the apps and their tests read repository files
+# (resources and test data) only from the bundled trees, and those trees are
+# excluded as a whole, so a Markdown file added there (a future resource, say)
+# never carries. The trees are the iOS app and test targets (ios/Regards*/),
+# every Android module's sources, assets and tests (android/*/src/; the *
+# crosses slashes, so android/feature/overdue/src/ is covered, while
+# android/docs/ and android/README.md stay eligible), and shared/testvectors/,
+# test data with two readers: the Swift suite, which generates the vectors and
+# consumes them first, and the Android domain tests (ANDROID_PORT.md A6). A
+# Markdown file there would be read as data, so the tree is excluded to fail
+# closed. Elsewhere a Markdown file is documentation, except the instruction
+# files and ARCHITECTURE.md named above, which agents read as instructions or
+# as the contract.
 
 set -euo pipefail
 export LC_ALL=C
