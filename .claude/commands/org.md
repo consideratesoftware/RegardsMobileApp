@@ -206,9 +206,9 @@ Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown
 outside the agent, script and CI directories, never AGENTS*.md, CLAUDE*.md,
 ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
 `android/*/schemas` or `shared/testvectors`; anything else reruns that
-reviewer. The release manager
-checks each `CARRIED:` line (`release-manager.md`, Merge conditions) and
-rejects one that fails, so if you aren't sure, rerun the reviewer. The other four reviewers and Codex never
+reviewer. The release manager checks each `CARRIED:` line
+(`release-manager.md`, Merge conditions) and rejects one that fails, so if you
+aren't sure, rerun the reviewer. The other four reviewers and Codex never
 carry: they rerun on every head.
 
 Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
@@ -238,9 +238,9 @@ Save the PR body draft to `pr-body.md` in the lane's folder, then launch
 `release-manager` with every report from the lane, plus these absolute paths
 (the release manager runs elsewhere): the lane worktree, the root checkout
 (where it finds `scripts/`), `owner-answers.md` if it exists, and the Codex
-review file. It opens the PR, watches CI and the hosted review, routes repairs, records the checkpoint via
-`tech-writer`, and merges only when all merge conditions in
-`ENGINEERING_ORG.md` hold. Stacked items open as drafts.
+review file. It opens the PR, watches CI and the hosted review, routes
+repairs, records the checkpoint via `tech-writer`, and merges only when all
+merge conditions in `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
 
 Owner direction, 2026-11-02: a PR whose merge conditions all hold is
 merged. Don't ask Sid "ready to merge?" and don't hold a green PR for his
@@ -263,9 +263,10 @@ relaunch `release-manager` with the new verdicts:
   repost any that scrolled out of the newest 100.
 
 Blockers go to the slice owner as in Stage 3. After 3 stale rounds on one PR,
-park it and say why. Count only head moves caused by fixes. An `update-branch` merge (lanes merging in
-sequence move `main`) and a checkpoint or doc commit from `tech-writer` run
-the reviews again but don't count, or a green PR would park for nothing.
+park it and say why. Count only head moves caused by fixes. An `update-branch`
+merge (lanes merging in sequence move `main`) and a checkpoint or doc commit
+from `tech-writer` run the reviews again but don't count, or a green PR would
+park for nothing.
 
 ## Stage 5: report
 
