@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Fixture tests for scripts/check-carried-approval.sh. Each case builds a
-# throwaway repository, commits one change on top of a base commit, and checks
-# the script's exit status (0 = carry allowed, 1 = carry fails).
+# change on top of a base commit in a throwaway repository and checks the
+# script's exit status: 0 = the carry is allowed, 1 = it fails.
+#
+# CARRY_CHECKER=<path> runs the cases against another copy of the script, for
+# mutation checks (remove one rule, confirm the matching case then fails).
 
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
-checker="$repo_root/scripts/check-carried-approval.sh"
+checker="${CARRY_CHECKER:-$repo_root/scripts/check-carried-approval.sh}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -19,21 +22,33 @@ repo="$work/repo"
 git init -q -b main "$repo"
 git -C "$repo" config core.fileMode true
 
-mkdir -p "$repo/docs" "$repo/ios/Regards.xcodeproj" "$repo/ios/Regards/App" \
-  "$repo/.claude/agents" "$repo/.codex/agents" "$repo/.github/workflows" \
-  "$repo/scripts" "$repo/tools"
-printf '# Doc\n\ntext\n' > "$repo/docs/guide.md"
-printf '<plist></plist>\n' > "$repo/ios/Info.plist"
-printf '<plist></plist>\n' > "$repo/ios/My File.plist"
-printf 'name: Regards\n' > "$repo/project.yml"
-printf '// pbx\n' > "$repo/ios/Regards.xcodeproj/project.pbxproj"
-printf -- '---\nname: x\n---\n\n# Heading\n' > "$repo/.claude/agents/x.md"
-printf 'developer_instructions = """\n## Checklist\n"""\n' > "$repo/.codex/agents/y.toml"
-printf 'name: ci\n' > "$repo/.github/workflows/w.yml"
-printf '#!/usr/bin/env bash\n# note\necho hi\n' > "$repo/tools/run.sh"
-printf '#!/usr/bin/env bash\necho hi\n' > "$repo/scripts/helper.sh"
-printf 'import Foundation\n\n// note\nlet x = 1\n#if DEBUG\nlet y = 2\n#endif\n' > "$repo/ios/Regards/App/A.swift"
-printf '# config\nkey: value\n' > "$repo/tools/config.yml"
+put() { # put <path> <content>
+  mkdir -p "$repo/$(dirname "$1")"
+  printf '%s\n' "$2" > "$repo/$1"
+}
+
+put docs/guide.md '# Guide'
+put docs/old.md '# Old'
+put docs/gone.md '# Gone'
+put 'docs/Café.md' '# Café'
+put .agents/README.md '# Agents'
+put .codex/skills/s/SKILL.md '# Skill'
+put .claude/agents/x.md '# Agent'
+put scripts/x.md '# Script doc'
+put .github/x.md '# Github doc'
+put ios/Regards/App/A.swift '// note
+let x = 1'
+put 'ios/Café.swift' 'let y = 1'
+put tools/run.sh '#!/usr/bin/env bash
+echo hi'
+put tools/t.py 'print(1)'
+put tools/config.yml 'key: value'
+put .codex/agents/y.toml 'name = "y"'
+put ios/Info.plist '<plist></plist>'
+put project.yml 'name: Regards'
+# The attribute lives in the base commit, so the external-diff case below
+# changes nothing but a .swift file.
+put .gitattributes '*.swift diff=hidden'
 git -C "$repo" add -A
 git -C "$repo" commit -q -m base
 base="$(git -C "$repo" rev-parse HEAD)"
@@ -53,6 +68,8 @@ expect() {
   output="$(bash "$checker" "$repo" "$base" "$(git -C "$repo" rev-parse HEAD)" 2>&1)"
   status=$?
   set -e
+  git -C "$repo" config --unset diff.external 2>/dev/null || true
+  git -C "$repo" config --unset diff.hidden.textconv 2>/dev/null || true
   if [[ "$status" -ne "$expected" ]]; then
     echo "FAIL: $name (expected $expected, got $status): $output" >&2
     exit 1
@@ -60,56 +77,79 @@ expect() {
   echo "PASS: $name"
 }
 
-plist_and_md() { printf '<plist>x</plist>\n' > "$repo/ios/Info.plist"; printf '# Doc\n\nmore\n' > "$repo/docs/guide.md"; }
-spaced_plist_and_md() { printf '<plist>x</plist>\n' > "$repo/ios/My File.plist"; printf '# Doc\n\nmore\n' > "$repo/docs/guide.md"; }
-rename_to_md() { git -C "$repo" mv ios/Info.plist docs/Info.md; }
-shebang_edit() { printf '#!/bin/bash\n# note\necho hi\n' > "$repo/tools/run.sh"; }
-sh_line_one() { printf '# new first line\n#!/usr/bin/env bash\n# note\necho hi\n' > "$repo/tools/run.sh"; }
-sh_mid_comment() { printf '#!/usr/bin/env bash\n# note changed\necho hi\n' > "$repo/tools/run.sh"; }
-mode_change() { chmod +x "$repo/docs/guide.md"; }
-swift_if_change() { printf 'import Foundation\n\n// note\nlet x = 1\n#if RELEASE\nlet y = 2\n#endif\n' > "$repo/ios/Regards/App/A.swift"; }
-swiftlint_directive() { printf 'import Foundation\n\n// note\n// swiftlint:disable all\nlet x = 1\n#if DEBUG\nlet y = 2\n#endif\n' > "$repo/ios/Regards/App/A.swift"; }
-swift_comment_only() { printf 'import Foundation\n\n// note, reworded\n\n// another note\nlet x = 1\n#if DEBUG\nlet y = 2\n#endif\n' > "$repo/ios/Regards/App/A.swift"; }
-swift_code_change() { printf 'import Foundation\n\n// note\nlet x = 2\n#if DEBUG\nlet y = 2\n#endif\n' > "$repo/ios/Regards/App/A.swift"; }
-swift_trailing_comment() { printf 'import Foundation\n\n// note\nlet x = 1 // trailing\n#if DEBUG\nlet y = 2\n#endif\n' > "$repo/ios/Regards/App/A.swift"; }
-claude_contract_md() { printf -- '---\nname: x\n---\n\n# Heading\n\nmore\n' > "$repo/.claude/agents/x.md"; }
-toml_heading() { printf 'developer_instructions = """\n## Other heading\n"""\n' > "$repo/.codex/agents/y.toml"; }
-ci_comment() { printf '# a comment\nname: ci\n' > "$repo/.github/workflows/w.yml"; }
-scripts_comment() { printf '#!/usr/bin/env bash\n# new comment\necho hi\n' > "$repo/scripts/helper.sh"; }
-project_yml() { printf '# comment\nname: Regards\n' > "$repo/project.yml"; }
-pbxproj_comment() { printf '// pbx changed\n' > "$repo/ios/Regards.xcodeproj/project.pbxproj"; }
-docs_md_only() { printf '# Doc\n\nmore text\n' > "$repo/docs/guide.md"; printf '# New\n' > "$repo/docs/new.md"; }
-yml_comment_only() { printf '# config, reworded\nkey: value\n' > "$repo/tools/config.yml"; }
-yml_value_change() { printf '# config\nkey: other\n' > "$repo/tools/config.yml"; }
-new_file_comment_only() { printf '// only a comment\n' > "$repo/ios/Regards/App/B.swift"; }
+md_change() { put docs/guide.md '# Guide, reworded'; }
+md_added() { put docs/new.md '# New'; }
+md_deleted() { git -C "$repo" rm -q docs/gone.md; }
+md_moved() { git -C "$repo" mv docs/old.md docs/new-name.md; }
+md_non_ascii() { put 'docs/Café.md' '# Café, reworded'; }
 no_change() { :; }
+md_mode() { chmod +x "$repo/docs/guide.md"; }
+agents_md() { put .agents/README.md '# Agents, changed'; }
+codex_md() { put .codex/skills/s/SKILL.md '# Skill, changed'; }
+claude_md() { put .claude/agents/x.md '# Agent, changed'; }
+scripts_md() { put scripts/x.md '# Script doc, changed'; }
+github_md() { put .github/x.md '# Github doc, changed'; }
+swift_comment() { put ios/Regards/App/A.swift '// note, reworded
+let x = 1'; }
+swift_code() { put ios/Regards/App/A.swift '// note
+let x = 2'; }
+swift_non_ascii() { put 'ios/Café.swift' 'let y = 2'; }
+sh_comment() { put tools/run.sh '#!/usr/bin/env bash
+# new comment
+echo hi'; }
+py_change() { put tools/t.py 'print(2)'; }
+yml_comment() { put tools/config.yml '# note
+key: value'; }
+toml_change() { put .codex/agents/y.toml 'name = "z"'; }
+plist_change() { put ios/Info.plist '<plist>x</plist>'; }
+project_yml() { put project.yml 'name: Other'; }
+plist_to_md() { git -C "$repo" mv ios/Info.plist docs/Info.md; }
+md_plus_plist() { put docs/guide.md '# Guide, again'; put ios/Info.plist '<plist>y</plist>'; }
+swift_with_external_diff() {
+  git -C "$repo" config diff.external true
+  git -C "$repo" config diff.hidden.textconv true
+  put ios/Regards/App/A.swift '// note
+let x = 3'
+}
 
-expect 'plist plus md fails' 1 plist_and_md
-expect 'a plist with a space in its name plus md fails' 1 spaced_plist_and_md
-expect 'a rename to .md fails' 1 rename_to_md
-expect 'a shebang edit fails' 1 shebang_edit
-expect 'a change to line 1 of a .sh file fails' 1 sh_line_one
-expect 'a mid-file .sh comment change passes' 0 sh_mid_comment
-expect 'a mode change fails' 1 mode_change
-expect 'a Swift #if change fails' 1 swift_if_change
-expect 'a swiftlint directive comment fails' 1 swiftlint_directive
-expect 'a Swift code change fails' 1 swift_code_change
-expect 'a Swift trailing comment on a code line fails' 1 swift_trailing_comment
-expect 'a .claude agent contract .md change fails' 1 claude_contract_md
-expect 'a .toml heading change fails' 1 toml_heading
-expect 'a CI workflow comment change fails' 1 ci_comment
-expect 'a scripts/ comment change fails' 1 scripts_comment
-expect 'a project.yml change fails' 1 project_yml
-expect 'an xcodeproj change fails' 1 pbxproj_comment
-expect 'a new Swift file fails even if it is only a comment' 1 new_file_comment_only
-expect 'a YAML value change fails' 1 yml_value_change
-expect 'docs/*.md changes pass' 0 docs_md_only
-expect 'a Swift comment-only change passes' 0 swift_comment_only
-expect 'a YAML comment-only change passes' 0 yml_comment_only
+expect 'a docs .md change passes' 0 md_change
+expect 'an added docs .md passes' 0 md_added
+expect 'a deleted docs .md passes' 0 md_deleted
+expect 'an .md move passes' 0 md_moved
+expect 'a non-ASCII-named .md change passes' 0 md_non_ascii
 expect 'an empty change passes' 0 no_change
+expect 'an .md mode change fails' 1 md_mode
+expect 'an .agents/ .md change fails' 1 agents_md
+expect 'a .codex/ .md change fails' 1 codex_md
+expect 'a .claude/ .md change fails' 1 claude_md
+expect 'a scripts/ .md change fails' 1 scripts_md
+expect 'a .github/ .md change fails' 1 github_md
+expect 'a Swift comment-only change fails' 1 swift_comment
+expect 'a Swift code change fails' 1 swift_code
+expect 'a non-ASCII-named .swift change fails' 1 swift_non_ascii
+expect 'a .sh comment change fails' 1 sh_comment
+expect 'a .py change fails' 1 py_change
+expect 'a .yml comment change fails' 1 yml_comment
+expect 'a .toml change fails' 1 toml_change
+expect 'a .plist change fails' 1 plist_change
+expect 'a project.yml change fails' 1 project_yml
+expect 'a rename from .plist to .md fails' 1 plist_to_md
+expect 'an .md change plus a .plist change fails' 1 md_plus_plist
+expect 'a Swift change still fails with diff.external and textconv set' 1 swift_with_external_diff
+
+# Two sibling commits that each change only a docs .md file: the diff between
+# them is Markdown-only, so only the ancestor check can reject the carry.
+git -C "$repo" checkout -q -B sibling-a "$base"
+put docs/guide.md '# Guide, sibling a'
+git -C "$repo" commit -q -am sibling-a
+sibling_a="$(git -C "$repo" rev-parse HEAD)"
+git -C "$repo" checkout -q -B sibling-b "$base"
+put docs/guide.md '# Guide, sibling b'
+git -C "$repo" commit -q -am sibling-b
+sibling_b="$(git -C "$repo" rev-parse HEAD)"
 
 set +e
-bash "$checker" "$repo" "$(git -C "$repo" rev-parse HEAD)" "$base" > /dev/null 2>&1
+bash "$checker" "$repo" "$sibling_a" "$sibling_b" > /dev/null 2>&1
 backwards=$?
 bash "$checker" "$repo" deadbeef "$base" > /dev/null 2>&1
 bad_sha=$?
