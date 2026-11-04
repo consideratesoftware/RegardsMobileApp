@@ -4,10 +4,19 @@ import Testing
 
 // MARK: - Counting repository
 
+/// One `transitionState` call and whether it changed a row.
+struct TransitionCall: Equatable {
+    let id: UUID
+    let from: ReminderState
+    let to: ReminderState
+    let applied: Bool
+}
+
 /// A `ReminderRepository` that forwards every call to a real backend and
 /// counts the writes, so a test can prove a pass run changed nothing.
 /// `fetchSchedule()` forwards too: the pass reads its snapshot from it.
 /// `observations` counts `observeSchedule()` calls: the pass must make none.
+/// `transitionLog` records every compare-and-set and whether it applied.
 /// `upsertGate`, when set, holds the first `upsert` open until the gate opens:
 /// the run has read its snapshot and decided, and is parked before writing.
 /// `setFetchFails(true)` makes `fetchSchedule()` throw, as a failed snapshot
@@ -20,6 +29,7 @@ actor CountingReminderRepository: ReminderRepository {
     private let failUpsertsForContact: UUID?
     private(set) var upserts = 0
     private(set) var transitions = 0
+    private(set) var transitionLog: [TransitionCall] = []
     private(set) var stateUpdates = 0
     private(set) var deletes = 0
     /// Calls to `observeSchedule()`, which the pass never makes.
@@ -59,7 +69,9 @@ actor CountingReminderRepository: ReminderRepository {
     @discardableResult
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
         transitions += 1
-        return try await wrapped.transitionState(id: id, from: from, to: to)
+        let applied = try await wrapped.transitionState(id: id, from: from, to: to)
+        transitionLog.append(TransitionCall(id: id, from: from, to: to, applied: applied))
+        return applied
     }
 
     func delete(id: UUID) async throws {
