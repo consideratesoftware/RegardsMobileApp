@@ -3,26 +3,29 @@
 #
 #   scripts/check-carried-approval.sh <lane worktree> <carried sha> <head sha>
 #
-# Exit 0 prints "CARRY PASSES". Any other exit prints "CARRY FAILS: <reason>".
-# Run it with bash, never the agent's default shell: the loop below depends on
-# bash semantics (zsh does not word-split an unquoted variable).
+# Run it with bash. Exit codes:
+#   0   prints "CARRY PASSES"; the approval carries.
+#   1   prints "CARRY FAILS: <reason>"; the reviewer reruns.
+#   64  usage error (printed to stderr).
+#   any other nonzero exit is a script error and fails the carry too.
 #
-# An approval carries only when every commit between the two shas changes docs
-# or comments and nothing else:
-#   - *.md files outside .claude/, .codex/, .agents/, scripts/ and .github/
-#     (agent contracts, commands, skills, scripts and CI are behavior, so a
-#     change there never carries);
-#   - *.swift, *.yml, *.sh and *.py files outside those directories, when
-#     every changed line is a comment or blank. A shebang, line 1 of a .sh
-#     file, and a Swift comment holding a `swiftlint:` directive count as
-#     code, as do mode changes and added, deleted or renamed files;
-#   - nothing else: .toml (its # lines are prompt headings), project.yml,
-#     ios/Regards.xcodeproj, plists, json and so on never carry.
-# Renames are never detected (--no-renames), so a move shows up as a delete
-# plus an add; an added or deleted .md file is still docs. Any git or awk error
-# fails the carry.
+# The rule, applied to the net change between the two shas (not per commit):
+# an approval carries only when every changed path is a Markdown file (*.md)
+# outside .claude/, .codex/, .agents/, scripts/ and .github/, and no file has
+# a mode change. An added or deleted .md file is docs. Agent contracts,
+# commands, skills, scripts and CI are behavior, so a change there never
+# carries. Every other path fails: source, config, project files, plists, toml,
+# anything. Renames are never detected, so a move is a delete plus an add.
+#
+# Why Markdown alone is safe: no tracked .md file outside those directories is
+# bundled into or read by the app or its tests, so a Markdown-only change
+# cannot change behavior. A future bundled .md resource would break that, and
+# review should catch it. Re-check with both of these printing 0:
+#   git ls-files 'ios/Regards*' 'android/app/src' | grep -c '\.md$'
+#   grep -c '\.md' ios/project.yml
 
 set -euo pipefail
+export LC_ALL=C
 
 fail() {
   echo "CARRY FAILS: $1"
@@ -43,73 +46,27 @@ trap 'rm -rf "$tmp"' EXIT
 git -C "$lane" merge-base --is-ancestor "$from" "$to" \
   || fail "not an ancestor, or a git error"
 
-git -C "$lane" diff --no-renames --name-only -z "$from" "$to" > "$tmp/names" \
-  || fail "git error listing files"
+# --raw -z prints ":<old mode> <new mode> <old sha> <new sha> <status>" and the
+# path as separate NUL-terminated fields, so no path is ever quoted or split.
+git -C "$lane" diff --raw -z --no-renames --no-ext-diff --no-textconv \
+  "$from" "$to" > "$tmp/raw" || fail "git error reading the diff"
 
-count=0
-while IFS= read -r -d '' path; do
-  count=$((count + 1))
+while IFS= read -r -d '' meta; do
+  IFS= read -r -d '' path || fail "git output ended inside a record"
+  read -r old_mode new_mode _ <<< "${meta#:}"
+  for mode in "$old_mode" "$new_mode"; do
+    case "$mode" in
+      000000 | 100644 ) ;;
+      * ) fail "mode $mode on $path" ;;
+    esac
+  done
   case "$path" in
-    project.yml | */project.yml | ios/Regards.xcodeproj/* )
-      fail "project file: $path" ;;
-    .claude/* | .codex/* | .agents/* | scripts/* | .github/* )
+    .claude/* | */.claude/* | .codex/* | */.codex/* | .agents/* | */.agents/* \
+      | scripts/* | */scripts/* | .github/* | */.github/* )
       fail "behavior path never carries: $path" ;;
-    *.md | *.swift | *.yml | *.sh | *.py )
-      ;;
-    * )
-      fail "path outside the allowlist: $path" ;;
+    ?*.md ) ;;
+    * ) fail "not a Markdown file: $path" ;;
   esac
-done < "$tmp/names"
-
-if [[ "$count" -eq 0 ]]; then
-  echo "CARRY PASSES"
-  exit 0
-fi
-
-git -C "$lane" diff --no-renames --unified=0 --no-color "$from" "$to" \
-  > "$tmp/diff" || fail "git error reading the diff"
-
-awk '
-  /^diff --git / {
-    hdr = 1
-    file = $NF
-    sub(/^b\//, "", file)
-    next
-  }
-  hdr && /^(old mode|new mode|rename |similarity |Binary files)/ {
-    print "mode, rename or binary change: " file
-    next
-  }
-  hdr && /^(new file mode|deleted file mode)/ {
-    if (file !~ /\.md$/) print "added or deleted file: " file
-    next
-  }
-  /^@@ / {
-    hdr = 0
-    if (file ~ /\.sh$/ && ($0 ~ /^@@ -1( |,[1-9])/ || $0 ~ /^@@ -0,0 / || $0 ~ / \+1( |,[1-9])/)) {
-      print "line 1 of " file
-    }
-    next
-  }
-  hdr { next }
-  /^[+-]/ {
-    if (file ~ /\.md$/) next
-    body = substr($0, 2)
-    if (body ~ /^[[:space:]]*$/) next
-    if (file ~ /\.swift$/) {
-      if (body ~ /^[[:space:]]*\/\// && body !~ /swiftlint:/) next
-    } else if (body ~ /^#!/) {
-      print "shebang in " file ": " $0
-      next
-    } else if (body ~ /^[[:space:]]*#/) {
-      next
-    }
-    print file ": " $0
-  }
-' "$tmp/diff" > "$tmp/bad" || fail "awk error reading the diff"
-
-if [[ -s "$tmp/bad" ]]; then
-  fail "non-comment change: $(head -n 3 "$tmp/bad" | tr '\n' ' ')"
-fi
+done < "$tmp/raw"
 
 echo "CARRY PASSES"
