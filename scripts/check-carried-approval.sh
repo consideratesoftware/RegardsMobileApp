@@ -46,10 +46,12 @@ trap 'rm -rf "$tmp"' EXIT
 git -C "$lane" merge-base --is-ancestor "$from" "$to" \
   || fail "not an ancestor, or a git error"
 
-# --raw -z prints ":<old mode> <new mode> <old sha> <new sha> <status>" and the
-# path as separate NUL-terminated fields, so no path is ever quoted or split.
-git -C "$lane" diff --raw -z --no-renames --no-ext-diff --no-textconv \
-  "$from" "$to" > "$tmp/raw" || fail "git error reading the diff"
+# diff-tree is plumbing, so no diff.* setting (ignoreSubmodules, relative,
+# external, textconv) can hide a change. -r recurses into directories and -z
+# prints ":<old mode> <new mode> <old sha> <new sha> <status>" and the path as
+# separate NUL-terminated fields, so no path is ever quoted or split.
+git -C "$lane" diff-tree -r -z --no-renames "$from" "$to" > "$tmp/raw" \
+  || fail "git error reading the diff"
 
 # Directory names match in any case: a case-insensitive checkout (macOS) treats
 # .CLAUDE/ and .claude/ as the same directory.

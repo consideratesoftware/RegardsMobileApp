@@ -19,6 +19,7 @@ export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com
 export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
 
 repo="$work/repo"
+lane="$repo" # the path handed to the checker; a case may point it at a subdirectory
 git init -q -b main "$repo"
 git -C "$repo" config core.fileMode true
 
@@ -46,9 +47,8 @@ put tools/config.yml 'key: value'
 put .codex/agents/y.toml 'name = "y"'
 put ios/Info.plist '<plist></plist>'
 put project.yml 'name: Regards'
-# The attribute lives in the base commit, so the external-diff case below
-# changes nothing but a .swift file.
-put .gitattributes '*.swift diff=hidden'
+put scripts/run.sh '#!/usr/bin/env bash
+echo run'
 git -C "$repo" add -A
 git -C "$repo" commit -q -m base
 base="$(git -C "$repo" rev-parse HEAD)"
@@ -60,11 +60,12 @@ check() {
   local output status
 
   set +e
-  output="$(bash "$checker" "$repo" "$3" "$4" 2>&1)"
+  output="$(bash "$checker" "$lane" "$3" "$4" 2>&1)"
   status=$?
   set -e
-  git -C "$repo" config --unset diff.external 2>/dev/null || true
-  git -C "$repo" config --unset diff.hidden.textconv 2>/dev/null || true
+  lane="$repo"
+  git -C "$repo" config --unset diff.ignoreSubmodules 2>/dev/null || true
+  git -C "$repo" config --unset diff.relative 2>/dev/null || true
   if [[ "$status" -ne "$expected" ]]; then
     echo "FAIL: $name (expected $expected, got $status): $output" >&2
     exit 1
@@ -131,11 +132,15 @@ upper_claude_dir() {
   git -C "$repo" update-index --add --cacheinfo \
     "100644,$(git -C "$repo" rev-parse "$base:.claude/agents/x.md"),.CLAUDE/agents/x.md"
 }
-swift_with_external_diff() {
-  git -C "$repo" config diff.external true
-  git -C "$repo" config diff.hidden.textconv true
-  put ios/Regards/App/A.swift '// note
-let x = 3'
+gitlink_ignored_by_diff_config() {
+  git -C "$repo" config diff.ignoreSubmodules all
+  git -C "$repo" update-index --add --cacheinfo "160000,$base,vendor/lib"
+}
+script_change_outside_relative_lane() {
+  git -C "$repo" config diff.relative true
+  lane="$repo/docs"
+  put scripts/run.sh '#!/usr/bin/env bash
+echo changed'
 }
 
 expect 'a docs .md change passes' 0 md_change
@@ -161,8 +166,9 @@ expect 'a .plist change fails' 1 plist_change
 expect 'a project.yml change fails' 1 project_yml
 expect 'a rename from .plist to .md fails' 1 plist_to_md
 expect 'an .md change plus a .plist change fails' 1 md_plus_plist
-expect 'a Swift change still fails with diff.external and textconv set' 1 swift_with_external_diff
+expect 'a scripts/run.sh change fails under diff.relative with the lane in docs/' 1 script_change_outside_relative_lane
 expect_index 'an upper-case .CLAUDE/ .md add fails' 1 upper_claude_dir
+expect_index 'a gitlink add fails under diff.ignoreSubmodules=all' 1 gitlink_ignored_by_diff_config
 
 # Two sibling commits that each change only a docs .md file: the diff between
 # them is Markdown-only, so only the ancestor check can reject the carry.
