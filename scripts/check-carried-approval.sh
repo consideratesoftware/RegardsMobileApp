@@ -11,7 +11,8 @@
 #   any other nonzero exit is a script error and fails the carry too.
 #
 # The rule, applied to the net change between the two shas (not per commit):
-# an approval carries only when every changed path is a Markdown file (*.md)
+# an approval carries only when every changed path is a Markdown file (*.md,
+# lower-case suffix; Note.MD is not one)
 # outside .claude/, .codex/, .agents/, scripts/ and .github/, is not named
 # AGENTS.md or CLAUDE.md at any depth, and has no mode change. An added or
 # deleted .md file is docs. Agent contracts, commands, skills, scripts, CI and
@@ -61,10 +62,6 @@ git -C "$lane" diff-tree -r -z --no-renames --ignore-submodules=none \
   "$from" "$to" > "$tmp/raw" \
   || fail "git error reading the diff"
 
-# Directory names match in any case: a case-insensitive checkout (macOS) treats
-# .CLAUDE/ and .claude/ as the same directory.
-shopt -s nocasematch
-
 while IFS= read -r -d '' meta; do
   IFS= read -r -d '' path || fail "git output ended inside a record"
   read -r old_mode new_mode _ <<< "${meta#:}"
@@ -74,12 +71,19 @@ while IFS= read -r -d '' meta; do
       * ) fail "mode $mode on $path" ;;
     esac
   done
+  # Directory and agent-file names match in any case: a case-insensitive
+  # checkout (macOS) treats .CLAUDE/ and .claude/ as the same directory. The
+  # .md suffix below is case-sensitive, so Note.MD is not a Markdown file.
+  shopt -s nocasematch
   case "$path" in
     .claude/* | */.claude/* | .codex/* | */.codex/* | .agents/* | */.agents/* \
       | scripts/* | */scripts/* | .github/* | */.github/* )
       fail "behavior path never carries: $path" ;;
     AGENTS.md | */AGENTS.md | CLAUDE.md | */CLAUDE.md )
       fail "agent instruction file never carries: $path" ;;
+  esac
+  shopt -u nocasematch
+  case "$path" in
     ?*.md ) ;;
     * ) fail "not a Markdown file: $path" ;;
   esac

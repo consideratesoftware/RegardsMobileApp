@@ -127,6 +127,7 @@ executable_md_deleted() { git -C "$repo" rm -q docs/run.md; }
 gitlink_on_md_path() {
   git -C "$repo" update-index --add --cacheinfo "160000,$base,docs/sub.md"
 }
+upper_case_md_suffix() { put docs/Note.MD '# Note'; }
 root_agents_md() { put AGENTS.md '# Agents file, changed'; }
 root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
 nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
@@ -181,6 +182,7 @@ expect 'a nested docs/.github/ .md add fails' 1 nested_github_md
 expect 'a docs/link.md symlink to ios/Info.plist fails' 1 md_symlink
 expect 'a deleted executable docs/run.md fails' 1 executable_md_deleted
 expect_index 'a gitlink added on a .md path fails' 1 gitlink_on_md_path
+expect 'an added docs/Note.MD (upper-case suffix) fails' 1 upper_case_md_suffix
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a nested AGENTS.md change fails' 1 nested_agents_md
