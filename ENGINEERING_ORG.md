@@ -147,8 +147,13 @@ at the current head. Sid is asked only if a blocker survives 2 rounds or a
 fix needs a product decision. The `PR REVIEW:` comment lists which
 reviewers reran and which approvals carry from which sha. An approval
 carries only when every commit since it changes docs or comments only, and
-the release manager checks that mechanically. `pr-security-privacy` and
-Codex never carry; they run again on every head.
+the release manager checks that with `scripts/check-carried-approval.sh`.
+`pr-security-privacy` and Codex never carry; they run again on every head.
+On every newest `PR REVIEW:` comment, scoped or not, each reviewer the
+routing table requires must be APPROVE on its `REVIEWERS:` line or on a
+passing `CARRIED:` line, and `pr-security-privacy` must be on the
+`REVIEWERS:` line at the head. A comment without a `REVIEWERS:` line fails
+the check (STATE CODEX STALE).
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his

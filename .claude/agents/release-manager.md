@@ -170,16 +170,19 @@ PR, never in the root checkout.
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.
 
-  Two more checks apply to a scoped `PR REVIEW:` comment (one with a `RERAN:`
-  line), and a failure of either is STATE CODEX STALE:
-  - Completeness. `pr-security-privacy` must be in `RERAN`. Every reviewer
-    the routing table in `.claude/commands/pr-review.md` runs for this PR must
-    be in `RERAN` or on a `CARRIED:` line that passed: `pr-correctness`,
-    `pr-security-privacy`, `pr-code-quality`, `pr-tests` when
-    `origin/main...HEAD` changes code or tests, and `pr-accessibility` and
-    `pr-fit-finish` when their path rules match that diff
-    (`git -C <lane> diff --name-only origin/main...HEAD`). A missing one is
-    "reviewer missing: <name>".
+  Two more checks apply to every newest `PR REVIEW:` comment, scoped or
+  not, and a failure of either is STATE CODEX STALE:
+  - Completeness. The comment needs a `REVIEWERS:` line; without one, report
+    "no REVIEWERS line". `pr-security-privacy` must be APPROVE in
+    `REVIEWERS` at the head (it never carries). Find the reviewers the
+    routing table in `.claude/commands/pr-review.md` requires: run
+    `git -C <lane> fetch`, then
+    `git -C <lane> diff --name-only origin/main...<head sha>`. They are
+    `pr-correctness`, `pr-security-privacy`, `pr-code-quality`, `pr-tests`
+    when that diff changes code or tests, and `pr-accessibility` and
+    `pr-fit-finish` when their path rules match it. Each required reviewer
+    must be APPROVE in `REVIEWERS` or on a `CARRIED:` line that passed. A
+    missing one is "reviewer missing: <name>".
   - Newest verdict. A carried approval must be that reviewer's newest
     recorded verdict, so there is no carry past a later REQUEST_CHANGES.
     Print every counting `PR REVIEW:` comment's first line and `REVIEWERS:`
