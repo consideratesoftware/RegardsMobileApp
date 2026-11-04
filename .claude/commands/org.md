@@ -186,9 +186,9 @@ may recheck the fixes without asking Sid. Rerun `pr-security-privacy`,
 `pr-correctness`, `pr-fit-finish` and `pr-accessibility` (the last two where
 the routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
-the current head. Rerun `pr-code-quality` and `pr-tests` when the new commits
-touch their areas. Ask Sid only if a blocker survives 2 rounds or a fix needs
-a product decision. The `PR REVIEW:` comment lists every reviewer that ran on
+the current head. Rerun `pr-code-quality` and `pr-tests` unless the new
+commits are Markdown-only under the carry rule. Ask Sid only if a blocker
+survives 2 rounds or a fix needs a product decision. The `PR REVIEW:` comment lists every reviewer that ran on
 a `REVIEWERS:` line with its verdict. A scoped recheck adds a `RERAN:` line
 naming the reviewers that ran, and one `CARRIED:` line per `pr-code-quality`
 or `pr-tests` approval that stands, as `CARRIED: <reviewer> APPROVE from
