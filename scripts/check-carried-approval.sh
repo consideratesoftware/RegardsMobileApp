@@ -51,11 +51,14 @@ trap 'rm -rf "$tmp"' EXIT
 git -C "$lane" merge-base --is-ancestor "$from" "$to" \
   || fail "not an ancestor, or a git error"
 
-# diff-tree is plumbing, so no diff.* setting (ignoreSubmodules, relative,
-# external, textconv) can hide a change. -r recurses into directories and -z
-# prints ":<old mode> <new mode> <old sha> <new sha> <status>" and the path as
+# diff-tree is plumbing, so the diff.* settings (ignoreSubmodules, relative,
+# external, textconv) do not apply to it. It still reads submodule.<name>.ignore
+# from .gitmodules, so --ignore-submodules=none overrides that and a gitlink
+# change always shows. -r recurses into directories and -z prints
+# ":<old mode> <new mode> <old sha> <new sha> <status>" and the path as
 # separate NUL-terminated fields, so no path is ever quoted or split.
-git -C "$lane" diff-tree -r -z --no-renames "$from" "$to" > "$tmp/raw" \
+git -C "$lane" diff-tree -r -z --no-renames --ignore-submodules=none \
+  "$from" "$to" > "$tmp/raw" \
   || fail "git error reading the diff"
 
 # Directory names match in any case: a case-insensitive checkout (macOS) treats

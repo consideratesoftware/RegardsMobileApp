@@ -197,7 +197,7 @@ expect 'a rename from .plist to .md fails' 1 plist_to_md
 expect 'an .md change plus a .plist change fails' 1 md_plus_plist
 expect 'a scripts/run.sh change fails under diff.relative with the lane in docs/' 1 script_change_outside_relative_lane
 expect_index 'an upper-case .CLAUDE/ .md add fails' 1 upper_claude_dir
-expect_index 'a gitlink add fails under diff.ignoreSubmodules=all' 1 gitlink_ignored_by_diff_config
+expect_index 'a gitlink add fails with diff.ignoreSubmodules=all in config (plumbing ignores it)' 1 gitlink_ignored_by_diff_config
 
 # Two sibling commits that each change only a docs .md file: the diff between
 # them is Markdown-only, so only the ancestor check can reject the carry.
@@ -223,6 +223,21 @@ carried="$(git -C "$repo" rev-parse HEAD)"
 git -C "$repo" merge -q --no-edit merge-main
 check 'a merge that brings a .swift change from main fails' 1 \
   "$carried" "$(git -C "$repo" rev-parse HEAD)"
+
+# A gitlink bump on a submodule that .gitmodules marks "ignore = all". Plain
+# diff-tree hides the bump; --ignore-submodules=none shows it. Built by hand
+# because the carried commit must already hold .gitmodules and the gitlink.
+git -C "$repo" checkout -q -B submodule-lane "$base"
+printf '[submodule "vendor/lib"]\n\tpath = vendor/lib\n\turl = ../lib\n\tignore = all\n' \
+  > "$repo/.gitmodules"
+git -C "$repo" add .gitmodules
+git -C "$repo" update-index --add --cacheinfo "160000,$base,vendor/lib"
+git -C "$repo" commit -q -m submodule-from
+submodule_from="$(git -C "$repo" rev-parse HEAD)"
+git -C "$repo" update-index --cacheinfo "160000,$submodule_from,vendor/lib"
+git -C "$repo" commit -q -m submodule-bump
+check 'a gitlink bump fails when .gitmodules says ignore = all' 1 \
+  "$submodule_from" "$(git -C "$repo" rev-parse HEAD)"
 
 # A mktemp that always fails, put first on PATH.
 mkdir "$work/bin"
