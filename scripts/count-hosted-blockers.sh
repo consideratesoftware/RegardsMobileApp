@@ -9,8 +9,11 @@
 #   BLOCKERS <n>        the number of bullets under "### Blockers". 0 is printed
 #                       only when the text also says "VERDICT: APPROVE".
 #   MALFORMED: <why>    fail closed: treat as unresolved blockers.
-# Bullets are "-", "*", or numbered ("1." or "1)"). A bullet that reads only
-# "None" is not a blocker. Run it with bash. Exit 64 is a usage error, and any
+# Bullets are "-", "*", or numbered ("1." or "1)"), followed by a space or tab.
+# A bullet that reads only "None" is not a blocker. Any other non-blank line
+# under Blockers that is not a bullet (a wrapped line, "**2.** text") makes the
+# result MALFORMED even when bullets are also present: a count that might skip
+# a blocker must not pass. Run it with bash. Exit 64 is a usage error, and any
 # other nonzero exit (an awk failure, say) is a script error: it fails closed,
 # so treat it as unresolved blockers.
 
@@ -32,11 +35,11 @@ awk '
   /^### Blockers/ { found = 1; s = 1; next }
   /^### /         { s = 0 }
   s && /^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]+None\.?[[:space:]]*$/ { next }
-  s && /^[[:space:]]*([-*]|[0-9]+[.)]) / { n++; next }
+  s && /^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]/ { n++; next }
   s && NF && !/^None\.?[[:space:]]*$/ { other++ }
   END {
     if (!found)                        print "MALFORMED: no Blockers section"
-    else if (n == 0 && other > 0)      print "MALFORMED: Blockers section has text but no bullets"
+    else if (other > 0)                print "MALFORMED: Blockers section has lines that are not bullets"
     else if (n == 0 && v != "APPROVE") print "MALFORMED: no blockers listed but VERDICT is " (v == "" ? "missing" : v)
     else                               print "BLOCKERS " n + 0
   }

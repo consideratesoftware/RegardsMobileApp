@@ -37,6 +37,11 @@ expect_output 'dash and numbered bullets are counted' 'BLOCKERS 3' \
   $'VERDICT: REQUEST_CHANGES\n### Blockers\n- a\n2. b\n3) c\n### Should fix\n- d\n'
 expect_output 'star bullets are counted' 'BLOCKERS 2' \
   $'VERDICT: REQUEST_CHANGES\n### Blockers\n* a\n* b\n'
+expect_output 'a bullet marker followed by a tab is counted' 'BLOCKERS 2' \
+  $'VERDICT: REQUEST_CHANGES\n### Blockers\n- first\n-\tsecond\n'
+expect_output 'a non-bullet line next to bullets is MALFORMED' \
+  'MALFORMED: Blockers section has lines that are not bullets' \
+  $'VERDICT: REQUEST_CHANGES\n### Blockers\n- first\n**2.** second\n'
 expect_output 'REQUEST_CHANGES with no bullets is MALFORMED' \
   'MALFORMED: no blockers listed but VERDICT is REQUEST_CHANGES' \
   $'VERDICT: REQUEST_CHANGES\n### Blockers\n\nNone.\n'
@@ -44,7 +49,7 @@ expect_output 'a missing VERDICT with no bullets is MALFORMED' \
   'MALFORMED: no blockers listed but VERDICT is missing' \
   $'### Blockers\n\nNone.\n'
 expect_output 'prose only is MALFORMED' \
-  'MALFORMED: Blockers section has text but no bullets' \
+  'MALFORMED: Blockers section has lines that are not bullets' \
   $'VERDICT: APPROVE\n### Blockers\n\nSomething odd happened.\n\n### Should fix\n- a\n'
 expect_output 'no Blockers section is MALFORMED' \
   'MALFORMED: no Blockers section' \
