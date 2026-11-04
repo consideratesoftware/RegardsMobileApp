@@ -20,8 +20,8 @@ import Foundation
 ///
 /// **Fired marking and no re-nag (§9 "Notification fired", owner ruling 5).**
 /// Each run first marks covered pending rows at or before `now` fired. Fired
-/// rows are history and never cancelled. A fired cadence row stays while its
-/// contact is overdue in the same cycle and its window has capacity.
+/// rows are history and never cancelled. A fired cadence row stays until an interaction
+/// or a longer cadence starts a new cycle; a clock rollback can re-arm it only after a window edit (R68).
 ///
 /// **Corrupt rows.** Runs read one `fetchSchedule()` snapshot, which drops
 /// an undecodable contact (with its rows) or row. The pass never cancels what
@@ -191,7 +191,7 @@ public actor SchedulingPass {
             // No re-nag: a fired row stays while it is this cycle's: at or after the start of the slot
             // holding overdueAt (a 25-hour day's 1-day cadence starts before its anchor; a clock set
             // back leaves overdueAt ahead of now), or, once overdue, at or after the anchor (a window edit).
-            // The first needs no overdue check because every fired cadence row postdates the last interaction.
+            // No overdue check on the first: a fired row still here was written after the last interaction.
             if let existing, existing.state == .fired || existing.scheduledFor <= now,
                context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
                 .map({ $0 <= existing.scheduledFor }) == true
