@@ -120,9 +120,8 @@ public actor SchedulingPass {
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
         let targetIds = Set(targets.map(\.id))
-        // §9 "Notification fired": a due covered pending row was delivered, so
-        // it becomes fired history. A row this call writes into the slot in
-        // progress is written fired, so after any run no covered pending row is due.
+        // §9 "Notification fired": a due covered pending row was delivered, so it becomes fired history.
+        // Every row this call writes at or before now is written fired, so after any run no covered pending row is due.
         var rows = snapshot.reminders
         for (index, row) in rows.enumerated()
         where row.state == .pending && row.scheduledFor <= now && targetIds.contains(row.contactId) {
@@ -149,7 +148,7 @@ public actor SchedulingPass {
                    calendar.isDate(existing.scheduledFor, inSameDayAs: occurrence) {
                     continue
                 }
-                let desired = ScheduledReminder(
+                var desired = ScheduledReminder(
                     id: id,
                     contactId: contact.id,
                     kind: occasion.kind,
@@ -162,6 +161,7 @@ public actor SchedulingPass {
                     ) ?? occurrence,
                     osNotificationId: Self.notificationId(contactId: contact.id, kind: occasion.kind)
                 )
+                if desired.scheduledFor <= now { desired.state = .fired }
                 if existingById[id] != desired { try await reminders.upsert(desired) }
             }
 
@@ -188,14 +188,14 @@ public actor SchedulingPass {
                 continue
             }
             desiredIds.insert(id)
-            // No re-nag: a fired row stays while the contact is still overdue
-            // and the row is this cycle's: at or after the anchor, or at or
-            // after the start of the slot holding overdueAt. The second covers a
-            // 25-hour day, where a 1-day cadence's slot starts before its anchor.
-            if let existing, existing.state == .fired || existing.scheduledFor <= now, overdueAt <= now,
-               anchor <= existing.scheduledFor
-                || context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
-                    .map({ $0 <= existing.scheduledFor }) == true {
+            // No re-nag: a fired row stays while it is this cycle's: at or after the start of the slot
+            // holding overdueAt (a 25-hour day's 1-day cadence starts before its anchor; a clock set
+            // back leaves overdueAt ahead of now), or, once overdue, at or after the anchor (a window edit).
+            // The first needs no overdue check because every fired cadence row postdates the last interaction.
+            if let existing, existing.state == .fired || existing.scheduledFor <= now,
+               context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
+                .map({ $0 <= existing.scheduledFor }) == true
+                || (overdueAt <= now && anchor <= existing.scheduledFor) {
                 continue
             }
             let desired = ScheduledReminder(
@@ -363,9 +363,7 @@ public actor SchedulingPass {
         // `try?`: a failed read refuses like an ineligible contact, and the
         // caller learns it from the `false` return.
         guard let contact = try? await contacts.fetch(id: contactId), contact.isCadenceEligible,
-              let cadenceDays = contact.cadenceDays else {
-            return false
-        }
+              let cadenceDays = contact.cadenceDays else { return false }
         let global = try await window.fetchGlobal()
         let context = Context(now: clock(), global: global)
         let now = context.now
