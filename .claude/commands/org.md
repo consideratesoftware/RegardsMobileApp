@@ -248,8 +248,9 @@ relaunch `release-manager` with the new verdicts:
   new file;
 - more than 100 comments: check the PR's verdict comments yourself, and
   repost any that scrolled out of the newest 100.
-Blockers go to the slice owner as in Stage 3. After 3 stale rounds on one PR, park it and say why. Count only
-head moves caused by fixes. An `update-branch` merge (lanes merging in
+
+Blockers go to the slice owner as in Stage 3. After 3 stale rounds on one PR,
+park it and say why. Count only head moves caused by fixes. An `update-branch` merge (lanes merging in
 sequence move `main`) and a checkpoint or doc commit from `tech-writer` run
 the reviews again but don't count, or a green PR would park for nothing.
 
