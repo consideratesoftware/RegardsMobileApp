@@ -606,9 +606,9 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
   3. A notification that arrives while Regards is in the foreground shows as a banner, in the list, and with sound. (EM addition.)
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
-  4. Deny notifications for Regards, then grant them in iOS Settings. The next reminder fires. (EM addition, from the lane plan's risk that iOS might drop adds while not authorized.)
+  4. Deny notifications for Regards, then grant them in iOS Settings. The next reminder fires. Pass: the reminder arrives. (EM addition.) Risk: iOS might drop requests added while notifications are not authorized.
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
-  5. Watch for a duplicate notification at a slot boundary. (EM addition, from the lane plan's risk that a changed request whose time passes between plan and add gets a nil trigger and delivers at once.)
+  5. Watch a reminder across a slot boundary. Pass: one banner per reminder. Fail: two banners for the same reminder. (EM addition.) Risk: a changed request whose time passes between planning and the add gets no trigger and delivers at once, which can double a notification at a slot boundary.
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
 Standing notes:
