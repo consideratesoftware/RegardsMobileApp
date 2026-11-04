@@ -188,13 +188,16 @@ the routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
 the current head. Rerun `pr-code-quality` and `pr-tests` unless the new
 commits are Markdown-only under the carry rule. Ask Sid only if a blocker
-survives 2 rounds or a fix needs a product decision. The `PR REVIEW:` comment lists every reviewer that ran on
-a `REVIEWERS:` line with its verdict. A scoped recheck adds a `RERAN:` line
+survives 2 rounds or a fix needs a product decision. The `PR REVIEW:`
+comment lists every reviewer that ran on a `REVIEWERS:` line with its
+verdict. A scoped recheck adds a `RERAN:` line
 naming the reviewers that ran, and one `CARRIED:` line per `pr-code-quality`
 or `pr-tests` approval that stands, as `CARRIED: <reviewer> APPROVE from
-<sha>`. Every reviewer the routing table runs for the PR must be rerun or,
-for those two, carried, and a carry can't pass a later REQUEST_CHANGES from
-that reviewer.
+<sha>`. Every reviewer the routing table runs for the PR needs an APPROVE as
+its newest verdict at the current head, taken from any counting `PR REVIEW:`
+comment on that head or, for those two, from a passing carry. A carry can't
+pass a later REQUEST_CHANGES from that reviewer. A comment that reruns one
+reviewer only completes the set.
 
 Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown
 outside the agent, script and CI directories, never AGENTS*.md, CLAUDE*.md,

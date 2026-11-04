@@ -166,11 +166,10 @@ PR, never in the root checkout.
      the copy in the root checkout on `main`, not the lane's: the PR under
      review could have edited its own copy. (While this PR is itself under
      review, the engineering manager's prompt gives you the path of its
-     copy.) The rule is one
-     line: only Markdown outside the agent, script and CI directories
-     carries, never AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown
-     under ios/Regards* or android/app, and anything else reruns that
-     reviewer. The script's header defines it.
+     copy.) The rule is one line: only Markdown outside the agent, script
+     and CI directories carries, never AGENTS*.md, CLAUDE*.md,
+     ARCHITECTURE.md, or Markdown under ios/Regards* or android/app, and
+     anything else reruns that reviewer. The script's header defines it.
   If any check fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.
@@ -184,11 +183,13 @@ PR, never in the root checkout.
     `git -C <lane> diff --name-only origin/main...<head sha>`. They are
     `pr-correctness`, `pr-security-privacy`, `pr-code-quality`, `pr-tests`
     when that diff changes code or tests, and `pr-accessibility` and
-    `pr-fit-finish` when their path rules match it. Each required reviewer
-    must be APPROVE in `REVIEWERS` at the head. Only `pr-code-quality` and
-    `pr-tests` may instead be on a `CARRIED:` line that passed. A missing one
-    is "reviewer missing: <name>".
-  - Newest verdict. A carried approval must be that reviewer's newest
+    `pr-fit-finish` when their path rules match it. Each required reviewer's
+    newest verdict, read from any counting `PR REVIEW:` comment at the
+    current head (not only the newest comment), must be APPROVE, so a comment
+    that reran only that reviewer completes the set. Only `pr-code-quality`
+    and `pr-tests` may instead be on a `CARRIED:` line that passed. A
+    missing one is "reviewer missing: <name>".
+  - Newest verdict. Completeness and carrying both use a reviewer's newest
     recorded verdict, so there is no carry past a later REQUEST_CHANGES.
     Print every counting `PR REVIEW:` comment's first line and `REVIEWERS:`
     line, oldest first, with this filter on the same GraphQL output:
@@ -199,8 +200,10 @@ PR, never in the root checkout.
       | select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
       | split("\n")[] | select(test("^(PR REVIEW:|REVIEWERS:)"))'
     ```
-    The reviewer's last `REVIEWERS:` entry in that output must be APPROVE
-    and must sit in the comment whose sha is the `CARRIED:` line's `<sha>`.
+    A reviewer's newest verdict is its last `REVIEWERS:` entry in that
+    output. Without a carry, it must be APPROVE and sit in a comment whose
+    sha is the current head. With a carry, it must be APPROVE and sit in the
+    comment whose sha is the `CARRIED:` line's `<sha>`.
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
   `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check

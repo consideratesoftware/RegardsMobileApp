@@ -153,11 +153,12 @@ which approvals carry from which sha. A carry stands only as
 script and CI directories carries, never AGENTS*.md, CLAUDE*.md,
 ARCHITECTURE.md, or Markdown under ios/Regards* or android/app, and anything
 else reruns that reviewer.
-The release manager runs that script. On every newest `PR REVIEW:` comment,
-scoped or not, each reviewer the routing table requires must be APPROVE on
-its `REVIEWERS:` line, or for `pr-code-quality` and `pr-tests` on a passing
-`CARRIED:` line. A comment without a `REVIEWERS:` line fails the check (STATE
-CODEX STALE).
+The release manager runs that script. Each reviewer the routing table
+requires must have APPROVE as its newest verdict, read from any counting
+`PR REVIEW:` comment on the current head, or for `pr-code-quality` and
+`pr-tests` from a passing `CARRIED:` line, so a comment that reruns one
+reviewer only completes the set. The newest `PR REVIEW:` comment, scoped or
+not, needs a `REVIEWERS:` line, or the check fails (STATE CODEX STALE).
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
