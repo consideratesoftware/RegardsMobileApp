@@ -97,6 +97,11 @@ extension AppLaunchCoordinator {
 /// a request from `.notDetermined` resolves to the scripted `requestOutcome`,
 /// and `send(_:)` delivers an action as if the user tapped it.
 ///
+/// It also keeps an in-memory pending set that `schedule`, `cancel`, and
+/// `pendingRequests` honor, keyed by identifier like the system's. It never
+/// delivers: a request stays pending until it is cancelled or replaced, even
+/// with a fire date in the past.
+///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
 /// `AsyncStream` and its `Continuation` are `Sendable` and thread-safe.
@@ -115,6 +120,7 @@ actor DebugNotificationScheduling: NotificationScheduling {
     private let requestOutcome: RequestOutcome
     /// How many times `requestAuthorization()` ran, prompt or not.
     private(set) var requestCount = 0
+    private var pending: [String: ReminderNotificationRequest] = [:]
 
     init(status: NotificationAuthorizationStatus = .notDetermined, requestOutcome: RequestOutcome = .grant) {
         (actions, continuation) = AsyncStream.makeStream(of: NotificationAction.self, bufferingPolicy: .unbounded)
@@ -140,6 +146,20 @@ actor DebugNotificationScheduling: NotificationScheduling {
     }
 
     func authorizationStatus() async -> NotificationAuthorizationStatus { status }
+
+    func pendingRequests() async -> [ReminderNotificationRequest] {
+        pending.values.sorted { $0.identifier < $1.identifier }
+    }
+
+    func schedule(_ request: ReminderNotificationRequest) async throws {
+        pending[request.identifier] = request
+    }
+
+    func cancel(identifiers: [String]) async {
+        for identifier in identifiers {
+            pending[identifier] = nil
+        }
+    }
 
     /// Simulates the user changing the permission in iOS Settings.
     func setStatus(_ newStatus: NotificationAuthorizationStatus) {
