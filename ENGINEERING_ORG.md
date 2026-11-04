@@ -151,8 +151,9 @@ product decision. The `PR REVIEW:` comment lists which reviewers reran and
 which approvals carry from which sha. A carry stands only if all 3 hold: (1)
 the reviewer is `pr-code-quality` or `pr-tests`; (2) the carried sha S
 matches by prefix (at least 7 characters) the sha of the `PR REVIEW:` comment
-that holds that reviewer's newest APPROVE, and S is not the current head; (3)
-`scripts/check-carried-approval.sh` from S to the head passes. The script
+that holds that reviewer's newest verdict, that verdict is APPROVE, and S is
+not the current head; (3) `scripts/check-carried-approval.sh` from S to the
+head passes. The script
 allows only Markdown outside the agent, script and CI directories, never
 AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown under `ios/Regards*`,
 `android/*/src`, `android/*/schemas` or `shared/testvectors`; anything else

@@ -160,8 +160,8 @@ PR, never in the root checkout.
   1. The reviewer is `pr-code-quality` or `pr-tests`. The other four
      reviewers and Codex rerun on every head and never carry.
   2. S matches by prefix (at least 7 characters) the sha of the `PR REVIEW:`
-     comment that holds that reviewer's newest APPROVE (see Newest verdict
-     below), and S is not the current head.
+     comment that holds that reviewer's newest verdict (see Newest verdict
+     below), that verdict is APPROVE, and S is not the current head.
   3. This passes, with `<lane>` the absolute lane worktree path from your
      prompt:
      ```
