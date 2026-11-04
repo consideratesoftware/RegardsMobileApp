@@ -192,14 +192,13 @@ before new feature work.
 
 Every PR gets the same multi-agent review before merge. Codex invokes
 `$regards-pr-review`; Claude Code invokes `/pr-review`. Both pre-flight the
-mechanical gates, then use the mirrored read-only agents:
-`pr-correctness`, `pr-security-privacy`, and `pr-code-quality` always;
-`pr-tests` for code/test changes; and `pr-accessibility` plus
-`pr-fit-finish` when their UI/docs path rules match. Any blocker means
-`REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
-checks. The Claude Code org (`ENGINEERING_ORG.md`) runs both orchestrators
-on each lane and needs both verdicts before merge. `.agents/README.md`
-describes the adapters, and
+mechanical gates, then use the mirrored read-only agents: `pr-correctness`,
+`pr-security-privacy`, and `pr-code-quality` always; `pr-tests` for code/test
+changes; and `pr-accessibility` plus `pr-fit-finish` when their UI/docs path
+rules match. Any blocker means `REQUEST_CHANGES`. Claimed R-closures are
+verified against §19 acceptance checks. The Claude Code org
+(`ENGINEERING_ORG.md`) runs both orchestrators on each lane and needs both
+verdicts before merge. `.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
 The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions
@@ -207,9 +206,10 @@ job cannot satisfy it. A blocker still means `REQUEST_CHANGES`, but the check
 reports whether a valid review ran, not whether it approved; read the check
 output before merging. For a person, acting on a blocker is the author's call;
 the Claude Code org clears every blocker or records Sid's linked deferral
-first (`ENGINEERING_ORG.md`). The workflow runs only when a PR targets the default branch, so a stacked draft stays on its
-parent until the parent merges. Retarget and rebase the child, publish it, then
-push the rebased head to trigger the hosted review against the final base.
+first (`ENGINEERING_ORG.md`). The workflow runs only when a PR targets the
+default branch, so a stacked draft stays on its parent until the parent
+merges. Retarget and rebase the child, publish it, then push the rebased head
+to trigger the hosted review against the final base.
 
 ## Things to avoid
 
