@@ -100,9 +100,9 @@ extension AppLaunchCoordinator {
 /// It also keeps an in-memory pending set that `schedule`, `cancel`, and
 /// `pendingRequests` honor, keyed by identifier like the system's. `schedule`
 /// stores each request through `UserNotificationsAdapter.makeRequest` and
-/// `decode` with `clock`, so a fire date at or before now is delivered at once
-/// and never pending, as in the real center. Otherwise a request stays pending
-/// until it is cancelled or replaced.
+/// `decode` with `clock`. A request is delivered, so no longer pending, when
+/// its fire date is at or before now as it is added, or when `clock` passes
+/// its fire date later, as in the real center.
 ///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
@@ -156,7 +156,10 @@ actor DebugNotificationScheduling: NotificationScheduling {
     func authorizationStatus() async -> NotificationAuthorizationStatus { status }
 
     func pendingRequests() async -> [ReminderNotificationRequest] {
-        pending.values.sorted { $0.identifier < $1.identifier }
+        // A request whose time has come is delivered and no longer listed.
+        let now = clock()
+        pending = pending.filter { $0.value.fireDate > now }
+        return pending.values.sorted { $0.identifier < $1.identifier }
     }
 
     func schedule(_ request: ReminderNotificationRequest) async throws {
