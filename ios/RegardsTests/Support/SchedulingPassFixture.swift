@@ -6,11 +6,12 @@ import Testing
 
 /// A `ReminderRepository` that forwards every call to a real backend and
 /// counts the writes, so a test can prove a pass run changed nothing.
-/// `observeSchedule()` forwards too: the pass reads its snapshot from it.
+/// `fetchSchedule()` forwards too: the pass reads its snapshot from it.
+/// `observations` counts `observeSchedule()` calls: the pass must make none.
 /// `upsertGate`, when set, holds the first `upsert` open until the gate opens:
 /// the run has read its snapshot and decided, and is parked before writing.
-/// `setObserveFails(true)` makes `observeSchedule()` finish without a value, as
-/// a failed snapshot read does, until it is set back to `false`.
+/// `setFetchFails(true)` makes `fetchSchedule()` throw, as a failed snapshot
+/// read does, until it is set back to `false`.
 actor CountingReminderRepository: ReminderRepository {
     private let wrapped: any ReminderRepository
     private var upsertGate: AsyncGate?
@@ -21,7 +22,9 @@ actor CountingReminderRepository: ReminderRepository {
     private(set) var transitions = 0
     private(set) var stateUpdates = 0
     private(set) var deletes = 0
-    private var observeFails = false
+    /// Calls to `observeSchedule()`, which the pass never makes.
+    private(set) var observations = 0
+    private var fetchFails = false
 
     init(_ wrapped: any ReminderRepository, upsertGate: AsyncGate? = nil, failUpsertsForContact: UUID? = nil) {
         self.wrapped = wrapped
@@ -64,12 +67,17 @@ actor CountingReminderRepository: ReminderRepository {
         try await wrapped.delete(id: id)
     }
 
-    func setObserveFails(_ fails: Bool) {
-        observeFails = fails
+    func setFetchFails(_ fails: Bool) {
+        fetchFails = fails
+    }
+
+    func fetchSchedule() async throws -> ScheduleSnapshot {
+        if fetchFails { throw RepositoryFakeFailure() }
+        return try await wrapped.fetchSchedule()
     }
 
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot> {
-        if observeFails { return AsyncStream { $0.finish() } }
+        observations += 1
         return await wrapped.observeSchedule()
     }
 }
@@ -174,13 +182,10 @@ struct PassFixture {
         try await repositories.reminders.fetchPending(forContact: contact.id).first { $0.kind == kind }
     }
 
-    /// A pending or fired row by id, as the pass sees it (`observeSchedule`).
+    /// A pending or fired row by id, as the pass sees it (`fetchSchedule`).
     /// `fetchPending` cannot return a fired row.
     func row(_ id: UUID) async throws -> ScheduledReminder? {
-        for await snapshot in await repositories.reminders.observeSchedule() {
-            return snapshot.reminders.first { $0.id == id }
-        }
-        return nil
+        try await repositories.reminders.fetchSchedule().reminders.first { $0.id == id }
     }
 
     func cadenceID(_ contact: Contact) -> UUID {

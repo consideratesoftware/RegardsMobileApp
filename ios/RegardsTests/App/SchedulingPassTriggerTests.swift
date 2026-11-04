@@ -151,8 +151,8 @@ struct SchedulingPassTriggerTests {
     /// must not hold the tab root back, on launch or on foreground.
     @Test("A failing pass does not keep the app out of .ready")
     func passFailureDoesNotBlockReady() async throws {
-        // `StubReminderRepository.observeSchedule()` finishes with no value,
-        // which makes `runFull()` throw.
+        // `StubReminderRepository.fetchSchedule()` throws, which makes
+        // `runFull()` throw.
         let harness = try await Self.failingPassHarness(started: false)
         await #expect(throws: (any Error).self) { try await harness.scheduler.runFull() }
 
@@ -166,8 +166,8 @@ struct SchedulingPassTriggerTests {
 
     // MARK: - A failing pass after a window save
 
-    /// `StubReminderRepository.observeSchedule()` finishes with no value, so
-    /// `runFull()` and `run(for:)` throw while every write still lands.
+    /// `StubReminderRepository.fetchSchedule()` throws, so `runFull()` and
+    /// `run(for:)` throw while every write still lands.
     private static func failingPassHarness(started: Bool = true) async throws -> Harness {
         let harness = try await NotificationActionHandlingTests.harness(
             backend: .mock, onboarded: true, reminders: StubReminderRepository())

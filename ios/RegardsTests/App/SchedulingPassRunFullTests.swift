@@ -69,6 +69,27 @@ struct SchedulingPassRunFullTests {
         #expect(await fixture.reminders.writeCount == firstRunWrites)
     }
 
+    /// R66: GRDB delivers an observation on the main queue, and the pass
+    /// awaits its snapshot while it holds its lock, so it reads with the
+    /// one-shot `fetchSchedule()` and never subscribes. Every entry that
+    /// reschedules is covered; the writes prove the runs did real work.
+    @Test(
+        "No pass entry point subscribes to the schedule observation",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func passNeverSubscribesToTheScheduleObservation(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+
+        try await fixture.pass.runFull()
+        try await fixture.pass.run(for: contact.id)
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
+
+        #expect(await fixture.reminders.writeCount > 0)
+        #expect(await fixture.reminders.observations == 0)
+    }
+
     /// No re-nag (§9, owner ruling 5): once a cadence row's time has passed,
     /// a contact who is still overdue keeps that row. Re-deriving it would
     /// move it to the next window's slot on every later run.

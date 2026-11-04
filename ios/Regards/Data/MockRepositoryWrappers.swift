@@ -73,6 +73,7 @@ struct MockReminderRepository: ReminderRepository {
     }
     func delete(id: UUID) async throws { await store.deleteReminder(id: id) }
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot> { await store.observeSchedule() }
+    func fetchSchedule() async throws -> ScheduleSnapshot { await store.scheduleSnapshot() }
 }
 
 struct MockInteractionRepository: InteractionRepository {

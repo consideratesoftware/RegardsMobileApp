@@ -89,6 +89,7 @@
 		5D6FB5A12729EF021C9D04DC /* DayOfWeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3C46E8CED7412E12D16392 /* DayOfWeek.swift */; };
 		5EF2B954605E25F062B36C40 /* OnboardingAccessibilityEffectsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5535E603517DD36100438771 /* OnboardingAccessibilityEffectsTests.swift */; };
 		607728A371DB3C42AE7707DC /* AppLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF37C281EC11771129182D9C /* AppLaunchCoordinator.swift */; };
+		61121F1874E9A98316873732 /* ScheduleFetchContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81904B579CDF5680DC996C17 /* ScheduleFetchContractTests.swift */; };
 		612D14E2C0A4D65F50DB4C52 /* InteractionLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F35FFABA2F385B00DA6FAC7 /* InteractionLogging.swift */; };
 		6146A6D7764DA45B93A25904 /* ReminderWindowRepositoryReadContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 749A533304ABA207075077DC /* ReminderWindowRepositoryReadContractTests.swift */; };
 		63088204C5AB3C3C6FD63917 /* AnnualRecurrenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E56E8D68511FF7E66764BF0 /* AnnualRecurrenceTests.swift */; };
@@ -377,6 +378,7 @@
 		7CEFE1FAFED8E294FEE4B401 /* PriorityTier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriorityTier.swift; sourceTree = "<group>"; };
 		7DF5695280B533191F946271 /* OnboardingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScreen.swift; sourceTree = "<group>"; };
 		8174EBCF2C3834E4430A332E /* ChannelTapPreviewMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelTapPreviewMessageTests.swift; sourceTree = "<group>"; };
+		81904B579CDF5680DC996C17 /* ScheduleFetchContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleFetchContractTests.swift; sourceTree = "<group>"; };
 		81AAC5A27726A4A3B00D4A15 /* ScreensAccessibilityTests+PresentedSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+PresentedSurfaces.swift"; sourceTree = "<group>"; };
 		82D16147E4A38A9832234AE8 /* TimePickerField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePickerField.swift; sourceTree = "<group>"; };
 		83F057C5D73819618C5586DE /* UserNotificationsAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserNotificationsAdapterTests.swift; sourceTree = "<group>"; };
@@ -550,6 +552,7 @@
 				97947E73AD0975A89695E0FC /* ReminderWindowOverrideContractTests.swift */,
 				749A533304ABA207075077DC /* ReminderWindowRepositoryReadContractTests.swift */,
 				9337143263D1CE0320C55554 /* RepositoriesTests.swift */,
+				81904B579CDF5680DC996C17 /* ScheduleFetchContractTests.swift */,
 				423064D9789D307905C7C6A4 /* ScheduleObservationContractTests.swift */,
 				3305FC28E614B9F9D3B32F77 /* ScheduleObservationSnapshotContractTests.swift */,
 				11FB87B0798421853230A006 /* UpdateLastInteractedAtContractTests.swift */,
@@ -1248,6 +1251,7 @@
 				9D872359157DA01ECDBB62A0 /* RepositoryFakes.swift in Sources */,
 				ED1E2F81DC4ACDB521FEDB05 /* RootViewSceneActivationTests.swift in Sources */,
 				E14B475BE691A6F2D19E1DD1 /* RowActionAccessibilityEffectsTests.swift in Sources */,
+				61121F1874E9A98316873732 /* ScheduleFetchContractTests.swift in Sources */,
 				2A5DD5805C21199B9D51E5CE /* ScheduleObservationContractTests.swift in Sources */,
 				730D7986238D9D420E308969 /* ScheduleObservationSnapshotContractTests.swift in Sources */,
 				875DF210621FA3C10FC3B85F /* SchedulingPassCadenceCycleTests.swift in Sources */,

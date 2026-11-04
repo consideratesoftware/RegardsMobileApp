@@ -112,6 +112,12 @@ struct GRDBReminderRepository: ReminderRepository {
         }
     }
 
+    /// The same read as one `observeSchedule()` emission. `dbQueue.read` runs
+    /// on GRDB's queue, where an observation delivers on the main queue.
+    func fetchSchedule() async throws -> ScheduleSnapshot {
+        try await dbQueue.read { db in try Self.readSchedule(db) }
+    }
+
     private static func readSchedule(_ db: Database) throws -> ScheduleSnapshot {
         // `try?` drops only a row that fails to decode, the per-row tolerance
         // `observeTracked()` has (R50); the error itself has nowhere to go

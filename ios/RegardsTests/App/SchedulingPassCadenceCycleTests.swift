@@ -203,7 +203,7 @@ struct SchedulingPassCadenceCycleTests {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1, cadenceDays: 14)
         #expect(try await fixture.pass.snooze(contactId: contact.id))
-        await fixture.reminders.setObserveFails(true)
+        await fixture.reminders.setFetchFails(true)
 
         #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
 
@@ -212,7 +212,7 @@ struct SchedulingPassCadenceCycleTests {
         let stored = try #require(try await fixture.repositories.contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == PassFixture.at("2026-06-10 10:00"))
         #expect(try await fixture.cadenceRow(contact) == nil)
-        await fixture.reminders.setObserveFails(false)
+        await fixture.reminders.setFetchFails(false)
 
         try await fixture.pass.runFull()
 
@@ -323,9 +323,9 @@ struct SchedulingPassCadenceCycleTests {
         let contact = try await fixture.addContact(1, cadenceDays: 7)
         try await fixture.pass.runFull()
         #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
-        await fixture.reminders.setObserveFails(true)
+        await fixture.reminders.setFetchFails(true)
         #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
-        await fixture.reminders.setObserveFails(false)
+        await fixture.reminders.setFetchFails(false)
         #expect(try await fixture.cadenceRow(contact) == nil)
         // Past the old 06-10 18:00 slot and past the new due date, 06-17 10:00.
         fixture.setNow("2026-06-18 10:00")

@@ -26,7 +26,7 @@ import Foundation
 /// due pending row. Until TF-07e marks rows fired from the OS, a due pending
 /// row stands in for a fired one.
 ///
-/// **Corrupt rows.** Runs read one `observeSchedule()` snapshot, which drops
+/// **Corrupt rows.** Runs read one `fetchSchedule()` snapshot, which drops
 /// an undecodable contact (with its rows) or row. The pass never cancels what
 /// it can't decode, one bad row never stops scheduling for everyone else, and
 /// a write at an undecodable row's id replaces it. The orphan sweep's reads
@@ -115,14 +115,10 @@ public actor SchedulingPass {
     /// Writes the rows the snapshot says should exist, for every tracked
     /// contact or only `contactId`, and cancels pending rows that shouldn't.
     private func reschedule(only contactId: UUID?) async throws {
-        // One read: the first snapshot `observeSchedule()` emits holds the
-        // contacts, the pending and fired rows, and the window.
-        var firstSnapshot: ScheduleSnapshot?
-        for await emitted in await reminders.observeSchedule() {
-            firstSnapshot = emitted
-            break
-        }
-        guard let snapshot = firstSnapshot else { throw SnapshotUnavailable() }
+        // One read holds the contacts, the pending and fired rows, and the
+        // window. A one-shot fetch, never the observation: GRDB delivers that
+        // on the main queue, and this await holds the lock (R66).
+        let snapshot = try await reminders.fetchSchedule()
         let context = Context(now: clock(), global: snapshot.window)
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
@@ -252,9 +248,6 @@ public actor SchedulingPass {
             try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
         }
     }
-
-    /// `observeSchedule()` finished without a value: its read failed.
-    struct SnapshotUnavailable: Error {}
 
     // MARK: - Derivation
 
