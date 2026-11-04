@@ -11,16 +11,20 @@
 #
 # The rule, applied to the net change between the two shas (not per commit):
 # an approval carries only when every changed path is a Markdown file (*.md)
-# outside .claude/, .codex/, .agents/, scripts/ and .github/, and no file has
-# a mode change. An added or deleted .md file is docs. Agent contracts,
-# commands, skills, scripts and CI are behavior, so a change there never
-# carries. Every other path fails: source, config, project files, plists, toml,
-# anything. Renames are never detected, so a move is a delete plus an add.
+# outside .claude/, .codex/, .agents/, scripts/ and .github/, is not named
+# AGENTS.md or CLAUDE.md at any depth, and has no mode change. An added or
+# deleted .md file is docs. Agent contracts, commands, skills, scripts, CI and
+# the AGENTS.md and CLAUDE.md instruction files are behavior, so a change there
+# never carries. Every other path fails: source, config, project files,
+# plists, toml, anything. Renames are never detected, so a move is a delete
+# plus an add.
 #
 # Why Markdown alone is safe: no tracked .md file outside those directories is
 # bundled into or read by the app or its tests, so a Markdown-only change
-# cannot change behavior. A future bundled .md resource would break that, and
-# review should catch it. Re-check with both of these printing 0:
+# cannot change behavior. AGENTS.md and CLAUDE.md are the exception, because
+# agents read them as instructions wherever they sit. A future bundled .md
+# resource would break the rule, and review should catch it. Re-check with
+# both of these printing 0:
 #   git ls-files 'ios/Regards*' 'android/app/src' | grep -c '\.md$'
 #   grep -c '\.md' ios/project.yml
 
@@ -70,6 +74,8 @@ while IFS= read -r -d '' meta; do
     .claude/* | */.claude/* | .codex/* | */.codex/* | .agents/* | */.agents/* \
       | scripts/* | */scripts/* | .github/* | */.github/* )
       fail "behavior path never carries: $path" ;;
+    AGENTS.md | */AGENTS.md | CLAUDE.md | */CLAUDE.md )
+      fail "agent instruction file never carries: $path" ;;
     ?*.md ) ;;
     * ) fail "not a Markdown file: $path" ;;
   esac

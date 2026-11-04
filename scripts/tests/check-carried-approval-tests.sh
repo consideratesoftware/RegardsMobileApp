@@ -36,6 +36,9 @@ put .agents/README.md '# Agents'
 put .codex/skills/s/SKILL.md '# Skill'
 put .claude/agents/x.md '# Agent'
 put scripts/x.md '# Script doc'
+put AGENTS.md '# Agents file'
+put CLAUDE.md '# Claude file'
+put docs/AGENTS.md '# Nested agents file'
 put .github/x.md '# Github doc'
 put ios/Regards/App/A.swift '// note
 let x = 1'
@@ -112,6 +115,9 @@ codex_md() { put .codex/skills/s/SKILL.md '# Skill, changed'; }
 claude_md() { put .claude/agents/x.md '# Agent, changed'; }
 scripts_md() { put scripts/x.md '# Script doc, changed'; }
 github_md() { put .github/x.md '# Github doc, changed'; }
+root_agents_md() { put AGENTS.md '# Agents file, changed'; }
+root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
+nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
 swift_comment() { put ios/Regards/App/A.swift '// note, reworded
 let x = 1'; }
 swift_code() { put ios/Regards/App/A.swift '// note
@@ -155,6 +161,9 @@ expect 'a .codex/ .md change fails' 1 codex_md
 expect 'a .claude/ .md change fails' 1 claude_md
 expect 'a scripts/ .md change fails' 1 scripts_md
 expect 'a .github/ .md change fails' 1 github_md
+expect 'a root AGENTS.md change fails' 1 root_agents_md
+expect 'a root CLAUDE.md change fails' 1 root_claude_md
+expect 'a nested AGENTS.md change fails' 1 nested_agents_md
 expect 'a Swift comment-only change fails' 1 swift_comment
 expect 'a Swift code change fails' 1 swift_code
 expect 'a non-ASCII-named .swift change fails' 1 swift_non_ascii
