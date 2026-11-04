@@ -600,12 +600,12 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
 - TF-07e3 (notification adapter), five device steps, one result line per step.
-  1. Live scheduling against the real notification center. It's the owner's decision of 2026-11-03, recorded on PR #71. Nothing in a shipping build calls `schedule(_:)`, `pendingRequests()`, or `cancel(identifiers:)` before TF-07e slice 4, so this step runs on a build that includes TF-07e slice 4. Check each live call through what the tester can see:
+  1. The owner decided on 2026-11-03, recorded on PR #71, that the three live calls (schedule, cancel, pendingRequests) get a device check, and the observables below are the EM's. Live scheduling against the real notification center. Nothing in a shipping build calls `schedule(_:)`, `pendingRequests()`, or `cancel(identifiers:)` before TF-07e slice 4, so this step runs on a build that includes TF-07e slice 4. Check each live call through what the tester can see:
      - schedule: a reminder the app schedules arrives at its time.
      - cancel: a reminder that is snoozed or caught up before its time doesn't arrive.
-     - pendingRequests: relaunch the app twice before a scheduled reminder's time. The reminder still arrives exactly once. Each launch's pass reads the pending request back and doesn't add it again.
+     - pendingRequests: while a reminder for a contact is scheduled, close the app, then untrack that contact or delete it in Contacts. Relaunch before the reminder's time. Pass: the reminder doesn't arrive (the pass read the request back and cancelled it as an orphan). Fail: it arrives.
 
-     Sub-check added by the EM: add a request for 1 hour ahead, then add the same identifier with a time in the past. The re-added request arrives once, straight away, and the replaced one-hour request doesn't arrive at its time.
+     Replacing a pending request under the same identifier is covered by the fakes' unit tests (`immediateAddReplacesAPendingRequest`, `futureAddReplacesPendingWithSameIdentifier`) and is documented iOS behavior; there is no device step for it.
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
   2. Overdue contact joining the in-progress slot delivers at once (proxy for R57(2); the single `Date()` read stays a code-reading check). A device can't reproduce the race between planning and the add, so this step only shows that a past-dated request delivers at once. (EM addition. The R57(2) deferral itself was the EM's, not the owner's.)
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
