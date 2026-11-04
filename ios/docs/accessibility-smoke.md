@@ -2,9 +2,10 @@
 
 Run this in the pre-release device pass, not before each merge (owner ruling,
 2026-10-28). Each UI-touching PR adds its steps to `TESTFLIGHT_PLAN.md`'s
-"Pre-release device pass", and the result is recorded there. The automated
-checks still gate: focused accessibility audits on each PR, and the broad
-audits after merge, nightly, and before release.
+"Pre-release device pass", and the result is recorded there. On a pull
+request the accessibility gates are the `pr-accessibility` review and the
+focused regressions the engineer runs. The broad audits run after merge,
+nightly, and before release.
 
 ## Setup
 
