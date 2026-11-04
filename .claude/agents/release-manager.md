@@ -195,10 +195,12 @@ PR, never in the root checkout.
     entry on the last `REVIEWERS:` line that lists it, across all the
     counting `PR REVIEW:` comments at any head. It must be APPROVE, and the
     comment that holds it must name the current head (the comment's sha is a
-    prefix of the full head sha, at least 7 characters). Only for
-    `pr-code-quality` and `pr-tests`, it may instead name the sha on that
-    reviewer's `CARRIED:` line in the newest counting comment, and then the
-    carry check from that sha to the head must pass. Anything else is
+    prefix of the full head sha, at least 7 characters). For `pr-code-quality`
+    or `pr-tests` only, the comment that holds the APPROVE may instead name
+    an older sha S, when all of these hold: the newest counting comment has a
+    `CARRIED: <reviewer> APPROVE from <S>` line; S and the holding comment's
+    sha match by prefix (at least 7 characters); S is not the current head;
+    and the carry check from S to the head passes. Anything else is
     "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
     <name>" (it has one). A later REQUEST_CHANGES at any head is the newest
     verdict, so it ends a carry. The filter takes no arguments. Run the same

@@ -157,10 +157,13 @@ reviewer. The release manager runs that script. Each reviewer the routing table
 requires must have APPROVE as its newest verdict. The release manager reads
 every counting `PR REVIEW:` comment, oldest first, and takes each reviewer's
 entry on the last `REVIEWERS:` line that lists it, at any head. The entry must
-be APPROVE in a comment that names the current head or, for `pr-code-quality`
-and `pr-tests`, the sha on that reviewer's `CARRIED:` line in the newest
-comment. A later REQUEST_CHANGES at any head ends a carry. A comment that
-reruns one reviewer only completes the set.
+be APPROVE in a comment that names the current head. For `pr-code-quality` or
+`pr-tests` only, the comment that holds the APPROVE may instead name an older
+sha S, when all of these hold: the newest counting comment has a `CARRIED:
+<reviewer> APPROVE from <S>` line; S and the holding comment's sha match by
+prefix (at least 7 characters); S is not the current head; and the carry check
+from S to the head passes. A later REQUEST_CHANGES at any head ends a carry. A
+comment that reruns one reviewer only completes the set.
 The newest `PR REVIEW:` comment, scoped or not, needs a `REVIEWERS:` line, or
 the check fails (STATE CODEX STALE).
 

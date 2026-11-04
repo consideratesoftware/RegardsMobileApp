@@ -197,10 +197,15 @@ or `pr-tests` approval that stands, as `CARRIED: <reviewer> APPROVE from
 newest verdict. The release manager reads every counting `PR REVIEW:`
 comment, oldest first, and takes each reviewer's entry on the last
 `REVIEWERS:` line that lists it, at any head. The entry must be APPROVE in a
-comment that names the current head or, for `pr-code-quality` and
-`pr-tests`, the sha on that reviewer's `CARRIED:` line in the newest comment.
-A later REQUEST_CHANGES at any head ends a carry. A comment that reruns one
-reviewer only completes the set.
+comment that names the current head. For `pr-code-quality` or `pr-tests`
+only, the comment that holds the APPROVE may instead name an older sha S,
+when all of these hold: the newest counting comment has a `CARRIED:
+<reviewer> APPROVE from <S>` line; S and the holding comment's sha match by
+prefix (at least 7 characters); S is not the current head; and the carry
+check from S to the head passes. So a `CARRIED:` line cites the sha of the
+comment that holds the reviewer's APPROVE, and a chained carry (A, scoped B,
+scoped C) keeps citing A. A later REQUEST_CHANGES at any head ends a carry. A
+comment that reruns one reviewer only completes the set.
 
 Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown
 outside the agent, script and CI directories, never AGENTS*.md, CLAUDE*.md,
