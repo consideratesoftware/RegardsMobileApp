@@ -25,7 +25,7 @@ never pick up Android work.
 - Next ready work: none. Slice 4 (`TF-07e`) builds on slice 3, so it waits for slice 3's review.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #69 (`claude/build-engineer-cwd`) and `TF-07e` slice 3 (`claude/tf-07e3-adapter`, PR number not yet recorded here). #69 was open at the `gh pr list --state open` check on 2026-11-02. #68 (`TF-11`) and #70 (`TF-07d`) are merged.
+- Open pull requests: #69 (`claude/build-engineer-cwd`). `TF-07e` slice 3 is on branch `claude/tf-07e3-adapter`; its PR number is added when it opens. #69 was open at the `gh pr list --state open` check on 2026-11-02. #68 (`TF-11`) and #70 (`TF-07d`) are merged.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
@@ -200,7 +200,7 @@ numbers.
 | TF-08 | BLOCKED | TF-07 | Channel and notification deep-link execution works on every surface; Discord scheme is minimal; a global default channel (`.sms`) is settable in Settings and drives importer-derived per-contact preferreds; interaction logging and routing tests pass | PR26; R11, R37, R58 |
 | TF-09 | BLOCKED | TF-08, TF-11 | Real Edit Contact form with dirty-field partial write-back, denial/error states, re-fetch, safe navigation, purpose string, and audit coverage. Any tracking or cadence write calls `scheduler.run(for:)` for the affected contacts. | PR27; R13, R16–R17 |
 | TF-10 | BLOCKED | TF-08, TF-11 | Virtual merge, unmerge, skip, manual link, full-handle detection, grouped reminders/lists, persistence, and audits. Group collapse in the scheduling pass (one cadence reminder per group, member-max interaction) is part of this item, moved from TF-07 by owner ruling 6 (2026-10-28). | PR28; R11–R12, R24 |
-| TF-11 | ACTIVE | TF-06 | Onboarding: concept, Contacts step, starter picker (onboarding and Settings), limited path, relaunch resume, and the Settings Contacts access row. **PR29 slices 1 to 4 are in review in PR #68.** TF-03 is no longer a dependency (owner ruling of 2026-10-28, device deferral). Slice 5 (notification ask, a conditional fourth step) waits for TF-07e (OS notification scheduling) and gets its own PR. Settings starter saves call `scheduler.run(for:)` for each changed contact, and onboarding starters are covered by the `runFull()` at completion: wired in PR #68 after TF-07c (tech-lead ruling, 2026-10-28). Device checks: Pre-release device pass. | PR29; R11, R14 (R14 open, progress note) |
+| TF-11 | ACTIVE | TF-06 | Onboarding: concept, Contacts step, starter picker (onboarding and Settings), limited path, relaunch resume, and the Settings Contacts access row. **PR29 slices 1 to 4 are merged as PR #68 (`a301d83`).** TF-03 is no longer a dependency (owner ruling of 2026-10-28, device deferral). Slice 5 (notification ask, a conditional fourth step) waits for TF-07e (OS notification scheduling) and gets its own PR. Settings starter saves call `scheduler.run(for:)` for each changed contact, and onboarding starters are covered by the `runFull()` at completion: wired in PR #68 after TF-07c (tech-lead ruling, 2026-10-28). Device checks: Pre-release device pass. | PR29; R11, R14 (R14 open, progress note) |
 | TF-12 | BLOCKED | TF-09, TF-10 | Read-only EventKit occasions merge with Contacts precedence; revocation degrades safely; purpose string and tests are complete | PR30; R17 |
 | TF-13 | BLOCKED | TF-12 | Widget target and App Group migration preserve the DB; read-only small/medium/lock widgets refresh from SchedulingPass | PR31 |
 | TF-14 | BLOCKED | TF-02, TF-11 | StoreKit trial/lifetime entitlement, paywall, soft lock, tips, restore, and StoreKitTest suite pass without eroding no-network app code | PR32 |
@@ -594,7 +594,7 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
 
 - TF-07e3 (notification adapter), three device steps, one result line (owner decision, 2026-11-03).
   1. Round-trip against the real notification center: `schedule(_:)` adds a request, `pendingRequests()` reads it back, and `cancel(identifiers:)` removes it. Confirm it is gone from `pendingRequests()`.
-  2. An overdue contact joining the in-progress slot delivers at once. This checks R57(2): `schedule` reads `Date()` once, immediately before the add.
+  2. Proxy for R57(2): an overdue contact joining the in-progress slot delivers at once. A device can't reproduce the race between planning and the add, so this step only shows that a past-dated request delivers at once. The single `Date()` read in `schedule` stays a code-reading check.
   3. A notification that arrives while Regards is in the foreground shows as a banner, in the list, and with sound.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 

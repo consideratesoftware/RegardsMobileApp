@@ -202,9 +202,10 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// `UNCalendarNotificationTrigger` (§9 platform nuance) whose components
     /// are pinned to UTC: UTC has no skipped or repeated hour, so the trigger
     /// names one absolute instant whatever the device zone or DST does. A
-    /// `fireDate` at or before `now` gets a nil trigger, which delivers
-    /// immediately (§9 contract 5: a past slot start is an immediate
-    /// delivery); a calendar trigger for a past instant would never fire.
+    /// request whose whole-second trigger instant is at or before `now` gets
+    /// no trigger, which delivers immediately (§9 contract 5: a past slot
+    /// start is an immediate delivery); a calendar trigger for a past instant
+    /// would never fire.
     ///
     /// The visible text is `request.title` and `request.body` as given. The
     /// contact id goes to `userInfo` only.
