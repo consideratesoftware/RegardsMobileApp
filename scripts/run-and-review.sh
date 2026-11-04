@@ -17,7 +17,7 @@ if ! command -v claude >/dev/null 2>&1; then
 fi
 
 if [[ "${1:-}" == "--review-only" ]]; then
-  review_target="${2:-main...HEAD}"
+  review_target="${2:-origin/main...HEAD}"
   exec claude --permission-mode plan --print "/pr-review ${review_target}"
 fi
 
