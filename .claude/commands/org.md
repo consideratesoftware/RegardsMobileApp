@@ -108,8 +108,8 @@ For each READY item in queue order, up to the budget:
    Simulator `RegardsTF##`, DerivedData `/tmp/RegardsTF##DerivedData`.
    After an Xcode update adds a runtime, a lane's simulator can sit on an older
    one. If every copy of it is on an older runtime than `build-engineer`
-   resolves, delete it (`xcrun simctl delete`); the build engineer recreates
-   it on its next run.
+   resolves, delete every copy (`xcrun simctl delete`); the build engineer
+   recreates it on its next run.
 
 Stage 2 runs for all READY items before Stage 3 starts any lane, so lock
 conflicts are decided with full information.
