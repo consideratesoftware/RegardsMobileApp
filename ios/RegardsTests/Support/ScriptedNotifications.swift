@@ -25,7 +25,9 @@ actor ScriptedNotifications: NotificationScheduling {
     private var pending: [String: ReminderNotificationRequest] = [:]
     private(set) var scheduleCalls: [ReminderNotificationRequest] = []
     private(set) var cancelCalls: [[String]] = []
-    /// Requests the real center would have delivered at once (see `schedule`).
+    /// Requests the real center would have delivered, at once on add or once
+    /// their time passes (checked at the start of every call). Fire dates are
+    /// recorded at whole seconds, as the real center reports them.
     private(set) var delivered: [ReminderNotificationRequest] = []
     private let clock: @Sendable () -> Date
 
@@ -80,34 +82,51 @@ actor ScriptedNotifications: NotificationScheduling {
     /// `makeRequest` and `decode`, so a fire date comes back truncated to the
     /// whole second, and a request whose trigger instant is not after the clock
     /// is delivered at once: it is recorded in `delivered`, replaces any
-    /// pending request with its identifier, and is never pending. A pending
-    /// request whose time then passes is delivered when `pendingRequests()` is
-    /// next read: it moves to `delivered` (with its whole-second fire date) and
-    /// is no longer returned.
+    /// pending request with its identifier, and is never pending.
+    ///
+    /// A pending request whose time passes is delivered at the next call of any
+    /// of the 3 members (`deliverDue`), before that call acts, so a cancel or a
+    /// same-id schedule can't hide it. `delivered` always holds the whole-second
+    /// fire date.
     func pendingRequests() async -> [ReminderNotificationRequest] {
-        let now = clock()
-        for request in pending.values.filter({ $0.fireDate <= now }).sorted(by: { $0.identifier < $1.identifier }) {
-            pending[request.identifier] = nil
-            delivered.append(request)
-        }
+        deliverDue()
         return pending.values.sorted { $0.identifier < $1.identifier }
     }
 
     func schedule(_ request: ReminderNotificationRequest) async throws {
+        deliverDue()
         scheduleCalls.append(request)
         let built = UserNotificationsAdapter.makeRequest(request, now: clock())
         if let stored = UserNotificationsAdapter.decode(built) {
             pending[request.identifier] = stored
         } else {
             pending[request.identifier] = nil
-            delivered.append(request)
+            delivered.append(ReminderNotificationRequest(
+                identifier: request.identifier,
+                title: request.title,
+                body: request.body,
+                fireDate: Date(timeIntervalSince1970: request.fireDate.timeIntervalSince1970.rounded(.down)),
+                contactId: request.contactId,
+                category: request.category
+            ))
         }
     }
 
     func cancel(identifiers: [String]) async {
+        deliverDue()
         cancelCalls.append(identifiers)
         for identifier in identifiers {
             pending[identifier] = nil
+        }
+    }
+
+    /// Moves every pending request whose time is at or before the clock to
+    /// `delivered`, in identifier order.
+    private func deliverDue() {
+        let now = clock()
+        for request in pending.values.filter({ $0.fireDate <= now }).sorted(by: { $0.identifier < $1.identifier }) {
+            pending[request.identifier] = nil
+            delivered.append(request)
         }
     }
 

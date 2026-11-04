@@ -75,7 +75,9 @@ struct NotificationFakeParityTests {
         #expect(await scheduling.pendingRequests().isEmpty)
         if fake == .scripted {
             let scripted = try #require(scheduling as? ScriptedNotifications)
-            #expect(await scripted.delivered == [sent])
+            let floored = sent.fireDate.timeIntervalSince1970.rounded(.down)
+            let expected = Self.request(fireDate: Date(timeIntervalSince1970: floored))
+            #expect(await scripted.delivered == [expected])
         }
     }
 
@@ -106,6 +108,32 @@ struct NotificationFakeParityTests {
             let scripted = try #require(scheduling as? ScriptedNotifications)
             #expect(await scripted.delivered == [sent])
         }
+    }
+
+    @Test("A request just before its time is still pending", arguments: Fake.allCases)
+    func requestJustBeforeItsTimeIsStillPending(_ fake: Fake) async throws {
+        let clock = MutableClock(Self.now)
+        let scheduling = fake.make(clock: { clock.now() })
+        let sent = Self.request(fireDate: Self.now.addingTimeInterval(60))
+        try await scheduling.schedule(sent)
+
+        clock.advance(by: 59.9)
+
+        #expect(await scheduling.pendingRequests() == [sent])
+    }
+
+    @Test("A due request is delivered before a cancel of its id, with no read in between")
+    func dueRequestIsDeliveredBeforeACancel() async throws {
+        let clock = MutableClock(Self.now)
+        let scripted = ScriptedNotifications(clock: { clock.now() })
+        let sent = Self.request(fireDate: Self.now.addingTimeInterval(60))
+        try await scripted.schedule(sent)
+
+        clock.advance(by: 60)
+        await scripted.cancel(identifiers: [sent.identifier])
+
+        #expect(await scripted.delivered == [sent])
+        #expect(await scripted.pendingRequests().isEmpty)
     }
 
     @Test("Cancel removes only the named pending requests and ignores unknown ids", arguments: Fake.allCases)
