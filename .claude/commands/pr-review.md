@@ -2,14 +2,14 @@
 description: Run the staged multi-agent PR review (correctness, security/privacy, tests, accessibility, code quality, fit-and-finish) and merge the verdicts into one review.
 ---
 
-Review the current branch against `main`, or use the target in `$ARGUMENTS`.
+Review the current branch against `origin/main`, or use the target in `$ARGUMENTS`.
 Treat the literal target `worktree` as all tracked and untracked changes against
 `HEAD`. Follow this workflow exactly.
 
 ## Stage 0 — pre-flight gate (do this yourself; no agents yet)
 
 1. Resolve the target:
-   - No argument: `main...HEAD`.
+   - No argument: `origin/main...HEAD`, the target the org's verdict comments name.
    - Branch/ref argument: use that exact diff target.
    - `worktree`: use `git status --short`, `git diff HEAD`, and full reads of
      every untracked file.
@@ -24,9 +24,11 @@ Treat the literal target `worktree` as all tracked and untracked changes against
      review.
    - SwiftLint from the repo root, never from `ios/`:
      `(cd "<worktree root>" && swiftlint --strict)`.
-   - The 2 guard scripts CI runs, from the repo root: `scripts/check-no-network.sh`
-     (the privacy grep) and `scripts/check-domain-purity.sh`. Each is its own
-     check; a nonzero exit from either fails pre-flight.
+   - The 2 iOS guard scripts this pre-flight uses, from the repo root:
+     `scripts/check-no-network.sh` (the privacy grep) and
+     `scripts/check-domain-purity.sh`. Each is its own check; a nonzero exit
+     from either fails pre-flight. (CI also runs Android guards; this
+     pre-flight doesn't.)
 3. If any pre-flight check fails: STOP. Report the failures as the review; do not dispatch agents against a red baseline.
 
 ## Stage 1 — dispatch (parallel, conditional)
