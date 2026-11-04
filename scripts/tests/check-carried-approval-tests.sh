@@ -132,6 +132,8 @@ upper_case_md_suffix() { put docs/Note.MD '# Note'; }
 root_claude_local_md() { put CLAUDE.local.md '# Local claude file'; }
 nested_agents_override_md() { put docs/AGENTS.override.md '# Agents override'; }
 root_architecture_md() { put ARCHITECTURE.md '# Architecture, changed'; }
+lower_case_architecture_md() { put docs/architecture.md '# Architecture notes'; }
+lower_case_agents_override_md() { put docs/agents.override.md '# Agents override notes'; }
 ios_bundle_md() { put ios/Regards/Resources/x.md '# Resource'; }
 android_app_md() { put android/app/src/main/x.md '# Resource'; }
 android_module_asset_md() { put android/feature/overdue/src/main/assets/x.md '# Asset'; }
@@ -196,6 +198,8 @@ expect 'an added docs/Note.MD (upper-case suffix) fails' 1 upper_case_md_suffix
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a root ARCHITECTURE.md change fails' 1 root_architecture_md
+expect 'an added lower-case docs/architecture.md fails' 1 lower_case_architecture_md
+expect 'an added lower-case docs/agents.override.md fails' 1 lower_case_agents_override_md
 expect 'an added ios/Regards/Resources/x.md fails' 1 ios_bundle_md
 expect 'an added android/app/src/main/x.md fails' 1 android_app_md
 expect 'an added android/feature/overdue/src/main/assets/x.md fails' 1 android_module_asset_md
