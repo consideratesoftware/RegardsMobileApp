@@ -68,6 +68,7 @@
 		46BDE040140A2537136D6D43 /* OverdueViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00E53F04678C9EC8FC3E2C3 /* OverdueViewModelTests.swift */; };
 		471A6E656E760A2A289E16D0 /* Contact+Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8343690FABEA01958056C82 /* Contact+Accessibility.swift */; };
 		480ADB8111662E1E1846371C /* DuplicateDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C323AA4C4A8ED52B96B70D7 /* DuplicateDetectorTests.swift */; };
+		4ADC1DA1F8105819644CA0FA /* NotificationCallerGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF960DCF1CFBA791F6A75D44 /* NotificationCallerGateTests.swift */; };
 		4B668D6DFA64D62381BB7324 /* SchedulingPassSnoozeCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A40C514B390F4D2E4D15531 /* SchedulingPassSnoozeCalendarTests.swift */; };
 		4D50819664D5008945EC9D15 /* CadenceDescriptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069B04546D68874FB8492E5F /* CadenceDescriptorTests.swift */; };
 		4DC3FCCE2BE3579953F30E74 /* ContactValueAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0F1602FA69250B09439710 /* ContactValueAccessibility.swift */; };
@@ -212,6 +213,7 @@
 		DD20A1B2BD058209D6FE830D /* ContactDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A5B86E2C444859AF9C274C /* ContactDetailViewModel.swift */; };
 		DFB6EF7AF9A6E91D1E8FC0E9 /* AllContactsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5002D63159BA69D9D8E3AC9 /* AllContactsScreen.swift */; };
 		E14B475BE691A6F2D19E1DD1 /* RowActionAccessibilityEffectsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB9BC25AB0C2BDDD3AF5EDB /* RowActionAccessibilityEffectsTests.swift */; };
+		E244C3AA32EAF05275B29B44 /* NotificationFakeParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0554DB8A736749004658979 /* NotificationFakeParityTests.swift */; };
 		E4457278F17AE1064C3D5A09 /* OverdueViewModelSnoozeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71D4094A307432BCC0C98F5 /* OverdueViewModelSnoozeTests.swift */; };
 		E4525D4289A80E4FB0239829 /* UpdateLastInteractedAtContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11FB87B0798421853230A006 /* UpdateLastInteractedAtContractTests.swift */; };
 		E4B0A7C5A1EA4F5FDAB6B011 /* RegardsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1ADC20C0E7E4CE0DA30722D /* RegardsApp.swift */; };
@@ -483,7 +485,9 @@
 		EA3C46E8CED7412E12D16392 /* DayOfWeek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayOfWeek.swift; sourceTree = "<group>"; };
 		EA572793D3C00A1A6C26838A /* UpcomingViewModel+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UpcomingViewModel+Formatting.swift"; sourceTree = "<group>"; };
 		EEAC7D0796929127167DE692 /* ReminderWindowsScreenAnnouncementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsScreenAnnouncementTests.swift; sourceTree = "<group>"; };
+		EF960DCF1CFBA791F6A75D44 /* NotificationCallerGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCallerGateTests.swift; sourceTree = "<group>"; };
 		EFCB01A0AB276C59369DCF5F /* ContactRepositoryOverrideFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactRepositoryOverrideFallbackTests.swift; sourceTree = "<group>"; };
+		F0554DB8A736749004658979 /* NotificationFakeParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationFakeParityTests.swift; sourceTree = "<group>"; };
 		F0796D2167027FBCEF07289C /* ContactsReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsReconciler.swift; sourceTree = "<group>"; };
 		F0D63AF974D1F91B8867B7C3 /* ReminderRepositoryContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderRepositoryContractTests.swift; sourceTree = "<group>"; };
 		F1ADC20C0E7E4CE0DA30722D /* RegardsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsApp.swift; sourceTree = "<group>"; };
@@ -724,6 +728,7 @@
 				C97F0CC9EFBD1158613E9519 /* AppRuntimeTests.swift */,
 				A77D67185D9D3AB9DDF06CBD /* NotificationActionHandlingTests.swift */,
 				B1E67C1B927F6D7E8F58F9EF /* NotificationActionHandlingTests+Launch.swift */,
+				EF960DCF1CFBA791F6A75D44 /* NotificationCallerGateTests.swift */,
 				DC16A190DA2644DE6DF69935 /* ReconciliationCoalescingTests.swift */,
 				10AFB91724C972036043E115 /* RegardsIntentRouterTests.swift */,
 				9628392A18BE56DFD931C1CC /* RootViewSceneActivationTests.swift */,
@@ -809,6 +814,7 @@
 				03942DF2AF18E649A0CCFDD5 /* ContactsReconcilerTests.swift */,
 				33EC9E9494EB1265441684D9 /* ContactsSourceStressTests.swift */,
 				6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */,
+				F0554DB8A736749004658979 /* NotificationFakeParityTests.swift */,
 				795C41FB0564D733ADDAA308 /* UserNotificationsAdapterRequestTests.swift */,
 				83F057C5D73819618C5586DE /* UserNotificationsAdapterTests.swift */,
 			);
@@ -1212,6 +1218,8 @@
 				070D9BDEF30DD04CC38E0BFA /* NeverContactedAnchorParityTests.swift in Sources */,
 				1D7CEC7E13382900B298A9F2 /* NotificationActionHandlingTests+Launch.swift in Sources */,
 				57BB9159AD431542A73741EA /* NotificationActionHandlingTests.swift in Sources */,
+				4ADC1DA1F8105819644CA0FA /* NotificationCallerGateTests.swift in Sources */,
+				E244C3AA32EAF05275B29B44 /* NotificationFakeParityTests.swift in Sources */,
 				9CE96DB402E3799B9C5B7003 /* NotificationPermissionViewModelTests.swift in Sources */,
 				6D23C79551DF9CA7A9705689 /* OccasionFireDateDSTTests.swift in Sources */,
 				AA1A09F770BC6F672F321FEE /* OccasionFireDateTransitionPinTests.swift in Sources */,

@@ -25,13 +25,18 @@ actor ScriptedNotifications: NotificationScheduling {
     private var pending: [String: ReminderNotificationRequest] = [:]
     private(set) var scheduleCalls: [ReminderNotificationRequest] = []
     private(set) var cancelCalls: [[String]] = []
+    /// Requests the real center would have delivered at once (see `schedule`).
+    private(set) var delivered: [ReminderNotificationRequest] = []
+    private let clock: @Sendable () -> Date
 
     init(
         status: NotificationAuthorizationStatus = .notDetermined,
         requests: [ScriptedRequestStep] = [],
         immediateReads: Int = .max,
-        heldReads: Int = 0
+        heldReads: Int = 0,
+        clock: @escaping @Sendable () -> Date = { Date() }
     ) {
+        self.clock = clock
         self.status = status
         self.steps = requests
         self.immediateReads = immediateReads
@@ -71,15 +76,24 @@ actor ScriptedNotifications: NotificationScheduling {
 
     /// Scheduling members: a pending set keyed by identifier like the
     /// system's (`schedule` replaces, `cancel` removes), plus a record of every
-    /// call in order. It has no clock, so a request with a past fire date stays
-    /// pending; the real center delivers it at once and drops it.
+    /// call in order. `schedule` stores each request through the adapter's own
+    /// `makeRequest` and `decode`, so a fire date comes back truncated to the
+    /// whole second, and a request whose trigger instant is not after the clock
+    /// is delivered at once: it is recorded in `delivered`, replaces any
+    /// pending request with its identifier, and is never pending.
     func pendingRequests() async -> [ReminderNotificationRequest] {
         pending.values.sorted { $0.identifier < $1.identifier }
     }
 
     func schedule(_ request: ReminderNotificationRequest) async throws {
         scheduleCalls.append(request)
-        pending[request.identifier] = request
+        let built = UserNotificationsAdapter.makeRequest(request, now: clock())
+        if let stored = UserNotificationsAdapter.decode(built) {
+            pending[request.identifier] = stored
+        } else {
+            pending[request.identifier] = nil
+            delivered.append(request)
+        }
     }
 
     func cancel(identifiers: [String]) async {
