@@ -9,8 +9,9 @@ AN-10; the rules below apply from the first composable regardless.
   of the SwiftLint `button_requires_accessibility` rule).
 - Font scale honored through the largest system setting; no clipped text.
 - Reduce-motion (`ANIMATOR_DURATION_SCALE` 0) respected.
-- TalkBack manual smoke before any UI-touching merge (script lands at AN-10,
-  mirroring `ios/docs/accessibility-smoke.md`).
+- TalkBack manual smoke in the pre-release device pass, not before each merge
+  (owner ruling, 2026-10-28; script lands at AN-10, mirroring
+  `ios/docs/accessibility-smoke.md`).
 - Accessibility Test Framework checks wired into screen tests (AN-10).
 - Same flake discipline as iOS: reproduce ≥ 2/5 before fixing; prefer deleting
   cleverness over adding waits. The one-run audit belongs after merges;

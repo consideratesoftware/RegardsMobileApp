@@ -143,10 +143,14 @@ require a hosted coding credential.
 
 The recurring task may create branches, edit files, run tests, commit, push,
 open pull requests, address reviews, and merge a pull request once every
-required check is green. The `Regards staged review` check passes whenever a
-valid review ran for the current head, including one that requests changes, so
-green is not the same as approved: read the check output and clear or
-consciously defer every blocker before merging. It must not:
+merge condition in `ENGINEERING_ORG.md` holds (required checks green is only
+the first). The `Regards staged review` check passes whenever a valid review
+ran for the current head, including one that requests changes, so green is not
+the same as approved: read the check output and clear every blocker, or
+record Sid's deferral of it with a link to his PR comment (which names the
+blocker text and the head sha, and is void when the head moves unless the same
+blocker text reappears), before merging. It
+must not:
 
 - weaken the privacy, accessibility, data-integrity, or layer-purity gates;
 - discard user work or use destructive Git operations;
@@ -157,8 +161,11 @@ consciously defer every blocker before merging. It must not:
   dependency. Review and CI monitoring may continue alongside all three lanes.
 
 When an owner-only action blocks the next acceptance criterion, mark the item
-`OWNER`, write one exact checklist under `Owner gates`, and continue any
-independent `READY` work. Ask once, not on every scheduled run.
+`OWNER`, record what's needed under `Owner gates` so a restart can see it,
+and continue any independent `READY` work. Ask Sid in the session as an
+interview (`ENGINEERING_ORG.md`, Owner gates), with exact steps for any
+physical task, and record the answer as a PR comment. If Sid isn't in the
+session, ask when he is next there; ask once, not on every scheduled run.
 
 ## Release gates
 

@@ -23,8 +23,12 @@ report why with the ARCHITECTURE.md section that shows it.
   `@unchecked Sendable` needs a written invariant you have checked.
 - No force-unwraps in `Domain/`. `try?` needs a comment saying why the error
   is safely lost. No `import GRDB` outside `Data/`.
-- Every behavior change gets a test that fails on the old code. Prove it by
-  reverting the change in place, running the test, and restoring; say you did.
+- Every behavior change gets regression proof as `qa-engineer.md` (Rules)
+  defines it: a fix to existing behavior needs a test that fails on the old
+  code; new behavior the old code can't run needs a test that fails on the old
+  code or under a named mutation. Prove it by reverting the change (or
+  applying the named mutation) in place, running the test, and restoring; say
+  you did.
 - Inline until 3 call sites. Match neighboring code.
 - Explicit `git add` paths. `find . -name "* 2.*" -not -path "./.git/*"` before
   every commit. Never amend after review. Never touch another worktree.
@@ -43,7 +47,7 @@ touched.
 SLICE: TF-## / name: COMPLETE | PARTIAL | BLOCKED
 COMMITS: sha: first line
 CRITERIA: criterion → file / test | NOT MET (why)
-REGRESSION PROOF: test → how it was shown to fail on old code
+REGRESSION PROOF: test → fails on old code | fails under mutation: <the edit> | PIN
 GATE: build-engineer RESULT line verbatim
 DEVIATIONS: from the plan, or none
 QUESTIONS FOR TECH LEAD: or none

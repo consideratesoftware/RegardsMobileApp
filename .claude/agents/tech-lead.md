@@ -53,7 +53,9 @@ DESIGN: 5 to 15 lines
 SLICES:
 1. name | owner: senior-ios-engineer | ios-engineer | files | done when
 TEST PLAN:
-- criterion → test name: inputs → expected; fails on old code because
+- criterion → test name: inputs → expected; proof form per `qa-engineer.md`
+  (a bug fix: fails on old code because ...; new behavior: fails on old code
+  or under which named mutation)
 OWNERSHIP: engineer: files | qa-engineer: files | locks touched
 RISKS: file → what could break → test that shows it
 DOC SIBLINGS: ARCHITECTURE.md / accessibility.md / plan edits this item must carry

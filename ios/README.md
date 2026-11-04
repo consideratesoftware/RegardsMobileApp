@@ -53,7 +53,9 @@ The `test` action runs:
   calls `XCUIApplication.performAccessibilityAudit()`. The one-run audit runs
   after merges to `main`; the five-run sweep runs nightly and by manual
   dispatch before release. UI pull requests require the staged accessibility
-  reviewer and manual smoke; releases require a green five-run sweep. See
+  reviewer and focused regressions; the manual VoiceOver smoke goes to the
+  pre-release device pass (owner ruling, 2026-10-28). Releases require a
+  green five-run sweep. See
   [`docs/accessibility.md`](docs/accessibility.md) for the standing rules.
 
 ## Execution plan

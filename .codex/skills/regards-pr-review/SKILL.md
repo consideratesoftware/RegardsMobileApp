@@ -5,7 +5,7 @@ description: Run and consolidate the Regards repository's staged multi-agent pul
 
 # Regards PR review
 
-Review the current branch against `main` unless the user supplies another ref.
+Review the current branch against `origin/main...HEAD` unless the user supplies another ref.
 Treat the literal target `worktree` as all tracked and untracked changes against
 `HEAD`.
 
@@ -18,13 +18,19 @@ Treat the literal target `worktree` as all tracked and untracked changes against
    - Branch/ref: `git diff --stat <target>` and `git diff <target>`.
    - Worktree: `git status --short`, `git diff HEAD`, and every untracked file.
 3. Stop if the target is empty.
-4. Run the mechanical gates before spawning reviewers:
+4. Run the mechanical gates before spawning reviewers. These 4 are the whole
+   set:
    - Copy `ios/` into a temporary directory, run `xcodegen generate` inside the
-     temporary `ios/`, and compare its `Regards.xcodeproj` with the working
-     tree. Do not generate into the working tree during a review.
-   - Run `swiftlint --strict`.
-   - Run the privacy and domain-purity checks defined in
-     `.github/workflows/guards.yml`.
+     temporary `ios/`, compare its `Regards.xcodeproj` with the working tree,
+     and remove the temporary directory on both paths. Do not generate into
+     the working tree during a review.
+   - Run SwiftLint from the repo root, never from `ios/` (`.swiftlint.yml`
+     lives at the root): `(cd "<worktree root>" && swiftlint --strict)`.
+   - The 2 iOS guard scripts this pre-flight uses, from the repo root:
+     `scripts/check-no-network.sh` (the privacy grep) and
+     `scripts/check-domain-purity.sh`. Each is its own check; a nonzero exit
+     from either fails the gates. (CI also runs Android guards; this
+     pre-flight doesn't.)
 5. If a gate fails, return `REQUEST_CHANGES` with the gate evidence and do not
    dispatch reviewers.
 
@@ -62,17 +68,20 @@ VERDICT: APPROVE | REQUEST_CHANGES
 
 ### Nits (take or leave)
 
-### Questions for Sid
+### Owner questions (interview in session)
 
 ### Audit trail
 - Invariants verified (from pr-security-privacy, verbatim)
 - Process line (from pr-accessibility, if run)
 - Docs line (from pr-fit-finish, if run)
 - Criteria map (from pr-tests, verbatim)
+- Not checked (every agent's `NOT CHECKED:` line that isn't `none`)
 ```
 
 Deduplicate identical file-and-line findings, credit all reporting agents, and
-keep the highest severity. Any blocker means `REQUEST_CHANGES`. Drop a finding
+keep the highest severity. Any blocker means `REQUEST_CHANGES`, and so does any
+agent's own `REQUEST_CHANGES` verdict, including one caused by a `NOT CHECKED:`
+entry. Drop a finding
 only when it contradicts `ARCHITECTURE.md`, and record the governing section in
 the audit trail. Cap nits at ten.
 

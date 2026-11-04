@@ -21,9 +21,39 @@ test plan from your prompt, the existing test files and fakes for the area.
 - One scenario per test; the name says scenario and expectation.
 - Behavior, not implementation. A test asserting a mock returns its seed is
   worthless unless it is a contract test run on both backends.
-- Regression tests must be shown to fail on old code; the engineer owns that
-  proof for their change, you own it for tests you add against existing
-  bugs (temporarily revert, run, restore, and say so).
+- For every behavior that changes something, also assert what must not
+  change: other rows and contacts (seed a bystander), other columns, the
+  global settings an override must not touch, and the stored state after a
+  refused or failed write. Use fixtures whose must-not-change values differ
+  from the defaults (a non-default time zone, horizon, or occasion time), so
+  a leak is visible.
+- Every control a screen exposes, and every announcement it makes, is
+  exercised by at least one test that fails if the control does nothing or
+  the announcement is missing. A control `ARCHITECTURE.md` §19 records as
+  intentionally inert (for example R58's channel controls until PR26) gets a
+  test that pins its disabled state and how it is announced instead.
+- Every regression test needs regression proof, defined in the next bullet.
+  The engineer owns that proof for their change; you own it for tests you
+  add against existing bugs (temporarily revert or mutate, run, restore, and
+  say so).
+- Regression proof is defined here; `verifier.md` and `/org` refer to this
+  bullet. A test is regression proof in one of 2 forms: it fails on the old
+  code, or it fails under a named mutation (a specific edit to production
+  code, such as "drop the `isActive` guard in `markCaughtUp`", that you
+  applied, ran, and restored). Which form counts depends on the change. A
+  slice that fixes existing behavior needs a test that fails on the old
+  code; a mutation does not stand in for it. Mutation proof counts only for
+  new behavior the old code cannot run (a new method or code path), where
+  "fails on the old code" can't be shown. A test that passes on old code but
+  fails under a named mutation is regression proof for new behavior and a
+  pin for a bug fix. A pin passes on old code and you can name no mutation
+  that fails it, or it is the mutation-only test of a bug fix: it guards
+  existing behavior against a later change and proves no fix. Label every
+  pin: the first words of its doc comment are `/// Pin.`
+  followed by what it guards (for example `/// Pin. Archived contacts stay
+  out of the pass; this passed before the fix and guards against a later
+  change.`). Never describe a pin as a regression test, and never leave a
+  test that passes on old code with no named mutation unlabeled.
 - Flake rules: no `waitForExistence` on predicate queries; no sleeps as
   synchronization; no timing-dependent unit assertions.
 - Tests go in the right bundle: `RegardsTests` (swift-testing unit),
@@ -45,7 +75,8 @@ simulator; if it reproduces, find the race and report it with file:line; if
 
 ```
 TESTS: file: name → criterion it proves
-REGRESSION PROOF: test → how shown to fail on old code, or n-a
+REGRESSION PROOF: test → fails on old code | fails under mutation: <the edit>
+  | PIN (passes on old code) | n-a
 GATE: build-engineer RESULT line verbatim
 CRITERIA MAP: §14 criterion → test name(s) | MISSING (needs production change: what)
 FLAKES: id → n/5, cause or "did not reproduce"

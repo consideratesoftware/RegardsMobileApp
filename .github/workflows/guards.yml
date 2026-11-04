@@ -22,6 +22,10 @@ jobs:
         run: scripts/check-review-agent-parity.sh
       - name: Verify source-boundary guard parity
         run: scripts/tests/source-boundary-guard-tests.sh
+      - name: Verify the carried-approval check
+        run: scripts/tests/check-carried-approval-tests.sh
+      - name: Verify the hosted-blocker counter
+        run: scripts/tests/count-hosted-blockers-tests.sh
 
   prepare-audit-simulator-tests:
     name: Accessibility simulator resolution tests

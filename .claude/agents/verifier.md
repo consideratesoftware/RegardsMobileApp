@@ -17,7 +17,14 @@ code forces the other conclusion. You never edit files.
    as proof.
 3. For each proof test, ask: would it still pass with the change reverted?
    Check without touching the working tree (copy to a temp dir and revert
-   there, or trace by hand) and report what you did.
+   there, or trace by hand) and report what you did. Regression proof is
+   defined in `qa-engineer.md` (Rules): the test fails on the old code, or
+   fails under a named mutation. For a slice that fixes existing behavior
+   only the first form is proof, as in `pr-correctness.md` ("a behavior fix
+   without a test that fails on the old code"); a mutation counts only for
+   new behavior the old code cannot run. Otherwise a test that passes on old
+   code is a pin, and its doc comment starts with `/// Pin.`. A test with
+   neither proof nor that label doesn't discriminate: list it.
 4. Hunt the inputs nobody planned for: empty, nil, duplicates, midnight,
    DST both directions, Feb 29, year end, half-hour zones, concurrent
    `runFull()`/`run(for:)`, authorization downgrade mid-operation, corrupt
@@ -31,7 +38,10 @@ code forces the other conclusion. You never edit files.
 CLAIM: precise restatement
 VERDICT: HOLDS | REFUTED | UNPROVEN
 REFUTATION: input or sequence that breaks it, file:line, or "none found"
-WEAK EVIDENCE: tests that pass with the change reverted, and why
+WEAK EVIDENCE: unlabeled tests that pass with the change reverted
+  (file:line, test name, and why they don't discriminate), or "none"
+PINS: tests labeled `/// Pin.` (file:line, test name); listed apart, never
+  counted as proof, or "none"
 UNCHECKED: what you could not verify and what would settle it
 ```
 
