@@ -115,6 +115,11 @@ codex_md() { put .codex/skills/s/SKILL.md '# Skill, changed'; }
 claude_md() { put .claude/agents/x.md '# Agent, changed'; }
 scripts_md() { put scripts/x.md '# Script doc, changed'; }
 github_md() { put .github/x.md '# Github doc, changed'; }
+nested_claude_md() { put docs/.claude/n.md '# Nested'; }
+nested_codex_md() { put docs/.codex/n.md '# Nested'; }
+nested_agents_dir_md() { put docs/.agents/n.md '# Nested'; }
+nested_scripts_md() { put ios/scripts/n.md '# Nested'; }
+nested_github_md() { put docs/.github/n.md '# Nested'; }
 root_agents_md() { put AGENTS.md '# Agents file, changed'; }
 root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
 nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
@@ -161,6 +166,11 @@ expect 'a .codex/ .md change fails' 1 codex_md
 expect 'a .claude/ .md change fails' 1 claude_md
 expect 'a scripts/ .md change fails' 1 scripts_md
 expect 'a .github/ .md change fails' 1 github_md
+expect 'a nested docs/.claude/ .md add fails' 1 nested_claude_md
+expect 'a nested docs/.codex/ .md add fails' 1 nested_codex_md
+expect 'a nested docs/.agents/ .md add fails' 1 nested_agents_dir_md
+expect 'a nested ios/scripts/ .md add fails' 1 nested_scripts_md
+expect 'a nested docs/.github/ .md add fails' 1 nested_github_md
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a nested AGENTS.md change fails' 1 nested_agents_md
