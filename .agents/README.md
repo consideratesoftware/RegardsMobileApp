@@ -48,9 +48,10 @@ it through the dedicated App bot. The check asserts that a valid review ran
 for the current head, not that the reviewer agreed: a missing, malformed or
 stale-head artifact fails it, while a `REQUEST_CHANGES` verdict publishes the
 findings and passes, with the verdict and blocker count in the check summary.
-For a human author, acting on a blocker is their call; the Claude Code org's
-merge policy, in `ENGINEERING_ORG.md`, is zero hosted blockers on the current
-head. The publisher uses that App credential from the `hosted-review`
+For a person, acting on a blocker is the author's call. The Claude Code org
+holds itself to a stricter policy of its own, in `ENGINEERING_ORG.md`: clear
+every hosted blocker, or record Sid's deferral of it with a link to his PR
+comment. The publisher uses that App credential from the `hosted-review`
 environment to create the head-bound `Regards staged review` check. Branch
 protection binds that context to the dedicated App's identity, so a
 same-repository PR cannot satisfy it with an identically named Actions job.
