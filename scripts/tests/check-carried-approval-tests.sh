@@ -31,6 +31,8 @@ put() { # put <path> <content>
 put docs/guide.md '# Guide'
 put docs/old.md '# Old'
 put docs/gone.md '# Gone'
+put docs/run.md '# Executable doc'
+chmod +x "$repo/docs/run.md"
 put 'docs/Café.md' '# Café'
 put .agents/README.md '# Agents'
 put .codex/skills/s/SKILL.md '# Skill'
@@ -120,6 +122,11 @@ nested_codex_md() { put docs/.codex/n.md '# Nested'; }
 nested_agents_dir_md() { put docs/.agents/n.md '# Nested'; }
 nested_scripts_md() { put ios/scripts/n.md '# Nested'; }
 nested_github_md() { put docs/.github/n.md '# Nested'; }
+md_symlink() { ln -s ../ios/Info.plist "$repo/docs/link.md"; }
+executable_md_deleted() { git -C "$repo" rm -q docs/run.md; }
+gitlink_on_md_path() {
+  git -C "$repo" update-index --add --cacheinfo "160000,$base,docs/sub.md"
+}
 root_agents_md() { put AGENTS.md '# Agents file, changed'; }
 root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
 nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
@@ -171,6 +178,9 @@ expect 'a nested docs/.codex/ .md add fails' 1 nested_codex_md
 expect 'a nested docs/.agents/ .md add fails' 1 nested_agents_dir_md
 expect 'a nested ios/scripts/ .md add fails' 1 nested_scripts_md
 expect 'a nested docs/.github/ .md add fails' 1 nested_github_md
+expect 'a docs/link.md symlink to ios/Info.plist fails' 1 md_symlink
+expect 'a deleted executable docs/run.md fails' 1 executable_md_deleted
+expect_index 'a gitlink added on a .md path fails' 1 gitlink_on_md_path
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a nested AGENTS.md change fails' 1 nested_agents_md
@@ -199,6 +209,20 @@ git -C "$repo" checkout -q -B sibling-b "$base"
 put docs/guide.md '# Guide, sibling b'
 git -C "$repo" commit -q -am sibling-b
 sibling_b="$(git -C "$repo" rev-parse HEAD)"
+
+# A merge: the carried commit is docs-only, then a .swift change from main is
+# merged in. The net change from the carried commit to the merge includes it.
+git -C "$repo" checkout -q -B merge-main "$base"
+put ios/Regards/App/A.swift '// note
+let x = 4'
+git -C "$repo" commit -q -am main-swift
+git -C "$repo" checkout -q -B merge-lane "$base"
+put docs/guide.md '# Guide, carried'
+git -C "$repo" commit -q -am carried
+carried="$(git -C "$repo" rev-parse HEAD)"
+git -C "$repo" merge -q --no-edit merge-main
+check 'a merge that brings a .swift change from main fails' 1 \
+  "$carried" "$(git -C "$repo" rev-parse HEAD)"
 
 set +e
 bash "$checker" "$repo" "$sibling_a" "$sibling_b" > /dev/null 2>&1
