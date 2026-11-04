@@ -239,10 +239,19 @@ review. Sid hears only about PRs that need him: a blocking owner gate, an
 OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a scope change, or a PR parked
 after its repair rounds.
 
-If it reports CODEX STALE (either review's newest verdict comment names a
-sha other than the head), run both reviews on the new head as in Stage 3 and relaunch
-`release-manager` with the new verdicts. Blockers go to the slice owner as
-in Stage 3. After 3 stale rounds on one PR, park it and say why. Count only
+If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
+relaunch `release-manager` with the new verdicts:
+- a newest verdict names a sha other than the head, or the branch was just
+  updated (`update-branch`): both reviews, on the new head;
+- `carry rejected: <reviewer>` or `reviewer missing: <name>`: that reviewer
+  only, and post a new `PR REVIEW:` comment that lists it in `RERAN:`;
+- no `REVIEWERS:` line on the newest `PR REVIEW:` comment: `/pr-review` in
+  full;
+- the Codex review file is missing or its sha differs: Codex, and save the
+  new file;
+- more than 100 comments: check the PR's verdict comments yourself, and
+  repost any that scrolled out of the newest 100.
+Blockers go to the slice owner as in Stage 3. After 3 stale rounds on one PR, park it and say why. Count only
 head moves caused by fixes. An `update-branch` merge (lanes merging in
 sequence move `main`) and a checkpoint or doc commit from `tech-writer` run
 the reviews again but don't count, or a green PR would park for nothing.
