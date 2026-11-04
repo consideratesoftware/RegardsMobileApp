@@ -99,6 +99,8 @@ struct SchedulingPassTriggerOrderTests {
         #expect(try await Self.hasCadenceRow(environment, contact))
     }
 
+    // TF-11 slice 3 changed this expectation: the import now lands on the
+    // starter step, and the pass runs when onboarding finishes (Done or Skip).
     @Test("Finishing onboarding after the import runs the pass")
     func onboardingAfterImportRunsThePass() async throws {
         let environment = try await Self.environment(onboarded: false, now: now)
@@ -110,7 +112,14 @@ struct SchedulingPassTriggerOrderTests {
         await launch.start()
         #expect(try await Self.hasCadenceRow(environment, contact) == false)
 
+        launch.showContactsStep()
         await launch.requestContactsAndImport()
+
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
+        #expect(try await Self.hasCadenceRow(environment, contact) == false, "The import alone schedules nothing.")
+
+        await launch.finishOnboarding()
 
         #expect(launch.phase == .ready)
         #expect(try await Self.hasCadenceRow(environment, contact))

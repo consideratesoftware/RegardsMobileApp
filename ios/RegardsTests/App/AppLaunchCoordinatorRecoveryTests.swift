@@ -4,7 +4,9 @@ import Testing
 
 @MainActor
 struct AppLaunchCoordinatorRecoveryTests {
-    nonisolated private static let now = Date(timeIntervalSince1970: 1_785_600_000)
+    static let finishSetupFailureMessage =
+        "Contacts were imported, but Regards couldn't finish setup. Tap Finish setup to try again."
+    nonisolated static let now = Date(timeIntervalSince1970: 1_785_600_000)
 
     @Test("A cancelled production open becomes visibly retryable")
     func cancelledProductionOpenCanRetry() async throws {
@@ -82,7 +84,9 @@ struct AppLaunchCoordinatorRecoveryTests {
         await source.finishRequest()
         await firstTap.value
 
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: the one import lands on the starter step.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         #expect(await source.counts() == .init(current: 2, requests: 1, fetches: 1))
         let runtime = try #require(launch.runtime)
         #expect(try await runtime.environment.contacts.fetchAll().filter {
@@ -90,6 +94,9 @@ struct AppLaunchCoordinatorRecoveryTests {
         }.count == 1)
     }
 
+    // TF-11 slice 3 changed this flow: the import no longer saves the profile,
+    // so the completion save that fails is the one `finishOnboarding()` makes
+    // from the starter step.
     @Test("A successful import retries profile completion without importing twice")
     func successfulImportThenProfileSaveFailureCanBrowseAndRetry() async throws {
         let profile = RetryingRecoveryProfileRepository(
@@ -106,9 +113,17 @@ struct AppLaunchCoordinatorRecoveryTests {
         await launch.start()
 
         #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
+        #expect(!launch.onboardingCompletionPending)
+        #expect(launch.statusMessage == nil)
+        #expect(await profile.saveCount() == 0)
+
+        await launch.finishOnboarding()
+
+        #expect(launch.phase == .onboarding)
         #expect(launch.onboardingCompletionPending)
         #expect(launch.canContinueWithoutContacts)
-        #expect(launch.statusMessage == "Contacts were imported, but Regards couldn't finish setup. Try again.")
+        #expect(launch.statusMessage == Self.finishSetupFailureMessage)
         #expect(try await runtime.environment.contacts.fetchAll().filter {
             $0.systemContactRef == Self.systemContact.identifier
         }.count == 1)
@@ -124,7 +139,9 @@ struct AppLaunchCoordinatorRecoveryTests {
         }.count == 1)
         #expect(try await profile.fetch().onboardingCompletedAt == Self.now)
         #expect(await profile.saveCount() == 2)
-        #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
+        // The import ran once (the rows above are not duplicated). The second
+        // read of the store is the reconcile that a successful Finish setup runs.
+        #expect(await source.counts().fetches == 2)
     }
 
     @Test("Double-tapping continue starts one profile save")
@@ -183,7 +200,7 @@ struct AppLaunchCoordinatorRecoveryTests {
         #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == Self.now)
     }
 
-    private func coordinator(
+    func coordinator(
         runtime: AppRuntime,
         source: any ContactsSource
     ) -> AppLaunchCoordinator {
@@ -196,7 +213,7 @@ struct AppLaunchCoordinatorRecoveryTests {
         )
     }
 
-    private func coordinator(
+    func coordinator(
         environment: AppEnvironment,
         source: any ContactsSource
     ) -> AppLaunchCoordinator {
@@ -211,7 +228,7 @@ struct AppLaunchCoordinatorRecoveryTests {
         )
     }
 
-    private func runtime(profile: any UserProfileRepository) -> AppRuntime {
+    func runtime(profile: any UserProfileRepository) -> AppRuntime {
         let base = AppEnvironment.makeMock(now: Self.now)
         let environment = AppEnvironment(
             contacts: base.contacts,
@@ -232,13 +249,13 @@ struct AppLaunchCoordinatorRecoveryTests {
         )
     }
 
-    private static let startedTrialProfile = UserProfile(
+    static let startedTrialProfile = UserProfile(
         entitlementTier: .trial,
         entitlementRefreshedAt: now,
         trialStartedAt: now
     )
 
-    private static let systemContact = SystemContact(
+    static let systemContact = SystemContact(
         identifier: "recovery-contact",
         givenName: "Leia",
         familyName: "Organa",
@@ -251,7 +268,7 @@ private enum LaunchRecoveryTestError: Error {
     case saveFailed
 }
 
-private actor RecoveryContactsSource: ContactsSource {
+actor RecoveryContactsSource: ContactsSource {
     struct Counts: Equatable {
         let current: Int
         let requests: Int
@@ -328,7 +345,7 @@ private actor CancellableRecoveryRuntimeFactory {
     func attemptCount() -> Int { attempts }
 }
 
-private actor RetryingRecoveryProfileRepository: UserProfileRepository {
+actor RetryingRecoveryProfileRepository: UserProfileRepository {
     private var profile: UserProfile
     private var failuresRemaining: Int
     private var saves = 0
@@ -352,7 +369,7 @@ private actor RetryingRecoveryProfileRepository: UserProfileRepository {
     func saveCount() -> Int { saves }
 }
 
-private actor BlockingRecoveryProfileRepository: UserProfileRepository {
+actor BlockingRecoveryProfileRepository: UserProfileRepository {
     private var profile: UserProfile
     private var saves = 0
     private var saveStarted = false

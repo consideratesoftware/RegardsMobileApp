@@ -6,8 +6,9 @@ import Foundation
 /// `AppLaunchCoordinator.swift` to keep that file's primary type body under
 /// the lint length limit — these members can't be `private` because of the
 /// file split, but nothing outside `AppLaunchCoordinator` itself calls them
-/// except `RootView`'s `handleSceneActivation()`, which was already
-/// non-private.
+/// except `handleSceneActivation()`, which RootView calls on scene
+/// activation and ContactsAccessViewModel calls through
+/// makeContactsAccessViewModel() after a Settings grant.
 extension AppLaunchCoordinator {
     /// Called when the scene becomes active again (app foregrounded). A
     /// no-op before the runtime is ready or while onboarding is still in

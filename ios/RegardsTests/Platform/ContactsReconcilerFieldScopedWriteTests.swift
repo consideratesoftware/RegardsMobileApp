@@ -54,6 +54,68 @@ struct ContactsReconcilerFieldScopedWriteTests {
         // stale snapshot would have reverted this back to `nil`.
         #expect(reloaded.lastInteractedAt == concurrentInteractionAt)
     }
+
+    /// TF-11 plan risk: a refresh, an un-archive or an archive sweep that resets
+    /// `tracked`, `cadenceDays` or `priorityTier` would silently drop the starters
+    /// a user just picked. One pass set covers the four write paths that touch an
+    /// existing row: refresh of a tracked row, refresh of an untracked row (must
+    /// stay untracked), un-archive of a tracked row, and archive of a tracked row.
+    @Test("Reconciling never changes tracked, cadenceDays or priorityTier on any path")
+    func reconcileNeverChangesTrackingColumns() async throws {
+        let repo = GRDBRepositories(dbQueue: try DatabaseFactory.makeInMemoryDatabase()).contacts
+        let refreshedTracked = Contact(
+            systemContactRef: "tracking-refresh-tracked", displayName: "Old Tracked",
+            tracked: true, cadenceDays: 14, priorityTier: .close
+        )
+        let refreshedUntracked = Contact(
+            systemContactRef: "tracking-refresh-untracked", displayName: "Old Untracked"
+        )
+        let unarchivedTracked = Contact(
+            systemContactRef: "tracking-unarchive", displayName: "Old Returning",
+            tracked: true, cadenceDays: 30, priorityTier: .regular,
+            archivedAt: Self.now.addingTimeInterval(-86_400)
+        )
+        let archivedTracked = Contact(
+            systemContactRef: "tracking-archive", displayName: "Soon Gone",
+            tracked: true, cadenceDays: 7, priorityTier: .close
+        )
+        let seeded = [refreshedTracked, refreshedUntracked, unarchivedTracked, archivedTracked]
+        for contact in seeded { try await repo.upsert(contact) }
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "tracking-refresh-tracked", givenName: "New", familyName: "Tracked",
+                          phoneNumbers: [], emailAddresses: []),
+            SystemContact(identifier: "tracking-refresh-untracked", givenName: "New", familyName: "Untracked",
+                          phoneNumbers: [], emailAddresses: []),
+            SystemContact(identifier: "tracking-unarchive", givenName: "New", familyName: "Returning",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
+        let clock = MutableClock(Self.now)
+        let reconciler = ContactsReconciler(source: source, repo: repo, clock: clock.now)
+
+        let firstPass = try await reconciler.reconcile()
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
+        let secondPass = try await reconciler.reconcile(previouslyMissingRefs: firstPass.missingRefs)
+
+        // The passes did the work the assertions below depend on.
+        #expect(firstPass.refreshed == 2)
+        #expect(firstPass.unarchived == 1)
+        #expect(secondPass.archived == 1)
+        let names = try await Dictionary(
+            uniqueKeysWithValues: repo.fetchAll().map { ($0.systemContactRef, $0.displayName) }
+        )
+        #expect(names["tracking-refresh-tracked"] == "New Tracked")
+        #expect(names["tracking-refresh-untracked"] == "New Untracked")
+        #expect(names["tracking-unarchive"] == "New Returning")
+        let archivedRow = try #require(try await repo.fetch(id: archivedTracked.id))
+        #expect(archivedRow.archivedAt != nil)
+
+        for before in seeded {
+            let after = try #require(try await repo.fetch(id: before.id))
+            #expect(after.tracked == before.tracked, "\(before.systemContactRef) tracked")
+            #expect(after.cadenceDays == before.cadenceDays, "\(before.systemContactRef) cadenceDays")
+            #expect(after.priorityTier == before.priorityTier, "\(before.systemContactRef) priorityTier")
+        }
+    }
 }
 
 /// Wraps a real `ContactRepository` and runs `onUpdateReconciledFields`

@@ -13,10 +13,12 @@ extension AppLaunchCoordinatorTests {
 
         await launch.start()
 
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: the import lands on the starter step, not on tabs.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         let runtime = try #require(launch.runtime)
         #expect(try await runtime.environment.contacts.fetchAll().count == 1)
-        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == now)
+        #expect(try await runtime.environment.profile.fetch().onboardingCompletedAt == nil)
         #expect(await source.counts() == .init(current: 2, requests: 0, fetches: 1))
     }
 

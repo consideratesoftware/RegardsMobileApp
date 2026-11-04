@@ -33,6 +33,12 @@ struct MockContactRepository: ContactRepository {
         try await store.updateReminderWindowOverride(id: id, window: window)
     }
 
+    /// Overrides the protocol's default the same way, for the same reason.
+    @discardableResult
+    func updateTracking(id: UUID, cadenceDays: Int?) async throws -> Bool {
+        try await store.updateTracking(id: id, cadenceDays: cadenceDays)
+    }
+
     /// Overrides the protocol's default (which reports zero corruption for
     /// any in-memory backend) so the `REGARDS_UI_TEST_SEED_CORRUPT_ROW`
     /// fixture can make the All Contacts corruption banner reachable.
