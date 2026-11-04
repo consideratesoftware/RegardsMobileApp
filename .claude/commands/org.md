@@ -180,24 +180,28 @@ fix), run both `/pr-review origin/main...HEAD` and `codex-reviewer` again on
 the new head before Stage 4 re-checks merge conditions; the release manager
 can't launch agents.
 
-Scoped rechecks. Owner ruling, 2026-11-02 (PR #68 comment 6597940023): after
-a round with no blockers, you may recheck the fixes without asking Sid.
-Rerun the `/pr-review` reviewers whose areas the new commits touch (routing
-table in `pr-review.md`), plus `codex-reviewer`, which always reviews the
-whole `origin/main...HEAD` diff at the current head. Ask Sid only if a
-blocker survives 2 rounds or a fix needs a product decision. The `PR
-REVIEW:` comment lists every reviewer that ran on a `REVIEWERS:` line with
-its verdict. A scoped recheck adds a `RERAN:` line naming the reviewers that
-ran, which must include `pr-security-privacy`, and one `CARRIED:` line per
-reviewer whose earlier approval stands, as `CARRIED: <reviewer> APPROVE from
-<sha>`. Every reviewer the routing table runs for the PR must be rerun or
-carried, and a carry can't pass a later REQUEST_CHANGES from that reviewer.
+Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
+2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, you
+may recheck the fixes without asking Sid. Rerun `pr-security-privacy`,
+`pr-correctness`, `pr-fit-finish` and `pr-accessibility` (the last two where
+the routing table in `pr-review.md` requires them) on every head, plus
+`codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
+the current head. Rerun `pr-code-quality` and `pr-tests` when the new commits
+touch their areas. Ask Sid only if a blocker survives 2 rounds or a fix needs
+a product decision. The `PR REVIEW:` comment lists every reviewer that ran on
+a `REVIEWERS:` line with its verdict. A scoped recheck adds a `RERAN:` line
+naming the reviewers that ran, and one `CARRIED:` line per `pr-code-quality`
+or `pr-tests` approval that stands, as `CARRIED: <reviewer> APPROVE from
+<sha>`. Every reviewer the routing table runs for the PR must be rerun or,
+for those two, carried, and a carry can't pass a later REQUEST_CHANGES from
+that reviewer.
 
-Only Markdown outside the agent, script and CI directories carries; anything
-else reruns that reviewer. The release manager checks each `CARRIED:` line
+Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown
+outside the agent, script and CI directories; anything else reruns that
+reviewer. The release manager checks each `CARRIED:` line
 (`release-manager.md`, Merge conditions) and rejects one that fails, so if you
-aren't sure, rerun the reviewer. `pr-security-privacy` never carries: it
-reruns on every head the release manager checks. Codex never carries either.
+aren't sure, rerun the reviewer. The other four reviewers and Codex never
+carry: they rerun on every head.
 
 Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
 and Stage 3 alike. Don't start a general-purpose agent and tell it to read

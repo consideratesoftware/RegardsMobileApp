@@ -153,8 +153,8 @@ PR, never in the root checkout.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
   Check each `CARRIED: <reviewer> APPROVE from <sha>` line, and list the
   results in your report. A carry stands only if both hold:
-  1. The reviewer is not `pr-security-privacy` (it reruns on every head and
-     never carries) and the line is not about Codex.
+  1. The reviewer is `pr-code-quality` or `pr-tests`. The other four
+     reviewers and Codex rerun on every head and never carry.
   2. This passes, with `<lane>` the absolute lane worktree path from your
      prompt:
      ```
@@ -175,16 +175,16 @@ PR, never in the root checkout.
   Two more checks apply to every newest `PR REVIEW:` comment, scoped or
   not, and a failure of either is STATE CODEX STALE:
   - Completeness. The comment needs a `REVIEWERS:` line; without one, report
-    "no REVIEWERS line". `pr-security-privacy` must be APPROVE in
-    `REVIEWERS` at the head (it never carries). Find the reviewers the
+    "no REVIEWERS line". Find the reviewers the
     routing table in `.claude/commands/pr-review.md` requires: run
     `git -C <lane> fetch`, then
     `git -C <lane> diff --name-only origin/main...<head sha>`. They are
     `pr-correctness`, `pr-security-privacy`, `pr-code-quality`, `pr-tests`
     when that diff changes code or tests, and `pr-accessibility` and
     `pr-fit-finish` when their path rules match it. Each required reviewer
-    must be APPROVE in `REVIEWERS` or on a `CARRIED:` line that passed. A
-    missing one is "reviewer missing: <name>".
+    must be APPROVE in `REVIEWERS` at the head. Only `pr-code-quality` and
+    `pr-tests` may instead be on a `CARRIED:` line that passed. A missing one
+    is "reviewer missing: <name>".
   - Newest verdict. A carried approval must be that reviewer's newest
     recorded verdict, so there is no carry past a later REQUEST_CHANGES.
     Print every counting `PR REVIEW:` comment's first line and `REVIEWERS:`

@@ -139,22 +139,23 @@ All of these, on the current head, with no averaging:
    protection on `main` requires branches to be up to date, so a behind
    branch can't merge anyway.
 
-Scoped rechecks. Owner ruling, 2026-11-02 (PR #68 comment 6597940023):
-after a round with no blockers, the engineering manager may recheck the
-fixes without asking Sid: the `/pr-review` reviewers whose areas the new
-commits touch, plus `codex-reviewer` on the whole `origin/main...HEAD` diff
-at the current head. Sid is asked only if a blocker survives 2 rounds or a
-fix needs a product decision. The `PR REVIEW:` comment lists which
-reviewers reran and which approvals carry from which sha. An approval
-carries only as `scripts/check-carried-approval.sh` allows: only Markdown
-outside the agent, script and CI directories carries, and anything else
-reruns that reviewer. The release manager runs that script.
-`pr-security-privacy` and Codex never carry; they run again on every head.
-On every newest `PR REVIEW:` comment, scoped or not, each reviewer the
-routing table requires must be APPROVE on its `REVIEWERS:` line or on a
-passing `CARRIED:` line, and `pr-security-privacy` must be on the
-`REVIEWERS:` line at the head. A comment without a `REVIEWERS:` line fails
-the check (STATE CODEX STALE).
+Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
+2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, the
+engineering manager may recheck the fixes without asking Sid. Only
+`pr-code-quality` and `pr-tests` may carry an approval over a Markdown-only
+change. `pr-security-privacy`, `pr-correctness`, `pr-fit-finish`,
+`pr-accessibility` (where the routing table requires them) and
+`codex-reviewer` on the whole `origin/main...HEAD` diff run again on every
+head. Sid is asked only if a blocker survives 2 rounds or a fix needs a
+product decision. The `PR REVIEW:` comment lists which reviewers reran and
+which approvals carry from which sha. A carry stands only as
+`scripts/check-carried-approval.sh` allows: only Markdown outside the agent,
+script and CI directories carries, and anything else reruns that reviewer.
+The release manager runs that script. On every newest `PR REVIEW:` comment,
+scoped or not, each reviewer the routing table requires must be APPROVE on
+its `REVIEWERS:` line, or for `pr-code-quality` and `pr-tests` on a passing
+`CARRIED:` line. A comment without a `REVIEWERS:` line fails the check (STATE
+CODEX STALE).
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
