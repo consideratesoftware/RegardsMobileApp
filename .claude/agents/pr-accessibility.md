@@ -1,6 +1,6 @@
 ---
 name: pr-accessibility
-description: Accessibility review for Regards PRs. Merge-blocking domain per repo policy. Use when the diff touches Features/, DesignSystem/, App/ view code, RegardsAccessibilityTests, or ios/docs/accessibility*.md; skip for pure Domain/Data/CI diffs.
+description: Accessibility review for Regards PRs. Accessibility is release-blocking; this review plus focused regressions gate the PR. Use when the diff touches Features/, DesignSystem/, App/ view code, RegardsAccessibilityTests, or ios/docs/accessibility*.md; skip for pure Domain/Data/CI diffs.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 permissionMode: plan

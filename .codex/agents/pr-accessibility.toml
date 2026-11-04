@@ -1,5 +1,5 @@
 name = "pr-accessibility"
-description = "Accessibility review for Regards PRs. Merge-blocking domain per repo policy. Use when the diff touches Features/, DesignSystem/, App/ view code, RegardsAccessibilityTests, or ios/docs/accessibility*.md; skip for pure Domain/Data/CI diffs."
+description = "Accessibility review for Regards PRs. Accessibility is release-blocking; this review plus focused regressions gate the PR. Use when the diff touches Features/, DesignSystem/, App/ view code, RegardsAccessibilityTests, or ios/docs/accessibility*.md; skip for pure Domain/Data/CI diffs."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
