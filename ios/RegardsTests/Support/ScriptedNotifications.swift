@@ -26,8 +26,10 @@ actor ScriptedNotifications: NotificationScheduling {
     private(set) var scheduleCalls: [ReminderNotificationRequest] = []
     private(set) var cancelCalls: [[String]] = []
     /// Requests the real center would have delivered, at once on add or once
-    /// their time passes (checked at the start of every call). Fire dates are
-    /// recorded at whole seconds, as the real center reports them.
+    /// their time passes (checked at the start of every scheduling call). Fire
+    /// dates are recorded at whole seconds, as the real center reports them.
+    /// Requests that come due together are recorded in fire-date order, then
+    /// identifier order, as the real center delivers them.
     private(set) var delivered: [ReminderNotificationRequest] = []
     private let clock: @Sendable () -> Date
 
@@ -121,10 +123,12 @@ actor ScriptedNotifications: NotificationScheduling {
     }
 
     /// Moves every pending request whose time is at or before the clock to
-    /// `delivered`, in identifier order.
+    /// `delivered`, in fire-date order, then identifier order.
     private func deliverDue() {
         let now = clock()
-        for request in pending.values.filter({ $0.fireDate <= now }).sorted(by: { $0.identifier < $1.identifier }) {
+        let due = pending.values.filter { $0.fireDate <= now }
+            .sorted { ($0.fireDate, $0.identifier) < ($1.fireDate, $1.identifier) }
+        for request in due {
             pending[request.identifier] = nil
             delivered.append(request)
         }

@@ -6,8 +6,9 @@ import Testing
 /// fakes answering like the real center. Both fakes store each request through
 /// the adapter's `makeRequest` and `decode` with an injected clock. These tests
 /// pin that add-time delivery, read-time delivery, whole-second truncation,
-/// replace by identifier and cancel match the real center, and every case runs
-/// against both fakes.
+/// replace by identifier and cancel match the real center. Every parameterized
+/// case runs against both fakes; the scripted-only cases check its delivered
+/// record.
 ///
 /// The truncation and delivery rules come from the adapter's own `makeRequest`
 /// and `decode`, which `UserNotificationsAdapterRequestTests` pins. These tests
@@ -134,6 +135,36 @@ struct NotificationFakeParityTests {
 
         #expect(await scripted.delivered == [sent])
         #expect(await scripted.pendingRequests().isEmpty)
+    }
+
+    @Test("A due request is delivered before a same-id schedule, with no read in between")
+    func dueRequestIsDeliveredBeforeASameIdSchedule() async throws {
+        let clock = MutableClock(Self.now)
+        let scripted = ScriptedNotifications(clock: { clock.now() })
+        let first = Self.request(body: "first", fireDate: Self.now.addingTimeInterval(60))
+        let second = Self.request(body: "second", fireDate: Self.now.addingTimeInterval(60 + 3600))
+        try await scripted.schedule(first)
+
+        clock.advance(by: 60)
+        try await scripted.schedule(second)
+
+        #expect(await scripted.delivered == [first])
+        #expect(await scripted.pendingRequests() == [second])
+    }
+
+    @Test("Requests that come due together are delivered in fire-date order")
+    func dueRequestsAreDeliveredInFireDateOrder() async throws {
+        let clock = MutableClock(Self.now)
+        let scripted = ScriptedNotifications(clock: { clock.now() })
+        let earlier = Self.request(id: "b", fireDate: Self.now.addingTimeInterval(30))
+        let later = Self.request(id: "a", fireDate: Self.now.addingTimeInterval(60))
+        try await scripted.schedule(later)
+        try await scripted.schedule(earlier)
+
+        clock.advance(by: 60)
+
+        #expect(await scripted.pendingRequests().isEmpty)
+        #expect(await scripted.delivered == [earlier, later])
     }
 
     @Test("Cancel removes only the named pending requests and ignores unknown ids", arguments: Fake.allCases)
