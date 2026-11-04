@@ -162,9 +162,11 @@ PR, never in the root checkout.
      ```
      Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
-     other nonzero exit is a script error; all of them fail the carry. Run
-     the root checkout's copy on `main`, not the lane's, because the PR under
-     review could have edited its own copy of the scripts. The rule is one
+     other nonzero exit is a script error; all of them fail the carry. Use
+     the copy in the root checkout on `main`, not the lane's: the PR under
+     review could have edited its own copy. (While this PR is itself under
+     review, the engineering manager's prompt gives you the path of its
+     copy.) The rule is one
      line: only Markdown outside the agent, script and CI directories
      carries, never AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown
      under ios/Regards* or android/app, and anything else reruns that
