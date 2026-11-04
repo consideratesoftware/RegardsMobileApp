@@ -112,33 +112,21 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
   --jq '[.check_runs[] | select(.app.slug == "regards-staged-review")]
         | sort_by(.completed_at // .started_at) | last | .output.text // empty' \
   > "<scratch>/hosted-review.txt"
-if [ -s "<scratch>/hosted-review.txt" ]; then
-  awk '
-    /^VERDICT:/ && !v { v = $2 }
-    /^### Blockers/ { found = 1; s = 1; next }
-    /^### /         { s = 0 }
-    s && /^[[:space:]]*([-*]|[0-9]+[.)])[[:space:]]+None\.?[[:space:]]*$/ { next }
-    s && /^[[:space:]]*([-*]|[0-9]+[.)]) / { n++; next }
-    s && NF && !/^None\.?[[:space:]]*$/ { other++ }
-    END {
-      if (NR == 0)                  print "PENDING: empty review text"
-      else if (!found)              print "MALFORMED: no Blockers section"
-      else if (n == 0 && other > 0) print "MALFORMED: Blockers section has text but no bullets"
-      else if (n == 0 && v != "APPROVE") print "MALFORMED: no blockers listed but VERDICT is " (v == "" ? "missing" : v)
-      else                          print "BLOCKERS " n + 0
-    }' "<scratch>/hosted-review.txt"
-else
-  echo "PENDING: no review text for this head yet"
-fi
+bash "<root checkout>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
 ```
 
-`PENDING` means the review hasn't run on this head: wait and query again, and
-never count it as zero. Only `BLOCKERS 0` counts as zero, and the counter
+Always run the script with `bash`, never your default shell. Use the copy in
+the root checkout on `main`, not the lane's: the PR under review could have
+edited its own copy. (While this PR is itself under review, the engineering
+manager's prompt gives you the path of its copy.) The script prints one line,
+`PENDING: <why>`, `BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its
+tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
+`PENDING` means the review hasn't run on this head: wait and query again,
+and never count it as zero. Only `BLOCKERS 0` counts as zero, and the script
 prints it only when the text also has `VERDICT: APPROVE`. `MALFORMED` fails
 closed: treat it as unresolved blockers, quote the section, and report it.
-Bullets can be `-`, `*`, or numbered; a bullet that reads only `None` isn't a
-blocker. Also check that the text's `HEAD SHA:` line equals `<head sha>` and
-that `VERDICT:` is present. Quote the blockers verbatim in your report.
+Also check that the text's `HEAD SHA:` line equals `<head sha>`. Quote the
+blockers verbatim in your report.
 
 Red or blockers: hand off to `on-call-engineer` with the findings, then watch
 again. At most 2 rounds, then park.
@@ -161,58 +149,23 @@ PR, never in the root checkout.
   moves, except for a blocker whose text reappears unchanged in the new
   head's review; compare the text.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
-  Check each `CARRIED: <reviewer> APPROVE from <sha>` line mechanically,
-  and list the results in your report. A carry stands only if all of these
-  hold:
+  Check each `CARRIED: <reviewer> APPROVE from <sha>` line, and list the
+  results in your report. A carry stands only if both hold:
   1. The reviewer is not `pr-security-privacy` (it reruns on every head and
      never carries) and the line is not about Codex.
-  2. `<sha>` is an ancestor of the head.
-  3. Every path in `git diff --name-only <sha> <head sha>` ends in `.md`,
-     `.swift`, `.yml`, `.sh`, `.py`, or `.toml`, and is neither `project.yml`
-     nor under `ios/Regards.xcodeproj`. Any other path fails the carry: a
-     plist, `.xcprivacy`, json, `.kts`, properties, `Package.resolved`, or an
-     extensionless script all fail.
-  4. The non-`.md` files change comments and blank lines only. A shebang
-     (`#!`) line never counts as a comment, and neither does any change to
-     line 1 of a `.sh` file, a mode change, or an added, deleted, or renamed
-     file.
-  Run checks 2 to 4 as one script, with `<lane>` the absolute lane worktree
-  path from your prompt. Any git error fails the carry. It prints `CARRY
-  PASSES` or `CARRY FAILS` with the reason:
-  ```
-  lane="<lane>"; from="<sha>"; head="<head sha>"
-  fail() { echo "CARRY FAILS: $1"; exit 1; }
-  git -C "$lane" merge-base --is-ancestor "$from" "$head" || fail "not an ancestor, or a git error"
-  names=$(git -C "$lane" diff --name-only "$from" "$head") || fail "git error listing files"
-  for f in $names; do
-    case "$f" in
-      project.yml|*/project.yml|ios/Regards.xcodeproj/*) fail "project file: $f" ;;
-      *.md|*.swift|*.yml|*.sh|*.py|*.toml) ;;
-      *) fail "path outside the allowlist: $f" ;;
-    esac
-  done
-  diff=$(git -C "$lane" diff --unified=0 --no-color "$from" "$head" -- '*.swift' '*.yml' '*.sh' '*.py' '*.toml') || fail "git error reading the diff"
-  bad=$(printf '%s\n' "$diff" | awk '
-    /^diff --git / { hdr = 1; file = $NF; sub(/^b\//, "", file); next }
-    hdr && /^(old mode|new mode|new file mode|deleted file mode|rename |similarity )/ { print "mode/add/delete/rename: " file; next }
-    /^@@ / {
-      hdr = 0
-      if (file ~ /\.sh$/ && ($0 ~ /^@@ -1( |,[1-9])/ || $0 ~ /^@@ -0,0 / || $0 ~ / \+1( |,[1-9])/)) print "line 1 of " file
-      next
-    }
-    hdr { next }
-    /^[+-]/ {
-      body = substr($0, 2)
-      if (body ~ /^[[:space:]]*$/) next
-      if (file ~ /\.swift$/) { if (body ~ /^[[:space:]]*\/\//) next }
-      else if (body ~ /^#!/) { print "shebang in " file ": " $0; next }
-      else if (body ~ /^[[:space:]]*#/) next
-      print file ": " $0
-    }
-  ')
-  [ -z "$bad" ] || fail "non-comment change: $bad"
-  echo "CARRY PASSES"
-  ```
+  2. This passes, with `<lane>` the absolute lane worktree path from your
+     prompt:
+     ```
+     bash "<root checkout>/scripts/check-carried-approval.sh" "<lane>" <sha> <head sha>
+     ```
+     Exit 0 and `CARRY PASSES` mean the carry is allowed; anything else
+     prints `CARRY FAILS: <reason>`. Always run it with `bash`, never your
+     default shell (zsh does not word-split a variable, and the script relies
+     on it). Use the root checkout's copy on `main`, not the lane's, for the
+     reason given for the blocker counter. The script's header and
+     `scripts/tests/check-carried-approval-tests.sh` define the rules: docs
+     and comment-only changes carry, and agent contracts, commands, skills,
+     scripts, CI, `.toml`, project files, and anything else never do.
   If any check fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.
