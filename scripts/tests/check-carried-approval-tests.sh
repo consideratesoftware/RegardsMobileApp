@@ -224,7 +224,14 @@ git -C "$repo" merge -q --no-edit merge-main
 check 'a merge that brings a .swift change from main fails' 1 \
   "$carried" "$(git -C "$repo" rev-parse HEAD)"
 
+# A mktemp that always fails, put first on PATH.
+mkdir "$work/bin"
+printf '#!/bin/sh\nexit 1\n' > "$work/bin/mktemp"
+chmod +x "$work/bin/mktemp"
+
 set +e
+no_tmp_output="$(PATH="$work/bin:$PATH" bash "$checker" "$repo" "$base" "$base" 2>&1)"
+no_tmp=$?
 bash "$checker" "$repo" "$sibling_a" "$sibling_b" > /dev/null 2>&1
 backwards=$?
 bash "$checker" "$repo" deadbeef "$base" > /dev/null 2>&1
@@ -234,6 +241,9 @@ usage=$?
 set -e
 [[ "$backwards" -eq 1 ]] || { echo "FAIL: a non-ancestor carry should fail, got $backwards" >&2; exit 1; }
 echo 'PASS: a non-ancestor sha fails'
+[[ "$no_tmp" -eq 1 && "$no_tmp_output" == CARRY\ FAILS:* ]] \
+  || { echo "FAIL: a failed mktemp should print CARRY FAILS and exit 1, got $no_tmp: $no_tmp_output" >&2; exit 1; }
+echo 'PASS: a failed mktemp prints CARRY FAILS'
 [[ "$bad_sha" -eq 1 ]] || { echo "FAIL: an unknown sha should fail, got $bad_sha" >&2; exit 1; }
 echo 'PASS: an unknown sha fails'
 [[ "$usage" -eq 64 ]] || { echo "FAIL: usage error should exit 64, got $usage" >&2; exit 1; }

@@ -5,7 +5,8 @@
 #
 # Run it with bash. Exit codes:
 #   0   prints "CARRY PASSES"; the approval carries.
-#   1   prints "CARRY FAILS: <reason>"; the reviewer reruns.
+#   1   prints "CARRY FAILS: <reason>"; the reviewer reruns. This includes a
+#       failed mktemp, which prints it too.
 #   64  usage error (printed to stderr).
 #   any other nonzero exit is a script error and fails the carry too.
 #
@@ -44,7 +45,7 @@ lane="$1"
 from="$2"
 to="$3"
 
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)" || fail "cannot create a temp directory"
 trap 'rm -rf "$tmp"' EXIT
 
 git -C "$lane" merge-base --is-ancestor "$from" "$to" \
