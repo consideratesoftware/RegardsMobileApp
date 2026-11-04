@@ -35,14 +35,15 @@
 # every Android module's sources, assets and tests (android/*/src/; the *
 # crosses slashes, so android/feature/overdue/src/ is covered, while
 # android/docs/ and android/README.md stay eligible), android/*/schemas/ (the
-# Room schemaLocation in android/data/build.gradle.kts, whose committed schema
-# files the migration tests read), and shared/testvectors/, test data with two
-# readers: the Swift suite, which generates the vectors and consumes them
-# first, and the Android domain tests (ANDROID_PORT.md A6). A Markdown file in
-# those last two trees would be read as data, so they are excluded to fail
-# closed. Elsewhere a Markdown file is documentation, except the instruction
-# files and ARCHITECTURE.md named above, which agents read as instructions or
-# as the contract.
+# Room schemaLocation in android/data/build.gradle.kts; Room migration tests
+# will read the committed schema files there once they exist), and
+# shared/testvectors/, test data with two future readers: the Swift suite,
+# which will generate the vectors and read them first, and the Android domain
+# tests (AN-02 and ANDROID_PORT.md A6). Neither tree has a reader yet, but a
+# Markdown file there would be read as data once one does, so both are
+# excluded now to fail closed. Elsewhere a Markdown file is documentation,
+# except the instruction files and ARCHITECTURE.md named above, which agents
+# read as instructions or as the contract.
 
 set -euo pipefail
 export LC_ALL=C
