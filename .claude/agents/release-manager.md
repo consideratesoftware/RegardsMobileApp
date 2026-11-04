@@ -68,8 +68,10 @@ gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$
 The query returns the newest 100 comments, oldest first. If `total comments`
 is above 100 and either a kind prints `none` or a required reviewer has no
 `REVIEWERS:` entry in the output, stop and report STATE CODEX STALE with the
-reason "more than 100 comments, verdict lookup needs a manual check". A
-rejected carry keeps its own "carry rejected: <name>" reason. Fail closed:
+reason "more than 100 comments, verdict lookup needs a manual check". That
+reason wins over "carry rejected" for a required reviewer with no
+`REVIEWERS:` entry in the output. A carry rejected for a reviewer that does
+have an entry keeps its own "carry rejected: <name>" reason. Fail closed:
 don't treat it as a missing verdict and don't page through older comments
 yourself; the engineering manager checks and reposts a verdict if needed.
 
