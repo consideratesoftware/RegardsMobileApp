@@ -101,6 +101,60 @@ struct SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
+    // MARK: - Clock rollback
+
+    /// The device clock is set back 1 hour before the fired row's slot. The
+    /// row was delivered, so a rollback never re-arms it: the contact's
+    /// overdue time (06-10 17:30) is still ahead of `now` (17:00), yet the
+    /// fired row at 18:00 is the slot holding it.
+    @Test(
+        "A fired cadence row survives the clock being set back before its slot",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func firedCadenceRowSurvivesAClockRollback(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:10")
+        let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 17:30")
+        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 18:00"), in: fixture)
+        fired.state = .fired
+        try await fixture.repositories.reminders.upsert(fired)
+        // Settles the mock backend's seed cast; the fired row is held.
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(fired.id) == fired)
+        fixture.setNow("2026-06-10 17:00")
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
+    /// A contact who becomes overdue at 18:30 joins the 18:00 slot already in
+    /// progress at 18:45, so the row is written fired. The clock then moves
+    /// back to 18:15, before the contact's overdue time. The rollback must
+    /// not turn that delivered row into a pending one for the next day.
+    @Test(
+        "A cadence row written into the slot in progress survives the clock being set back before its due time",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func joinedCadenceRowSurvivesAClockRollbackBeforeItsDueTime(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:45")
+        let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 18:30")
+        try await fixture.pass.runFull()
+        let joined = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(joined.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        #expect(joined.state == .fired)
+        let writes = await fixture.reminders.writeCount
+        fixture.setNow("2026-06-10 18:15")
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(joined.id) == joined)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
     // MARK: - Zero capacity round trip (contract 2)
 
     /// The slot in progress was delivered: the row is fired at its start `S`.

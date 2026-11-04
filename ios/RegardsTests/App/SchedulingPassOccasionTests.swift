@@ -239,34 +239,38 @@ struct SchedulingPassOccasionTests {
     }
 
     /// Installing at noon on the birthday gives "fire now" (R5): the
-    /// occurrence is `now`. The next run marks that row fired, and a run after
-    /// that must not chase the clock either.
+    /// occurrence is `now`, so the row is written fired (§9 "Notification
+    /// fired": every row a run writes at or before now is fired). Later runs
+    /// neither rewrite it nor chase the clock.
     @Test(
-        "A same-day occasion that already fired stays put on a later run",
+        "A same-day occasion whose time has come is written fired and stays put",
         arguments: RepositoryContractBackend.allCases
     )
-    func sameDayLateOccasionStaysPutOnALaterRun(backend: RepositoryContractBackend) async throws {
+    func sameDayLateOccasionIsWrittenFired(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(
             backend: backend, now: "2026-06-10 12:00",
             occasions: try Self.birthdays(on: MonthDay(month: 6, day: 10), for: [1]))
         let contact = try await fixture.addContact(1, cadenceDays: 30, lastInteracted: "2026-06-09 10:00")
-        try await fixture.pass.runFull()
-        let first = try #require(try await fixture.occasionRow(contact, .birthday))
-        #expect(first.scheduledFor == PassFixture.at("2026-06-10 12:00"))
-        var fired = first
-        fired.state = .fired
+        let id = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
 
-        fixture.setNow("2026-06-10 13:00")
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.row(first.id) == fired)
-        let writesAfterMarking = await fixture.reminders.writeCount
+        let written = try #require(try await fixture.row(id))
+        #expect(written.scheduledFor == PassFixture.at("2026-06-10 12:00"))
+        #expect(written.state == .fired)
+        #expect(try await fixture.occasionRow(contact, .birthday) == nil)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(id) == written)
+        #expect(await fixture.reminders.writeCount == writes)
 
         fixture.setNow("2026-06-10 14:00")
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.row(first.id) == fired)
-        #expect(await fixture.reminders.writeCount == writesAfterMarking)
+        #expect(try await fixture.row(id) == written)
+        #expect(await fixture.reminders.writeCount == writes)
     }
 
     // MARK: - Same-date tie-breaks
