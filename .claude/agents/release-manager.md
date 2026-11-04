@@ -184,27 +184,30 @@ PR, never in the root checkout.
     `git -C <lane> diff --name-only origin/main...<head sha>`. They are
     `pr-correctness`, `pr-security-privacy`, `pr-code-quality`, `pr-tests`
     when that diff changes code or tests, and `pr-accessibility` and
-    `pr-fit-finish` when their path rules match it. Each required reviewer's
-    newest verdict, read from any counting `PR REVIEW:` comment at the
-    current head (not only the newest comment), must be APPROVE, so a comment
-    that reran only that reviewer completes the set. Only `pr-code-quality`
-    and `pr-tests` may instead be on a `CARRIED:` line that passed. A
-    missing one is "reviewer missing: <name>".
-  - Newest verdict. Completeness and carrying both use a reviewer's newest
-    recorded verdict, so there is no carry past a later REQUEST_CHANGES.
-    Print every counting `PR REVIEW:` comment's first line and `REVIEWERS:`
-    line, oldest first, with this filter on the same GraphQL output:
+    `pr-fit-finish` when their path rules match it. Each required reviewer
+    needs APPROVE as its newest verdict (next bullet), so a comment that
+    reran only that reviewer completes the set. Only `pr-code-quality` and
+    `pr-tests` may instead be on a `CARRIED:` line that passed. A missing
+    one is "reviewer missing: <name>".
+  - Newest verdict. Read only the counting `PR REVIEW:` comments whose first
+    line names the current head or, for a reviewer with a `CARRIED:` line,
+    the carried `<sha>`. In those comments, oldest first, a reviewer's
+    newest verdict is the last `REVIEWERS:` line that lists it, so there is
+    no carry past a later REQUEST_CHANGES. It must be APPROVE. An APPROVE at
+    the current head also satisfies a reviewer that had a carry. Run the
+    filter once per required reviewer on the same GraphQL output, with
+    `<shas>` the full head sha, plus that reviewer's carried sha when it has
+    one, separated by a space. It prints the first line and `REVIEWERS:`
+    line of each comment it reads, oldest first:
     ```
-    jq -r --arg me "$(gh api user --jq .login)" '
+    jq -r --arg me "$(gh api user --jq .login)" --arg shas "<shas>" '
       .data.repository.pullRequest.comments.nodes[]
       | select(.author.login == $me and .lastEditedAt == null) | .body
       | select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
+      | select((split("\n")[0] | capture("@ (?<s>[0-9a-f]{7,40}) ").s) as $s
+               | any(($shas | split(" "))[]; . as $f | ($f | startswith($s)) or ($s | startswith($f))))
       | split("\n")[] | select(test("^(PR REVIEW:|REVIEWERS:)"))'
     ```
-    A reviewer's newest verdict is its last `REVIEWERS:` entry in that
-    output. Without a carry, it must be APPROVE and sit in a comment whose
-    sha is the current head. With a carry, it must be APPROVE and sit in the
-    comment whose sha is the `CARRIED:` line's `<sha>`.
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
   `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check

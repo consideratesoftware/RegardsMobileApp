@@ -193,10 +193,12 @@ comment lists every reviewer that ran on a `REVIEWERS:` line with its
 verdict. A scoped recheck adds a `RERAN:` line
 naming the reviewers that ran, and one `CARRIED:` line per `pr-code-quality`
 or `pr-tests` approval that stands, as `CARRIED: <reviewer> APPROVE from
-<sha>`. Every reviewer the routing table runs for the PR needs an APPROVE as
-its newest verdict at the current head, taken from any counting `PR REVIEW:`
-comment on that head or, for those two, from a passing carry. A carry can't
-pass a later REQUEST_CHANGES from that reviewer. A comment that reruns one
+<sha>`. Every reviewer the routing table runs for the PR needs APPROVE as its
+newest verdict. The release manager reads only the counting `PR REVIEW:`
+comments whose first line names the current head or, for a carried reviewer,
+the carried sha, and takes the last `REVIEWERS:` line in them that lists that
+reviewer. An APPROVE at the current head also satisfies a reviewer that had a
+carry, and a later REQUEST_CHANGES defeats a carry. A comment that reruns one
 reviewer only completes the set.
 
 Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown

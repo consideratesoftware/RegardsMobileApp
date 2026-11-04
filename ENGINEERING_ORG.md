@@ -154,11 +154,14 @@ script and CI directories carries, never AGENTS*.md, CLAUDE*.md,
 ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src` or
 `shared/testvectors`, and anything else reruns that reviewer.
 The release manager runs that script. Each reviewer the routing table
-requires must have APPROVE as its newest verdict, read from any counting
-`PR REVIEW:` comment on the current head, or for `pr-code-quality` and
-`pr-tests` from a passing `CARRIED:` line, so a comment that reruns one
-reviewer only completes the set. The newest `PR REVIEW:` comment, scoped or
-not, needs a `REVIEWERS:` line, or the check fails (STATE CODEX STALE).
+requires must have APPROVE as its newest verdict. The release manager reads
+only the counting `PR REVIEW:` comments whose first line names the current
+head or, for a carried reviewer, the carried sha, and takes the last
+`REVIEWERS:` line in them that lists that reviewer. An APPROVE at the current
+head also satisfies a reviewer that had a carry, and a later REQUEST_CHANGES
+defeats a carry. A comment that reruns one reviewer only completes the set.
+The newest `PR REVIEW:` comment, scoped or not, needs a `REVIEWERS:` line, or
+the check fails (STATE CODEX STALE).
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
