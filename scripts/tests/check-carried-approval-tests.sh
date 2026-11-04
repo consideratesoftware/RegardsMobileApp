@@ -128,6 +128,8 @@ gitlink_on_md_path() {
   git -C "$repo" update-index --add --cacheinfo "160000,$base,docs/sub.md"
 }
 upper_case_md_suffix() { put docs/Note.MD '# Note'; }
+root_claude_local_md() { put CLAUDE.local.md '# Local claude file'; }
+nested_agents_override_md() { put docs/AGENTS.override.md '# Agents override'; }
 root_agents_md() { put AGENTS.md '# Agents file, changed'; }
 root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
 nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
@@ -186,6 +188,8 @@ expect 'an added docs/Note.MD (upper-case suffix) fails' 1 upper_case_md_suffix
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a nested AGENTS.md change fails' 1 nested_agents_md
+expect 'an added root CLAUDE.local.md fails' 1 root_claude_local_md
+expect 'an added docs/AGENTS.override.md fails' 1 nested_agents_override_md
 expect 'a Swift comment-only change fails' 1 swift_comment
 expect 'a Swift code change fails' 1 swift_code
 expect 'a non-ASCII-named .swift change fails' 1 swift_non_ascii
