@@ -101,8 +101,9 @@ extension AppLaunchCoordinator {
 /// `pendingRequests` honor, keyed by identifier like the system's. `schedule`
 /// stores each request through `UserNotificationsAdapter.makeRequest` and
 /// `decode` with `clock`. A request is delivered, so no longer pending, when
-/// its fire date is at or before now as it is added, or when `clock` passes
-/// its fire date later, as in the real center.
+/// its trigger instant (the fire date truncated to the whole second) is at or
+/// before now as it is added, or when `clock` passes its fire date later, as
+/// in the real center.
 ///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
