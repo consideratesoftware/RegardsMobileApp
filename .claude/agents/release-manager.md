@@ -153,14 +153,17 @@ PR, never in the root checkout.
   moves, except for a blocker whose text reappears unchanged in the new
   head's review; compare the text.
 - The newest `PR REVIEW:` comment names the current head and is APPROVE.
-  Check each `CARRIED: <reviewer> APPROVE from <sha>` line, and list the
-  results in your report. A carry stands only if both hold:
+  Check each `CARRIED: <reviewer> APPROVE from <S>` line, and list the
+  results in your report. A carry stands only if all 3 hold:
   1. The reviewer is `pr-code-quality` or `pr-tests`. The other four
      reviewers and Codex rerun on every head and never carry.
-  2. This passes, with `<lane>` the absolute lane worktree path from your
+  2. S matches by prefix (at least 7 characters) the sha of the `PR REVIEW:`
+     comment that holds that reviewer's newest APPROVE (see Newest verdict
+     below), and S is not the current head.
+  3. This passes, with `<lane>` the absolute lane worktree path from your
      prompt:
      ```
-     bash "<root checkout>/scripts/check-carried-approval.sh" "<lane>" <sha> <head sha>
+     bash "<root checkout>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>
      ```
      Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
@@ -173,9 +176,11 @@ PR, never in the root checkout.
      ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
      `android/*/schemas` or `shared/testvectors`, and anything else reruns
      that reviewer. The script's header defines it.
-  If any check fails, reject the carry: report STATE CODEX STALE with
+  If any condition fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
-  reviewer.
+  reviewer. A `CARRIED:` line is checked by these conditions even when the
+  reviewer also has an APPROVE at the head, and one that fails them is
+  "carry rejected" regardless.
 
   Two more checks apply to every newest `PR REVIEW:` comment, scoped or
   not, and a failure of either is STATE CODEX STALE:
@@ -189,8 +194,8 @@ PR, never in the root checkout.
     `pr-fit-finish` when their path rules match it. Each required reviewer
     needs APPROVE as its newest verdict (next bullet), so a comment that
     reran only that reviewer completes the set. Only `pr-code-quality` and
-    `pr-tests` may instead be on a `CARRIED:` line that passed. A missing
-    one is "reviewer missing: <name>".
+    `pr-tests` may instead be on a `CARRIED:` line whose carry holds (next
+    bullet). A missing one is "reviewer missing: <name>".
   - Newest verdict. For each required reviewer, its newest verdict is its
     entry on the last `REVIEWERS:` line that lists it, across all the
     counting `PR REVIEW:` comments at any head. It must be APPROVE, and the
@@ -203,7 +208,9 @@ PR, never in the root checkout.
     and the carry check from S to the head passes. Anything else is
     "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
     <name>" (it has one). A later REQUEST_CHANGES at any head is the newest
-    verdict, so it ends a carry. The filter takes no arguments. Run the same
+    verdict, so it ends a carry. A `CARRIED:` line whose carry fails is "carry
+    rejected" even when the reviewer also has an APPROVE at the head. The
+    filter takes no arguments. Run the same
     `gh api graphql` command into a file (`> "<scratch>/comments.json"`) and
     give that file to `jq`. For every counting `PR REVIEW:` comment it
     prints, oldest first, the first line, the `REVIEWERS:` line and every

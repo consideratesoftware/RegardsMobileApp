@@ -207,14 +207,18 @@ comment that holds the reviewer's APPROVE, and a chained carry (A, scoped B,
 scoped C) keeps citing A. A later REQUEST_CHANGES at any head ends a carry. A
 comment that reruns one reviewer only completes the set.
 
-Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown
-outside the agent, script and CI directories, never AGENTS*.md, CLAUDE*.md,
-ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
-`android/*/schemas` or `shared/testvectors`; anything else reruns that
-reviewer. The release manager checks each `CARRIED:` line
-(`release-manager.md`, Merge conditions) and rejects one that fails, so if you
-aren't sure, rerun the reviewer. The other four reviewers and Codex never
-carry: they rerun on every head.
+A carry stands only if all 3 hold: (1) the reviewer is `pr-code-quality` or
+`pr-tests`; (2) the carried sha S matches by prefix (at least 7 characters)
+the sha of the `PR REVIEW:` comment that holds that reviewer's newest
+APPROVE, and S is not the current head; (3) the carry check from S to the head
+passes. That check allows only Markdown outside the agent, script and CI
+directories, never AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown under
+`ios/Regards*`, `android/*/src`, `android/*/schemas` or `shared/testvectors`;
+anything else reruns that reviewer. The other four reviewers and Codex never
+carry: they rerun on every head. The release manager checks each `CARRIED:`
+line against all 3 (`release-manager.md`, Merge conditions), even when the
+reviewer also has an APPROVE at the head, and rejects one that fails, so if
+you aren't sure, rerun the reviewer.
 
 Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
 and Stage 3 alike. Don't start a general-purpose agent and tell it to read

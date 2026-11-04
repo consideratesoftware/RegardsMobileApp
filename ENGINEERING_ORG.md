@@ -148,12 +148,17 @@ change. `pr-security-privacy`, `pr-correctness`, `pr-fit-finish`,
 `codex-reviewer` on the whole `origin/main...HEAD` diff run again on every
 head. Sid is asked only if a blocker survives 2 rounds or a fix needs a
 product decision. The `PR REVIEW:` comment lists which reviewers reran and
-which approvals carry from which sha. A carry stands only as
-`scripts/check-carried-approval.sh` allows: only Markdown outside the agent,
-script and CI directories carries, never AGENTS*.md, CLAUDE*.md,
-ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
-`android/*/schemas` or `shared/testvectors`, and anything else reruns that
-reviewer. The release manager runs that script. Each reviewer the routing table
+which approvals carry from which sha. A carry stands only if all 3 hold: (1)
+the reviewer is `pr-code-quality` or `pr-tests`; (2) the carried sha S
+matches by prefix (at least 7 characters) the sha of the `PR REVIEW:` comment
+that holds that reviewer's newest APPROVE, and S is not the current head; (3)
+`scripts/check-carried-approval.sh` from S to the head passes. The script
+allows only Markdown outside the agent, script and CI directories, never
+AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown under `ios/Regards*`,
+`android/*/src`, `android/*/schemas` or `shared/testvectors`; anything else
+reruns that reviewer. A `CARRIED:` line is checked by these conditions even
+when the reviewer also has an APPROVE at the head, and one that fails them is
+"carry rejected" regardless. The release manager runs that script. Each reviewer the routing table
 requires must have APPROVE as its newest verdict. The release manager reads
 every counting `PR REVIEW:` comment, oldest first, and takes each reviewer's
 entry on the last `REVIEWERS:` line that lists it, at any head. The entry must
