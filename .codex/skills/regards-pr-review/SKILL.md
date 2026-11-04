@@ -26,11 +26,11 @@ Treat the literal target `worktree` as all tracked and untracked changes against
      the working tree during a review.
    - Run SwiftLint from the repo root, never from `ios/` (`.swiftlint.yml`
      lives at the root): `(cd "<worktree root>" && swiftlint --strict)`.
-   - Run the 2 iOS guard scripts these gates use, from the repo root:
+   - The 2 iOS guard scripts this pre-flight uses, from the repo root:
      `scripts/check-no-network.sh` (the privacy grep) and
      `scripts/check-domain-purity.sh`. Each is its own check; a nonzero exit
-     from either fails the gates. (CI also runs Android guards; these gates
-     don't.)
+     from either fails the gates. (CI also runs Android guards; this
+     pre-flight doesn't.)
 5. If a gate fails, return `REQUEST_CHANGES` with the gate evidence and do not
    dispatch reviewers.
 

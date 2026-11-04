@@ -160,14 +160,14 @@ PR, never in the root checkout.
      ```
      bash "<root checkout>/scripts/check-carried-approval.sh" "<lane>" <sha> <head sha>
      ```
-     Exit 0 and `CARRY PASSES` mean the carry is allowed; anything else
-     prints `CARRY FAILS: <reason>`. Always run it with `bash`, never your
-     default shell (zsh does not word-split a variable, and the script relies
-     on it). Use the root checkout's copy on `main`, not the lane's, for the
-     reason given for the blocker counter. The script's header and
-     `scripts/tests/check-carried-approval-tests.sh` define the rules: docs
-     and comment-only changes carry, and agent contracts, commands, skills,
-     scripts, CI, `.toml`, project files, and anything else never do.
+     Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
+     Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
+     other nonzero exit is a script error; all of them fail the carry. Run
+     the root checkout's copy on `main`, not the lane's, because the PR under
+     review could have edited its own copy of the scripts. The rule is one
+     line: only Markdown outside the agent, script and CI directories
+     carries, and anything else reruns that reviewer. The script's header
+     defines it.
   If any check fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.

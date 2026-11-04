@@ -146,8 +146,9 @@ commits touch, plus `codex-reviewer` on the whole `origin/main...HEAD` diff
 at the current head. Sid is asked only if a blocker survives 2 rounds or a
 fix needs a product decision. The `PR REVIEW:` comment lists which
 reviewers reran and which approvals carry from which sha. An approval
-carries only when every commit since it changes docs or comments only, and
-the release manager checks that with `scripts/check-carried-approval.sh`.
+carries only as `scripts/check-carried-approval.sh` allows: only Markdown
+outside the agent, script and CI directories carries, and anything else
+reruns that reviewer. The release manager runs that script.
 `pr-security-privacy` and Codex never carry; they run again on every head.
 On every newest `PR REVIEW:` comment, scoped or not, each reviewer the
 routing table requires must be APPROVE on its `REVIEWERS:` line or on a

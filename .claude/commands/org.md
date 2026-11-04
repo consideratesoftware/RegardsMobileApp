@@ -193,14 +193,11 @@ reviewer whose earlier approval stands, as `CARRIED: <reviewer> APPROVE from
 <sha>`. Every reviewer the routing table runs for the PR must be rerun or
 carried, and a carry can't pass a later REQUEST_CHANGES from that reviewer.
 
-An approval carries to a new head only when every commit since it changes
-docs or comments only: every path is `.md`, `.swift`, `.yml`, `.sh`, `.py`, or
-`.toml` (never `project.yml`, the Xcode project, a plist, json, or any other
-type), and no non-comment line changed. The release manager checks each `CARRIED:`
-line mechanically (`release-manager.md`, Merge conditions) and rejects one
-that fails, so if you aren't sure, rerun the reviewer. `pr-security-privacy`
-never carries: it reruns on every head the release manager checks. Codex
-never carries either.
+Only Markdown outside the agent, script and CI directories carries; anything
+else reruns that reviewer. The release manager checks each `CARRIED:` line
+(`release-manager.md`, Merge conditions) and rejects one that fails, so if you
+aren't sure, rerun the reviewer. `pr-security-privacy` never carries: it
+reruns on every head the release manager checks. Codex never carries either.
 
 Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
 and Stage 3 alike. Don't start a general-purpose agent and tell it to read
