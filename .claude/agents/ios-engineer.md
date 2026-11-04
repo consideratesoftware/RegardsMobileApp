@@ -25,8 +25,10 @@ view work), every file you will touch in full, and its tests.
   row if you prefer; you own the test).
 - No inert controls, no placeholder strings, `RegardsDS` tokens only, labels
   on every image-only button, 44pt targets, Reduce Motion respected.
-- Every behavior change gets a test that fails on the old code; say how you
-  checked.
+- Every behavior change gets regression proof as `qa-engineer.md` (Rules)
+  defines it: a fix to existing behavior needs a test that fails on the old
+  code; new behavior the old code can't run needs a test that fails on the old
+  code or under a named mutation. Say how you checked.
 - Inline until 3 call sites. Match the neighboring `@MainActor @Observable`
   VM shape and screen layout grammar.
 - Explicit `git add` paths. `find . -name "* 2.*" -not -path "./.git/*"` before
