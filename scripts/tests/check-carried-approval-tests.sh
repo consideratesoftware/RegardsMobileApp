@@ -40,6 +40,7 @@ put .claude/agents/x.md '# Agent'
 put scripts/x.md '# Script doc'
 put AGENTS.md '# Agents file'
 put CLAUDE.md '# Claude file'
+put ARCHITECTURE.md '# Architecture'
 put docs/AGENTS.md '# Nested agents file'
 put .github/x.md '# Github doc'
 put ios/Regards/App/A.swift '// note
@@ -130,6 +131,9 @@ gitlink_on_md_path() {
 upper_case_md_suffix() { put docs/Note.MD '# Note'; }
 root_claude_local_md() { put CLAUDE.local.md '# Local claude file'; }
 nested_agents_override_md() { put docs/AGENTS.override.md '# Agents override'; }
+root_architecture_md() { put ARCHITECTURE.md '# Architecture, changed'; }
+ios_bundle_md() { put ios/Regards/Resources/x.md '# Resource'; }
+android_app_md() { put android/app/src/main/x.md '# Resource'; }
 root_agents_md() { put AGENTS.md '# Agents file, changed'; }
 root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
 nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
@@ -187,6 +191,9 @@ expect_index 'a gitlink added on a .md path fails' 1 gitlink_on_md_path
 expect 'an added docs/Note.MD (upper-case suffix) fails' 1 upper_case_md_suffix
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
+expect 'a root ARCHITECTURE.md change fails' 1 root_architecture_md
+expect 'an added ios/Regards/Resources/x.md fails' 1 ios_bundle_md
+expect 'an added android/app/src/main/x.md fails' 1 android_app_md
 expect 'a nested AGENTS.md change fails' 1 nested_agents_md
 expect 'an added root CLAUDE.local.md fails' 1 root_claude_local_md
 expect 'an added docs/AGENTS.override.md fails' 1 nested_agents_override_md

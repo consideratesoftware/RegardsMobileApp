@@ -12,24 +12,26 @@
 #
 # The rule, applied to the net change between the two shas (not per commit):
 # an approval carries only when every changed path is a Markdown file (*.md,
-# lower-case suffix; Note.MD is not one)
-# outside .claude/, .codex/, .agents/, scripts/ and .github/, is not named
-# AGENTS*.md or CLAUDE*.md at any depth (AGENTS.override.md, CLAUDE.local.md),
-# and has no mode change. An added or
-# deleted .md file is docs. Agent contracts, commands, skills, scripts, CI and
-# the AGENTS*.md and CLAUDE*.md instruction files are behavior, so a change there
-# never carries. Every other path fails: source, config, project files,
-# plists, toml, anything. Renames are never detected, so a move is a delete
-# plus an add.
+# lower-case suffix; Note.MD is not one) and none of these hold:
+#   - the path is under .claude/, .codex/, .agents/, scripts/ or .github/,
+#     nested copies included;
+#   - the path is named AGENTS*.md or CLAUDE*.md at any depth
+#     (AGENTS.override.md, CLAUDE.local.md);
+#   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
+#     from it, so an edit there changes what the tests must prove);
+#   - the path is under ios/Regards*/ or android/app/ (the bundled trees);
+#   - the entry has a mode change (only 100644, or add/delete, is allowed).
+# An added or deleted .md file is docs. Agent contracts, commands, skills,
+# scripts, CI and the instruction files are behavior, so a change there never
+# carries. Every other path fails: source, config, project files, plists,
+# toml, anything. Renames are never detected, so a move is a delete plus an
+# add.
 #
-# Why Markdown alone is safe: no tracked .md file outside those directories is
-# bundled into or read by the app or its tests, so a Markdown-only change
-# cannot change behavior. AGENTS*.md and CLAUDE*.md are the exception, because
-# agents read them as instructions wherever they sit. A future bundled .md
-# resource would break the rule, and review should catch it. Re-check with
-# both of these printing 0:
-#   git ls-files 'ios/Regards*' 'android/app/src' | grep -c '\.md$'
-#   grep -c '\.md' ios/project.yml
+# Why Markdown alone is safe: the app and its tests read files only from the
+# bundled trees, and those trees are excluded as a whole, so a Markdown file
+# added there (a future resource, say) never carries. Elsewhere a Markdown
+# file is documentation, except the instruction files and ARCHITECTURE.md
+# named above, which agents read as instructions or as the contract.
 
 set -euo pipefail
 export LC_ALL=C
@@ -82,6 +84,10 @@ while IFS= read -r -d '' meta; do
       fail "behavior path never carries: $path" ;;
     AGENTS*.md | */AGENTS*.md | CLAUDE*.md | */CLAUDE*.md )
       fail "agent instruction file never carries: $path" ;;
+    ARCHITECTURE.md | */ARCHITECTURE.md )
+      fail "ARCHITECTURE.md never carries: $path" ;;
+    ios/Regards*/* | android/app/* )
+      fail "bundled tree never carries: $path" ;;
   esac
   shopt -u nocasematch
   case "$path" in
