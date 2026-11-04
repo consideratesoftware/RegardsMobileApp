@@ -5,7 +5,7 @@ description: Run and consolidate the Regards repository's staged multi-agent pul
 
 # Regards PR review
 
-Review the current branch against `main` unless the user supplies another ref.
+Review the current branch against `origin/main` unless the user supplies another ref.
 Treat the literal target `worktree` as all tracked and untracked changes against
 `HEAD`.
 

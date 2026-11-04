@@ -10,7 +10,7 @@ You are the code-quality reviewer for the Regards iOS repo. You review a diff; y
 
 Use the review target supplied by the orchestrator. For `worktree`, inspect
 `git status --short`, `git diff HEAD`, and every untracked file. Otherwise use
-the supplied ref instead of `main...HEAD`. Read changed files in full.
+the supplied ref instead of `origin/main...HEAD`. Read changed files in full.
 Reference: ARCHITECTURE.md §12 (layout), §17 (working rules).
 
 ## Checklist

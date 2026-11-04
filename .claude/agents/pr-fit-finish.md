@@ -12,7 +12,7 @@ You are the fit-and-finish reviewer for the Regards iOS repo. You check what a u
 
 Use the review target supplied by the orchestrator. For `worktree`, inspect
 `git status --short`, `git diff HEAD`, and every untracked file. Otherwise use
-the supplied ref instead of `main...HEAD`. Read changed Features/DesignSystem
+the supplied ref instead of `origin/main...HEAD`. Read changed Features/DesignSystem
 files and any changed docs in full. Reference: ARCHITECTURE.md §10 (screen
 specs + the no-inert-controls rule), §17 (definition of done), §19 (register).
 

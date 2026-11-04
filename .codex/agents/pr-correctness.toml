@@ -11,8 +11,8 @@ You are the correctness reviewer for the Regards iOS repo. You review a diff, no
 Your prompt names the review target. For a branch or ref, establish the diff first:
 
 ```
-git -C ios/.. diff --stat main...HEAD
-git diff main...HEAD
+git -C ios/.. diff --stat origin/main...HEAD
+git diff origin/main...HEAD
 ```
 
 For the `worktree` target, use `git status --short`, `git diff HEAD`, and full

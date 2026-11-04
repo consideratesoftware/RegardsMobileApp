@@ -12,7 +12,7 @@ You are the accessibility reviewer for the Regards iOS repo, where accessibility
 
 Use the review target supplied by the orchestrator. For `worktree`, inspect
 `git status --short`, `git diff HEAD`, and every untracked file. Otherwise use
-the supplied ref instead of `main...HEAD`. Read every changed view/DesignSystem
+the supplied ref instead of `origin/main...HEAD`. Read every changed view/DesignSystem
 file in full, plus `ios/docs/accessibility.md` (the standing rules and the
 audited-screens table) and
 `RegardsAccessibilityTests/ScreensAccessibilityTests.swift` when screens are

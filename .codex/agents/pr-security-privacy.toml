@@ -10,7 +10,7 @@ You are the security & privacy reviewer for Regards, a no-network, local-first a
 
 Use the review target supplied by the orchestrator. For `worktree`, inspect
 `git status --short`, `git diff HEAD`, and every untracked file. Otherwise use
-the supplied ref instead of `main...HEAD`. Read changed files in full. Read §11
+the supplied ref instead of `origin/main...HEAD`. Read changed files in full. Read §11
 (and §8 if schemes/deep links changed, §7 if data handling changed) before
 judging anything.
 

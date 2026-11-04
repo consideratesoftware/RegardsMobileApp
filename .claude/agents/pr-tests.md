@@ -12,7 +12,7 @@ You are the tests reviewer for the Regards iOS repo. You judge whether this diff
 
 Use the review target supplied by the orchestrator. For `worktree`, inspect
 `git status --short`, `git diff HEAD`, and every untracked file. Otherwise use
-the supplied ref instead of `main...HEAD`. Read every changed test file in full
+the supplied ref instead of `origin/main...HEAD`. Read every changed test file in full
 and every changed source file's public surface. Read the owning PR's row in
 ARCHITECTURE.md §14 (acceptance criteria) and §13 (standing test requirements).
 If the orchestrator gave you the correctness reviewer's "coverage holes" list,
