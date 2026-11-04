@@ -164,10 +164,10 @@ never paste a reviewer's output into a comment; the full review stays in the
 lane's report.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
-dirty tree: the lane's owner commits the files, which makes a new head, so the
-rerun is the first run on the head the commit produces; never discard them
-without asking Sid), then run it once more on the same head. That is the one automatic
-rerun. A second RETRY on the same head, a timeout included, is an owner gate:
+dirty tree: the lane's owner commits the files, and never discards them
+without asking Sid), then rerun it once, on the head the fix produces. That
+is the one automatic rerun. A second RETRY on that head, a timeout included,
+is an owner gate:
 record it as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs
 origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
 of rerunning again. A RETRY after a repair moved the head is the first RETRY
