@@ -53,19 +53,14 @@ git -C "$repo" add -A
 git -C "$repo" commit -q -m base
 base="$(git -C "$repo" rev-parse HEAD)"
 
-# expect <name> <expected status> <mutation function>
-expect() {
+# check <name> <expected status> <from sha> <head sha>
+check() {
   local name="$1"
   local expected="$2"
-  local mutate="$3"
   local output status
 
-  git -C "$repo" checkout -q -B case "$base"
-  "$mutate"
-  git -C "$repo" add -A
-  git -C "$repo" commit -q --allow-empty -m "$name"
   set +e
-  output="$(bash "$checker" "$repo" "$base" "$(git -C "$repo" rev-parse HEAD)" 2>&1)"
+  output="$(bash "$checker" "$repo" "$3" "$4" 2>&1)"
   status=$?
   set -e
   git -C "$repo" config --unset diff.external 2>/dev/null || true
@@ -75,6 +70,33 @@ expect() {
     exit 1
   fi
   echo "PASS: $name"
+}
+
+# expect <name> <expected status> <mutation function>
+# Commits the working-tree change the function makes on top of the base commit.
+expect() {
+  git -C "$repo" checkout -q -B case "$base"
+  "$3"
+  git -C "$repo" add -A
+  git -C "$repo" commit -q --allow-empty -m "$1"
+  check "$1" "$2" "$base" "$(git -C "$repo" rev-parse HEAD)"
+}
+
+# expect_index <name> <expected status> <index function>
+# Builds the commit from a scratch index with git update-index, never touching
+# the working tree. Needed for paths a case-insensitive checkout would fold
+# into an existing one, and for gitlinks.
+expect_index() {
+  local tree head
+
+  export GIT_INDEX_FILE="$work/scratch-index"
+  rm -f "$GIT_INDEX_FILE"
+  git -C "$repo" read-tree "$base"
+  "$3"
+  tree="$(git -C "$repo" write-tree)"
+  head="$(git -C "$repo" commit-tree "$tree" -p "$base" -m "$1")"
+  unset GIT_INDEX_FILE
+  check "$1" "$2" "$base" "$head"
 }
 
 md_change() { put docs/guide.md '# Guide, reworded'; }
@@ -105,6 +127,10 @@ plist_change() { put ios/Info.plist '<plist>x</plist>'; }
 project_yml() { put project.yml 'name: Other'; }
 plist_to_md() { git -C "$repo" mv ios/Info.plist docs/Info.md; }
 md_plus_plist() { put docs/guide.md '# Guide, again'; put ios/Info.plist '<plist>y</plist>'; }
+upper_claude_dir() {
+  git -C "$repo" update-index --add --cacheinfo \
+    "100644,$(git -C "$repo" rev-parse "$base:.claude/agents/x.md"),.CLAUDE/agents/x.md"
+}
 swift_with_external_diff() {
   git -C "$repo" config diff.external true
   git -C "$repo" config diff.hidden.textconv true
@@ -136,6 +162,7 @@ expect 'a project.yml change fails' 1 project_yml
 expect 'a rename from .plist to .md fails' 1 plist_to_md
 expect 'an .md change plus a .plist change fails' 1 md_plus_plist
 expect 'a Swift change still fails with diff.external and textconv set' 1 swift_with_external_diff
+expect_index 'an upper-case .CLAUDE/ .md add fails' 1 upper_claude_dir
 
 # Two sibling commits that each change only a docs .md file: the diff between
 # them is Markdown-only, so only the ancestor check can reject the carry.

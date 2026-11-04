@@ -51,6 +51,10 @@ git -C "$lane" merge-base --is-ancestor "$from" "$to" \
 git -C "$lane" diff --raw -z --no-renames --no-ext-diff --no-textconv \
   "$from" "$to" > "$tmp/raw" || fail "git error reading the diff"
 
+# Directory names match in any case: a case-insensitive checkout (macOS) treats
+# .CLAUDE/ and .claude/ as the same directory.
+shopt -s nocasematch
+
 while IFS= read -r -d '' meta; do
   IFS= read -r -d '' path || fail "git output ended inside a record"
   read -r old_mode new_mode _ <<< "${meta#:}"
