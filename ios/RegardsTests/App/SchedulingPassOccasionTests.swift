@@ -239,7 +239,8 @@ struct SchedulingPassOccasionTests {
     }
 
     /// Installing at noon on the birthday gives "fire now" (R5): the
-    /// occurrence is `now`. A later run must not chase the clock.
+    /// occurrence is `now`. The next run marks that row fired, and a run after
+    /// that must not chase the clock either.
     @Test(
         "A same-day occasion that already fired stays put on a later run",
         arguments: RepositoryContractBackend.allCases
@@ -252,13 +253,20 @@ struct SchedulingPassOccasionTests {
         try await fixture.pass.runFull()
         let first = try #require(try await fixture.occasionRow(contact, .birthday))
         #expect(first.scheduledFor == PassFixture.at("2026-06-10 12:00"))
-        let writesBefore = await fixture.reminders.writeCount
+        var fired = first
+        fired.state = .fired
 
         fixture.setNow("2026-06-10 13:00")
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.occasionRow(contact, .birthday) == first)
-        #expect(await fixture.reminders.writeCount == writesBefore)
+        #expect(try await fixture.row(first.id) == fired)
+        let writesAfterMarking = await fixture.reminders.writeCount
+
+        fixture.setNow("2026-06-10 14:00")
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(first.id) == fired)
+        #expect(await fixture.reminders.writeCount == writesAfterMarking)
     }
 
     // MARK: - Same-date tie-breaks

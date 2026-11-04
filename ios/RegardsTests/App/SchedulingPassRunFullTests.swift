@@ -91,10 +91,11 @@ struct SchedulingPassRunFullTests {
     }
 
     /// No re-nag (§9, owner ruling 5): once a cadence row's time has passed,
-    /// a contact who is still overdue keeps that row. Re-deriving it would
-    /// move it to the next window's slot on every later run.
+    /// the run marks it fired, and a contact who is still overdue keeps that
+    /// row. Re-deriving it would move it to the next window's slot on every
+    /// later run.
     @Test(
-        "A cadence row whose slot has started is left alone while the contact is still overdue",
+        "A cadence row whose slot has started is marked fired and left alone while the contact is still overdue",
         arguments: RepositoryContractBackend.allCases
     )
     func dueCadenceRowIsNotRewrittenOnALaterRun(backend: RepositoryContractBackend) async throws {
@@ -103,13 +104,21 @@ struct SchedulingPassRunFullTests {
         try await fixture.pass.runFull()
         let due = try #require(try await fixture.cadenceRow(contact))
         #expect(due.scheduledFor == PassFixture.at("2026-06-10 18:00"))
-        let writesBefore = await fixture.reminders.writeCount
+        var fired = due
+        fired.state = .fired
 
         fixture.setNow("2026-06-10 19:30")
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.cadenceRow(contact) == due)
-        #expect(await fixture.reminders.writeCount == writesBefore)
+        #expect(try await fixture.row(due.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        let writesAfterMarking = await fixture.reminders.writeCount
+
+        fixture.setNow("2026-06-10 20:30")
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(due.id) == fired)
+        #expect(await fixture.reminders.writeCount == writesAfterMarking)
     }
 
     // MARK: - Zero capacity (R4, §9 contract 2)
@@ -148,18 +157,20 @@ struct SchedulingPassRunFullTests {
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
     }
 
-    /// The slot has already started, so the no-re-nag rule would keep the due
-    /// row. A window that can no longer fire at all wins over it: the row is
-    /// cancelled and the contact is listed for the Settings badge.
+    /// The slot has started, so the run marks the row fired: it was delivered.
+    /// A window that can no longer fire at all cancels only pending rows, so
+    /// the fired row stays as history while the contact is listed for the
+    /// Settings badge.
     @Test(
-        "A due row is cancelled and the contact recorded when its window loses all capacity",
+        "A due row stays fired and the contact is recorded when its window loses all capacity",
         arguments: RepositoryContractBackend.allCases
     )
-    func zeroCapacityWithADueRowCancelsAndRecords(backend: RepositoryContractBackend) async throws {
+    func zeroCapacityWithADueRowKeepsItFired(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
         try await fixture.pass.runFull()
-        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        let slot = PassFixture.at("2026-06-10 18:00")
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == slot)
         fixture.setNow("2026-06-10 18:30")
         _ = try await fixture.repositories.contacts.updateReminderWindowOverride(
             id: contact.id,
@@ -167,6 +178,9 @@ struct SchedulingPassRunFullTests {
 
         try await fixture.pass.run(for: contact.id)
 
+        let kept = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(kept.state == .fired)
+        #expect(kept.scheduledFor == slot)
         #expect(try await fixture.cadenceRow(contact) == nil)
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
     }

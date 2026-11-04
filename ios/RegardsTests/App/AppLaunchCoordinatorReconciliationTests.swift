@@ -245,17 +245,144 @@ struct AppLaunchCoordinatorReconciliationTests {
         #expect(launch.reconciliationCoalesceCount == 0)
     }
 
+    // MARK: - Scheduling pass after a store change (TF-07e, §9 triggers)
+
+    /// A contact archived while the app is open (an iCloud sync) must lose its
+    /// pending row, and with it the OS notification, without waiting for a
+    /// foreground. The second change is the confirming miss, `floor` after the
+    /// first. The cancel is the only transition in this scenario, so its
+    /// arrival at the gated repository proves the change's pass ran.
+    @Test("A store change that archives a contact cancels its pending row without a foreground")
+    func storeChangeArchiveCancelsTheRowWithoutAForeground() async throws {
+        let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        let cancelSignal = AsyncGate()
+        await cancelSignal.open()
+        let environment = AppEnvironment(
+            contacts: base.contacts,
+            groups: base.groups,
+            reminders: GatedTransitionStateReminderRepository(wrapped: base.reminders, gate: cancelSignal),
+            interactions: base.interactions,
+            window: base.window,
+            profile: base.profile
+        )
+        try await environment.profile.save(onboardedProfile)
+        // Talked yesterday on a 30-day cadence: the row's slot is weeks ahead,
+        // so no run marks it fired and only the archive can remove it.
+        let leaving = Contact(
+            systemContactRef: "gone-s", displayName: "Leaving", tracked: true, cadenceDays: 30,
+            lastInteractedAt: now.addingTimeInterval(-86_400), createdAt: now.addingTimeInterval(-90 * 86_400))
+        try await environment.contacts.upsert(leaving)
+        let staying = SystemContact(
+            identifier: "staying-s", givenName: "Staying", familyName: "",
+            phoneNumbers: [], emailAddresses: [])
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "gone-s", givenName: "Leaving", familyName: "",
+                          phoneNumbers: [], emailAddresses: []),
+            staying,
+        ])
+        let clock = MutableClock(now)
+        let launch = coordinator(environment: environment, source: source, clock: clock.now, schedulerClock: clock.now)
+
+        await launch.start()
+        #expect(launch.reconciliationCount == 1)
+        #expect(try await environment.reminders.fetchPending(forContact: leaving.id).count == 1)
+
+        source.setContacts([staying])
+        source.simulateChange()
+        #expect(await eventually { launch.reconciliationCount == 2 })
+        clock.advance(by: ContactsReconciler.archiveDebounceFloor)
+        source.simulateChange()
+
+        // Bounded poll for an arrival only a missing pass would withhold.
+        var turns = 0
+        while turns < 200_000, await cancelSignal.arrivalCount == 0 {
+            await Task.yield()
+            turns += 1
+        }
+        #expect(await cancelSignal.arrivalCount == 1, "the store change's pass cancelled nothing")
+        // The pass holds the scheduler's lock from its read to its last write,
+        // so this call returns only after that pass has finished.
+        let scheduler = try #require(launch.runtime?.scheduler)
+        try await scheduler.run(for: UUID())
+        let archived = try await environment.contacts.fetch(id: leaving.id)
+        #expect(archived?.archivedAt == clock.now())
+        #expect(try await environment.reminders.fetchPending(forContact: leaving.id).isEmpty)
+    }
+
+    /// The replay in `start()` is followed by the `.ready` launch pass, so a
+    /// change that arrived with no runtime still cancels the archived
+    /// contact's row before `start()` returns. Pins the order: reconcile, then
+    /// pass. The miss is seeded 6 minutes back, past the debounce floor, so
+    /// the replayed reconcile is the confirming one.
+    @Test("A replayed store change is followed by a scheduling pass before start returns")
+    func replayedStoreChangeIsFollowedByAPass() async throws {
+        let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
+        try await environment.profile.save(onboardedProfile)
+        let leaving = Contact(
+            systemContactRef: "gone-r", displayName: "Leaving", tracked: true, cadenceDays: 30,
+            lastInteractedAt: now.addingTimeInterval(-86_400), createdAt: now.addingTimeInterval(-90 * 86_400))
+        try await environment.contacts.upsert(leaving)
+        try await environment.reminders.upsert(ScheduledReminder(
+            contactId: leaving.id,
+            kind: .cadence,
+            scheduledFor: now.addingTimeInterval(29 * 86_400),
+            osNotificationId: "contact-\(leaving.id.uuidString)-cadence"))
+        let store = MissingContactRefStore.ephemeral()
+        try store.save([ContactRefHasher.hash("gone-r"): now.addingTimeInterval(-6 * 60)])
+        let source = MutableContactsSource(status: .authorized, contacts: [
+            SystemContact(identifier: "staying-r", givenName: "Staying", familyName: "",
+                          phoneNumbers: [], emailAddresses: []),
+        ])
+        let clock = MutableClock(now)
+        let launch = coordinator(
+            environment: environment, source: source, clock: clock.now,
+            schedulerClock: clock.now, missingContactRefStore: store)
+        let dependencies = try #require(launch.dependencies)
+        launch.beginObservingContactStoreChanges(dependencies: dependencies)
+        source.simulateChange()
+        #expect(await eventually { launch.pendingStoreChangeReplay })
+        #expect(try await environment.reminders.fetchPending(forContact: leaving.id).count == 1)
+
+        await launch.start()
+
+        #expect(launch.reconciliationCount == 2)
+        let archived = try await environment.contacts.fetch(id: leaving.id)
+        #expect(archived?.archivedAt != nil)
+        #expect(try await environment.reminders.fetchPending(forContact: leaving.id).isEmpty)
+    }
+
+    private var onboardedProfile: UserProfile {
+        UserProfile(
+            onboardingCompletedAt: now,
+            entitlementTier: .trial,
+            entitlementRefreshedAt: now,
+            trialStartedAt: now
+        )
+    }
+
     private func coordinator(
         environment: AppEnvironment,
         source: any ContactsSource,
         clock: (@Sendable () -> Date)? = nil,
+        schedulerClock: (@Sendable () -> Date)? = nil,
         missingContactRefStore: MissingContactRefStore = .ephemeral()
     ) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(
             dependencies: .init(
                 makeRuntime: {
-                    try await AppRuntime.makeProduction(environment: environment)
+                    // Scheduling tests need the pass on the test's clock;
+                    // `makeProduction` reads the wall clock.
+                    guard let schedulerClock else {
+                        return try await AppRuntime.makeProduction(environment: environment)
+                    }
+                    return AppRuntime(
+                        environment: environment,
+                        window: try await environment.window.fetchGlobal(),
+                        userCalendar: Calendar(identifier: .gregorian),
+                        clock: schedulerClock,
+                        occasions: { _ in [] }
+                    )
                 },
                 contactsSource: source,
                 clock: clock ?? { now },

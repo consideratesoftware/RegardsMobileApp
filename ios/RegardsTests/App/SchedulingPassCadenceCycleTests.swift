@@ -265,10 +265,11 @@ struct SchedulingPassCadenceCycleTests {
     }
 
     /// Plain no-re-nag with a floor: the snoozed slot has started, the contact
-    /// has not talked to the person, and is still overdue. The run leaves the
-    /// row, floor included, exactly as it was.
+    /// has not talked to the person, and is still overdue. The run marks the
+    /// row fired and leaves it, floor included, as it was, and a second run
+    /// writes nothing.
     @Test(
-        "A snoozed row whose slot has started is left alone while the contact is still overdue",
+        "A snoozed row whose slot has started is marked fired and left alone while the contact is still overdue",
         arguments: RepositoryContractBackend.allCases
     )
     func dueSnoozedRowIsLeftAloneWithoutInteraction(backend: RepositoryContractBackend) async throws {
@@ -277,12 +278,19 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.pass.snooze(contactId: contact.id))
         let snoozed = try #require(try await fixture.cadenceRow(contact))
         #expect(snoozed.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+        #expect(snoozed.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        var fired = snoozed
+        fired.state = .fired
         fixture.setNow("2026-06-17 18:30")
 
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.cadenceRow(contact) == snoozed)
-        #expect(snoozed.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        #expect(try await fixture.row(snoozed.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        let writes = await fixture.reminders.writeCount
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(snoozed.id) == fired)
+        #expect(await fixture.reminders.writeCount == writes)
     }
 
     /// Contact Detail asks the pass for the snooze date. Once the snoozed slot
@@ -301,7 +309,8 @@ struct SchedulingPassCadenceCycleTests {
 
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        // The row is fired now and keeps its spent floor.
+        #expect(try await fixture.row(fixture.cadenceID(contact))?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
         #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == nil)
     }
 
