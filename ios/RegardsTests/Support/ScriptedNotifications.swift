@@ -80,9 +80,17 @@ actor ScriptedNotifications: NotificationScheduling {
     /// `makeRequest` and `decode`, so a fire date comes back truncated to the
     /// whole second, and a request whose trigger instant is not after the clock
     /// is delivered at once: it is recorded in `delivered`, replaces any
-    /// pending request with its identifier, and is never pending.
+    /// pending request with its identifier, and is never pending. A pending
+    /// request whose time then passes is delivered when `pendingRequests()` is
+    /// next read: it moves to `delivered` (with its whole-second fire date) and
+    /// is no longer returned.
     func pendingRequests() async -> [ReminderNotificationRequest] {
-        pending.values.sorted { $0.identifier < $1.identifier }
+        let now = clock()
+        for request in pending.values.filter({ $0.fireDate <= now }).sorted(by: { $0.identifier < $1.identifier }) {
+            pending[request.identifier] = nil
+            delivered.append(request)
+        }
+        return pending.values.sorted { $0.identifier < $1.identifier }
     }
 
     func schedule(_ request: ReminderNotificationRequest) async throws {
