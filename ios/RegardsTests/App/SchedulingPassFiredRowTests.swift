@@ -155,6 +155,54 @@ struct SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
+    /// Records accepted residual R68 (§19), a pending owner decision. The row
+    /// stores no fired cycle, so after a window edit moves the slot to 18:30
+    /// and the clock is set back to 17:00, the pass derives the delivered
+    /// row as pending again; it fires a second time once 18:30 arrives, then
+    /// holds. A future fix that stores the fired cycle on the row should turn
+    /// step 3 (the re-arm) red on purpose; update this test with that change.
+    @Test(
+        "A window edit then a clock rollback re-arms a fired row once",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func windowEditThenClockRollbackReArmsOnce(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:10")
+        let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 17:30")
+        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 18:00"), in: fixture)
+        fired.state = .fired
+        try await fixture.repositories.reminders.upsert(fired)
+        // Settles the mock backend's seed cast; the fired row is held.
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(fired.id) == fired)
+
+        // The window now opens at 18:30. The 18:00 row is still held.
+        let range = TimeRange(start: TimeOfDay(hour: 18, minute: 30), end: TimeOfDay(hour: 19))
+        try await fixture.repositories.window.saveGlobal(ReminderWindow(
+            allowedDays: .allDays, allowedTimeRanges: [range], quietHours: nil, timezoneIdentifier: PassFixture.zone))
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(fired.id) == fired)
+
+        // Rolled back before the new slot: the row is pending for 18:30.
+        fixture.setNow("2026-06-10 17:00")
+        try await fixture.pass.runFull()
+        let rearmed = try #require(try await fixture.cadenceRow(contact))
+        #expect(rearmed.scheduledFor == PassFixture.at("2026-06-10 18:30"))
+
+        // The new slot arrives: the row fires once.
+        fixture.setNow("2026-06-10 18:31")
+        try await fixture.pass.runFull()
+        let refired = try #require(try await fixture.row(fired.id))
+        #expect(refired.scheduledFor == PassFixture.at("2026-06-10 18:30"))
+        #expect(refired.state == .fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == refired)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
     // MARK: - Zero capacity round trip (contract 2)
 
     /// The slot in progress was delivered: the row is fired at its start `S`.
