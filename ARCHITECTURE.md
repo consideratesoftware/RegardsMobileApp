@@ -425,6 +425,9 @@ protocol NotificationScheduling: Sendable {          // Platform/Notifications
   func requestAuthorization() async throws -> Bool
   func authorizationStatus() async -> NotificationAuthorizationStatus
   var actions: AsyncStream<NotificationAction> { get }   // one consumer
+  func pendingRequests() async -> [ReminderNotificationRequest]
+  func schedule(_ request: ReminderNotificationRequest) async throws
+  func cancel(identifiers: [String]) async
 }
 
 actor SchedulingPass {
