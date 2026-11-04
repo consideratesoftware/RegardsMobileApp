@@ -4,22 +4,27 @@ enum RegardsSettingsRoute: Hashable {
     case reminderWindows
     case mergeDuplicates
     case transparency
-    case onboarding
+    case starterContacts
 }
 
 public struct SettingsScreen: View {
     /// Nil hides the Notifications section: a launch with no notification
     /// seam has nothing to show, and a row that did nothing would be inert.
     private let notifications: NotificationPermissionViewModel?
+    /// Nil hides the Contacts access row: a launch with no Contacts source
+    /// (the DEBUG mock runtime) has nothing to show.
+    private let contactsAccess: ContactsAccessViewModel?
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @AccessibilityFocusState private var notificationRowFocused: Bool
+    @AccessibilityFocusState private var contactsRowFocused: Bool
     /// Whether this screen is showing. The status can change while a pushed
     /// screen covers it, and focus must not move on a screen the user isn't on.
     @State private var isOnScreen = false
 
-    public init(notifications: NotificationPermissionViewModel?) {
+    public init(notifications: NotificationPermissionViewModel?, contactsAccess: ContactsAccessViewModel? = nil) {
         self.notifications = notifications
+        self.contactsAccess = contactsAccess
     }
 
     // MARK: - Body
@@ -44,6 +49,21 @@ public struct SettingsScreen: View {
                             title: "Find duplicate contacts",
                             subtitle: "Virtual merges only.",
                             route: .mergeDuplicates
+                        )
+                    }
+                }
+
+                SectionHeader("People")
+                RegardsCard {
+                    VStack(spacing: 0) {
+                        if let contactsAccess {
+                            ContactsAccessRow(viewModel: contactsAccess, isFocused: $contactsRowFocused)
+                        }
+                        navRow(
+                            id: "choose-starters",
+                            title: "Choose people to keep in touch with",
+                            subtitle: "Pick up to 3, and how often.",
+                            route: .starterContacts
                         )
                     }
                 }
@@ -157,16 +177,6 @@ public struct SettingsScreen: View {
                     )
                 }
 
-                SectionHeader("Help")
-                RegardsCard {
-                    navRow(
-                        id: "onboarding-preview",
-                        title: "Onboarding preview",
-                        subtitle: "Revisit the permission intro.",
-                        route: .onboarding
-                    )
-                }
-
                 Color.clear.frame(height: 40)
             }
         }
@@ -178,9 +188,11 @@ public struct SettingsScreen: View {
         .onAppear { isOnScreen = true }
         .onDisappear { isOnScreen = false }
         .task { await notifications?.load() }
+        .task { await contactsAccess?.load() }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task { await notifications?.refresh() }
+            Task { await contactsAccess?.refresh() }
         }
         // The row is replaced when the status changes (the button becomes
         // status text, or another button), which drops VoiceOver focus from
@@ -193,6 +205,15 @@ public struct SettingsScreen: View {
             Task { @MainActor in
                 await Task.yield()
                 notificationRowFocused = true
+            }
+        }
+        // Same for the Contacts row, which swaps its button for status text.
+        .onChange(of: contactsAccess?.status) { oldStatus, newStatus in
+            guard isOnScreen, oldStatus != nil, newStatus != nil else { return }
+            contactsRowFocused = false
+            Task { @MainActor in
+                await Task.yield()
+                contactsRowFocused = true
             }
         }
     }

@@ -4,8 +4,8 @@ import GRDB
 // The smaller GRDB repository implementations — split out of
 // `Repositories.swift` to keep that file under the lint length limit.
 // `GRDBContactRepository` (the largest, and the one carrying
-// `observeTracked()`/`updateReconciledFields`/`updateLastInteractedAt`)
-// stays there.
+// `observeTracked()`) stays there; its field-scoped writes live in
+// `GRDBContactRepository+FieldWrites.swift`.
 
 struct GRDBContactGroupRepository: ContactGroupRepository {
     let dbQueue: DatabaseQueue

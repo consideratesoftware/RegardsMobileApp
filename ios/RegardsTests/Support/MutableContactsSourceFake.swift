@@ -13,6 +13,19 @@ final class MutableContactsSource: ContactsSource, @unchecked Sendable {
     private var status: ContactsAuthorizationStatus
     private var contacts: [SystemContact]
     private var fetchCount = 0
+    private var requestCount = 0
+    /// What the next `requestAccess()` does. Nil keeps the old behavior:
+    /// return the current status without changing it.
+    private var requestOutcome: Result<ContactsAuthorizationStatus, any Error>?
+    /// With a failure outcome: the status the system records before the
+    /// request throws. On a device a decline arrives this way (CNError 100
+    /// while the status becomes `.denied`).
+    private var statusDecidedOnFailure: ContactsAuthorizationStatus?
+    /// Status reads let through before the held ones, and how many of the next
+    /// reads then suspend until a test releases each with the value it returns.
+    private var immediateReads = Int.max
+    private var holdsRemaining = 0
+    private var heldReads: [CheckedContinuation<ContactsAuthorizationStatus, Never>] = []
     private var continuation: AsyncStream<Void>.Continuation?
     /// Fires once per `fetchAllContacts()` call, right before it returns —
     /// lets a test simulate a permission change landing mid-enumeration
@@ -25,11 +38,72 @@ final class MutableContactsSource: ContactsSource, @unchecked Sendable {
     }
 
     func currentAuthorization() async -> ContactsAuthorizationStatus {
-        lock.withLock { status }
+        let shouldHold: Bool = lock.withLock {
+            if immediateReads > 0 {
+                immediateReads -= 1
+                return false
+            }
+            guard holdsRemaining > 0 else { return false }
+            holdsRemaining -= 1
+            return true
+        }
+        guard shouldHold else { return lock.withLock { status } }
+        return await withCheckedContinuation { continuation in
+            lock.withLock { heldReads.append(continuation) }
+        }
+    }
+
+    /// After `immediateReads` more reads, the next `count` status reads
+    /// suspend until `releaseHeldRead(at:as:)`, so an older read can finish
+    /// after a newer one.
+    func holdReads(after immediateReads: Int = 0, count: Int) {
+        lock.withLock {
+            self.immediateReads = immediateReads
+            holdsRemaining = count
+        }
+    }
+
+    func heldReadCountValue() -> Int {
+        lock.withLock { heldReads.count }
+    }
+
+    /// Lets the held read at `index` (in call order) return `value`.
+    func releaseHeldRead(at index: Int, as value: ContactsAuthorizationStatus) {
+        lock.withLock { heldReads[index] }.resume(returning: value)
     }
 
     func requestAccess() async throws -> ContactsAuthorizationStatus {
-        lock.withLock { status }
+        let outcome: Result<ContactsAuthorizationStatus, any Error>? = lock.withLock {
+            requestCount += 1
+            switch requestOutcome {
+            case .success(let granted)?: status = granted
+            case .failure?: if let decided = statusDecidedOnFailure { status = decided }
+            case nil: break
+            }
+            return requestOutcome
+        }
+        switch outcome {
+        case .success(let granted)?: return granted
+        case .failure(let error)?: throw error
+        case nil: return lock.withLock { status }
+        }
+    }
+
+    /// Scripts the system prompt: a success becomes the new status, a failure
+    /// throws and leaves the status alone unless `decidingOnFailure` says the
+    /// user's decision was recorded first.
+    func setRequestOutcome(
+        _ outcome: Result<ContactsAuthorizationStatus, any Error>?,
+        decidingOnFailure decided: ContactsAuthorizationStatus? = nil
+    ) {
+        lock.withLock {
+            requestOutcome = outcome
+            statusDecidedOnFailure = decided
+        }
+    }
+
+    func requestCountValue() -> Int {
+        lock.withLock { requestCount }
     }
 
     func fetchAllContacts() async throws -> [SystemContact] {
