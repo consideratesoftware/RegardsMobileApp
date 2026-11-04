@@ -99,6 +99,32 @@ struct UserNotificationsAdapterRequestTests {
         #expect(decoded == original)
     }
 
+    /// Pending requests this app didn't build are left out of `pendingRequests()`,
+    /// so `decode` must return nil for them instead of guessing a category.
+    @Test("A pending request with a category this app doesn't define decodes to nothing")
+    func pendingRequestWithUnknownCategoryDecodesToNil() throws {
+        let now = try Self.utc(Self.now)
+        let built = UserNotificationsAdapter.makeRequest(
+            Self.cadenceRequest(fireDate: now.addingTimeInterval(3600)), now: now
+        )
+        let content = try #require(built.content.mutableCopy() as? UNMutableNotificationContent)
+        content.categoryIdentifier = "other"
+        let foreign = UNNotificationRequest(identifier: built.identifier, content: content, trigger: built.trigger)
+
+        #expect(UserNotificationsAdapter.decode(foreign) == nil)
+    }
+
+    @Test("A request with no trigger (it delivers at once and is never pending) decodes to nothing")
+    func requestWithNoTriggerDecodesToNil() throws {
+        let now = try Self.utc(Self.now)
+        let immediate = UserNotificationsAdapter.makeRequest(
+            Self.cadenceRequest(fireDate: now.addingTimeInterval(-600)), now: now
+        )
+        try #require(immediate.trigger == nil)
+
+        #expect(UserNotificationsAdapter.decode(immediate) == nil)
+    }
+
     // MARK: Privacy
 
     /// Title and body are display text. An identifier or contact id in either
@@ -230,6 +256,36 @@ struct UserNotificationsAdapterRequestTests {
     @Test("A notification that arrives while Regards is in the foreground shows a banner, the list and sound")
     func willPresentShowsBannerListAndSound() {
         #expect(UserNotificationsAdapter.foregroundPresentationOptions == [.banner, .list, .sound])
+    }
+
+    private static let willPresentSelector = #selector(
+        (any UNUserNotificationCenterDelegate).userNotificationCenter(_:willPresent:withCompletionHandler:)
+    )
+
+    /// Without this delegate method the system shows nothing for a notification
+    /// that arrives in the foreground. The constant test above can't see the
+    /// method being renamed or deleted, so this one checks it exists.
+    @Test("The adapter implements the willPresent delegate method")
+    func adapterImplementsWillPresent() {
+        #expect(UserNotificationsAdapter.instancesRespond(to: Self.willPresentSelector))
+    }
+
+    /// `UNNotification` can't be constructed, so this calls the Objective-C
+    /// implementation with nil for the center and the notification. It works
+    /// because the method never reads them; if it starts to, this test crashes
+    /// and the method needs a seam like `receive`.
+    @Test("The willPresent delegate method completes with banner, list and sound")
+    func willPresentCompletesWithBannerListAndSound() {
+        typealias Implementation = @convention(c) (
+            AnyObject, Selector, AnyObject?, AnyObject?, @convention(block) (UInt) -> Void
+        ) -> Void
+        let adapter = UserNotificationsAdapter()
+        let call = unsafeBitCast(adapter.method(for: Self.willPresentSelector), to: Implementation.self)
+        var completions: [UNNotificationPresentationOptions] = []
+
+        call(adapter, Self.willPresentSelector, nil, nil) { completions.append(.init(rawValue: $0)) }
+
+        #expect(completions == [[.banner, .list, .sound]])
     }
 
     // MARK: Helpers
