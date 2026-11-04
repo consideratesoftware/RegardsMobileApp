@@ -75,9 +75,10 @@ public protocol NotificationScheduling: Sendable {
     /// actions and run alongside the first, so they'd be handled out of order.
     var actions: AsyncStream<NotificationAction> { get }
     /// The requests waiting to fire, decoded from the system's pending list.
-    /// Content and fire date come back, so a caller can tell a moved or
-    /// reworded request from an unchanged one under the same identifier. A
-    /// pending request this app didn't build is left out.
+    /// Content comes back, and the fire date comes back truncated to the whole
+    /// second, so a caller can tell a moved or reworded request from an
+    /// unchanged one under the same identifier. A pending request this app
+    /// didn't build is left out.
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// A `fireDate` that has already passed delivers at once (§9 contract 5).
