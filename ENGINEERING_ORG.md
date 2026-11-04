@@ -150,7 +150,9 @@ head. Sid is asked only if a blocker survives 2 rounds or a fix needs a
 product decision. The `PR REVIEW:` comment lists which reviewers reran and
 which approvals carry from which sha. A carry stands only as
 `scripts/check-carried-approval.sh` allows: only Markdown outside the agent,
-script and CI directories carries, and anything else reruns that reviewer.
+script and CI directories carries, never AGENTS*.md, CLAUDE*.md,
+ARCHITECTURE.md, or Markdown under ios/Regards* or android/app, and anything
+else reruns that reviewer.
 The release manager runs that script. On every newest `PR REVIEW:` comment,
 scoped or not, each reviewer the routing table requires must be APPROVE on
 its `REVIEWERS:` line, or for `pr-code-quality` and `pr-tests` on a passing

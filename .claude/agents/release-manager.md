@@ -166,8 +166,9 @@ PR, never in the root checkout.
      the root checkout's copy on `main`, not the lane's, because the PR under
      review could have edited its own copy of the scripts. The rule is one
      line: only Markdown outside the agent, script and CI directories
-     carries, and anything else reruns that reviewer. The script's header
-     defines it.
+     carries, never AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown
+     under ios/Regards* or android/app, and anything else reruns that
+     reviewer. The script's header defines it.
   If any check fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer.
