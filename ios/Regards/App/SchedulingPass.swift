@@ -121,8 +121,8 @@ public actor SchedulingPass {
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
         let targetIds = Set(targets.map(\.id))
         // §9 "Notification fired": a due covered pending row was delivered, so
-        // it becomes fired history. After this, no covered pending row is due
-        // except one this call writes into the slot in progress (next run's).
+        // it becomes fired history. A row this call writes into the slot in
+        // progress is written fired, so after any run no covered pending row is due.
         var rows = snapshot.reminders
         for (index, row) in rows.enumerated()
         where row.state == .pending && row.scheduledFor <= now && targetIds.contains(row.contactId) {
@@ -204,6 +204,7 @@ public actor SchedulingPass {
                 kind: .cadence,
                 scheduledFor: slot,
                 osNotificationId: Self.notificationId(contactId: contact.id, kind: .cadence),
+                state: slot <= now ? .fired : .pending,
                 snoozedUntil: floor
             )
             if existing != desired { try await reminders.upsert(desired) }
@@ -398,23 +399,15 @@ public actor SchedulingPass {
         return true
     }
 
-    /// What the user did: Caught up from a screen or from a notification, or
-    /// "Log other channel…" through `channel`.
-    public enum Interaction: Sendable, Equatable {
-        case caughtUp
-        case caughtUpFromNotification
-        case other(Channel)
-    }
-
     /// Caught up and Log other (§9 re-evaluation triggers, R60) in one lock
-    /// span: `.pending` to `.userCaughtUp` on the cadence row (a
+    /// span: `.pending` or `.fired` to `.userCaughtUp` on the cadence row (a
     /// compare-and-set, never an insert, R59), log through
     /// `InteractionLogging`, then `reschedule(only:)`, never `run(for:)`,
     /// which would wait on this lock. The transition comes first so every
     /// `lastInteractedAt` broadcast lands after the snooze is gone.
     ///
-    /// If logging throws, a row this call cleared goes back to `.pending`
-    /// with its floor; the lock keeps anything else from moving it first.
+    /// If logging throws, a row this call cleared goes back to the state it
+    /// left, floor included; the lock keeps anything else from moving it first.
     /// Then it returns `false` for a notification whose contact isn't
     /// `isCadenceEligible` (a notification can outlive tracking) and
     /// rethrows anything else. A failed reschedule after a logged interaction
@@ -425,7 +418,14 @@ public actor SchedulingPass {
         await lock()
         defer { unlock() }
         let cadenceId = Self.reminderID(contactId: contactId, kind: .cadence)
-        let cleared = try await reminders.transitionState(id: cadenceId, from: .pending, to: .userCaughtUp)
+        // Invariant: any fired cadence row in a snapshot postdates the contact's last
+        // recorded interaction, so the no-re-nag hold never keeps a row the user answered.
+        var clearedFrom: ReminderState?
+        if try await reminders.transitionState(id: cadenceId, from: .pending, to: .userCaughtUp) {
+            clearedFrom = .pending
+        } else if try await reminders.transitionState(id: cadenceId, from: .fired, to: .userCaughtUp) {
+            clearedFrom = .fired
+        }
         let logging = InteractionLogging(contacts: contacts, interactions: interactions)
         do {
             switch interaction {
@@ -437,12 +437,12 @@ public actor SchedulingPass {
                 try await logging.logOther(contactId: contactId, channel: channel, at: clock())
             }
         } catch {
-            if cleared {
+            if let clearedFrom {
                 do {
-                    try await reminders.transitionState(id: cadenceId, from: .userCaughtUp, to: .pending)
+                    try await reminders.transitionState(id: cadenceId, from: .userCaughtUp, to: clearedFrom)
                 } catch {
                     let errorType = String(describing: type(of: error))
-                    Self.log.error("couldn't restore a cleared snooze: \(errorType, privacy: .public)")
+                    Self.log.error("couldn't restore a cleared cadence row: \(errorType, privacy: .public)")
                 }
             }
             if error is InteractionLogging.NotCadenceEligible { return false }
