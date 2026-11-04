@@ -10,7 +10,9 @@
 #                       only when the text also says "VERDICT: APPROVE".
 #   MALFORMED: <why>    fail closed: treat as unresolved blockers.
 # Bullets are "-", "*", or numbered ("1." or "1)"). A bullet that reads only
-# "None" is not a blocker. Exit 64 means a usage error.
+# "None" is not a blocker. Run it with bash. Exit 64 is a usage error, and any
+# other nonzero exit (an awk failure, say) is a script error: it fails closed,
+# so treat it as unresolved blockers.
 
 set -euo pipefail
 
@@ -33,8 +35,7 @@ awk '
   s && /^[[:space:]]*([-*]|[0-9]+[.)]) / { n++; next }
   s && NF && !/^None\.?[[:space:]]*$/ { other++ }
   END {
-    if (NR == 0)                       print "PENDING: empty review text"
-    else if (!found)                   print "MALFORMED: no Blockers section"
+    if (!found)                        print "MALFORMED: no Blockers section"
     else if (n == 0 && other > 0)      print "MALFORMED: Blockers section has text but no bullets"
     else if (n == 0 && v != "APPROVE") print "MALFORMED: no blockers listed but VERDICT is " (v == "" ? "missing" : v)
     else                               print "BLOCKERS " n + 0

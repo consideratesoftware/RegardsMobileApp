@@ -125,7 +125,9 @@ tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
 and never count it as zero. Only `BLOCKERS 0` counts as zero, and the script
 prints it only when the text also has `VERDICT: APPROVE`. `MALFORMED` fails
 closed: treat it as unresolved blockers, quote the section, and report it.
-Also check that the text's `HEAD SHA:` line equals `<head sha>`. Quote the
+A nonzero exit from this script, or from `check-carried-approval.sh` below,
+fails closed: the blockers stand and the carry is rejected. Also check that
+the text's `HEAD SHA:` line equals `<head sha>`. Quote the
 blockers verbatim in your report.
 
 Red or blockers: hand off to `on-call-engineer` with the findings, then watch

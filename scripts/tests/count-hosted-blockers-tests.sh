@@ -31,6 +31,8 @@ expect_output 'a "- None" bullet is zero blockers' 'BLOCKERS 0' \
   $'VERDICT: APPROVE\n### Blockers\n\n- None\n\n### Should fix\n'
 expect_output 'a "* None." bullet is zero blockers' 'BLOCKERS 0' \
   $'VERDICT: APPROVE\n### Blockers\n* None.\n'
+expect_output 'a numbered "1. None" bullet is zero blockers' 'BLOCKERS 0' \
+  $'VERDICT: APPROVE\n### Blockers\n\n1. None\n\n### Should fix\n'
 expect_output 'dash and numbered bullets are counted' 'BLOCKERS 3' \
   $'VERDICT: REQUEST_CHANGES\n### Blockers\n- a\n2. b\n3) c\n### Should fix\n- d\n'
 expect_output 'star bullets are counted' 'BLOCKERS 2' \
