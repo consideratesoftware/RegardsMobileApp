@@ -137,6 +137,7 @@ lower_case_agents_override_md() { put docs/agents.override.md '# Agents override
 ios_bundle_md() { put ios/Regards/Resources/x.md '# Resource'; }
 android_app_md() { put android/app/src/main/x.md '# Resource'; }
 android_module_asset_md() { put android/feature/overdue/src/main/assets/x.md '# Asset'; }
+android_schemas_md() { put android/data/schemas/x.md '# Schema notes'; }
 shared_testvectors_md() { put shared/testvectors/x.md '# Vector notes'; }
 android_docs_md() { put android/docs/notes.md '# Android notes'; }
 android_readme_md() { put android/README.md '# Android'; }
@@ -203,6 +204,7 @@ expect 'an added lower-case docs/agents.override.md fails' 1 lower_case_agents_o
 expect 'an added ios/Regards/Resources/x.md fails' 1 ios_bundle_md
 expect 'an added android/app/src/main/x.md fails' 1 android_app_md
 expect 'an added android/feature/overdue/src/main/assets/x.md fails' 1 android_module_asset_md
+expect 'an added android/data/schemas/x.md fails' 1 android_schemas_md
 expect 'an added shared/testvectors/x.md fails' 1 shared_testvectors_md
 expect 'an added android/docs/notes.md passes' 0 android_docs_md
 expect 'an added android/README.md passes' 0 android_readme_md

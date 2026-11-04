@@ -151,9 +151,9 @@ product decision. The `PR REVIEW:` comment lists which reviewers reran and
 which approvals carry from which sha. A carry stands only as
 `scripts/check-carried-approval.sh` allows: only Markdown outside the agent,
 script and CI directories carries, never AGENTS*.md, CLAUDE*.md,
-ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src` or
-`shared/testvectors`, and anything else reruns that reviewer.
-The release manager runs that script. Each reviewer the routing table
+ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
+`android/*/schemas` or `shared/testvectors`, and anything else reruns that
+reviewer. The release manager runs that script. Each reviewer the routing table
 requires must have APPROVE as its newest verdict. The release manager reads
 every counting `PR REVIEW:` comment, oldest first, and takes each reviewer's
 entry on the last `REVIEWERS:` line that lists it, at any head. The entry must

@@ -19,8 +19,8 @@
 #     (AGENTS.override.md, CLAUDE.local.md);
 #   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
 #     from it, so an edit there changes what the tests must prove);
-#   - the path is under ios/Regards*/, android/*/src/ or shared/testvectors/
-#     (the bundled trees; see below);
+#   - the path is under ios/Regards*/, android/*/src/, android/*/schemas/ or
+#     shared/testvectors/ (the bundled trees; see below);
 #   - the entry has a mode change (only 100644, or add/delete, is allowed).
 # An added or deleted .md file is docs. Agent contracts, commands, skills,
 # scripts, CI and the instruction files are behavior, so a change there never
@@ -34,10 +34,12 @@
 # never carries. The trees are the iOS app and test targets (ios/Regards*/),
 # every Android module's sources, assets and tests (android/*/src/; the *
 # crosses slashes, so android/feature/overdue/src/ is covered, while
-# android/docs/ and android/README.md stay eligible), and shared/testvectors/,
-# test data with two readers: the Swift suite, which generates the vectors and
-# consumes them first, and the Android domain tests (ANDROID_PORT.md A6). A
-# Markdown file there would be read as data, so the tree is excluded to fail
+# android/docs/ and android/README.md stay eligible), android/*/schemas/ (the
+# Room schemaLocation in android/data/build.gradle.kts, whose committed schema
+# files the migration tests read), and shared/testvectors/, test data with two
+# readers: the Swift suite, which generates the vectors and consumes them
+# first, and the Android domain tests (ANDROID_PORT.md A6). A Markdown file in
+# those last two trees would be read as data, so they are excluded to fail
 # closed. Elsewhere a Markdown file is documentation, except the instruction
 # files and ARCHITECTURE.md named above, which agents read as instructions or
 # as the contract.
@@ -95,7 +97,7 @@ while IFS= read -r -d '' meta; do
       fail "agent instruction file never carries: $path" ;;
     ARCHITECTURE.md | */ARCHITECTURE.md )
       fail "ARCHITECTURE.md never carries: $path" ;;
-    ios/Regards*/* | android/*/src/* | shared/testvectors/* )
+    ios/Regards*/* | android/*/src/* | android/*/schemas/* | shared/testvectors/* )
       fail "bundled tree never carries: $path" ;;
   esac
   shopt -u nocasematch

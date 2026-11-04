@@ -204,8 +204,9 @@ reviewer only completes the set.
 
 Only `pr-code-quality` and `pr-tests` can carry, and only over Markdown
 outside the agent, script and CI directories, never AGENTS*.md, CLAUDE*.md,
-ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src` or
-`shared/testvectors`; anything else reruns that reviewer. The release manager
+ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
+`android/*/schemas` or `shared/testvectors`; anything else reruns that
+reviewer. The release manager
 checks each `CARRIED:` line (`release-manager.md`, Merge conditions) and
 rejects one that fails, so if you aren't sure, rerun the reviewer. The other four reviewers and Codex never
 carry: they rerun on every head.
