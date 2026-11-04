@@ -369,6 +369,21 @@ extension MockStore {
         return true
     }
 
+    /// Mirrors `GRDBContactRepository.updateTracking`: validates before touching anything, writes only `tracked` and
+    /// `cadenceDays` on the current entry (actor-isolated, so no stale snapshot can revert another field), and treats
+    /// an archived contact as "no match." Broadcasts for the same R23 parity as the writes above.
+    @discardableResult
+    func updateTracking(id: UUID, cadenceDays: Int?) throws -> Bool {
+        try ContactTrackingError.validate(cadenceDays)
+        guard var c = contacts[id], c.isActive else { return false }
+        c.tracked = cadenceDays != nil
+        c.cadenceDays = cadenceDays
+        contacts[id] = c
+        broadcastTrackedChange()
+        broadcastScheduleChange()
+        return true
+    }
+
     func allGroups() -> [ContactGroup] { Array(groups.values) }
     func group(id: UUID) -> ContactGroup? { groups[id] }
     func upsertGroup(_ g: ContactGroup) throws { groups[g.id] = try mockStoredGroup(g) }

@@ -8,8 +8,9 @@ import Testing
 /// something — but before this fix, `requestContactsAndImport()` and
 /// `importAuthorizedContacts()` both discarded the result entirely, so an
 /// import where *every* row failed still fell through to
-/// `completeOnboardingAfterImport`, silently finishing onboarding with an
-/// empty All Contacts and no visible sign anything went wrong.
+/// the completion step (since TF-11 slice 3, the starter step and
+/// `finishOnboarding()`), silently moving on with an empty All Contacts and
+/// no visible sign anything went wrong.
 @MainActor
 struct AppLaunchCoordinatorImportFailureTests {
     let now = Date(timeIntervalSince1970: 1_785_600_000)
@@ -100,8 +101,8 @@ struct AppLaunchCoordinatorImportFailureTests {
     /// let a partially-successful import through, so `failed > 0 &&
     /// imported > 0` must complete onboarding normally, not get caught by
     /// `importEffectivelyFailed`'s guard as if the whole pass failed.
-    @Test("An import where some rows fail but others succeed still completes onboarding")
-    func importWithPartialFailureStillCompletesOnboarding() async throws {
+    @Test("An import where some rows fail but others succeed still reaches the starter step")
+    func importWithPartialFailureStillReachesStarterStep() async throws {
         let okContact = SystemContact(
             identifier: "partial-failure-ok-contact",
             givenName: "Han",
@@ -132,14 +133,14 @@ struct AppLaunchCoordinatorImportFailureTests {
 
         await launch.start()
 
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: "completes onboarding" became "reaches the starter
+        // step", because completion now waits for Done or Skip there.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         #expect(launch.statusMessage == nil)
         #expect(!launch.canContinueWithoutContacts)
         let profile = try await environment.profile.fetch()
-        #expect(
-            profile.onboardingCompletedAt == self.now,
-            "A partially-successful import (R35 tolerance) must still complete onboarding."
-        )
+        #expect(profile.onboardingCompletedAt == nil)
         let stored = try await environment.contacts.fetchAll()
         #expect(stored.map(\.systemContactRef) == [okContact.identifier])
     }
@@ -152,8 +153,8 @@ struct AppLaunchCoordinatorImportFailureTests {
     /// rows and skipping them. Requiring `skipped == 0` in
     /// `importEffectivelyFailed` is what tells this apart from a fresh
     /// total failure, which never skips anything.
-    @Test("A resumed import that only re-encounters one already-failing row completes onboarding")
-    func resumedImportWithOnlyASkippedFailingRowCompletesOnboarding() async throws {
+    @Test("A resumed import that only re-encounters one already-failing row reaches the starter step")
+    func resumedImportWithOnlyASkippedFailingRowReachesStarterStep() async throws {
         let alreadyImported = SystemContact(
             identifier: "already-imported-contact",
             givenName: "Chewbacca",
@@ -190,13 +191,13 @@ struct AppLaunchCoordinatorImportFailureTests {
 
         await launch.start()
 
-        #expect(launch.phase == .ready)
+        // TF-11 slice 3: a resumed import is not a failure, so it reaches the
+        // starter step instead of showing the failure copy.
+        #expect(launch.phase == .onboarding)
+        #expect(launch.onboardingStep == .starter)
         #expect(launch.statusMessage == nil)
         #expect(!launch.canContinueWithoutContacts)
         let profile = try await environment.profile.fetch()
-        #expect(
-            profile.onboardingCompletedAt == self.now,
-            "imported == 0 && skipped > 0 && failed > 0 is a resumed import, not a total failure."
-        )
+        #expect(profile.onboardingCompletedAt == nil)
     }
 }
