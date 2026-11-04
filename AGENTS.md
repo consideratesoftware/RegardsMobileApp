@@ -166,11 +166,10 @@ is bound as a fourth required context (`Regards staged review`, pinned to the
 dedicated App's identity), but it gates on *evidence, not agreement*: it fails
 when no valid review ran for the current head, and passes when a review ran,
 including one that requests changes. The blockers are published in the check
-summary and output. Whether a blocker must be cleared is the repo's rule for a
-human author (clear it, or record Sid's deferral with a link to his PR
-comment); the Claude Code org holds itself
-to the stricter policy in `ENGINEERING_ORG.md` (zero hosted blockers on the
-current head). Path filters were
+summary and output. For a person, acting on a blocker is the author's call
+(ARCHITECTURE.md, CI bullet). The Claude Code org holds itself to a stricter
+policy of its own, in `ENGINEERING_ORG.md`: clear every hosted blocker, or
+record Sid's deferral of it with a link to his PR comment. Path filters were
 deliberately removed (PR #15) so required checks always report. The
 accessibility audits moved off the PR path on 2026-08-02 and are
 release-blocking rather than merge-blocking (ARCHITECTURE.md §10).
@@ -206,9 +205,9 @@ The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions
 job cannot satisfy it. A blocker still means `REQUEST_CHANGES`, but the check
 reports whether a valid review ran, not whether it approved; read the check
-output and clear each blocker, or record Sid's deferral of it with a link to
-his PR comment, before merging. The workflow
-runs only when a PR targets the default branch, so a stacked draft stays on its
+output before merging. For a person, acting on a blocker is the author's call;
+the Claude Code org clears every blocker or records Sid's linked deferral
+first (`ENGINEERING_ORG.md`). The workflow runs only when a PR targets the default branch, so a stacked draft stays on its
 parent until the parent merges. Retarget and rebase the child, publish it, then
 push the rebased head to trigger the hosted review against the final base.
 

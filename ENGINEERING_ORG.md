@@ -158,7 +158,8 @@ the check (STATE CODEX STALE).
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
 review. It notifies Sid only about PRs that need him: a blocking owner gate
-(below), a Codex UNAVAILABLE, or a PR parked after its repair rounds. A
+(below), a Codex UNAVAILABLE, a hosted blocker that needs his deferral, or a
+PR parked after its repair rounds. A
 merged PR appears in the engineering manager's report as one line, not as a
 notification.
 

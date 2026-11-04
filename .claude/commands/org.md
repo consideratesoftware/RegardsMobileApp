@@ -236,8 +236,8 @@ watches CI and the hosted review, routes repairs, records the checkpoint via
 Owner direction, 2026-11-02: a PR whose merge conditions all hold is
 merged. Don't ask Sid "ready to merge?" and don't hold a green PR for his
 review. Sid hears only about PRs that need him: a blocking owner gate, an
-OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a scope change, or a PR parked
-after its repair rounds.
+OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a hosted blocker that needs his
+deferral, a scope change, or a PR parked after its repair rounds.
 
 If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
 relaunch `release-manager` with the new verdicts:
