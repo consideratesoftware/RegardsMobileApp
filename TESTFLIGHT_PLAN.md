@@ -12,20 +12,22 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-11-02
-- Baseline: `main` at `55c3d16` (merge of PR #67, `TF-07c`, merged 2026-10-30 (Pacific)).
+- Updated: 2026-11-03
+- Baseline: `main` at `05f0b5e` (merge of PR #70, `TF-07d`, merged 2026-11-03 (Pacific)). PR #67 (`TF-07c`) merged as `55c3d16` on 2026-10-30 (Pacific).
   PR #66 (`TF-07a`) merged as `0b784d7` on 2026-10-28. PR #65 (`TF-07b`) merged as
   `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06` fast-follow, merged as
   `3ebe90e`. `TF-05` merged as PR #63 (`a887ece`), and `TF-06` merged as PR #62
   (`de33098`).
-- Active work: `TF-07d` is PR #70 (`claude/tf-07d-interactions`, in review). It moves Caught up and Log other into one `SchedulingPass` lock span and deletes the dead engine cadence API. `TF-07e` through `TF-07g` follow it. `TF-11` is in progress on `claude/tf-11-onboarding` in its own lane.
+- Active work: `TF-07c` (PR #67) and `TF-07d` (PR #70) are merged. `TF-07e` is planned, and its adapter
+  slice is in progress on `claude/tf-07e3-adapter`. `TF-07f` and `TF-07g` follow it. `TF-11` is PR #68
+  (`claude/tf-11-onboarding`), in review.
   Owner ruling 8 moved every device-only check to the pre-release device pass (see
   `Owner gates`), so TF-03's device acceptance no longer blocks `TF-07` or `TF-11`.
   `TF-03`'s code is merged in PR #48.
-- Next ready work: none. `TF-07e` through `TF-07g` wait for `TF-07d`.
+- Next ready work: none. `TF-07e` is planned and in progress on `claude/tf-07e3-adapter`; `TF-07f` and `TF-07g` follow it.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`), #69 (`claude/build-engineer-cwd`), and #70 (`TF-07d`, `claude/tf-07d-interactions`). Checked with `gh pr list --state open` on 2026-11-02.
+- Open pull requests: #68 (`TF-11`, `claude/tf-11-onboarding`) and #69 (`claude/build-engineer-cwd`). Checked with `gh pr list --state open` on 2026-11-03.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
