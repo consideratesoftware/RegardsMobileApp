@@ -114,13 +114,13 @@ Navigation uses **one `NavigationStack` per tab** with per-tab `NavigationPath` 
 ## Accessibility is release-blocking
 
 `RegardsAccessibilityTests` runs `XCUIApplication.performAccessibilityAudit()`
-across the registered screens. Pull requests run focused regressions and the
-manual smoke for changed flows; the one-run audit after merges plus nightly and
-pre-release 5× stress workflows are release-blocking. See
-`ios/docs/accessibility.md` for the standing rules (VoiceOver label
-completeness, Dynamic Type through `accessibility5`, WCAG AA contrast, Reduce
-Motion, 44×44pt touch targets, focus order). Every new screen gets a row in the
-"screens audited" table in that doc.
+across the registered screens. Pull requests run focused regressions for
+changed flows (the manual smoke goes to the pre-release device pass); the
+one-run audit after merges plus nightly and pre-release 5× stress workflows
+are release-blocking. See `ios/docs/accessibility.md` for the standing rules
+(VoiceOver label completeness, Dynamic Type through `accessibility5`, WCAG AA
+contrast, Reduce Motion, 44×44pt touch targets, focus order). Every new screen
+gets a row in the "screens audited" table in that doc.
 
 The active release audit currently uses the **structural** categories
 (`elementDetection`, `sufficientElementDescription`, `trait`) through the
@@ -132,7 +132,9 @@ categories.
 
 UI-test flakiness rule (learned in PRs #11/#12): don't `waitForExistence` on predicate-matched queries — plain element queries for waits, predicates for read-after-known. PRs run the focused accessibility regressions affected by the diff; the single broad audit runs after merges, while repeated 5× stress belongs to nightly and pre-release automation. Use `ios/scripts/audit-stress.sh` locally only to investigate a reproduced flake or an explicitly requested release candidate, not as a routine PR gate.
 
-Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) is expected before any UI-touching merge.
+Manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`) for a UI-touching
+PR goes to the "Pre-release device pass" in `TESTFLIGHT_PLAN.md` (owner ruling
+8, 2026-10-28); it does not hold a merge.
 
 ## Info.plist privacy invariants
 
@@ -164,7 +166,10 @@ is bound as a fourth required context (`Regards staged review`, pinned to the
 dedicated App's identity), but it gates on *evidence, not agreement*: it fails
 when no valid review ran for the current head, and passes when a review ran,
 including one that requests changes. The blockers are published in the check
-summary and output; acting on them is the author's call. Path filters were
+summary and output. For a person, acting on a blocker is the author's call
+(ARCHITECTURE.md, CI bullet). The Claude Code org holds itself to a stricter
+policy of its own, in `ENGINEERING_ORG.md`: clear every hosted blocker, or
+record Sid's deferral of it with a link to his PR comment. Path filters were
 deliberately removed (PR #15) so required checks always report. The
 accessibility audits moved off the PR path on 2026-08-02 and are
 release-blocking rather than merge-blocking (ARCHITECTURE.md §10).
@@ -187,23 +192,24 @@ before new feature work.
 
 Every PR gets the same multi-agent review before merge. Codex invokes
 `$regards-pr-review`; Claude Code invokes `/pr-review`. Both pre-flight the
-mechanical gates, then use the mirrored read-only agents:
-`pr-correctness`, `pr-security-privacy`, and `pr-code-quality` always;
-`pr-tests` for code/test changes; and `pr-accessibility` plus
-`pr-fit-finish` when their UI/docs path rules match. Any blocker means
-`REQUEST_CHANGES`. Claimed R-closures are verified against §19 acceptance
-checks. The Claude Code org (`ENGINEERING_ORG.md`) runs both orchestrators
-on each lane and needs both verdicts before merge. `.agents/README.md`
-describes the adapters, and
+mechanical gates, then use the mirrored read-only agents: `pr-correctness`,
+`pr-security-privacy`, and `pr-code-quality` always; `pr-tests` for code/test
+changes; and `pr-accessibility` plus `pr-fit-finish` when their UI/docs path
+rules match. Any blocker means `REQUEST_CHANGES`. Claimed R-closures are
+verified against §19 acceptance checks. The Claude Code org
+(`ENGINEERING_ORG.md`) runs both orchestrators on each lane and needs both
+verdicts before merge. `.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
 The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions
 job cannot satisfy it. A blocker still means `REQUEST_CHANGES`, but the check
 reports whether a valid review ran, not whether it approved; read the check
-output and clear or consciously defer each blocker before merging. The workflow
-runs only when a PR targets the default branch, so a stacked draft stays on its
-parent until the parent merges. Retarget and rebase the child, publish it, then
-push the rebased head to trigger the hosted review against the final base.
+output before merging. For a person, acting on a blocker is the author's call;
+the Claude Code org clears every blocker or records Sid's linked deferral
+first (`ENGINEERING_ORG.md`). The workflow runs only when a PR targets the
+default branch, so a stacked draft stays on its parent until the parent
+merges. Retarget and rebase the child, publish it, then push the rebased head
+to trigger the hosted review against the final base.
 
 ## Things to avoid
 
