@@ -98,9 +98,11 @@ extension AppLaunchCoordinator {
 /// and `send(_:)` delivers an action as if the user tapped it.
 ///
 /// It also keeps an in-memory pending set that `schedule`, `cancel`, and
-/// `pendingRequests` honor, keyed by identifier like the system's. It never
-/// delivers: a request stays pending until it is cancelled or replaced, even
-/// with a fire date in the past.
+/// `pendingRequests` honor, keyed by identifier like the system's. `schedule`
+/// stores each request through `UserNotificationsAdapter.makeRequest` and
+/// `decode` with `clock`, so a fire date at or before now is delivered at once
+/// and never pending, as in the real center. Otherwise a request stays pending
+/// until it is cancelled or replaced.
 ///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
@@ -120,12 +122,18 @@ actor DebugNotificationScheduling: NotificationScheduling {
     private let requestOutcome: RequestOutcome
     /// How many times `requestAuthorization()` ran, prompt or not.
     private(set) var requestCount = 0
+    private let clock: @Sendable () -> Date
     private var pending: [String: ReminderNotificationRequest] = [:]
 
-    init(status: NotificationAuthorizationStatus = .notDetermined, requestOutcome: RequestOutcome = .grant) {
+    init(
+        status: NotificationAuthorizationStatus = .notDetermined,
+        requestOutcome: RequestOutcome = .grant,
+        clock: @escaping @Sendable () -> Date = { Date() }
+    ) {
         (actions, continuation) = AsyncStream.makeStream(of: NotificationAction.self, bufferingPolicy: .unbounded)
         self.status = status
         self.requestOutcome = requestOutcome
+        self.clock = clock
     }
 
     /// Mirrors iOS: only `.notDetermined` prompts. Once decided, a request
@@ -152,7 +160,11 @@ actor DebugNotificationScheduling: NotificationScheduling {
     }
 
     func schedule(_ request: ReminderNotificationRequest) async throws {
-        pending[request.identifier] = request
+        // Matches the real center: a request not after now is delivered at
+        // once, so it replaces any pending one and is not recorded.
+        pending[request.identifier] = UserNotificationsAdapter.decode(
+            UserNotificationsAdapter.makeRequest(request, now: clock())
+        )
     }
 
     func cancel(identifiers: [String]) async {
