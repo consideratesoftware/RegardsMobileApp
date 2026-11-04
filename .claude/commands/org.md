@@ -251,7 +251,8 @@ relaunch `release-manager` with the new verdicts:
 - a newest verdict names a sha other than the head, or the branch was just
   updated (`update-branch`): both reviews, on the new head;
 - `carry rejected: <reviewer>` or `reviewer missing: <name>`: that reviewer
-  only, and post a new `PR REVIEW:` comment that lists it in `RERAN:`;
+  only, and post a new `PR REVIEW:` comment that lists it in `RERAN:` and
+  repeats every `CARRIED:` line that still stands;
 - no `REVIEWERS:` line on the newest `PR REVIEW:` comment: `/pr-review` in
   full;
 - the Codex review file is missing or its sha differs: Codex, and save the
