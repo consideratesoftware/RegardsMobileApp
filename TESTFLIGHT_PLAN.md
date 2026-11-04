@@ -18,14 +18,14 @@ never pick up Android work.
   `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06` fast-follow, merged as
   `3ebe90e`. `TF-05` merged as PR #63 (`a887ece`), and `TF-06` merged as PR #62
   (`de33098`).
-- Active work: `TF-07e` slice 3, the notification adapter (`claude/tf-07e3-adapter`), is in review. Slice 4 wires the pass and resolves R57. `TF-07d` merged as PR #70 (`05f0b5e`). It moved Caught up and Log other into one `SchedulingPass` lock span and deleted the dead engine cadence API. `TF-07e` through `TF-07g` follow it. `TF-11` merged as PR #68 (`a301d83`, on `main`).
+- Active work: `TF-07e` slice 3, the notification adapter (`claude/tf-07e3-adapter`, PR #71), is in review. Slice 4 wires the pass and resolves R57. `TF-07d` merged as PR #70 (`05f0b5e`). It moved Caught up and Log other into one `SchedulingPass` lock span and deleted the dead engine cadence API. `TF-07e` through `TF-07g` follow it. `TF-11` merged as PR #68 (`a301d83`, on `main`).
   Owner ruling 8 moved every device-only check to the pre-release device pass (see
   `Owner gates`), so TF-03's device acceptance no longer blocks `TF-07` or `TF-11`.
   `TF-03`'s code is merged in PR #48.
 - Next ready work: none. Slice 4 (`TF-07e`) builds on slice 3, so it waits for slice 3's review.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #69 (`claude/build-engineer-cwd`). `TF-07e` slice 3 is on branch `claude/tf-07e3-adapter`; its PR number is added when it opens. #69 was open at the `gh pr list --state open` check on 2026-11-02. #68 (`TF-11`) and #70 (`TF-07d`) are merged.
+- Open pull requests: #71 (`TF-07e` slice 3, `claude/tf-07e3-adapter`), the only one at the `gh pr list --state open` check on 2026-11-03. #68 (`TF-11`), #69 (`claude/build-engineer-cwd`), and #70 (`TF-07d`) are merged.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
