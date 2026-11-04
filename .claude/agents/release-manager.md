@@ -66,12 +66,12 @@ gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$
 ```
 
 The query returns the newest 100 comments, oldest first. If `total comments`
-is above 100 and a kind prints `none`, or a required reviewer's verdict (Merge
-conditions, Newest verdict) is missing or its carry is rejected, stop and
-report STATE CODEX STALE with the reason "more than 100 comments, verdict
-lookup needs a manual check". Fail closed: don't treat it as a missing
-verdict and don't page through older comments yourself; the engineering
-manager checks and reposts a verdict if needed.
+is above 100 and either a kind prints `none` or a required reviewer has no
+`REVIEWERS:` entry in the output, stop and report STATE CODEX STALE with the
+reason "more than 100 comments, verdict lookup needs a manual check". A
+rejected carry keeps its own "carry rejected: <name>" reason. Fail closed:
+don't treat it as a missing verdict and don't page through older comments
+yourself; the engineering manager checks and reposts a verdict if needed.
 
 The sha on a first line counts as the current head when it is a prefix of the
 head's full sha. Read `DISPUTED:` lines only from this output, never from any
