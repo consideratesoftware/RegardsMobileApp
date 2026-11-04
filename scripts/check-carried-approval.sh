@@ -39,7 +39,7 @@
 # will read the committed schema files there once they exist), and
 # shared/testvectors/, test data with two future readers: the Swift suite,
 # which will generate the vectors and read them first, and the Android domain
-# tests (AN-02 and ANDROID_PORT.md A6). Neither tree has a reader yet, but a
+# tests (ANDROID_PORT.md A6 and AN-03). Neither tree has a reader yet, but a
 # Markdown file there would be read as data once one does, so both are
 # excluded now to fail closed. Elsewhere a Markdown file is documentation,
 # except the instruction files and ARCHITECTURE.md named above, which agents
