@@ -19,7 +19,8 @@
 #     (AGENTS.override.md, CLAUDE.local.md);
 #   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
 #     from it, so an edit there changes what the tests must prove);
-#   - the path is under ios/Regards*/ or android/app/ (the bundled trees);
+#   - the path is under ios/Regards*/, android/*/src/ or shared/testvectors/
+#     (the bundled trees; see below);
 #   - the entry has a mode change (only 100644, or add/delete, is allowed).
 # An added or deleted .md file is docs. Agent contracts, commands, skills,
 # scripts, CI and the instruction files are behavior, so a change there never
@@ -27,9 +28,15 @@
 # toml, anything. Renames are never detected, so a move is a delete plus an
 # add.
 #
-# Why Markdown alone is safe: the app and its tests read files only from the
+# Why Markdown alone is safe: the apps and their tests read files only from the
 # bundled trees, and those trees are excluded as a whole, so a Markdown file
-# added there (a future resource, say) never carries. Elsewhere a Markdown
+# added there (a future resource, say) never carries. The trees are the iOS
+# app and test targets (ios/Regards*/), every Android module's sources, assets
+# and tests (android/*/src/; the * crosses slashes, so android/feature/overdue/
+# src/ is covered, while android/docs/ and android/README.md stay eligible),
+# and shared/testvectors/, test-only data that the Android domain tests will
+# read (ANDROID_PORT.md A6). The last one is excluded to fail closed, since
+# the tests would read a Markdown file there as data. Elsewhere a Markdown
 # file is documentation, except the instruction files and ARCHITECTURE.md
 # named above, which agents read as instructions or as the contract.
 
@@ -86,7 +93,7 @@ while IFS= read -r -d '' meta; do
       fail "agent instruction file never carries: $path" ;;
     ARCHITECTURE.md | */ARCHITECTURE.md )
       fail "ARCHITECTURE.md never carries: $path" ;;
-    ios/Regards*/* | android/app/* )
+    ios/Regards*/* | android/*/src/* | shared/testvectors/* )
       fail "bundled tree never carries: $path" ;;
   esac
   shopt -u nocasematch

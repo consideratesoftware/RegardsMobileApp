@@ -134,6 +134,10 @@ nested_agents_override_md() { put docs/AGENTS.override.md '# Agents override'; }
 root_architecture_md() { put ARCHITECTURE.md '# Architecture, changed'; }
 ios_bundle_md() { put ios/Regards/Resources/x.md '# Resource'; }
 android_app_md() { put android/app/src/main/x.md '# Resource'; }
+android_module_asset_md() { put android/feature/overdue/src/main/assets/x.md '# Asset'; }
+shared_testvectors_md() { put shared/testvectors/x.md '# Vector notes'; }
+android_docs_md() { put android/docs/notes.md '# Android notes'; }
+android_readme_md() { put android/README.md '# Android'; }
 root_agents_md() { put AGENTS.md '# Agents file, changed'; }
 root_claude_md() { put CLAUDE.md '# Claude file, changed'; }
 nested_agents_md() { put docs/AGENTS.md '# Nested agents file, changed'; }
@@ -194,6 +198,10 @@ expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a root ARCHITECTURE.md change fails' 1 root_architecture_md
 expect 'an added ios/Regards/Resources/x.md fails' 1 ios_bundle_md
 expect 'an added android/app/src/main/x.md fails' 1 android_app_md
+expect 'an added android/feature/overdue/src/main/assets/x.md fails' 1 android_module_asset_md
+expect 'an added shared/testvectors/x.md fails' 1 shared_testvectors_md
+expect 'an added android/docs/notes.md passes' 0 android_docs_md
+expect 'an added android/README.md passes' 0 android_readme_md
 expect 'a nested AGENTS.md change fails' 1 nested_agents_md
 expect 'an added root CLAUDE.local.md fails' 1 root_claude_local_md
 expect 'an added docs/AGENTS.override.md fails' 1 nested_agents_override_md
