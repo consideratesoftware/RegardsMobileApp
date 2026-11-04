@@ -22,6 +22,9 @@ actor ScriptedNotifications: NotificationScheduling {
     private var immediateReads: Int
     private var holdsRemaining: Int
     private var heldReads: [CheckedContinuation<NotificationAuthorizationStatus, Never>] = []
+    private var pending: [String: ReminderNotificationRequest] = [:]
+    private(set) var scheduleCalls: [ReminderNotificationRequest] = []
+    private(set) var cancelCalls: [[String]] = []
 
     init(
         status: NotificationAuthorizationStatus = .notDetermined,
@@ -64,6 +67,26 @@ actor ScriptedNotifications: NotificationScheduling {
     /// The system's real status from now on (what an unheld read returns).
     func setStatus(_ newStatus: NotificationAuthorizationStatus) {
         status = newStatus
+    }
+
+    /// Scheduling members: a pending set keyed by identifier like the
+    /// system's (`schedule` replaces, `cancel` removes), plus a record of every
+    /// call in order. It has no clock, so a request with a past fire date stays
+    /// pending; the real center delivers it at once and drops it.
+    func pendingRequests() async -> [ReminderNotificationRequest] {
+        pending.values.sorted { $0.identifier < $1.identifier }
+    }
+
+    func schedule(_ request: ReminderNotificationRequest) async throws {
+        scheduleCalls.append(request)
+        pending[request.identifier] = request
+    }
+
+    func cancel(identifiers: [String]) async {
+        cancelCalls.append(identifiers)
+        for identifier in identifiers {
+            pending[identifier] = nil
+        }
     }
 
     var heldReadCount: Int { heldReads.count }

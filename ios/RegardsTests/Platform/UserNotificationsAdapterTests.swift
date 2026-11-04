@@ -9,17 +9,16 @@ private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 /// (categories, decoding, status mapping). The `receive` tests build a fresh
 /// `UserNotificationsAdapter()` and read its `actions` stream, which is also
 /// free of the system notification center. Neither touches the real center, so
-/// none can raise the system permission alert. The request-building and
-/// trigger tests return in TF-07 with the code they cover (restore from
-/// fec13d7).
+/// none can raise the system permission alert. Request building, triggers and
+/// pending-request decoding are in `UserNotificationsAdapterRequestTests`.
 struct UserNotificationsAdapterTests {
 
     // MARK: Categories
 
-    @Test("Registered categories are cadence with Caught up and Snooze (both foreground) and an empty digest")
+    @Test("Categories: cadence has Caught up and Snooze (both foreground); digest and occasion have no actions")
     func categoriesMatchActionContract() throws {
         let categories = UserNotificationsAdapter.categories
-        #expect(Set(categories.map(\.identifier)) == ["regards.cadence", "regards.digest"])
+        #expect(Set(categories.map(\.identifier)) == ["regards.cadence", "regards.digest", "regards.occasion"])
 
         let cadence = try #require(categories.first { $0.identifier == "regards.cadence" })
         #expect(Set(cadence.actions.map(\.identifier)) == ["regards.caught-up", "regards.snooze"])
@@ -33,6 +32,9 @@ struct UserNotificationsAdapterTests {
 
         let digest = try #require(categories.first { $0.identifier == "regards.digest" })
         #expect(digest.actions.isEmpty)
+
+        let occasion = try #require(categories.first { $0.identifier == "regards.occasion" })
+        #expect(occasion.actions.isEmpty)
     }
 
     // MARK: Decoding

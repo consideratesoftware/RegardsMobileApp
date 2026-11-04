@@ -35,7 +35,6 @@
 		1F429DEAA785789A90C10694 /* Wordmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7694945635A3DD94162A61A /* Wordmark.swift */; };
 		1FF015873E58939210223586 /* SchedulingPassPendingSnoozeDateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE71CB5E14E6EEA82FA2054 /* SchedulingPassPendingSnoozeDateTests.swift */; };
 		21C13F2242D52556CDF87D28 /* ObservationSubscriptionToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1EDE1581885F647407E537 /* ObservationSubscriptionToken.swift */; };
-		21E6517E7A08DD91DFF4688A /* NotificationSchedulingGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B51091AC4418A2D53CB678A /* NotificationSchedulingGateTests.swift */; };
 		23158702D04EE983294DCB46 /* DuplicateDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A02186F019EB95A53170B0 /* DuplicateDetector.swift */; };
 		23A8CEE5282B1153BD15E2B0 /* AppRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97F0CC9EFBD1158613E9519 /* AppRuntimeTests.swift */; };
 		25AED5127B2A6248E63C5447 /* DatabaseMigratorV3Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0ED82A6D4AF73A19B55814 /* DatabaseMigratorV3Tests.swift */; };
@@ -105,6 +104,7 @@
 		76576A199DD77440D04AF58B /* ChannelTapPreviewMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8174EBCF2C3834E4430A332E /* ChannelTapPreviewMessageTests.swift */; };
 		76D69778DEA708EADCA07EDE /* ScreensAccessibilityTests+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEED67A526A2E67A56F9E0A6 /* ScreensAccessibilityTests+Notifications.swift */; };
 		781229BA83C41976A6237AB6 /* ReconciliationCoalescingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC16A190DA2644DE6DF69935 /* ReconciliationCoalescingTests.swift */; };
+		7ADA6C095B67110E4560131A /* UserNotificationsAdapterRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795C41FB0564D733ADDAA308 /* UserNotificationsAdapterRequestTests.swift */; };
 		7AFE2BA258ED5E217A87B481 /* SchedulingPassTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21F9599027EE763D25CFC53 /* SchedulingPassTriggerTests.swift */; };
 		7C9C3BFC545AEC946B91F45B /* MockRepositories+SeedCast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3748DE14016D570B69C3D079 /* MockRepositories+SeedCast.swift */; };
 		7D597EFD10C14663F2587DBB /* RegardsAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8422BFBA98540419934AFFB6 /* RegardsAppIntents.swift */; };
@@ -256,7 +256,6 @@
 		07DFCE9573BE0729618E8E9F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		089D71C160EADA0013F662BB /* ScreensAccessibilityTests+ContactWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+ContactWindow.swift"; sourceTree = "<group>"; };
 		0950902FF5E235B5FB5F695E /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
-		0B51091AC4418A2D53CB678A /* NotificationSchedulingGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSchedulingGateTests.swift; sourceTree = "<group>"; };
 		0B718FFDD5767AE98D80A1EF /* ContactAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactAccessibilityTests.swift; sourceTree = "<group>"; };
 		0F801281CA1EC0111165A9B8 /* DatabaseMigratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseMigratorTests.swift; sourceTree = "<group>"; };
 		10AFB91724C972036043E115 /* RegardsIntentRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegardsIntentRouterTests.swift; sourceTree = "<group>"; };
@@ -340,6 +339,7 @@
 		756D0FE6BAA86AE1C1F68EB0 /* SchedulingPassSnoozeWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassSnoozeWindowTests.swift; sourceTree = "<group>"; };
 		758853CDEABD9FE42140D77B /* ReminderWindowsScreen+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReminderWindowsScreen+Sections.swift"; sourceTree = "<group>"; };
 		7824B1F71B424AEAA2407782 /* ScreensAccessibilityTests+RowActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+RowActions.swift"; sourceTree = "<group>"; };
+		795C41FB0564D733ADDAA308 /* UserNotificationsAdapterRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserNotificationsAdapterRequestTests.swift; sourceTree = "<group>"; };
 		7AAA351624691C85A8CD1799 /* ScreensAccessibilityTests+NoInventedTimes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+NoInventedTimes.swift"; sourceTree = "<group>"; };
 		7ABF76C0C5D07E0E054F54E3 /* MockRepositoriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockRepositoriesTests.swift; sourceTree = "<group>"; };
 		7BB9BC25AB0C2BDDD3AF5EDB /* RowActionAccessibilityEffectsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowActionAccessibilityEffectsTests.swift; sourceTree = "<group>"; };
@@ -679,7 +679,6 @@
 				C97F0CC9EFBD1158613E9519 /* AppRuntimeTests.swift */,
 				A77D67185D9D3AB9DDF06CBD /* NotificationActionHandlingTests.swift */,
 				B1E67C1B927F6D7E8F58F9EF /* NotificationActionHandlingTests+Launch.swift */,
-				0B51091AC4418A2D53CB678A /* NotificationSchedulingGateTests.swift */,
 				DC16A190DA2644DE6DF69935 /* ReconciliationCoalescingTests.swift */,
 				10AFB91724C972036043E115 /* RegardsIntentRouterTests.swift */,
 				9628392A18BE56DFD931C1CC /* RootViewSceneActivationTests.swift */,
@@ -761,6 +760,7 @@
 				03942DF2AF18E649A0CCFDD5 /* ContactsReconcilerTests.swift */,
 				33EC9E9494EB1265441684D9 /* ContactsSourceStressTests.swift */,
 				6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */,
+				795C41FB0564D733ADDAA308 /* UserNotificationsAdapterRequestTests.swift */,
 				83F057C5D73819618C5586DE /* UserNotificationsAdapterTests.swift */,
 			);
 			path = Platform;
@@ -1150,7 +1150,6 @@
 				1D7CEC7E13382900B298A9F2 /* NotificationActionHandlingTests+Launch.swift in Sources */,
 				57BB9159AD431542A73741EA /* NotificationActionHandlingTests.swift in Sources */,
 				9CE96DB402E3799B9C5B7003 /* NotificationPermissionViewModelTests.swift in Sources */,
-				21E6517E7A08DD91DFF4688A /* NotificationSchedulingGateTests.swift in Sources */,
 				6D23C79551DF9CA7A9705689 /* OccasionFireDateDSTTests.swift in Sources */,
 				AA1A09F770BC6F672F321FEE /* OccasionFireDateTransitionPinTests.swift in Sources */,
 				5EF2B954605E25F062B36C40 /* OnboardingAccessibilityEffectsTests.swift in Sources */,
@@ -1210,6 +1209,7 @@
 				0FEA06BF27917BB5A18D3D30 /* UpcomingViewModelStateTests.swift in Sources */,
 				8BCE67FE0A8117775950EA48 /* UpcomingViewModelWindowTests.swift in Sources */,
 				E4525D4289A80E4FB0239829 /* UpdateLastInteractedAtContractTests.swift in Sources */,
+				7ADA6C095B67110E4560131A /* UserNotificationsAdapterRequestTests.swift in Sources */,
 				2E9F13C7D9084A22EF593AB9 /* UserNotificationsAdapterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
