@@ -158,8 +158,10 @@ Once the lane has a PR, post every review result on it (`/pr-review` and
 Codex alike, RETRY included) as a verdict comment in the form
 `release-manager.md` (Open) defines, never as a body edit: a body edit
 starts a new hosted review run. A comment carries the verdict line, the
-counts, and the `DISPUTED:` lines only. Never paste a reviewer's output into
-a comment; the full review stays in the lane's report.
+counts, the `DISPUTED:` lines, a `/pr-review` comment's `REVIEWERS:` line,
+and, on a scoped recheck, its `RERAN:` and `CARRIED:` lines. Nothing else:
+never paste a reviewer's output into a comment; the full review stays in the
+lane's report.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits the files, which makes a new head, so the
