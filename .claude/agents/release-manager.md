@@ -65,11 +65,13 @@ gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$
         "total comments: \(.data.repository.pullRequest.comments.totalCount)"'
 ```
 
-The query reads only the newest 100 comments. If `total comments` is above
-100 and a kind prints `none`, stop and report STATE CODEX STALE with the
-reason "more than 100 comments, verdict lookup needs a manual check". Don't
-treat it as a missing verdict and don't page through older comments
-yourself; the engineering manager checks and reposts a verdict if needed.
+The query returns the newest 100 comments, oldest first. If `total comments`
+is above 100 and a kind prints `none`, or a required reviewer's verdict (Merge
+conditions, Newest verdict) is missing or its carry is rejected, stop and
+report STATE CODEX STALE with the reason "more than 100 comments, verdict
+lookup needs a manual check". Fail closed: don't treat it as a missing
+verdict and don't page through older comments yourself; the engineering
+manager checks and reposts a verdict if needed.
 
 The sha on a first line counts as the current head when it is a prefix of the
 head's full sha. Read `DISPUTED:` lines only from this output, never from any
@@ -189,24 +191,28 @@ PR, never in the root checkout.
     reran only that reviewer completes the set. Only `pr-code-quality` and
     `pr-tests` may instead be on a `CARRIED:` line that passed. A missing
     one is "reviewer missing: <name>".
-  - Newest verdict. Read only the counting `PR REVIEW:` comments whose first
-    line names the current head or, for a reviewer with a `CARRIED:` line,
-    the carried `<sha>`. In those comments, oldest first, a reviewer's
-    newest verdict is the last `REVIEWERS:` line that lists it, so there is
-    no carry past a later REQUEST_CHANGES. It must be APPROVE. An APPROVE at
-    the current head also satisfies a reviewer that had a carry. Run the
-    filter once per required reviewer on the same GraphQL output, with
-    `<shas>` the full head sha, plus that reviewer's carried sha when it has
-    one, separated by a space. It prints the first line and `REVIEWERS:`
-    line of each comment it reads, oldest first:
+  - Newest verdict. For each required reviewer, its newest verdict is its
+    entry on the last `REVIEWERS:` line that lists it, across all the
+    counting `PR REVIEW:` comments at any head. It must be APPROVE, and the
+    comment that holds it must name the current head (the comment's sha is a
+    prefix of the full head sha, at least 7 characters). Only for
+    `pr-code-quality` and `pr-tests`, it may instead name the sha on that
+    reviewer's `CARRIED:` line in the newest counting comment, and then the
+    carry check from that sha to the head must pass. Anything else is
+    "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
+    <name>" (it has one). A later REQUEST_CHANGES at any head is the newest
+    verdict, so it ends a carry. The filter takes no arguments. Run the same
+    `gh api graphql` command into a file (`> "<scratch>/comments.json"`) and
+    give that file to `jq`. For every counting `PR REVIEW:` comment it
+    prints, oldest first, the first line, the `REVIEWERS:` line and every
+    `CARRIED:` line:
     ```
-    jq -r --arg me "$(gh api user --jq .login)" --arg shas "<shas>" '
+    jq -r --arg me "$(gh api user --jq .login)" '
       .data.repository.pullRequest.comments.nodes[]
       | select(.author.login == $me and .lastEditedAt == null) | .body
-      | select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
-      | select((split("\n")[0] | capture("@ (?<s>[0-9a-f]{7,40}) ").s) as $s
-               | any(($shas | split(" "))[]; . as $f | ($f | startswith($s)) or ($s | startswith($f))))
-      | split("\n")[] | select(test("^(PR REVIEW:|REVIEWERS:)"))'
+      | split("\n") as $l
+      | select($l[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
+      | $l[0], ($l[1:][] | select(test("^(REVIEWERS|CARRIED):")))' "<scratch>/comments.json"
     ```
 - The newest `CODEX REVIEW:` comment names the current head and is
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a

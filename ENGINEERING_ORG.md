@@ -155,11 +155,12 @@ ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src` or
 `shared/testvectors`, and anything else reruns that reviewer.
 The release manager runs that script. Each reviewer the routing table
 requires must have APPROVE as its newest verdict. The release manager reads
-only the counting `PR REVIEW:` comments whose first line names the current
-head or, for a carried reviewer, the carried sha, and takes the last
-`REVIEWERS:` line in them that lists that reviewer. An APPROVE at the current
-head also satisfies a reviewer that had a carry, and a later REQUEST_CHANGES
-defeats a carry. A comment that reruns one reviewer only completes the set.
+every counting `PR REVIEW:` comment, oldest first, and takes each reviewer's
+entry on the last `REVIEWERS:` line that lists it, at any head. The entry must
+be APPROVE in a comment that names the current head or, for `pr-code-quality`
+and `pr-tests`, the sha on that reviewer's `CARRIED:` line in the newest
+comment. A later REQUEST_CHANGES at any head ends a carry. A comment that
+reruns one reviewer only completes the set.
 The newest `PR REVIEW:` comment, scoped or not, needs a `REVIEWERS:` line, or
 the check fails (STATE CODEX STALE).
 
