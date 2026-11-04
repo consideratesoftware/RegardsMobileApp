@@ -18,7 +18,7 @@ struct UserNotificationsAdapterTests {
     @Test("Categories: cadence has Caught up and Snooze (both foreground); digest and occasion have no actions")
     func categoriesMatchActionContract() throws {
         let categories = UserNotificationsAdapter.categories
-        #expect(Set(categories.map(\.identifier)) == ["regards.cadence", "regards.digest", "regards.occasion"])
+        #expect(Set(categories.map(\.identifier)) == Set(NotificationCategory.allCases.map(\.rawValue)))
 
         let cadence = try #require(categories.first { $0.identifier == "regards.cadence" })
         #expect(Set(cadence.actions.map(\.identifier)) == ["regards.caught-up", "regards.snooze"])

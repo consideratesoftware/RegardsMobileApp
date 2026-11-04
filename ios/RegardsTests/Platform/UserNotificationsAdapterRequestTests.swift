@@ -7,8 +7,8 @@ private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 
 /// TF-07e (§9 platform nuance, §9 contract 5, R57). Request building and
 /// decoding, restored from fec13d7. Every assertion goes through the adapter's
-/// pure statics, so no test touches the real `UNUserNotificationCenter` and
-/// none can raise the system permission alert.
+/// pure statics (except the two willPresent tests), so no test touches the real
+/// `UNUserNotificationCenter` and none can raise the system permission alert.
 ///
 /// Nothing here reads the wall clock. `makeRequest` takes its `now`, and the
 /// trigger instant is checked by reading the trigger's components back through
@@ -112,6 +112,23 @@ struct UserNotificationsAdapterRequestTests {
         let foreign = UNNotificationRequest(identifier: built.identifier, content: content, trigger: built.trigger)
 
         #expect(UserNotificationsAdapter.decode(foreign) == nil)
+    }
+
+    /// Contract pin for the slice 4 diff: the trigger carries whole seconds, so a
+    /// pending request's fire date comes back truncated, and the diff must
+    /// compare against the truncated value.
+    @Test("A pending request's fire date decodes truncated to whole seconds")
+    func pendingRequestFireDateDecodesTruncatedToWholeSeconds() throws {
+        let now = try Self.utc(Self.now)
+        let original = Self.cadenceRequest(fireDate: now.addingTimeInterval(3 * 3600 + 0.7))
+
+        let decoded = try #require(
+            UserNotificationsAdapter.decode(UserNotificationsAdapter.makeRequest(original, now: now))
+        )
+
+        #expect(decoded.fireDate == now.addingTimeInterval(3 * 3600))
+        #expect(decoded.contactId == original.contactId)
+        #expect(decoded.identifier == original.identifier)
     }
 
     @Test("A request with no trigger (it delivers at once and is never pending) decodes to nothing")
