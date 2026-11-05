@@ -1,7 +1,11 @@
 # VoiceOver manual smoke
 
-Run this before merging any UI-touching PR. Records go in the PR description
-under a **Manual accessibility smoke** heading.
+Run this in the pre-release device pass, not before each merge (owner ruling,
+2026-10-28). Each UI-touching PR adds its steps to `TESTFLIGHT_PLAN.md`'s
+"Pre-release device pass", and the result is recorded there. On a pull
+request the accessibility gates are the `pr-accessibility` review and the
+focused regressions the engineer runs. The broad audits run after merge,
+nightly, and before release.
 
 ## Setup
 
@@ -226,11 +230,11 @@ Reminder window row.
 
 ## Reporting
 
-In the PR description:
+Under the PR's entry in `TESTFLIGHT_PLAN.md`'s "Pre-release device pass":
 
 ```
 ## Manual accessibility smoke
-Simulator: iPhone 17 Pro · current CI-pinned iOS runtime
+Simulator: iPhone 17 Pro · iOS <the runtime this run used>
 VoiceOver: Accessibility Inspector emulation (simulator) / on (physical device)
 Dynamic Type: accessibility5
 Reduce Motion: on / off (both tested)

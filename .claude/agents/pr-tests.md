@@ -12,7 +12,7 @@ You are the tests reviewer for the Regards iOS repo. You judge whether this diff
 
 Use the review target supplied by the orchestrator. For `worktree`, inspect
 `git status --short`, `git diff HEAD`, and every untracked file. Otherwise use
-the supplied ref instead of `main...HEAD`. Read every changed test file in full
+the supplied ref instead of `origin/main...HEAD`. Read every changed test file in full
 and every changed source file's public surface. Read the owning PR's row in
 ARCHITECTURE.md §14 (acceptance criteria) and §13 (standing test requirements).
 If the orchestrator gave you the correctness reviewer's "coverage holes" list,
@@ -28,6 +28,25 @@ verify each hole against the actual tests.
 6. **Coverage direction.** The Domain coverage floor (≥95%, CI-enforced after PR19) must not be approached from above; if the diff adds uncovered Domain branches, name them. Deleted tests require justification in the PR body; migration tests may never be deleted (§13).
 7. **Test hygiene.** New tests live in the right bundle (unit vs a11y vs UI), reuse existing fakes rather than growing parallel fakes, and don't add helpers with fewer than 3 call sites (§17 abstraction rule applies to test code too).
 
+## Shell discipline
+
+Keep every shell command bounded. A review of one diff should take about
+20 minutes. If you are not done by then, report what you have and name what
+you did not check. Never APPROVE with a required check left unchecked: list it on the
+`NOT CHECKED:` line with why, and return REQUEST_CHANGES.
+
+- No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
+  over search results). Read changed files in full with the Read tool, and
+  search with one `grep -rn <pattern> <paths> | head -50`.
+- End any command that can print a lot with `| head -50` or another explicit
+  cap. Never `cat` a generated file or a whole log.
+- Search the changed paths, not the whole repo, unless a finding needs a
+  repo-wide check. Then use one pattern in one command.
+- Don't run builds, tests, or anything that waits on input or the network.
+  The orchestrator's pre-flight and CI run the gates.
+- If a command hasn't returned after about 2 minutes, stop it and list it
+  under what you did not check.
+
 ## Output format (exactly this)
 
 ```
@@ -39,6 +58,7 @@ BLOCKERS: (n)
 FIX: (n)
 NIT: (max 3)
 HOLES CONFIRMED/CLEARED: (from correctness reviewer's list, if provided)
+NOT CHECKED: each required check you did not complete, with why; or none
 ```
 
 When you name a missing test, specify it concretely enough that a lightweight agent could write it: inputs, expected output, suggested test name. No praise, no diff summary.

@@ -66,4 +66,5 @@ The dedicated PR must show:
    accessibility review. The one-run audit remains post-merge; the five-run
    sweep remains nightly and manually dispatched before release.
 6. Manual VoiceOver, Dynamic Type `accessibility5`, Reduce Motion, and Increased
-   Contrast smoke before merge.
+   Contrast smoke in the pre-release device pass (owner ruling, 2026-10-28), not
+   before each merge.

@@ -2,24 +2,33 @@
 description: Run the staged multi-agent PR review (correctness, security/privacy, tests, accessibility, code quality, fit-and-finish) and merge the verdicts into one review.
 ---
 
-Review the current branch against `main`, or use the target in `$ARGUMENTS`.
+Review the current branch against `origin/main...HEAD`, or use the target in `$ARGUMENTS`.
 Treat the literal target `worktree` as all tracked and untracked changes against
 `HEAD`. Follow this workflow exactly.
 
 ## Stage 0 — pre-flight gate (do this yourself; no agents yet)
 
 1. Resolve the target:
-   - No argument: `main...HEAD`.
+   - No argument: `origin/main...HEAD`, the target the org's verdict comments name.
    - Branch/ref argument: use that exact diff target.
    - `worktree`: use `git status --short`, `git diff HEAD`, and full reads of
      every untracked file.
    If the target is empty, stop and say so.
-2. Run the cheap mechanical checks an agent shouldn't burn tokens on:
-   - Copy `ios/` into a temporary directory, run `xcodegen generate` inside the
-     temporary `ios/`, then compare its `Regards.xcodeproj` with the working
-     tree. Never generate into the working tree during review.
-   - `swiftlint --strict`
-   - The privacy-grep and domain-purity patterns from `.github/workflows/guards.yml` against the diff
+2. Run the cheap mechanical checks an agent shouldn't burn tokens on. These
+   4 are the whole set, with the exact commands in steps 2 to 4 of
+   `.claude/agents/build-engineer.md`:
+   - XcodeGen determinism: copy `ios/` into a temporary directory, run
+     `xcodegen generate` inside the temporary `ios/`, compare its
+     `Regards.xcodeproj` with the working tree, and remove the temporary
+     directory on both paths. Never generate into the working tree during
+     review.
+   - SwiftLint from the repo root, never from `ios/`:
+     `(cd "<worktree root>" && swiftlint --strict)`.
+   - The 2 iOS guard scripts this pre-flight uses, from the repo root:
+     `scripts/check-no-network.sh` (the privacy grep) and
+     `scripts/check-domain-purity.sh`. Each is its own check; a nonzero exit
+     from either fails pre-flight. (CI also runs Android guards; this
+     pre-flight doesn't.)
 3. If any pre-flight check fails: STOP. Report the failures as the review; do not dispatch agents against a red baseline.
 
 ## Stage 1 — dispatch (parallel, conditional)
@@ -64,7 +73,7 @@ VERDICT: APPROVE | REQUEST_CHANGES
 ### Nits (take or leave)
 ...
 
-### Questions for Sid
+### Owner questions (interview in session)
 ...
 
 ### Audit trail
@@ -72,11 +81,14 @@ VERDICT: APPROVE | REQUEST_CHANGES
 - Process line (from pr-accessibility, if run)
 - Docs line (from pr-fit-finish, if run)
 - Criteria map (from pr-tests, verbatim)
+- Not checked (every agent's `NOT CHECKED:` line that isn't `none`)
 ```
 
 Merge rules:
 - Deduplicate: same file:line from multiple agents becomes one entry crediting both; keep the most severe rating.
-- Any single BLOCKER from any agent ⇒ overall REQUEST_CHANGES. No exceptions, no averaging.
+- Any single BLOCKER from any agent ⇒ overall REQUEST_CHANGES. So is any
+  agent's own REQUEST_CHANGES verdict, including one caused by a `NOT CHECKED:`
+  entry. No exceptions, no averaging.
 - An agent that contradicts ARCHITECTURE.md is wrong by definition; note it and drop the finding (then flag the doc §, in case the doc needs a look).
 - Cap the merged review at 10 nits total; drop the rest silently.
 - Do not soften findings. Do not add praise. The review is a work order, not a performance evaluation.
@@ -84,3 +96,12 @@ Merge rules:
 ## Stage 4 — register hygiene
 
 If the PR claims R-closures (§19): verify each acceptance check yourself against the diff and mark each claim CONFIRMED or NOT MET in the merged review. NOT MET is automatically a blocker (§17: never mark a remediation item done without meeting its acceptance check).
+
+## Cross-model review (Claude Code only)
+
+The Codex verdict comes from the `codex-reviewer` agent type
+(`subagent_type: codex-reviewer`), which runs `$regards-pr-review` read-only
+against the same target. It is not a stage of this command: `/org` launches
+it in the same batch as `/pr-review`, and the merge conditions in
+`ENGINEERING_ORG.md` need both verdicts. Launch it by that type name, never
+as a general-purpose agent told to read `.claude/agents/codex-reviewer.md`.

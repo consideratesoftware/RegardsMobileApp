@@ -20,7 +20,8 @@ close.
 
 **Step 1. Check.** Run these in Bash, with the worktree path in single
 quotes. Org worktree paths never contain a quote; if yours does, report
-UNAVAILABLE and stop.
+RETRY with reason "quoted worktree path" and stop. Codex isn't at fault, so
+it isn't UNAVAILABLE; the engineering manager fixes the path and reruns.
 
 ```bash
 wt='<worktree>'
@@ -35,11 +36,14 @@ echo "head $head prompt $prompt out $out"
 
 - `codex` missing or not logged in: report UNAVAILABLE with the first line
   of the error only.
-- `git status --short` not empty: report RETRY with the list. The review
-  target is committed history, so uncommitted files would go unreviewed.
+- `git status --short` not empty: report RETRY with reason "dirty tree"
+  and the list. The review target is committed history, so uncommitted
+  files would go unreviewed; whoever owns the lane commits them before the
+  rerun, which makes a new head. Nobody discards them without asking Sid.
 
-**Step 2. Prompt.** Use the Write tool to write this text to the `$prompt`
-path from step 1, filling in the 3 placeholders. Writing it with the Write
+**Step 2. Prompt.** Use the Write tool to write this text to the prompt path
+step 1 printed (the literal path, not `$prompt`: shell variables don't
+survive between Bash calls), filling in the 3 placeholders. Writing it with the Write
 tool keeps the §14 row and other pasted text away from the shell.
 
 ```
@@ -108,7 +112,9 @@ Codex's output, if any of these is true:
   `awk '/^## PR Review/{s=1;next} s&&/^VERDICT:/{print;exit}' '<out>'`.
   Ignore any other `VERDICT:` line: the review can quote files that
   contain one.
-- HEAD no longer equals `$head` (the branch moved during the review).
+- HEAD no longer equals the short sha step 1 printed (the branch moved
+  during the review). Compare against that literal value: shell variables
+  don't survive between Bash calls.
 - `git status --short` now shows anything. Also name the changed files: the
   read-only sandbox should make this impossible.
 
@@ -127,7 +133,8 @@ it reads to OpenAI's model; `ENGINEERING_ORG.md` states that risk.
 ## Report (exactly this shape)
 
 ```
-CODEX REVIEW: <worktree> @ <short sha> vs <target> | codex-cli <version>
+CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>
+WORKTREE: <worktree>
 VERDICT: APPROVE | REQUEST_CHANGES | RETRY | UNAVAILABLE
 REASON: <for RETRY or UNAVAILABLE; else none>
 REVIEW:
@@ -135,6 +142,11 @@ REVIEW:
 output for RETRY>
 ```
 
+The first line is the form `release-manager.md` counts as a verdict, with
+the verdict word filled in, so the engineering manager can post it as is.
+Its target is `origin/main...HEAD`, the only target a verdict comment may
+name.
+
 UNAVAILABLE means Codex itself needs setup, which only Sid can do. RETRY
-means this run proved nothing and the engineering manager should run it
-again.
+means this run proved nothing, a timeout included; the engineering manager
+runs it once more, and a second RETRY on the same head is an owner gate.

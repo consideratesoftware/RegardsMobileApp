@@ -6,8 +6,11 @@ not a polish-phase one.
 
 As of 2026-08-02 the one-run automated audit runs after merges to `main`. The
 five-run sweep runs nightly and on demand before release; neither runs on pull
-requests (ARCHITECTURE.md §10 has the reasoning). On a pull request the gate is
-the `pr-accessibility` reviewer plus the manual VoiceOver smoke. Before cutting
+requests (ARCHITECTURE.md §10 has the reasoning). On a pull request the gates
+are the staged accessibility review (`pr-accessibility`) and the focused
+regressions for the changed flow; the broad audits gate the release. The
+manual VoiceOver smoke goes to the pre-release device pass instead (owner
+ruling, 2026-10-28). Before cutting
 a release, run the five-run sweep with `workflow_dispatch` on `Audit stress`
 and require it green. UI pull requests run focused regressions for their
 affected flows because a regression now surfaces on `main`. Repeated local
@@ -53,10 +56,12 @@ audited* table.
 8. **Keyboard / Switch Control / Voice Control.** Focus order follows reading
    order; use `.accessibilitySortPriority` only when the default is wrong.
    Every tappable view responds to the default accessibility action.
-9. **VoiceOver manual smoke before merge.** See
-   [`accessibility-smoke.md`](accessibility-smoke.md) — work through the
-   script on a simulator (or real device) before merging any PR that changes
-   UI. Note the result in the PR description.
+9. **VoiceOver manual smoke in the pre-release device pass.** See
+   [`accessibility-smoke.md`](accessibility-smoke.md). A PR that changes UI
+   adds its steps to `TESTFLIGHT_PLAN.md`'s "Pre-release device pass"; the
+   smoke is not a merge gate (owner ruling, 2026-10-28). On a PR the gates are
+   the `pr-accessibility` review and the focused regressions; the broad
+   automated audits gate the release.
 10. **Documentation.** Every new screen gets a row in the table below.
 
 ## Labels mirror visible content
@@ -266,8 +271,8 @@ conclusive. `ScreensAccessibilityTests+RowActions.swift`'s
 `.elementDetection` only (the other three structural categories still
 gate) with this paragraph cited at the call site. Resolve by a real-device
 VoiceOver pass confirming the alert's title, message, and Done button are
-each announced correctly — already required before merge
-(`accessibility-smoke.md`) — and update this entry with the result either
+each announced correctly (part of the pre-release device pass in
+`accessibility-smoke.md`), and update this entry with the result either
 way rather than leaving it open indefinitely.
 
 ## Sensory-audit carve-outs
