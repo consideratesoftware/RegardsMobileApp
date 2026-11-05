@@ -603,7 +603,7 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
   1. The owner decided on 2026-11-03, recorded on PR #71, that the three live calls (schedule, cancel, pendingRequests) get a device check, and the observables below are the EM's. Live scheduling against the real notification center. Nothing in a shipping build calls `schedule(_:)`, `pendingRequests()`, or `cancel(identifiers:)` before TF-07e slice 4, so this step runs on a build that includes TF-07e slice 4. Check each live call through what the tester can see:
      - schedule: a reminder the app schedules arrives at its time.
      - cancel: a reminder that is snoozed or caught up before its time doesn't arrive.
-     - pendingRequests: while a reminder for a contact is scheduled, close the app, then untrack that contact or delete it in Contacts. Relaunch before the reminder's time. Pass: the reminder doesn't arrive (the pass read the request back and cancelled it as an orphan). Fail: it arrives.
+     - pendingRequests: TF-07e slice 4's PR writes this check here. What a tester can observe depends on how the pass reconciles with the pending list, and slice 4 builds that. The check must fail when the live `pendingRequests()` is broken.
 
      Replacing a pending request under the same identifier is covered by the fakes' unit tests (`immediateAddReplacesAPendingRequest`, `futureAddReplacesPendingWithSameIdentifier`) and is documented iOS behavior; there is no device step for it.
      Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.

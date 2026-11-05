@@ -28,8 +28,9 @@ actor ScriptedNotifications: NotificationScheduling {
     /// Requests the real center would have delivered, at once on add or once
     /// their time passes (checked at the start of every scheduling call). Fire
     /// dates are recorded at whole seconds, as the real center reports them.
-    /// Requests that come due together are recorded in fire-date order, then
-    /// identifier order, as the real center delivers them.
+    /// Requests that come due together are recorded in fire-date order, as the
+    /// real center delivers them, then identifier order as a deterministic
+    /// tiebreak.
     private(set) var delivered: [ReminderNotificationRequest] = []
     private let clock: @Sendable () -> Date
 
