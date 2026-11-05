@@ -80,9 +80,14 @@ public protocol NotificationScheduling: Sendable {
     /// unchanged one under the same identifier. Every pending request is this
     /// app's (iOS keeps one list per app). One that `decode` can't read (no
     /// calendar trigger, or a category outside `NotificationCategory`) is left
-    /// out, so a caller can't see or cancel it. No build schedules either shape.
-    /// A change that retires a category or adds a trigger type must cancel the
-    /// old requests first (§9a).
+    /// out, so a caller can't find it here, though `cancel(identifiers:)` still
+    /// removes it by identifier. No build leaves an undecodable request pending:
+    /// a request with no trigger is delivered at once, and every category this
+    /// build sends is in `NotificationCategory`. A change that stops decoding a
+    /// category or trigger shape must first cancel the pending requests of that
+    /// shape by their stored identifiers (`osNotificationId`) (§9a). A build
+    /// that adds a shape accepts that an older build can't see those requests;
+    /// each fires once and leaves the list.
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// A `fireDate` that has already passed delivers at once (§9 contract 5).
@@ -255,8 +260,8 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// The inverse of `makeRequest`, for a pending request. The fire date is
     /// read from the trigger's UTC components, so it doesn't depend on the
     /// current time or the device zone, and it has whole-second precision.
-    /// Nil for a shape this build never makes: no calendar trigger (a
-    /// request with none delivers at once and isn't pending) or an unknown
+    /// Nil for a shape `pendingRequests` never lists: no calendar trigger (such
+    /// a request is delivered at once and is never pending), or an unknown
     /// category.
     static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {
         guard
