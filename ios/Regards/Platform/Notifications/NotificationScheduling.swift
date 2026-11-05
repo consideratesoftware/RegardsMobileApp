@@ -78,16 +78,9 @@ public protocol NotificationScheduling: Sendable {
     /// Content comes back, and the fire date comes back truncated to the whole
     /// second, so a caller can tell a moved or reworded request from an
     /// unchanged one under the same identifier. Every pending request is this
-    /// app's (iOS keeps one list per app). One that `decode` can't read (no
-    /// calendar trigger, or a category outside `NotificationCategory`) is left
-    /// out, so a caller can't find it here, though `cancel(identifiers:)` still
-    /// removes it by identifier. This build never leaves a request it can't
-    /// decode pending: a request with no trigger is delivered at once, and every
-    /// category this build sends is in `NotificationCategory`. A change that
-    /// stops decoding a category or trigger shape must first cancel the pending
-    /// requests of that shape by their stored identifiers (`osNotificationId`)
-    /// (§9a). A build that adds a shape accepts that an older build can't see
-    /// those requests; each fires once and leaves the list.
+    /// app's (iOS keeps one list per app). Pending requests, decoded. A request
+    /// `decode` can't read is left out; ARCHITECTURE.md §9a gives the rule for
+    /// retiring or adding a request shape.
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// A `fireDate` that has already passed delivers at once (§9 contract 5).
@@ -260,9 +253,7 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// The inverse of `makeRequest`, for a pending request. The fire date is
     /// read from the trigger's UTC components, so it doesn't depend on the
     /// current time or the device zone, and it has whole-second precision.
-    /// Nil for a shape `pendingRequests` never lists: no calendar trigger (such
-    /// a request is delivered at once and is never pending), or an unknown
-    /// category.
+    /// Nil when the request isn't a shape this build leaves pending (ARCHITECTURE.md §9a).
     static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {
         guard
             let trigger = request.trigger as? UNCalendarNotificationTrigger,
