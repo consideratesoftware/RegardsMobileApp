@@ -5,19 +5,20 @@ import Testing
 /// scheduling until R57 is resolved, and slice 4 is the slice that wires the
 /// first production caller. Until then it checks 3 things:
 /// - No file may call `schedule`, `cancel` or `pendingRequests` on a
-///   `NotificationScheduling`, except the adapter's own folder and the fakes'
-///   parity tests. The 2 fakes only define the members, so they need no
-///   exemption. This scans `ios/Regards` and `ios/RegardsTests`.
-/// - No file in `ios/Regards` outside `Platform/Notifications/` may name
-///   `UNUserNotificationCenter` (G1). The tests may: a doc comment and the
-///   delegate selector in `UserNotificationsAdapterRequestTests` name it.
+///   `NotificationScheduling`, except the adapter's own folder, the fakes'
+///   parity tests and the gate itself. The 2 fakes only define the members, so
+///   they need no exemption. This scans `ios/Regards` and `ios/RegardsTests`.
+/// - No file in `ios/Regards` except `Platform/Notifications/NotificationScheduling.swift`
+///   may name `UNUserNotificationCenter` (G1). The tests may: a doc comment and
+///   the delegate selector in `UserNotificationsAdapterRequestTests` name it.
 /// - No file in `ios/Regards` outside `Platform/Notifications/` may name
 ///   `UNNotificationRequest` or a `UN...NotificationTrigger` type such as
 ///   `UNCalendarNotificationTrigger` (G4). The tests may: the adapter request
 ///   tests build and read them.
 ///
-/// G1 and G4 are kept from the deleted `NotificationSchedulingGateTests`, and
-/// G4 is narrowed from "the whole tree" to the adapter folder. G2 ("the
+/// G1 and G4 are kept from the deleted `NotificationSchedulingGateTests`. G1 is
+/// kept as before: only `NotificationScheduling.swift` may name the center. G4
+/// is narrowed from "the whole tree" to the adapter folder. G2 ("the
 /// adapter never calls `add`") and G3 ("the adapter names the center exactly
 /// 4 times") retire on purpose: TF-07e3 adds `schedule`, which calls `add`,
 /// and the scheduling members.
@@ -85,8 +86,8 @@ struct NotificationCallerGateTests {
         }
     }
 
-    @Test("Only the adapter folder names the center, and only it and the fake tests call the scheduling members")
-    func schedulingCallsAndTheCenterStayInsideTheAdapterFolder() throws {
+    @Test("Only the adapter file names the center; only the adapter folder, fake tests and gate call the members")
+    func onlyTheAdapterFileNamesTheCenterAndOnlyAllowedFilesCall() throws {
         let files = try Self.sources()
         // Fail closed: a wrong root or a moved adapter must not read as a pass.
         #expect(files.count > 50, "scanned only \(files.count) files under \(Self.iosRoot.path)")
@@ -97,14 +98,17 @@ struct NotificationCallerGateTests {
             .filter { Self.makesACall($0.text) }
             .map(\.path)
 
-        #expect(offenders.isEmpty, "R57 gate: only the adapter and the fakes may call these members: \(offenders)")
+        #expect(
+            offenders.isEmpty,
+            "R57 gate: only the adapter, the fake tests and the gate may call these members: \(offenders)"
+        )
 
         let centerNamers = files
-            .filter { $0.path.hasPrefix("Regards/") && !$0.path.hasPrefix(Self.adapterFolder) }
+            .filter { $0.path.hasPrefix("Regards/") && $0.path != Self.adapterPath }
             .filter { $0.text.range(of: Self.centerPattern, options: .regularExpression) != nil }
             .map(\.path)
 
-        #expect(centerNamers.isEmpty, "R57 gate: only the adapter folder may name the center: \(centerNamers)")
+        #expect(centerNamers.isEmpty, "R57 gate G1: only \(Self.adapterPath) may name the center: \(centerNamers)")
     }
 
     /// Files in `ios/Regards` outside the adapter folder that name a request or trigger type.
