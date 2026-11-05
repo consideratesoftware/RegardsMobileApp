@@ -77,8 +77,12 @@ public protocol NotificationScheduling: Sendable {
     /// The requests waiting to fire, decoded from the system's pending list.
     /// Content comes back, and the fire date comes back truncated to the whole
     /// second, so a caller can tell a moved or reworded request from an
-    /// unchanged one under the same identifier. A pending request this app
-    /// didn't build is left out.
+    /// unchanged one under the same identifier. Every pending request is this
+    /// app's (iOS keeps one list per app). One that `decode` can't read (no
+    /// calendar trigger, or a category outside `NotificationCategory`) is left
+    /// out, so a caller can't see or cancel it. No build schedules either shape.
+    /// A change that retires a category or adds a trigger type must cancel the
+    /// old requests first (§9a).
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// A `fireDate` that has already passed delivers at once (§9 contract 5).
@@ -251,7 +255,7 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// The inverse of `makeRequest`, for a pending request. The fire date is
     /// read from the trigger's UTC components, so it doesn't depend on the
     /// current time or the device zone, and it has whole-second precision.
-    /// Nil for a request this app didn't build: no calendar trigger (a
+    /// Nil for a shape this build never makes: no calendar trigger (a
     /// request with none delivers at once and isn't pending) or an unknown
     /// category.
     static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {

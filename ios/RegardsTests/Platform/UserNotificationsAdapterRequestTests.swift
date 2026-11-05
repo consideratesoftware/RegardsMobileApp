@@ -114,6 +114,15 @@ struct UserNotificationsAdapterRequestTests {
         #expect(UserNotificationsAdapter.decode(foreign) == nil)
     }
 
+    // Renaming or removing a category leaves old requests that decode can't read,
+    // so a change that does it must cancel them first (§9a).
+    @Test("The category raw values are pinned")
+    func categoryRawValuesArePinned() {
+        #expect(
+            NotificationCategory.allCases.map(\.rawValue) == ["regards.cadence", "regards.digest", "regards.occasion"]
+        )
+    }
+
     /// Contract pin for the slice 4 diff: the trigger carries whole seconds, so a
     /// pending request's fire date comes back truncated, and the diff must
     /// compare against the truncated value.
