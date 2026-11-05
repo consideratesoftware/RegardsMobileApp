@@ -10,9 +10,10 @@ import Testing
 /// case runs against both fakes; the scripted-only cases check its delivered
 /// record.
 ///
-/// The truncation and delivery rules come from the adapter's own `makeRequest`
-/// and `decode`, which `UserNotificationsAdapterRequestTests` pins. These tests
-/// pin that the fakes use them.
+/// Pending storage goes through the adapter's `makeRequest` and `decode`, which
+/// `UserNotificationsAdapterRequestTests` pins. The whole-second floor of the
+/// immediate-delivery record is the fake's own. `requestNotAfterNowIsNotPending`
+/// pins it against an independent floor computed in the test.
 struct NotificationFakeParityTests {
     enum Fake: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case scripted
