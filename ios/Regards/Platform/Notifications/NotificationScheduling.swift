@@ -81,13 +81,13 @@ public protocol NotificationScheduling: Sendable {
     /// app's (iOS keeps one list per app). One that `decode` can't read (no
     /// calendar trigger, or a category outside `NotificationCategory`) is left
     /// out, so a caller can't find it here, though `cancel(identifiers:)` still
-    /// removes it by identifier. No build leaves an undecodable request pending:
-    /// a request with no trigger is delivered at once, and every category this
-    /// build sends is in `NotificationCategory`. A change that stops decoding a
-    /// category or trigger shape must first cancel the pending requests of that
-    /// shape by their stored identifiers (`osNotificationId`) (§9a). A build
-    /// that adds a shape accepts that an older build can't see those requests;
-    /// each fires once and leaves the list.
+    /// removes it by identifier. This build never leaves a request it can't
+    /// decode pending: a request with no trigger is delivered at once, and every
+    /// category this build sends is in `NotificationCategory`. A change that
+    /// stops decoding a category or trigger shape must first cancel the pending
+    /// requests of that shape by their stored identifiers (`osNotificationId`)
+    /// (§9a). A build that adds a shape accepts that an older build can't see
+    /// those requests; each fires once and leaves the list.
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// A `fireDate` that has already passed delivers at once (§9 contract 5).
