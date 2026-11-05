@@ -3,14 +3,24 @@ import Testing
 
 /// R57 gate (ARCHITECTURE.md §19), reduced. TF-06 must not ship notification
 /// scheduling until R57 is resolved, and slice 4 is the slice that wires the
-/// first production caller. Until then it checks 2 things:
+/// first production caller. Until then it checks 3 things:
 /// - No file may call `schedule`, `cancel` or `pendingRequests` on a
 ///   `NotificationScheduling`, except the adapter's own folder and the fakes'
 ///   parity tests. The 2 fakes only define the members, so they need no
 ///   exemption. This scans `ios/Regards` and `ios/RegardsTests`.
 /// - No file in `ios/Regards` outside `Platform/Notifications/` may name
-///   `UNUserNotificationCenter`. The tests may: a doc comment and the
+///   `UNUserNotificationCenter` (G1). The tests may: a doc comment and the
 ///   delegate selector in `UserNotificationsAdapterRequestTests` name it.
+/// - No file in `ios/Regards` outside `Platform/Notifications/` may name
+///   `UNNotificationRequest` or a `UN...NotificationTrigger` type such as
+///   `UNCalendarNotificationTrigger` (G4). The tests may: the adapter request
+///   tests build and read them.
+///
+/// G1 and G4 are kept from the deleted `NotificationSchedulingGateTests`, and
+/// G4 is narrowed from "the whole tree" to the adapter folder. G2 ("the
+/// adapter never calls `add`") and G3 ("the adapter names the center exactly
+/// 4 times") retire on purpose: TF-07e3 adds `schedule`, which calls `add`,
+/// and the scheduling members.
 ///
 /// It scans raw source text, comments included, so it catches accidental
 /// wiring only. It can't see 2 shapes: an implicit-self `schedule(...)` inside
@@ -25,6 +35,10 @@ struct NotificationCallerGateTests {
     private static let callPattern = #"\.(schedule\s*\(|cancel\s*\(\s*identifiers:|pendingRequests\s*\()"#
 
     private static let centerPattern = #"\bUNUserNotificationCenter\b"#
+
+    /// G4: the request type and every trigger type (`UNCalendarNotificationTrigger`,
+    /// `UNTimeIntervalNotificationTrigger`, `UNLocationNotificationTrigger`).
+    private static let requestBuildingPattern = #"\bUNNotificationRequest\b|\bUN\w*NotificationTrigger\b"#
 
     private static let adapterFolder = "Regards/Platform/Notifications/"
 
@@ -93,9 +107,29 @@ struct NotificationCallerGateTests {
         #expect(centerNamers.isEmpty, "R57 gate: only the adapter folder may name the center: \(centerNamers)")
     }
 
+    /// Files in `ios/Regards` outside the adapter folder that name a request or trigger type.
+    private static func requestBuilders(in files: [(path: String, text: String)]) -> [String] {
+        files
+            .filter { $0.path.hasPrefix("Regards/") && !$0.path.hasPrefix(adapterFolder) }
+            .filter { $0.text.range(of: requestBuildingPattern, options: .regularExpression) != nil }
+            .map(\.path)
+    }
+
+    @Test("G4: only the adapter folder names a notification request or trigger type")
+    func requestBuildingStaysInsideTheAdapterFolder() throws {
+        let files = try Self.sources()
+        // Fail closed, as above.
+        #expect(files.count > 50, "scanned only \(files.count) files under \(Self.iosRoot.path)")
+        #expect(files.contains { $0.path == Self.adapterPath }, "no file at \(Self.adapterPath)")
+
+        let offenders = Self.requestBuilders(in: files)
+
+        #expect(offenders.isEmpty, "R57 gate G4: only the adapter folder may name these types: \(offenders)")
+    }
+
     /// Positive control: a pattern that matches nothing would pass the test
     /// above for every file.
-    @Test("The patterns match the fake tests' calls, a call split across lines, and the center")
+    @Test("The patterns match the fake tests' calls, split calls, the center, and request and trigger types")
     func patternsMatchRealAndMultiLineCalls() throws {
         let parity = try #require(
             Self.sources().first { $0.path == "RegardsTests/Platform/NotificationFakeParityTests.swift" }
@@ -104,5 +138,24 @@ struct NotificationCallerGateTests {
         #expect(Self.makesACall("await notifications.cancel(\n    identifiers: ids)"))
         let center = "let c = UNUserNotificationCenter.current()"
         #expect(center.range(of: Self.centerPattern, options: .regularExpression) != nil)
+
+        let builders = [
+            "UNCalendarNotificationTrigger(",
+            "UNNotificationRequest(",
+            "UNTimeIntervalNotificationTrigger(",
+        ]
+        for builder in builders {
+            #expect(
+                builder.range(of: Self.requestBuildingPattern, options: .regularExpression) != nil,
+                "G4 pattern misses \(builder)"
+            )
+        }
+        // The scan reports a file outside the adapter folder, and spares one inside it.
+        let probe = "let r = UNNotificationRequest(identifier: id, content: c, trigger: t)"
+        let found = Self.requestBuilders(in: [
+            (path: "Regards/App/Probe.swift", text: probe),
+            (path: Self.adapterFolder + "Probe.swift", text: probe),
+        ])
+        #expect(found == ["Regards/App/Probe.swift"])
     }
 }

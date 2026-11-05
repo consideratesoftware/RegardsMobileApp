@@ -3,12 +3,13 @@ import Testing
 @testable import Regards
 
 /// R57 / PR #71. Slice 4's diff against `pendingRequests()` depends on the
-/// fakes answering like the real center. Both fakes store each request through
-/// the adapter's `makeRequest` and `decode` with an injected clock. These tests
-/// pin that add-time delivery, read-time delivery, whole-second truncation,
-/// replace by identifier and cancel match the real center. Every parameterized
-/// case runs against both fakes; the scripted-only cases check its delivered
-/// record.
+/// fakes answering consistently. Both fakes store each request through the
+/// adapter's `makeRequest` and `decode` with an injected clock. These tests pin
+/// the fakes to those rules: add-time delivery, read-time delivery, whole-second
+/// truncation, replace by identifier and cancel. They don't show the real
+/// center behaves the same way; live-center behavior is left to device check
+/// (a) in TESTFLIGHT_PLAN.md. Every parameterized case runs against both
+/// fakes; the scripted-only cases check its delivered record.
 ///
 /// Pending storage goes through the adapter's `makeRequest` and `decode`, which
 /// `UserNotificationsAdapterRequestTests` pins. The whole-second floor of the
