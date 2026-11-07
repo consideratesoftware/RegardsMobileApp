@@ -35,31 +35,52 @@ public enum NotificationAction: Sendable, Equatable {
 /// `SchedulingPass` resolved through the engine (§9); the adapter never
 /// re-derives it from wall-clock fields in another zone.
 public struct ReminderNotificationRequest: Sendable, Equatable {
+    /// What the notification is. A cadence or occasion notification carries
+    /// the contact its actions act on, so one can't be built without it. A
+    /// digest covers several contacts and carries none.
+    public enum Kind: Equatable, Sendable {
+        case cadence(contactId: UUID)
+        case occasion(contactId: UUID)
+        case digest
+    }
+
     /// `contact-{uuid}-{kind}` or `digest-{slotStartEpoch}` (§9 contract 5).
     public let identifier: String
     /// Display names only. Never an identifier (privacy).
     public let title: String
     public let body: String
     public let fireDate: Date
-    /// Set for a single-contact notification, so its actions know whom they
-    /// act on. Nil for a digest.
-    public let contactId: UUID?
-    public let category: NotificationCategory
+    public let kind: Kind
+
+    public var category: NotificationCategory {
+        switch kind {
+        case .cadence: return .cadence
+        case .occasion: return .occasion
+        case .digest: return .digest
+        }
+    }
+
+    /// The contact a single-contact notification's actions act on. Nil for a
+    /// digest.
+    public var contactId: UUID? {
+        switch kind {
+        case .cadence(let contactId), .occasion(let contactId): return contactId
+        case .digest: return nil
+        }
+    }
 
     public init(
         identifier: String,
         title: String,
         body: String,
         fireDate: Date,
-        contactId: UUID?,
-        category: NotificationCategory
+        kind: Kind
     ) {
         self.identifier = identifier
         self.title = title
         self.body = body
         self.fireDate = fireDate
-        self.contactId = contactId
-        self.category = category
+        self.kind = kind
     }
 }
 
@@ -225,8 +246,11 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
         content.body = request.body
         content.sound = .default
         content.categoryIdentifier = request.category.rawValue
-        if let contactId = request.contactId {
+        switch request.kind {
+        case .cadence(let contactId), .occasion(let contactId):
             content.userInfo = [contactIdKey: contactId.uuidString]
+        case .digest:
+            break
         }
 
         // `calendar` carries the device zone; it is overwritten to GMT here.
@@ -253,7 +277,10 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// The inverse of `makeRequest`, for a pending request. The fire date is
     /// read from the trigger's UTC components, so it doesn't depend on the
     /// current time or the device zone, and it has whole-second precision.
-    /// Nil when the request isn't a shape this build leaves pending (ARCHITECTURE.md §9a).
+    /// Nil when the request isn't a shape this build leaves pending
+    /// (ARCHITECTURE.md §9a). A cadence or occasion request with no valid
+    /// contact id is one of those shapes: its actions would have nobody to
+    /// act on.
     static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {
         guard
             let trigger = request.trigger as? UNCalendarNotificationTrigger,
@@ -267,13 +294,23 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
             return nil
         }
         let contactId = (request.content.userInfo[contactIdKey] as? String).flatMap { UUID(uuidString: $0) }
+        let kind: ReminderNotificationRequest.Kind
+        switch category {
+        case .cadence:
+            guard let contactId else { return nil }
+            kind = .cadence(contactId: contactId)
+        case .occasion:
+            guard let contactId else { return nil }
+            kind = .occasion(contactId: contactId)
+        case .digest:
+            kind = .digest
+        }
         return ReminderNotificationRequest(
             identifier: request.identifier,
             title: request.content.title,
             body: request.content.body,
             fireDate: fireDate,
-            contactId: contactId,
-            category: category
+            kind: kind
         )
     }
 
