@@ -374,25 +374,6 @@ struct AppRuntimeTests {
         #expect(kinds.isSuperset(of: [.birthday, .anniversary]))
     }
 
-    /// The runtime freezes time at `MockRepositories.defaultNow`. The launch's
-    /// notification fake has to read that same clock: on the real one, a
-    /// request 60 s after the frozen now is already due, so it never shows up
-    /// as pending.
-    @Test("The mock launch's notification fake lists a request due 60 s after the frozen now")
-    @MainActor
-    func mockLaunchNotificationFakeUsesTheFrozenClock() async throws {
-        let launch = AppLaunchCoordinator.mockRuntimeLaunch(environment: [:])
-        let notifications = try #require(launch.notifications)
-        let request = ReminderNotificationRequest(
-            identifier: "digest-frozen-clock", title: "", body: "3 people are overdue.",
-            fireDate: MockRepositories.defaultNow.addingTimeInterval(60), kind: .digest
-        )
-
-        try await notifications.schedule(request)
-
-        #expect(await notifications.pendingRequests() == [request])
-    }
-
     private func environment(window: any ReminderWindowRepository) -> AppEnvironment {
         let base = AppEnvironment.makeMock()
         return AppEnvironment(

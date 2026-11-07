@@ -229,4 +229,22 @@ struct NotificationFakeParityTests {
 
         #expect(await scheduling.pendingRequests() == [second])
     }
+
+    // MARK: - The mock launch's fake
+
+    /// The mock launch builds its `DebugNotificationScheduling` on the runtime's
+    /// frozen clock (`MockRepositories.defaultNow`). On the real clock, a
+    /// request 60 s after that instant would read as already due and never be
+    /// pending.
+    @Test("The mock launch's fake lists a request due 60 s after the runtime's frozen now")
+    @MainActor
+    func mockLaunchFakeUsesTheFrozenClock() async throws {
+        let launch = AppLaunchCoordinator.mockRuntimeLaunch(environment: [:])
+        let scheduling = try #require(launch.notifications)
+        let sent = Self.request(fireDate: MockRepositories.defaultNow.addingTimeInterval(60))
+
+        try await scheduling.schedule(sent)
+
+        #expect(await scheduling.pendingRequests() == [sent])
+    }
 }
