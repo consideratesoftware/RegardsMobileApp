@@ -12,9 +12,8 @@ import Testing
 /// fakes; the scripted-only cases check its delivered record.
 ///
 /// Pending storage goes through the adapter's `makeRequest` and `decode`, which
-/// `UserNotificationsAdapterRequestTests` pins. The whole-second floor of the
-/// immediate-delivery record is the fake's own. `requestNotAfterNowIsNotPending`
-/// pins it against an independent floor computed in the test.
+/// `UserNotificationsAdapterRequestTests` pins. The delivered floor is pinned
+/// against the adapter's own whole-second truncation.
 struct NotificationFakeParityTests {
     enum Fake: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case scripted
@@ -67,7 +66,7 @@ struct NotificationFakeParityTests {
 
     @Test(
         "A request not after now is not pending",
-        arguments: Fake.allCases, [0.0, -1.0, 0.4]
+        arguments: Fake.allCases, [0.0, -1.0, 0.4, 0.6]
     )
     func requestNotAfterNowIsNotPending(_ fake: Fake, offset: TimeInterval) async throws {
         let now = Self.now
@@ -79,8 +78,12 @@ struct NotificationFakeParityTests {
         #expect(await scheduling.pendingRequests().isEmpty)
         if fake == .scripted {
             let scripted = try #require(scheduling as? ScriptedNotifications)
-            let floored = sent.fireDate.timeIntervalSince1970.rounded(.down)
-            let expected = Self.request(fireDate: Date(timeIntervalSince1970: floored))
+            // The adapter's own truncation: built from an instant well before
+            // the fire date, so `makeRequest` keeps a trigger for `decode` to
+            // read back.
+            let built = UserNotificationsAdapter.makeRequest(sent, now: now.addingTimeInterval(-3600))
+            let truncated = try #require(UserNotificationsAdapter.decode(built))
+            let expected = Self.request(fireDate: truncated.fireDate)
             #expect(await scripted.delivered == [expected])
         }
     }
