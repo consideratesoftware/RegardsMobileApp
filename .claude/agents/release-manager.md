@@ -145,6 +145,9 @@ PR, never in the root checkout.
 
 ## Merge conditions (all required; no averaging)
 
+Start with `git -C <lane> fetch`. The diff and carry checks below read the
+lane's refs, and this fetch brings them up to date.
+
 - Every required check green on the current head.
 - Hosted review: zero blockers in the review text for the current head,
   counted above and never inferred from the green check. A blocker stands
