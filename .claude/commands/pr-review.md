@@ -39,7 +39,7 @@ Decide the agent set from the diff's touched paths:
 |---|---|---|
 | pr-correctness | opus | always |
 | pr-security-privacy | sonnet | always |
-| pr-tests | sonnet | always (code or test changes) |
+| pr-tests | sonnet | only if the diff changes code or tests |
 | pr-code-quality | haiku | always |
 | pr-accessibility | sonnet | only if diff touches Features/, DesignSystem/, App/ view code, RegardsAccessibilityTests/, or ios/docs/accessibility* |
 | pr-fit-finish | haiku | only if diff touches Features/, DesignSystem/, user-facing strings, docs, or .github/ |

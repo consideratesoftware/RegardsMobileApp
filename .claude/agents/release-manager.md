@@ -188,16 +188,16 @@ PR, never in the root checkout.
   Two more checks apply to every newest `PR REVIEW:` comment, scoped or
   not, and a failure of either is STATE CODEX STALE:
   - Completeness. The comment needs a `REVIEWERS:` line; without one, report
-    "no REVIEWERS line". Find the reviewers the
-    routing table in `.claude/commands/pr-review.md` requires: run
+    "no REVIEWERS line". The routing table in
+    `.claude/commands/pr-review.md` sets the required reviewers: always
+    `pr-correctness`, `pr-security-privacy` and `pr-code-quality`;
+    `pr-tests` only when the diff changes code or tests; `pr-accessibility`
+    and `pr-fit-finish` when their path rules match. Check the diff with
     `git -C <lane> fetch`, then
-    `git -C <lane> diff --name-only origin/main...<head sha>`. They are
-    `pr-correctness`, `pr-security-privacy`, `pr-code-quality`, `pr-tests`
-    when that diff changes code or tests, and `pr-accessibility` and
-    `pr-fit-finish` when their path rules match it. Each required reviewer
-    needs APPROVE as its newest verdict (next bullet), so a comment that
-    reran only that reviewer completes the set. Only `pr-code-quality` and
-    `pr-tests` may instead be on a `CARRIED:` line whose carry holds (next
+    `git -C <lane> diff --name-only origin/main...<head sha>`. Each required
+    reviewer needs APPROVE as its newest verdict (next bullet), so a comment
+    that reran only that reviewer completes the set. Only `pr-code-quality`
+    and `pr-tests` may instead be on a `CARRIED:` line whose carry holds (next
     bullet). A missing one is "reviewer missing: <name>".
   - Newest verdict. For each required reviewer, its newest verdict is its
     entry on the last `REVIEWERS:` line that lists it, across all the
