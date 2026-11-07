@@ -278,13 +278,19 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// read from the trigger's UTC components, so it doesn't depend on the
     /// current time or the device zone, and it has whole-second precision.
     /// Nil when the request isn't a shape this build leaves pending
-    /// (ARCHITECTURE.md §9a). A cadence or occasion request with no valid
-    /// contact id is one of those shapes, because `Kind` can't hold either
-    /// without one. A cadence request's Caught up and Snooze would have
-    /// nobody to act on.
+    /// (ARCHITECTURE.md §9a):
+    /// - a non-calendar trigger (or no trigger);
+    /// - a repeating trigger, because this build never makes one and a
+    ///   repeating request never leaves the pending list;
+    /// - an unknown category;
+    /// - components that don't resolve to a date;
+    /// - a cadence or occasion request with no valid contact id, because
+    ///   `Kind` can't hold either without one and a cadence request's
+    ///   Caught up and Snooze would have nobody to act on.
     static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {
         guard
             let trigger = request.trigger as? UNCalendarNotificationTrigger,
+            !trigger.repeats,
             let category = NotificationCategory(rawValue: request.content.categoryIdentifier)
         else {
             return nil

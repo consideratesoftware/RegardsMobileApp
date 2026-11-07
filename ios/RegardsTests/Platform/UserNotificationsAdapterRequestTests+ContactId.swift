@@ -6,7 +6,9 @@ import UserNotifications
 private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 
 /// A cadence or occasion request always carries a contact id, and decode drops
-/// one that has none. The type enforces the pairing. Shares the helpers in
+/// one that has none. The type enforces the pairing. The file also holds the
+/// decode-nil tests for a trigger this build never makes, because they share
+/// the hand-built request. Shares the helpers in
 /// `UserNotificationsAdapterRequestTests.swift`; like that file, nothing here
 /// touches the real notification center or the wall clock.
 extension UserNotificationsAdapterRequestTests {
@@ -87,10 +89,39 @@ extension UserNotificationsAdapterRequestTests {
         #expect(decoded.fireDate == (try Self.utc("2026-10-01T03:00:00Z")))
     }
 
+    // MARK: Decoding a request with a trigger this build never makes
+
+    /// This build makes only non-repeating calendar triggers, and a repeating
+    /// request never leaves the pending list. The control above is the same
+    /// request with `repeats: false`, which decodes.
+    @Test("A repeating calendar trigger decodes to nothing")
+    func repeatingCalendarTriggerDecodesToNil() {
+        let request = Self.handBuilt(
+            category: "regards.cadence", contactId: contactX.uuidString,
+            trigger: Self.calendarTrigger(repeats: true)
+        )
+
+        #expect(UserNotificationsAdapter.decode(request) == nil)
+    }
+
+    @Test("A time-interval trigger decodes to nothing")
+    func timeIntervalTriggerDecodesToNil() {
+        let request = Self.handBuilt(
+            category: "regards.cadence", contactId: contactX.uuidString,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false)
+        )
+
+        #expect(UserNotificationsAdapter.decode(request) == nil)
+    }
+
     /// A pending request as the system could hold one that `makeRequest` did not
-    /// build: the given category and contact id (none when nil), and a
-    /// non-repeating calendar trigger at 2026-10-01 03:00:00 GMT.
-    private static func handBuilt(category: String, contactId: String?) -> UNNotificationRequest {
+    /// build: the given category and contact id (none when nil), and by default
+    /// a non-repeating calendar trigger at 2026-10-01 03:00:00 GMT.
+    private static func handBuilt(
+        category: String,
+        contactId: String?,
+        trigger: UNNotificationTrigger = calendarTrigger(repeats: false)
+    ) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = "Time to reach out"
         content.body = "It has been a while since you talked to Ada."
@@ -98,13 +129,13 @@ extension UserNotificationsAdapterRequestTests {
         if let contactId {
             content.userInfo = ["contactId": contactId]
         }
+        return UNNotificationRequest(identifier: "hand-built", content: content, trigger: trigger)
+    }
+
+    private static func calendarTrigger(repeats: Bool) -> UNCalendarNotificationTrigger {
         let components = DateComponents(
             calendar: gmtCalendar, timeZone: .gmt, year: 2026, month: 10, day: 1, hour: 3, minute: 0, second: 0
         )
-        return UNNotificationRequest(
-            identifier: "hand-built",
-            content: content,
-            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        )
+        return UNCalendarNotificationTrigger(dateMatching: components, repeats: repeats)
     }
 }
