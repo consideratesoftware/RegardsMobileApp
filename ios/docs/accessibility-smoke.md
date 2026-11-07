@@ -135,6 +135,17 @@ step.
       then return. The row then
       reads "Notifications on" as text with no button.
 
+## Channel preview alert (Overdue and Upcoming)
+
+Run this on a physical device with VoiceOver on. The audit excludes
+`.elementDetection` for this alert, so the device check decides whether its
+title, message, and Done button are announced (see `accessibility.md`).
+
+- [ ] Overdue: tap a row. VoiceOver announces the alert's title, then its
+      message, then Done. Check each one.
+- [ ] Activate Done. The alert dismisses. Note where VoiceOver focus lands.
+- [ ] Upcoming: repeat both steps on an Upcoming row.
+
 ## Screen checklist
 
 Apply this checklist to every screen changed by the pull request:
