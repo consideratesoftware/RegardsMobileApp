@@ -284,7 +284,7 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// - a repeating trigger, because this build never makes one and a
     ///   repeating request never leaves the pending list;
     /// - an unknown category;
-    /// - components that don't resolve to a date;
+    /// - components that lack a full date and time or don't resolve to one;
     /// - a cadence or occasion request with no valid contact id, because
     ///   `Kind` can't hold either without one and a cadence request's
     ///   Caught up and Snooze would have nobody to act on.
@@ -298,7 +298,14 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
         }
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = .gmt
-        guard let fireDate = utc.date(from: trigger.dateComponents) else {
+        // `Calendar.date(from:)` fills in a field the components lack instead of
+        // returning nil, so require all 6 before resolving.
+        let parts = trigger.dateComponents
+        guard
+            parts.year != nil, parts.month != nil, parts.day != nil,
+            parts.hour != nil, parts.minute != nil, parts.second != nil,
+            let fireDate = utc.date(from: parts)
+        else {
             return nil
         }
         let contactId = (request.content.userInfo[contactIdKey] as? String).flatMap { UUID(uuidString: $0) }
