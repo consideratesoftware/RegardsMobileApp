@@ -194,14 +194,14 @@ struct AppLaunchCoordinatorReconciliationTests {
         // — archiving needs a second consecutive `.authorized` pass, at
         // least `archiveDebounceFloor` later, that still doesn't see it.
         source.simulateChange()
-        #expect(await eventually { launch.reconciliationCount == 2 })
+        #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount == 2 })
         let stillNotArchivedAfterFirstMiss = try await environment.contacts.fetch(id: existing.id)
         #expect(stillNotArchivedAfterFirstMiss?.archivedAt == nil)
 
         clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         source.simulateChange()
 
-        #expect(await eventually { launch.reconciliationCount == 3 })
+        #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount == 3 })
         let archived = try await environment.contacts.fetch(id: existing.id)
         #expect(archived?.archivedAt == clock.now())
     }
