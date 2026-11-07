@@ -17,6 +17,8 @@ import Testing
 /// of its own. `requestWhoseWholeSecondFireDateIsNotAfterNowIsNotPending` pins
 /// that floor against literal whole-second instants.
 struct NotificationFakeParityTests {
+    // MARK: - Fakes and helpers
+
     enum Fake: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case scripted
         case debug
@@ -50,6 +52,8 @@ struct NotificationFakeParityTests {
         )
     }
 
+    // MARK: - Pending storage
+
     @Test("A future request is pending at its whole second, with every other field equal", arguments: Fake.allCases)
     func futureRequestIsPendingAtWholeSeconds(_ fake: Fake) async throws {
         let now = Self.now
@@ -65,6 +69,8 @@ struct NotificationFakeParityTests {
             #expect(await scripted.delivered.isEmpty)
         }
     }
+
+    // MARK: - Immediate delivery
 
     @Test(
         "A request whose whole-second fire date is not after now is not pending",
@@ -120,6 +126,8 @@ struct NotificationFakeParityTests {
 
         #expect(await scheduling.pendingRequests().isEmpty)
     }
+
+    // MARK: - Delivery once time passes
 
     @Test("A pending request is delivered once the clock reaches its time", arguments: Fake.allCases)
     func pendingRequestIsDeliveredOnceItsTimePasses(_ fake: Fake) async throws {
@@ -193,6 +201,8 @@ struct NotificationFakeParityTests {
         #expect(await scripted.pendingRequests().isEmpty)
         #expect(await scripted.delivered == [earlier, later])
     }
+
+    // MARK: - Cancel and replace
 
     @Test("Cancel removes only the named pending requests and ignores unknown ids", arguments: Fake.allCases)
     func cancelRemovesOnlyTheNamedPendingRequests(_ fake: Fake) async throws {
