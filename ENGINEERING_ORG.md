@@ -20,12 +20,12 @@ from skipping steps inside an item.
 | Senior iOS engineer | `senior-ios-engineer` | opus | yes | Engine, schema, migrations, Swift 6 concurrency; errors here are expensive |
 | iOS engineer | `ios-engineer` | sonnet | yes | Features, views, adapters from an approved plan |
 | QA engineer | `qa-engineer` | sonnet | tests only | Writes the test plan's tests, runs suites, investigates flakes |
-| Verifier | `verifier` | opus | no | Tries to refute a slice's correctness claim before review |
+| Verifier | `verifier` | opus | no | Tries to refute a slice's correctness claim before review, and each BLOCKER or FIX finding in the Claude Code verified run (`.claude/commands/pr-review.md`) |
 | Build engineer | `build-engineer` | haiku | no | Mechanical gates; no judgment needed |
 | On-call engineer | `on-call-engineer` | sonnet | yes | Red checks and review blockers on open PRs |
 | Release manager | `release-manager` | sonnet | no | PR lifecycle, CI, checkpoint, merge execution |
 | Tech writer | `tech-writer` | haiku | docs only | Sibling doc edits from facts other roles supply |
-| Review board | `pr-correctness` (opus), `pr-security-privacy` (sonnet), `pr-tests` (sonnet), `pr-accessibility` (sonnet), `pr-code-quality` (haiku), `pr-fit-finish` (haiku) via `/pr-review` | as listed | no | Unchanged; mirrored to `.codex/agents/` and checked by CI |
+| Review board | `pr-correctness` (opus), `pr-security-privacy` (sonnet), `pr-tests` (sonnet), `pr-accessibility` (sonnet), `pr-code-quality` (haiku), `pr-fit-finish` (haiku) via `/pr-review`, or its verified run (Claude Code only) | as listed | no | Unchanged; mirrored to `.codex/agents/` and checked by CI |
 | Cross-model reviewer | `codex-reviewer`, which runs Codex's `$regards-pr-review` read-only | haiku wrapper; Codex's default model reviews | no | Same review contract run by a different model family, so a blind spot shared by every Claude reviewer can still get caught |
 | Second opinion | `codex:codex-rescue` (Codex plugin), read-only diagnosis | Codex default | no | Fresh eyes on a lane that is about to park, before Sid is asked |
 
@@ -68,6 +68,7 @@ TF-## READY
       → verifier tries to refute the slice
   → tech-writer: doc siblings, register, a11y rows
   → /pr-review (review board) + codex-reviewer, in parallel
+    (or the verified run, which includes Codex; Claude Code only)
   → release-manager: PR, CI, hosted review, on-call repairs, checkpoint
   → merge as soon as every condition below holds; a PR that needs Sid waits
     while the engineering manager interviews him in the session
@@ -128,12 +129,14 @@ All of these, on the current head, with no averaging:
    names the blocker text and the head sha. It is void when the head moves,
    except for a blocker whose text reappears unchanged in the new head's
    review.
-3. `/pr-review` verdict APPROVE.
+3. `/pr-review` verdict APPROVE, from the plain run or the verified run.
 4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
    with every Codex blocker disputed in that verdict's PR comment by the
    engineering manager, citing the `ARCHITECTURE.md` section that settles it; the
    release manager checks each cited section exists and addresses the
-   finding. RETRY and UNAVAILABLE never satisfy this condition.
+   finding. Verifier votes never change this verdict: a refuted Codex finding still
+   needs a fix or a `DISPUTED:` line. RETRY and UNAVAILABLE never satisfy this
+   condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
 7. The branch was up to date with `main` when conditions 3 and 4 were

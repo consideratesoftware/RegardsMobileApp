@@ -26,6 +26,11 @@ calls `codex exec` read-only in the lane worktree. Keeping the two adapters
 in sync is what makes the Codex verdict a review of the same contract by a
 different model family.
 
+The one rule that differs: Claude Code's verified run can turn a reviewer's
+REQUEST_CHANGES into APPROVE when verifiers refute its findings. The Codex
+skill has no such step; see `.claude/commands/pr-review.md`, section "Claude
+Code org only".
+
 ## Hosted review gate
 
 `.github/workflows/claude-pr-review.yml` runs the same staged contract and

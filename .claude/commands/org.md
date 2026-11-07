@@ -81,8 +81,9 @@ For each open TF PR:
    or (for Codex) is a RETRY or has no `codex-<short sha>.md` file in the
    lane's folder, rerun that review: check the head
    out with `git worktree add --detach <tmp> <head sha>`, run
-   `/pr-review origin/main...HEAD` and/or the `codex-reviewer` agent type
-   there with that target, post the result as a new verdict comment, then
+   the verified run (`pr-review.md`, "Claude Code org only") there with that
+   target, or, when it can't run, `/pr-review origin/main...HEAD` and the
+   `codex-reviewer` agent type. Post the result as a new verdict comment, then
    `git worktree remove <tmp>`. A RETRY gets
    the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate:
    interview Sid before rerunning it.
@@ -136,10 +137,13 @@ After the last slice: launch `tech-writer` with the DOC SIBLINGS list and the
 facts from the slice reports. The tech writer commits its files; the review
 batch starts only when `git status --short` in the lane is empty. Write the
 target, the §14 row, and the claimed R-numbers to `review-context.md` in the
-lane's folder. Fetch, then in one batch run `/pr-review origin/main...HEAD`
-from inside the lane's worktree and launch the `codex-reviewer` agent type
-(`subagent_type: codex-reviewer`) with the worktree, the same target
-`origin/main...HEAD`, the item's §14 row, and its claimed R-numbers. The
+lane's folder. Fetch, then run the verified run from inside the lane's
+worktree (`pr-review.md`, "Claude Code org only") with `codex: true`, so the
+review board and Codex run in one workflow. If it can't run, run
+`/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
+`codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
+batch, with the worktree, the same target `origin/main...HEAD`, the item's §14
+row, and its claimed R-numbers. The
 three-dot target compares against the merge base, so commits that landed on
 `main` after the lane branched don't show up as reversions. Treat blockers
 from both the same way: they go to the slice owner (design questions to
@@ -152,7 +156,8 @@ Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
 verdict, and give that path to `release-manager`; the release manager checks
 each `DISPUTED:` line against it. A resumed PR whose head has no such file
-gets a fresh Codex run (Stage 1).
+gets a fresh Codex run (Stage 1). In a verified run, the full review is the
+workflow's `codexReview`.
 
 Once the lane has a PR, post every review result on it (`/pr-review` and
 Codex alike, RETRY included) as a verdict comment in the form
@@ -161,7 +166,8 @@ starts a new hosted review run. A comment carries the verdict line, the
 counts, the `DISPUTED:` lines, a `/pr-review` comment's `REVIEWERS:` line,
 and, on a scoped recheck, its `RERAN:` and `CARRIED:` lines. Nothing else:
 never paste a reviewer's output into a comment; the full review stays in the
-lane's report.
+lane's report. A verified run's comment has the shape `pr-review.md` gives,
+with its `REFUTED:` lines.
 
 A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
 dirty tree: the lane's owner commits the files, and never discards them
@@ -176,9 +182,9 @@ owner gate in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up a
 review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
-fix), run both `/pr-review origin/main...HEAD` and `codex-reviewer` again on
-the new head before Stage 4 re-checks merge conditions; the release manager
-can't launch agents.
+fix), run the verified run again, or both `/pr-review origin/main...HEAD` and
+`codex-reviewer`, on the new head before Stage 4 re-checks merge conditions;
+the release manager can't launch agents.
 
 Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
 2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, you
@@ -187,7 +193,9 @@ may recheck the fixes without asking Sid. Rerun `pr-security-privacy`,
 the routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
 the current head. Rerun `pr-code-quality` and `pr-tests` unless the new
-commits are Markdown-only under the carry rule. Ask Sid only if a blocker
+commits are Markdown-only under the carry rule. A verified run for this
+recheck passes `since`, the last reviewed head, and the reviewers it reruns.
+Ask Sid only if a blocker
 survives 2 rounds or a fix needs a product decision. The `PR REVIEW:` comment
 lists every reviewer that ran on a `REVIEWERS:` line with its verdict. A
 scoped recheck adds a `RERAN:` line naming the reviewers that ran, and one
@@ -246,7 +254,8 @@ deferral, a scope change, or a PR parked after its repair rounds.
 If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
 relaunch `release-manager` with the new verdicts:
 - a newest verdict names a sha other than the head, or the branch was just
-  updated (`update-branch`): both reviews, on the new head;
+  updated (`update-branch`): both reviews on the new head (one verified run
+covers both);
 - `carry rejected: <reviewer>` or `reviewer missing: <name>`: that reviewer
   only, and post a new `PR REVIEW:` comment that lists it in `RERAN:` and
   repeats every `CARRIED:` line that still stands;

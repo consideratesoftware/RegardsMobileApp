@@ -97,6 +97,116 @@ Merge rules:
 
 If the PR claims R-closures (§19): verify each acceptance check yourself against the diff and mark each claim CONFIRMED or NOT MET in the merged review. NOT MET is automatically a blocker (§17: never mark a remediation item done without meeting its acceptance check).
 
+## Claude Code org only
+
+The verified run is how the Claude Code org runs this review. It is the one
+exception to the Stage 3 rule that any BLOCKER means REQUEST_CHANGES. The
+hosted review applies Stages 1 to 4 only, does not read this section, and
+cannot run workflows. The Codex skill cannot run workflows either, so it does
+not use this section. The hosted review stays a separate gate.
+
+Use the verified run when the Workflow tool is available and someone can
+approve its prompt in this session. Otherwise run Stages 1 to 3 as written,
+with `codex-reviewer` in the same batch. An unattended `/org` run that cannot
+approve the prompt takes the plain path.
+
+Owner ruling, 2026-11-07: codify the verified run, and list every refuted
+finding in the PR REVIEW comment so the owner can see what was dropped.
+
+### The workflow's rules
+
+1. A finding is refuted only when 2 of its 3 verifiers say `real=false`. A
+   verifier that fails or returns nothing counts as a real vote.
+2. Only BLOCKER and FIX findings go to verifiers. ESCALATE findings and
+   coverage holes are returned untouched for Stage 2.
+3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when at least one
+   of its findings was refuted, none of its BLOCKERs survived, it has no NOT
+   CHECKED entry, and (pr-code-quality only) none of its FIX findings survived.
+4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
+5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
+   Codex finding still needs a fix or a `DISPUTED:` line (merge condition 4 in
+   `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line.
+
+### How to run it
+
+Run Stage 0 yourself. Then start the workflow once:
+
+```
+Workflow({ name: "pr-review-verified", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
+```
+
+- `title`: the PR's short name.
+- `worktree`, `branch`: the lane worktree and its branch.
+- `head`: the full 40-character head sha.
+- `since`: scoped recheck only, the sha of the last full review. Leave it out
+  otherwise.
+- `reviewers`: the pr-* reviewers this round runs: the Stage 1 set, or the set
+  a scoped recheck reruns.
+- `codex`: `true`, so Codex reviews in the same workflow.
+- `contextFile`: the absolute path of the lane's `review-context.md` (the §14
+  row and the R-numbers).
+
+If the name does not resolve, pass `scriptPath` instead, pointing at the root
+checkout's copy of `.claude/workflows/pr-review-verified.js`. Point it at the
+lane's copy only while this PR is in review, as the scripts are handled.
+
+Then run Stage 2 on the survivors, then Stage 4. Repair items come from the
+workflow's `workOrder`. Send each one to its owner, as Stage 3 says.
+
+### What the workflow returns
+
+- `verdicts`: one entry per reviewer. `verdict` is the verdict after
+  verification, and the verdict comment uses it. `reportedVerdict` is what the
+  reviewer said. A reviewer that returned nothing has `verdict: FAILED`.
+- `codexReview`: Codex's full review, verbatim, or null. Save it as
+  `codex-<short sha>.md` before you post. Its first line is the Codex verdict
+  line, which the Codex entry's `codexLine` also carries.
+- `refuted`: one entry per refuted finding, with its reviewer, severity,
+  location, claim and votes. Each vote names a `lens` (`truth`, `scope` or
+  `impact`) and `real` (`true`, `false` or `'failed'`).
+
+Don't post APPROVE while a reviewer is `FAILED` or has any verdict other than
+APPROVE or REQUEST_CHANGES. Rerun that reviewer alone. The workflow's verdict
+values have no UNAVAILABLE. When Codex reports UNAVAILABLE, or returns no
+verdict, rerun `codex-reviewer` alone and use its report.
+
+### The PR REVIEW comment
+
+Post one `PR REVIEW:` comment per round. A plain run and a verified run use
+this shape:
+
+```
+PR REVIEW: <APPROVE|REQUEST_CHANGES> @ <40-hex head sha> vs origin/main...HEAD
+BLOCKERS: <n>
+SHOULD_FIX: <n>
+REVIEWERS: <pr-reviewer> <APPROVE|REQUEST_CHANGES>, ...
+RERAN: <pr-reviewer>, ...                                  (scoped recheck only, as today)
+CARRIED: <pr-code-quality|pr-tests> APPROVE from <sha>     (scoped recheck only; 1 per carry)
+REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <paraphrase>   (verified run only; else "REFUTED: none")
+```
+
+- The first line is APPROVE only when no BLOCKER survived (in Stage 1 or
+  Stage 2) and every pr-* reviewer's verdict is APPROVE. Otherwise it is
+  REQUEST_CHANGES.
+- BLOCKERS and SHOULD_FIX count the pr-* findings that survived, plus any
+  Stage 2 items. A plain run refutes nothing, so every finding counts. Refuted
+  findings count for neither. Codex's counts stay on its own comment.
+- REVIEWERS takes each reviewer's verdict: the verdict after verification in a
+  verified run, or the Stage 1 verdict in a plain run. A Stage 2 blocker makes
+  that reviewer REQUEST_CHANGES.
+- Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
+  `<lens>` names the verifiers that voted `real=false`.
+- The paraphrase is your own words: at most 15 words, one physical line, no
+  `@`. Never paste reviewer text.
+- `release-manager.md` reads the first line and the `REVIEWERS:` and
+  `CARRIED:` lines of this comment. It reads `DISPUTED:` lines from the CODEX
+  REVIEW comment. Its filter keeps only `REVIEWERS:` and `CARRIED:` lines, so a
+  `REFUTED:` line never passes as a carry. `REFUTED:` lines are for Sid to see.
+  They never count toward any check.
+
+A scoped recheck passes `since`. Its comment carries `RERAN:` and `CARRIED:`
+lines as Stage 3 says.
+
 ## Cross-model review (Claude Code only)
 
 The Codex verdict comes from the `codex-reviewer` agent type
