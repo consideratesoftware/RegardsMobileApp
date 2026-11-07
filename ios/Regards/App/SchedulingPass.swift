@@ -217,7 +217,7 @@ public actor SchedulingPass {
         where row.state == .pending && targetIds.contains(row.contactId) && !desiredIds.contains(row.id) {
             try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
         }
-        try await cancelOrphans(snapshotContactIds: Set(snapshot.contacts.map(\.id)), only: contactId)
+        try await sweepOrphans(snapshotContactIds: Set(snapshot.contacts.map(\.id)), only: contactId, now: now)
 
         if let contactId {
             zeroCapacityContactIds.remove(contactId)
@@ -227,9 +227,10 @@ public actor SchedulingPass {
         }
     }
 
-    /// Cancels pending rows whose contact the snapshot doesn't hold because
-    /// it is untracked or archived. The snapshot can't show those rows.
-    private func cancelOrphans(snapshotContactIds: Set<UUID>, only contactId: UUID?) async throws {
+    /// Retires pending rows whose contact the snapshot doesn't hold (untracked or archived, so the
+    /// snapshot can't show them). A due row was delivered, so it becomes fired history and a returning
+    /// contact keeps the no-re-nag hold (§9 "Notification fired"); a future row is cancelled.
+    private func sweepOrphans(snapshotContactIds: Set<UUID>, only contactId: UUID?, now: Date) async throws {
         if let contactId, snapshotContactIds.contains(contactId) { return }
         let pending: [ScheduledReminder]
         do {
@@ -248,14 +249,13 @@ public actor SchedulingPass {
             return
         }
         for row in pending where !snapshotContactIds.contains(row.contactId) {
-            // Only a contact that decodes as untracked or archived loses its
-            // rows. `try?` folds two cases into "leave the row alone": a
-            // contact that fails to decode (the snapshot's policy) and a
-            // failed read, which the next run retries. A contact tracked
-            // since the snapshot is the next run's to schedule.
+            // Only a contact that decodes as untracked or archived has its rows retired. `try?` leaves the row
+            // alone for a contact that fails to decode (the snapshot's policy) or a failed read (the next
+            // run retries). A contact tracked since the snapshot is the next run's to schedule.
             guard let contact = try? await contacts.fetch(id: row.contactId),
                   !(contact.tracked && contact.isActive) else { continue }
-            try await reminders.transitionState(id: row.id, from: .pending, to: .cancelled)
+            let retired: ReminderState = row.scheduledFor <= now ? .fired : .cancelled
+            try await reminders.transitionState(id: row.id, from: .pending, to: retired)
         }
     }
 
