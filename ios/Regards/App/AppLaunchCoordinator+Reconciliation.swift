@@ -19,11 +19,13 @@ extension AppLaunchCoordinator {
         await runSchedulingPass(runtime: runtime)
     }
 
-    /// `runFull()` for the `.ready` triggers (launch, retry, onboarding done,
-    /// the DEBUG mock launch), foreground, and a Contacts store change, each
-    /// after its Contacts reconcile (§9 "App launch/foreground"). A failure
-    /// is logged, not shown. Writes the failed run made before it stopped may
-    /// already have landed; the next trigger runs the pass again.
+    /// `runFull()` for the `.ready` triggers. Launch and retry (start()), foreground,
+    /// and a Contacts store change each run it after their Contacts reconcile.
+    /// Onboarding completion runs it inside completeOnboarding, before the
+    /// post-starter reconcile; the DEBUG mock launch runs it with no reconcile
+    /// (§9 "App launch/foreground"). A failure is logged, not shown. Writes the
+    /// failed run made before it stopped may already have landed; the next
+    /// trigger runs the pass again.
     func runSchedulingPass(runtime: AppRuntime) async {
         do {
             try await runtime.scheduler.runFull()
