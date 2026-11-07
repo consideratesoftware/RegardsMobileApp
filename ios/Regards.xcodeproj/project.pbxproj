@@ -46,6 +46,7 @@
 		2E9F13C7D9084A22EF593AB9 /* UserNotificationsAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F057C5D73819618C5586DE /* UserNotificationsAdapterTests.swift */; };
 		30682ACB952D64CFD50182AE /* ScreensAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479FAC52C961F5A92DD72733 /* ScreensAccessibilityTests.swift */; };
 		31D2738073F7C43035F7BF65 /* ScreensAccessibilityTests+RowActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7824B1F71B424AEAA2407782 /* ScreensAccessibilityTests+RowActions.swift */; };
+		344A7EF95C24600E9F2C7756 /* UserNotificationsAdapterRequestTests+ContactId.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1D42ECD5853B0E9AC5413D /* UserNotificationsAdapterRequestTests+ContactId.swift */; };
 		34744884478D847E263EA7D7 /* ScriptedNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C934F5CE784566F2D99DB3E /* ScriptedNotifications.swift */; };
 		3658680CA6D7E7D28C86C228 /* Eventually.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBBFE7DF137363D94B872FE /* Eventually.swift */; };
 		36DDF0FC9E135C34E29412DC /* ContactAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B718FFDD5767AE98D80A1EF /* ContactAccessibilityTests.swift */; };
@@ -292,6 +293,7 @@
 		1A40C514B390F4D2E4D15531 /* SchedulingPassSnoozeCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassSnoozeCalendarTests.swift; sourceTree = "<group>"; };
 		1ADC5733A26E2C5DEF5A8AA3 /* AppLaunchCoordinator+Reconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppLaunchCoordinator+Reconciliation.swift"; sourceTree = "<group>"; };
 		1B4D4CD40D911D13AA4D2BFE /* ScreensAccessibilityTests+Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScreensAccessibilityTests+Onboarding.swift"; sourceTree = "<group>"; };
+		1C1D42ECD5853B0E9AC5413D /* UserNotificationsAdapterRequestTests+ContactId.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UserNotificationsAdapterRequestTests+ContactId.swift"; sourceTree = "<group>"; };
 		1D391EC6269B1A1F6020933D /* ReminderWindowsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsScreen.swift; sourceTree = "<group>"; };
 		1E4A9258C35656EBBD01F3D2 /* AppLaunchCoordinator+Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppLaunchCoordinator+Onboarding.swift"; sourceTree = "<group>"; };
 		1EBAEAC8C5F2751C38594416 /* OnboardingConceptScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingConceptScreen.swift; sourceTree = "<group>"; };
@@ -816,6 +818,7 @@
 				6C52456BDE4D58AC60A6AD7D /* ContactsSourceTests.swift */,
 				F0554DB8A736749004658979 /* NotificationFakeParityTests.swift */,
 				795C41FB0564D733ADDAA308 /* UserNotificationsAdapterRequestTests.swift */,
+				1C1D42ECD5853B0E9AC5413D /* UserNotificationsAdapterRequestTests+ContactId.swift */,
 				83F057C5D73819618C5586DE /* UserNotificationsAdapterTests.swift */,
 			);
 			path = Platform;
@@ -1285,6 +1288,7 @@
 				0FEA06BF27917BB5A18D3D30 /* UpcomingViewModelStateTests.swift in Sources */,
 				8BCE67FE0A8117775950EA48 /* UpcomingViewModelWindowTests.swift in Sources */,
 				E4525D4289A80E4FB0239829 /* UpdateLastInteractedAtContractTests.swift in Sources */,
+				344A7EF95C24600E9F2C7756 /* UserNotificationsAdapterRequestTests+ContactId.swift in Sources */,
 				7ADA6C095B67110E4560131A /* UserNotificationsAdapterRequestTests.swift in Sources */,
 				2E9F13C7D9084A22EF593AB9 /* UserNotificationsAdapterTests.swift in Sources */,
 			);

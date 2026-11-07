@@ -22,7 +22,7 @@ private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 /// are the fixed UTC wall time of the instant. Deleting the adapter's GMT pin
 /// fails them on every host.
 struct UserNotificationsAdapterRequestTests {
-    private static let now = "2026-10-01T00:00:00Z"
+    static let now = "2026-10-01T00:00:00Z"
 
     // MARK: Request mapping
 
@@ -48,8 +48,7 @@ struct UserNotificationsAdapterRequestTests {
             title: "",
             body: "3 people are overdue: Ada, Grace, and Linus.",
             fireDate: now.addingTimeInterval(3 * 3600),
-            contactId: nil,
-            category: .digest
+            kind: .digest
         )
 
         let mapped = UserNotificationsAdapter.makeRequest(request, now: now)
@@ -162,19 +161,22 @@ struct UserNotificationsAdapterRequestTests {
         arguments: [
             (
                 "contact-\(contactX.uuidString)-cadence", "", "Time to catch up with Ada.",
-                contactX as UUID?, NotificationCategory.cadence
+                ReminderNotificationRequest.Kind.cadence(contactId: contactX)
             ),
-            ("contact-\(contactX.uuidString)-occasion", "Birthday", "It is Ada's birthday.", contactX, .occasion),
-            ("digest-1790000000", "", "3 people are overdue: Ada, Grace, and Linus.", nil, .digest),
+            (
+                "contact-\(contactX.uuidString)-occasion", "Birthday", "It is Ada's birthday.",
+                .occasion(contactId: contactX)
+            ),
+            ("digest-1790000000", "", "3 people are overdue: Ada, Grace, and Linus.", .digest),
         ]
     )
     func requestContentNeverCarriesAnIdentifier(
-        identifier: String, title: String, body: String, contactId: UUID?, category: NotificationCategory
+        identifier: String, title: String, body: String, kind: ReminderNotificationRequest.Kind
     ) throws {
         let now = try Self.utc(Self.now)
         let request = ReminderNotificationRequest(
             identifier: identifier, title: title, body: body,
-            fireDate: now.addingTimeInterval(3600), contactId: contactId, category: category
+            fireDate: now.addingTimeInterval(3600), kind: kind
         )
 
         let content = UserNotificationsAdapter.makeRequest(request, now: now).content
@@ -316,13 +318,13 @@ struct UserNotificationsAdapterRequestTests {
 
     // MARK: Helpers
 
-    private static var gmtCalendar: Calendar {
+    static var gmtCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .gmt
         return calendar
     }
 
-    private static func utc(_ iso: String) throws -> Date {
+    static func utc(_ iso: String) throws -> Date {
         try #require(ISO8601DateFormatter().date(from: iso), "unparseable test date \(iso)")
     }
 
@@ -332,12 +334,11 @@ struct UserNotificationsAdapterRequestTests {
             title: "Time to reach out",
             body: "It has been a while since you talked to Ada.",
             fireDate: fireDate,
-            contactId: contactX,
-            category: .cadence
+            kind: .cadence(contactId: contactX)
         )
     }
 
-    private static func request(_ category: NotificationCategory, fireDate: Date) -> ReminderNotificationRequest {
+    static func request(_ category: NotificationCategory, fireDate: Date) -> ReminderNotificationRequest {
         switch category {
         case .cadence:
             return cadenceRequest(fireDate: fireDate)
@@ -345,12 +346,12 @@ struct UserNotificationsAdapterRequestTests {
             return ReminderNotificationRequest(
                 identifier: "digest-1790000000", title: "",
                 body: "3 people are overdue: Ada, Grace, and Linus.",
-                fireDate: fireDate, contactId: nil, category: .digest
+                fireDate: fireDate, kind: .digest
             )
         case .occasion:
             return ReminderNotificationRequest(
                 identifier: "contact-\(contactX.uuidString)-occasion", title: "Birthday",
-                body: "It is Ada's birthday.", fireDate: fireDate, contactId: contactX, category: .occasion
+                body: "It is Ada's birthday.", fireDate: fireDate, kind: .occasion(contactId: contactX)
             )
         }
     }

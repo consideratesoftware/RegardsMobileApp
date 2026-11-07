@@ -110,8 +110,7 @@ actor ScriptedNotifications: NotificationScheduling {
                 title: request.title,
                 body: request.body,
                 fireDate: Date(timeIntervalSince1970: request.fireDate.timeIntervalSince1970.rounded(.down)),
-                contactId: request.contactId,
-                category: request.category
+                kind: request.kind
             ))
         }
     }

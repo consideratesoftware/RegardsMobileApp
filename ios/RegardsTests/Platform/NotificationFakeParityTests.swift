@@ -33,6 +33,8 @@ struct NotificationFakeParityTests {
     /// A whole second, so the cases below can name sub-second offsets from it.
     private static let now = Date(timeIntervalSince1970: 1_785_600_000)
 
+    private static let contactId = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
+
     private static func request(
         id: String = "contact-5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B-cadence",
         body: String = "It has been a while since you talked to Ada.",
@@ -43,8 +45,7 @@ struct NotificationFakeParityTests {
             title: "Time to reach out",
             body: body,
             fireDate: fireDate,
-            contactId: UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B"),
-            category: .cadence
+            kind: .cadence(contactId: contactId)
         )
     }
 
