@@ -196,7 +196,6 @@ lane's refs, and this fetch brings them up to date.
     `pr-correctness`, `pr-security-privacy` and `pr-code-quality`;
     `pr-tests` only when the diff changes code or tests; `pr-accessibility`
     and `pr-fit-finish` when their path rules match. Check the diff with
-    `git -C <lane> fetch`, then
     `git -C <lane> diff --name-only origin/main...<head sha>`. Each required
     reviewer needs APPROVE as its newest verdict (next bullet), so a comment
     that reran only that reviewer completes the set. Only `pr-code-quality`
