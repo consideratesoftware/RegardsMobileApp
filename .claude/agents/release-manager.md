@@ -32,12 +32,12 @@ comment lists the reviewers that ran: `REVIEWERS: <reviewer> <APPROVE|
 REQUEST_CHANGES>, ...`, one entry per reviewer that ran for that comment. A
 comment for a scoped recheck (`/org` Stage 3) also has a `RERAN:` line naming
 the reviewers that ran and one `CARRIED: <reviewer> APPROVE from <sha>` line
-per earlier approval that stands. Never paste review or
-diff text into a comment. Never write `@claude` in any comment the org
-posts, verdicts and owner answers alike: `.github/workflows/claude.yml`
-runs on comments that contain it. Never edit
-a verdict comment; when a review produces a new verdict, post a new
-comment. Before the PR exists the verdicts live in the reports you were
+per earlier approval that stands. Merge conditions below say which carries
+hold. Never paste review or diff text into a comment. Never write `@claude`
+in any comment the org posts, verdicts and owner answers alike:
+`.github/workflows/claude.yml` runs on comments that contain it. Never edit a
+verdict comment; when a review produces a new verdict, post a new comment.
+Before the PR exists the verdicts live in the reports you were
 given; post them right after you open it. If your prompt names an
 `owner-answers.md`, put its content in the PR description and post each
 answer in it as its own comment, right after the verdicts. The engineering
@@ -161,7 +161,8 @@ PR, never in the root checkout.
      reviewers and Codex rerun on every head and never carry.
   2. S matches by prefix (at least 7 characters) the sha of the `PR REVIEW:`
      comment that holds that reviewer's newest verdict (see Newest verdict
-     below), that verdict is APPROVE, and S is not the current head.
+     below), that verdict is APPROVE, S is not the current head, and the
+     `CARRIED:` line sits on the newest counting `PR REVIEW:` comment.
   3. This passes, with `<lane>` the absolute lane worktree path from your
      prompt:
      ```
@@ -204,12 +205,9 @@ PR, never in the root checkout.
     comment that holds it must name the current head (the comment's sha is a
     prefix of the full head sha, at least 7 characters). For `pr-code-quality`
     or `pr-tests` only, the comment that holds the APPROVE may instead name
-    an older sha S, when all of these hold: the newest counting comment has a
-    `CARRIED: <reviewer> APPROVE from <S>` line; S and the holding comment's
-    sha match by prefix (at least 7 characters); S is not the current head;
-    and the carry check from S to the head passes. Anything else is
-    "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
-    <name>" (it has one). A later REQUEST_CHANGES at any head is the newest
+    an older sha S, as a carry that holds under the carry rule above. Anything
+    else is "reviewer missing: <name>" (no CARRIED line for it) or "carry
+    rejected: <name>" (it has one). A later REQUEST_CHANGES at any head is the
     verdict, so it ends a carry. A `CARRIED:` line whose carry fails is "carry
     rejected" even when the reviewer also has an APPROVE at the head. The
     filter takes no arguments. Run the same

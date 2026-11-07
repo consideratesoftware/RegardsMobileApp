@@ -188,38 +188,23 @@ the routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
 the current head. Rerun `pr-code-quality` and `pr-tests` unless the new
 commits are Markdown-only under the carry rule. Ask Sid only if a blocker
-survives 2 rounds or a fix needs a product decision. The `PR REVIEW:`
-comment lists every reviewer that ran on a `REVIEWERS:` line with its
-verdict. A scoped recheck adds a `RERAN:` line
-naming the reviewers that ran, and one `CARRIED:` line per `pr-code-quality`
-or `pr-tests` approval that stands, as `CARRIED: <reviewer> APPROVE from
-<sha>`. Every reviewer the routing table runs for the PR needs APPROVE as its
-newest verdict. The release manager reads every counting `PR REVIEW:`
-comment, oldest first, and takes each reviewer's entry on the last
-`REVIEWERS:` line that lists it, at any head. The entry must be APPROVE in a
-comment that names the current head. For `pr-code-quality` or `pr-tests`
-only, the comment that holds the APPROVE may instead name an older sha S,
-when all of these hold: the newest counting comment has a `CARRIED:
-<reviewer> APPROVE from <S>` line; S and the holding comment's sha match by
-prefix (at least 7 characters); S is not the current head; and the carry
-check from S to the head passes. So a `CARRIED:` line cites the sha of the
-comment that holds the reviewer's APPROVE, and a chained carry (A, scoped B,
-scoped C) keeps citing A. A later REQUEST_CHANGES at any head ends a carry. A
-comment that reruns one reviewer only completes the set.
+survives 2 rounds or a fix needs a product decision. The `PR REVIEW:` comment
+lists every reviewer that ran on a `REVIEWERS:` line with its verdict. A
+scoped recheck adds a `RERAN:` line naming the reviewers that ran, and one
+`CARRIED: <reviewer> APPROVE from <sha>` line per `pr-code-quality` or
+`pr-tests` approval that stands. The other four reviewers and Codex never
+carry: they rerun on every head. Every reviewer the routing table runs needs
+APPROVE as its newest verdict.
 
-A carry stands only if all 3 hold: (1) the reviewer is `pr-code-quality` or
-`pr-tests`; (2) the carried sha S matches by prefix (at least 7 characters)
-the sha of the `PR REVIEW:` comment that holds that reviewer's newest
-verdict, that verdict is APPROVE, and S is not the current head; (3) the carry
-check from S to the head passes. That check allows only Markdown outside the
-agent, script and CI directories, never AGENTS*.md, CLAUDE*.md,
-ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
-`android/*/schemas` or `shared/testvectors`; anything else reruns that
-reviewer. The other four reviewers and Codex never carry: they rerun on every
-head. The release manager checks each `CARRIED:` line against all 3
-(`release-manager.md`, Merge conditions), even when the reviewer also has an
-APPROVE at the head, and rejects one that fails, so if you aren't sure, rerun
-the reviewer.
+The release manager reads every counting `PR REVIEW:` comment, oldest first,
+and takes each reviewer's newest verdict from the last `REVIEWERS:` line that
+lists it. A `CARRIED:` line cites the sha of the comment that holds the
+reviewer's APPROVE. A chained carry (A, scoped B, scoped C) keeps citing A. A
+comment that reruns one reviewer only completes the set. The carry conditions
+are in `.claude/agents/release-manager.md` (Merge conditions). The release
+manager checks each `CARRIED:` line against them, even when the reviewer also
+has an APPROVE at the head, and rejects one that fails. If you aren't sure,
+rerun the reviewer.
 
 Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
 and Stage 3 alike. Don't start a general-purpose agent and tell it to read

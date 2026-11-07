@@ -141,37 +141,19 @@ All of these, on the current head, with no averaging:
 
 Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
 2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, the
-engineering manager may recheck the fixes without asking Sid. Only
-`pr-code-quality` and `pr-tests` may carry an approval over a Markdown-only
-change. `pr-security-privacy`, `pr-correctness`, `pr-fit-finish`,
-`pr-accessibility` (where the routing table requires them) and
-`codex-reviewer` on the whole `origin/main...HEAD` diff run again on every
-head. Sid is asked only if a blocker survives 2 rounds or a fix needs a
-product decision. The `PR REVIEW:` comment lists which reviewers reran and
-which approvals carry from which sha. A carry stands only if all 3 hold: (1)
-the reviewer is `pr-code-quality` or `pr-tests`; (2) the carried sha S
-matches by prefix (at least 7 characters) the sha of the `PR REVIEW:` comment
-that holds that reviewer's newest verdict, that verdict is APPROVE, and S is
-not the current head; (3) `scripts/check-carried-approval.sh` from S to the
-head passes. The script
-allows only Markdown outside the agent, script and CI directories, never
-AGENTS*.md, CLAUDE*.md, ARCHITECTURE.md, or Markdown under `ios/Regards*`,
-`android/*/src`, `android/*/schemas` or `shared/testvectors`; anything else
-reruns that reviewer. A `CARRIED:` line is checked by these conditions even
-when the reviewer also has an APPROVE at the head, and one that fails them is
-"carry rejected" regardless. The release manager runs that script. Each reviewer the routing table
-requires must have APPROVE as its newest verdict. The release manager reads
-every counting `PR REVIEW:` comment, oldest first, and takes each reviewer's
-entry on the last `REVIEWERS:` line that lists it, at any head. The entry must
-be APPROVE in a comment that names the current head. For `pr-code-quality` or
-`pr-tests` only, the comment that holds the APPROVE may instead name an older
-sha S, when all of these hold: the newest counting comment has a `CARRIED:
-<reviewer> APPROVE from <S>` line; S and the holding comment's sha match by
-prefix (at least 7 characters); S is not the current head; and the carry check
-from S to the head passes. A later REQUEST_CHANGES at any head ends a carry. A
-comment that reruns one reviewer only completes the set.
-The newest `PR REVIEW:` comment, scoped or not, needs a `REVIEWERS:` line, or
-the check fails (STATE CODEX STALE).
+engineering manager may recheck the fixes without asking Sid.
+`pr-security-privacy`, `pr-correctness`, `pr-fit-finish`, `pr-accessibility`
+(where the routing table requires them) and `codex-reviewer` on the whole
+`origin/main...HEAD` diff run again on every head. Only `pr-code-quality` and
+`pr-tests` may carry an approval over a Markdown-only change, and only under
+the carry rule. Sid is asked only if a blocker survives 2 rounds or a fix
+needs a product decision. The `PR REVIEW:` comment lists which reviewers reran
+and which approvals carry from which sha. The carry rule, the `CARRIED:` line
+format, and the check that runs `scripts/check-carried-approval.sh` are in
+`.claude/agents/release-manager.md` (Merge conditions). Each reviewer the
+routing table requires needs APPROVE as its newest verdict, or a carry that
+holds under that rule. The newest `PR REVIEW:` comment, scoped or not, needs a
+`REVIEWERS:` line, or the check fails (STATE CODEX STALE).
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his
