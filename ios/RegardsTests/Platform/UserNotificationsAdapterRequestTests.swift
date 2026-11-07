@@ -6,7 +6,8 @@ import UserNotifications
 private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 
 /// TF-07e (§9 platform nuance, §9 contract 5, R57). Request building and
-/// decoding, restored from fec13d7. Every assertion goes through the adapter's
+/// decoding, restored from fec13d7, with a `kind` payload in place of
+/// `contactId` and `category`. Every assertion goes through the adapter's
 /// pure statics (except the two willPresent tests), so no test touches the real
 /// `UNUserNotificationCenter` and none can raise the system permission alert.
 ///

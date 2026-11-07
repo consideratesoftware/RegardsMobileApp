@@ -35,9 +35,10 @@ public enum NotificationAction: Sendable, Equatable {
 /// `SchedulingPass` resolved through the engine (§9); the adapter never
 /// re-derives it from wall-clock fields in another zone.
 public struct ReminderNotificationRequest: Sendable, Equatable {
-    /// What the notification is. A cadence or occasion notification carries
-    /// the contact its actions act on, so one can't be built without it. A
-    /// digest covers several contacts and carries none.
+    /// What the notification is. A cadence or occasion notification is about
+    /// one contact and can't be built without its id. A cadence's Caught up
+    /// and Snooze act on that contact; an occasion has no actions. A digest
+    /// covers several contacts and carries none.
     public enum Kind: Equatable, Sendable {
         case cadence(contactId: UUID)
         case occasion(contactId: UUID)
@@ -60,8 +61,7 @@ public struct ReminderNotificationRequest: Sendable, Equatable {
         }
     }
 
-    /// The contact a single-contact notification's actions act on. Nil for a
-    /// digest.
+    /// The contact a single-contact notification is about. Nil for a digest.
     public var contactId: UUID? {
         switch kind {
         case .cadence(let contactId), .occasion(let contactId): return contactId
@@ -99,7 +99,7 @@ public protocol NotificationScheduling: Sendable {
     /// Content comes back, and the fire date comes back truncated to the whole
     /// second, so a caller can tell a moved or reworded request from an
     /// unchanged one under the same identifier. Every pending request is this
-    /// app's (iOS keeps one list per app). Pending requests, decoded. A request
+    /// app's (iOS keeps one list per app). A request
     /// `decode` can't read is left out; ARCHITECTURE.md §9a gives the rule for
     /// retiring or adding a request shape.
     func pendingRequests() async -> [ReminderNotificationRequest]
@@ -279,8 +279,9 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// current time or the device zone, and it has whole-second precision.
     /// Nil when the request isn't a shape this build leaves pending
     /// (ARCHITECTURE.md §9a). A cadence or occasion request with no valid
-    /// contact id is one of those shapes: its actions would have nobody to
-    /// act on.
+    /// contact id is one of those shapes, because `Kind` can't hold either
+    /// without one. A cadence request's Caught up and Snooze would have
+    /// nobody to act on.
     static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {
         guard
             let trigger = request.trigger as? UNCalendarNotificationTrigger,

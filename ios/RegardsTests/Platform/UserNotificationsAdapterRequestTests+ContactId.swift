@@ -6,16 +6,15 @@ import UserNotifications
 private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 
 /// A cadence or occasion request always carries a contact id, and decode drops
-/// one that has none (PR #71 hosted review: a request without it left Caught
-/// up and Snooze inert). Shares the helpers in
+/// one that has none. The type enforces the pairing. Shares the helpers in
 /// `UserNotificationsAdapterRequestTests.swift`; like that file, nothing here
 /// touches the real notification center or the wall clock.
 extension UserNotificationsAdapterRequestTests {
     // MARK: Contact id pairing
 
     /// Caught up and Snooze read the contact id back from `userInfo`, so a cadence
-    /// or occasion request without one would leave them inert. The expectation
-    /// comes from the category, not from the request.
+    /// request without one would leave them inert. The expectation comes from
+    /// the category, not from the request.
     @Test(
         "A cadence or occasion request carries its contact id in the user info and decodes with it; a digest has none",
         arguments: NotificationCategory.allCases
@@ -35,9 +34,10 @@ extension UserNotificationsAdapterRequestTests {
 
     // MARK: Decoding a request with no usable contact id
 
-    /// A cadence or occasion request with no contact id can't be built any more,
+    /// The type can't build a cadence or occasion request without a contact id,
     /// so one on the system's list was not made by `makeRequest`. Decode drops
-    /// it instead of returning a request whose actions would do nothing.
+    /// it. A cadence request kept without one would have Caught up and Snooze
+    /// that do nothing.
     @Test("A cadence request with no contact id in its user info decodes to nothing")
     func cadenceRequestWithoutContactIdDecodesToNil() {
         let request = Self.handBuilt(category: "regards.cadence", contactId: nil)
