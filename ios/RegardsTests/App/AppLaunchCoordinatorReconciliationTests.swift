@@ -231,7 +231,7 @@ struct AppLaunchCoordinatorReconciliationTests {
 
         launch.beginObservingContactStoreChanges(dependencies: dependencies)
         source.simulateChange()
-        #expect(await eventually { launch.pendingStoreChangeReplay })
+        #expect(await eventuallyPumpingRunLoop { launch.pendingStoreChangeReplay })
 
         await launch.start()
 
@@ -341,7 +341,7 @@ struct AppLaunchCoordinatorReconciliationTests {
         let dependencies = try #require(launch.dependencies)
         launch.beginObservingContactStoreChanges(dependencies: dependencies)
         source.simulateChange()
-        #expect(await eventually { launch.pendingStoreChangeReplay })
+        #expect(await eventuallyPumpingRunLoop { launch.pendingStoreChangeReplay })
         #expect(try await environment.reminders.fetchPending(forContact: leaving.id).count == 1)
 
         await launch.start()
