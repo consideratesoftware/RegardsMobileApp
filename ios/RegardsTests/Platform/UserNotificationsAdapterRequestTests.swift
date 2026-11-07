@@ -206,7 +206,7 @@ struct UserNotificationsAdapterRequestTests {
         #expect(Self.gmtCalendar.date(from: trigger.dateComponents) == fireDate)
     }
 
-    @Test("A fire date at or before now maps to no trigger, which delivers immediately", arguments: [-600.0, 0.0])
+    @Test("A fire date whose trigger instant is not after now delivers immediately", arguments: [-600.0, 0.0, 0.6])
     func pastOrPresentFireDateDeliversImmediately(offsetFromNow: TimeInterval) throws {
         let now = try Self.utc(Self.now)
         let fireDate = now.addingTimeInterval(offsetFromNow)
