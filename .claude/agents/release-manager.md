@@ -112,7 +112,7 @@ head that the review app published (slug `regards-staged-review`, app id
 Save it under `<scratch>`, a fresh `mktemp -d` directory, then count:
 
 ```
-gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs?check_name=Regards%20staged%20review&per_page=100" \
+gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs?check_name=Regards%20staged%20review&per_page=100&filter=all" \
   --jq '[.check_runs[] | select(.app.slug == "regards-staged-review")]
         | sort_by(.completed_at // .started_at) | last | .output.text // empty' \
   > "<scratch>/hosted-review.txt"
