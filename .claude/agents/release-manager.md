@@ -177,11 +177,13 @@ lane's refs, and this fetch brings them up to date.
      the copy in the root checkout on `main`, not the lane's: the PR under
      review could have edited its own copy. (While this PR is itself under
      review, the engineering manager's prompt gives you the path of its
-     copy.) The rule is one line: only Markdown outside the agent, script
-     and CI directories carries, never AGENTS*.md, CLAUDE*.md,
-     ARCHITECTURE.md, or Markdown under `ios/Regards*`, `android/*/src`,
-     `android/*/schemas` or `shared/testvectors`, and anything else reruns
-     that reviewer. The script's header defines it.
+     copy.) The rule: a carry needs a diff of lower-case `.md` files only,
+     each at the repository root, directly under `ios/` or `android/`, or
+     under `ios/docs/` or `android/docs/`. It never carries a path under
+     `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested
+     copies included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any
+     depth and in any letter case, or a file that is not mode 100644.
+     Anything else reruns that reviewer. The script's header defines it.
   If any condition fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
   reviewer. A `CARRIED:` line is checked by these conditions even when the
