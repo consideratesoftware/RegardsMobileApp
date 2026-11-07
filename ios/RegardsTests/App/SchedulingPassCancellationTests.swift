@@ -169,4 +169,149 @@ struct SchedulingPassCancellationTests {
         #expect(try await fixture.cadenceRow(contact) == nil)
         #expect(await fixture.reminders.writeCount == writes)
     }
+
+    // MARK: - The orphan sweep (§9 "Notification fired", §13)
+
+    /// Which entry point sweeps the rows of contacts the snapshot no longer holds.
+    enum Sweep: CaseIterable, Sendable {
+        case runFull, runFor
+    }
+
+    /// Two contacts each hold a pending cadence row: the first is due at
+    /// 18:00, the second is 25 days out. Both leave the snapshot (archived,
+    /// untracked) after 18:00 and no run covers them. The sweep marks the due
+    /// row fired, since it was delivered, and cancels the future one. Both
+    /// contacts come back a day later: the delivered row is held, the future
+    /// one is scheduled again.
+    @Test(
+        "The orphan sweep fires a due row and cancels a future one",
+        arguments: RepositoryContractBackend.allCases, Sweep.allCases
+    )
+    func orphanSweepFiresADueRowAndCancelsAFutureOne(
+        backend: RepositoryContractBackend, sweep: Sweep
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let due = try await fixture.addContact(1)
+        let future = try await fixture.addContact(2, cadenceDays: 30, lastInteracted: "2026-06-05 10:00")
+        try await fixture.pass.runFull()
+        let dueSlot = PassFixture.at("2026-06-10 18:00")
+        let futureSlot = PassFixture.at("2026-07-05 18:00")
+        #expect(try await fixture.cadenceRow(due)?.scheduledFor == dueSlot)
+        #expect(try await fixture.cadenceRow(future)?.scheduledFor == futureSlot)
+        fixture.setNow("2026-06-10 18:01")
+        try await fixture.repositories.contacts.archive(id: due.id, at: fixture.clock.now())
+        var untracked = future
+        untracked.tracked = false
+        try await fixture.repositories.contacts.upsert(untracked)
+
+        switch sweep {
+        case .runFull:
+            try await fixture.pass.runFull()
+        case .runFor:
+            try await fixture.pass.run(for: due.id)
+            try await fixture.pass.run(for: future.id)
+        }
+
+        let (dueID, futureID) = (fixture.cadenceID(due), fixture.cadenceID(future))
+        let log = await fixture.reminders.transitionLog
+        #expect(log.filter { $0.id == dueID } == [TransitionCall(id: dueID, from: .pending, to: .fired, applied: true)])
+        #expect(log.filter { $0.id == futureID }
+            == [TransitionCall(id: futureID, from: .pending, to: .cancelled, applied: true)])
+        // A second sweep has nothing left to change.
+        try await fixture.pass.runFull()
+        let writes = await fixture.reminders.writeCount
+        try await fixture.pass.runFull()
+        #expect(await fixture.reminders.writeCount == writes)
+
+        fixture.setNow("2026-06-11 10:00")
+        try await fixture.repositories.contacts.upsert(due)
+        try await fixture.repositories.contacts.upsert(future)
+        try await fixture.pass.runFull()
+
+        let delivered = try #require(try await fixture.row(dueID))
+        #expect(delivered.state == .fired)
+        #expect(delivered.scheduledFor == dueSlot)
+        #expect(try await fixture.cadenceRow(due) == nil)
+        #expect(try await fixture.cadenceRow(future)?.scheduledFor == futureSlot)
+    }
+
+    /// The contact is untracked right after its 18:00 slot delivered. Tracked
+    /// again, in the same slot or the next day, it is overdue on the same
+    /// cycle, so the fired row holds and the run writes nothing.
+    @Test(
+        "A re-tracked contact is not notified again for the slot that was delivered",
+        arguments: RepositoryContractBackend.allCases, ["2026-06-10 18:30", "2026-06-11 10:00"]
+    )
+    func reTrackedContactIsNotNotifiedAgainForItsDeliveredSlot(
+        backend: RepositoryContractBackend, returnAt: String
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        fixture.setNow("2026-06-10 18:01")
+        var untracked = contact
+        untracked.tracked = false
+        try await fixture.repositories.contacts.upsert(untracked)
+        try await fixture.pass.run(for: contact.id)
+        // Settles the mock backend's seed cast.
+        try await fixture.pass.runFull()
+        fixture.setNow(returnAt)
+        try await fixture.pass.runFull()
+        try await fixture.repositories.contacts.upsert(contact)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        let delivered = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(delivered.state == .fired)
+        #expect(delivered.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        #expect(delivered.snoozedUntil == nil)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
+    /// A birthday at 09:00 and a cadence row (moved to 06-11 by contract 6)
+    /// are both pending when the contact is untracked at 09:30. The sweep
+    /// fires the due birthday and cancels the future cadence row. Tracked
+    /// again at 10:00, the birthday is not delivered a second time.
+    @Test(
+        "The orphan sweep fires a due occasion row and cancels a future cadence row",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func orphanSweepFiresADueOccasionAndCancelsAFutureCadenceRow(backend: RepositoryContractBackend) async throws {
+        let id = try contractUUID(7_001)
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 08:00", occasions: { _ in
+            [ContactOccasion(contactId: id, kind: .birthday, monthDay: MonthDay(month: 6, day: 10))]
+        })
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let birthdayID = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
+        let cadenceID = fixture.cadenceID(contact)
+        let birthdaySlot = PassFixture.at("2026-06-10 09:00")
+        let cadenceSlot = PassFixture.at("2026-06-11 18:00")
+        #expect(try await fixture.occasionRow(contact, .birthday)?.scheduledFor == birthdaySlot)
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == cadenceSlot)
+        fixture.setNow("2026-06-10 09:30")
+        var untracked = contact
+        untracked.tracked = false
+        try await fixture.repositories.contacts.upsert(untracked)
+
+        try await fixture.pass.run(for: contact.id)
+
+        let log = await fixture.reminders.transitionLog
+        #expect(log.filter { $0.id == birthdayID }
+            == [TransitionCall(id: birthdayID, from: .pending, to: .fired, applied: true)])
+        #expect(log.filter { $0.id == cadenceID }
+            == [TransitionCall(id: cadenceID, from: .pending, to: .cancelled, applied: true)])
+
+        fixture.setNow("2026-06-10 10:00")
+        try await fixture.repositories.contacts.upsert(contact)
+        try await fixture.pass.runFull()
+
+        let birthday = try #require(try await fixture.row(birthdayID))
+        #expect(birthday.state == .fired)
+        #expect(birthday.scheduledFor == birthdaySlot)
+        #expect(try await fixture.occasionRow(contact, .birthday) == nil)
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == cadenceSlot)
+    }
 }
