@@ -214,7 +214,9 @@ Not owner gates: the manual VoiceOver smoke
 budget, device matrix, TF-18). Owner ruling, 2026-10-28: they go to
 `TESTFLIGHT_PLAN.md`'s "Pre-release device pass", one pass before release.
 The release manager has the tech writer add each PR's steps there in that
-PR, and no merge waits on them.
+PR, and no merge waits on them. An entry may name a section of
+`ios/docs/accessibility-smoke.md` and its items instead of copying the steps,
+as long as the entry has its own Result line.
 
 Simulator gates run on this Mac through `build-engineer`; GitHub-hosted
 macOS runners run the same gates plus the hosted review on every PR.

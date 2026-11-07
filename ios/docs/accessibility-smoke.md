@@ -2,7 +2,9 @@
 
 Run this in the pre-release device pass, not before each merge (owner ruling,
 2026-10-28). Each UI-touching PR adds its steps to `TESTFLIGHT_PLAN.md`'s
-"Pre-release device pass", and the result is recorded there. On a pull
+"Pre-release device pass", and the result is recorded there. An entry may
+name a section of `ios/docs/accessibility-smoke.md` and its items instead of
+copying the steps, as long as the entry has its own Result line. On a pull
 request the accessibility gates are the `pr-accessibility` review and the
 focused regressions the engineer runs. The broad audits run after merge,
 nightly, and before release.

@@ -256,7 +256,9 @@ lane's refs, and this fetch brings them up to date.
   gates (owner ruling, 2026-10-28). They go to `TESTFLIGHT_PLAN.md`'s
   `Pre-release device pass`: give `tech-writer` the exact steps for any diff
   touching `Features/`, `DesignSystem/`, or `App/` view code, and make sure
-  the entry lands in this PR. They never hold a merge.
+  the entry lands in this PR. An entry may name a section of
+  `ios/docs/accessibility-smoke.md` and its items instead of copying the steps,
+  as long as the entry has its own Result line. They never hold a merge.
 
 If all hold, merge the head you checked, so a push that lands in between
 can't ride along:
