@@ -11,39 +11,28 @@
 #   any other nonzero exit is a script error and fails the carry too.
 #
 # The rule, applied to the net change between the two shas (not per commit):
-# an approval carries only when every changed path is a Markdown file (*.md,
-# lower-case suffix; Note.MD is not one) and none of these hold:
+# an approval carries only when every changed path is a Markdown file with a
+# lower-case .md suffix (Note.MD is not one) at the repository root, directly
+# under ios/ or android/, or anywhere under ios/docs/ or android/docs/ (the
+# doc roots, matched case-sensitively), and none of these hold (the exclusions
+# match in any letter case):
 #   - the path is under .claude/, .codex/, .agents/, scripts/ or .github/,
 #     nested copies included;
 #   - the path is named AGENTS*.md or CLAUDE*.md at any depth
 #     (AGENTS.override.md, CLAUDE.local.md);
 #   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
 #     from it, so an edit there changes what the tests must prove);
-#   - the path is under ios/Regards*/, android/*/src/, android/*/schemas/ or
-#     shared/testvectors/ (the bundled trees; see below);
 #   - the entry has a mode change (only 100644, or add/delete, is allowed).
 # An added or deleted .md file is docs. Agent contracts, commands, skills,
 # scripts, CI and the instruction files are behavior, so a change there never
 # carries. Every other path fails: source, config, project files, plists,
-# toml, anything. Renames are never detected, so a move is a delete plus an
-# add.
+# toml, and Markdown outside the doc roots. Renames are never detected, so a
+# move is a delete plus an add.
 #
-# Why Markdown alone is safe: the apps and their tests read repository files
-# (resources and test data) only from the bundled trees, and those trees are
-# excluded as a whole, so a Markdown file added there (a future resource, say)
-# never carries. The trees are the iOS app and test targets (ios/Regards*/),
-# every Android module's sources, assets and tests (android/*/src/; the *
-# crosses slashes, so android/feature/overdue/src/ is covered, while
-# android/docs/ and android/README.md stay eligible), android/*/schemas/ (the
-# Room schemaLocation in android/data/build.gradle.kts; Room migration tests
-# will read the committed schema files there once they exist), and
-# shared/testvectors/, test data with two future readers: the Swift suite,
-# which will generate the vectors and read them first, and the Android domain
-# tests (ANDROID_PORT.md A6 and AN-03). Neither tree has a reader yet, but a
-# Markdown file there would be read as data once one does, so both are
-# excluded now to fail closed. Elsewhere a Markdown file is documentation,
-# except the instruction files and ARCHITECTURE.md named above, which agents
-# read as instructions or as the contract.
+# Why a list of doc roots: the apps and their tests read repository files as
+# data from folders such as ios/Regards*/, android/*/src/ and
+# shared/testvectors/, so only the doc roots carry, and a new folder fails
+# closed until someone adds it here on purpose.
 
 set -euo pipefail
 export LC_ALL=C
@@ -87,8 +76,7 @@ while IFS= read -r -d '' meta; do
     esac
   done
   # Directory and agent-file names match in any case: a case-insensitive
-  # checkout (macOS) treats .CLAUDE/ and .claude/ as the same directory. The
-  # .md suffix below is case-sensitive, so Note.MD is not a Markdown file.
+  # checkout (macOS) treats .CLAUDE/ and .claude/ as the same directory.
   shopt -s nocasematch
   case "$path" in
     .claude/* | */.claude/* | .codex/* | */.codex/* | .agents/* | */.agents/* \
@@ -98,14 +86,13 @@ while IFS= read -r -d '' meta; do
       fail "agent instruction file never carries: $path" ;;
     ARCHITECTURE.md | */ARCHITECTURE.md )
       fail "ARCHITECTURE.md never carries: $path" ;;
-    ios/Regards*/* | android/*/src/* | android/*/schemas/* | shared/testvectors/* )
-      fail "bundled tree never carries: $path" ;;
   esac
   shopt -u nocasematch
-  case "$path" in
-    ?*.md ) ;;
-    * ) fail "not a Markdown file: $path" ;;
-  esac
+  # The allowlist: a lower-case .md at the root, directly under ios/ or
+  # android/, or anywhere under ios/docs/ or android/docs/. Case-sensitive, so
+  # Note.MD and IOS/docs/x.md fail.
+  [[ "$path" =~ ^([^/]+|ios/[^/]+|android/[^/]+|(ios|android)/docs/.+)\.md$ ]] \
+    || fail "not a doc path: $path"
 done < "$tmp/raw"
 
 echo "CARRY PASSES"
