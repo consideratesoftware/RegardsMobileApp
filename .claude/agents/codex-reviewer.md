@@ -145,7 +145,8 @@ output for RETRY>
 The first line is the form `release-manager.md` counts as a verdict, with
 the verdict word filled in, so the engineering manager can post it as is.
 Its target is `origin/main...HEAD`, the only target a verdict comment may
-name.
+name. With any other target write `vs <target>`; that line never counts as a
+verdict.
 
 UNAVAILABLE means Codex itself needs setup, which only Sid can do. RETRY
 means this run proved nothing, a timeout included; the engineering manager
