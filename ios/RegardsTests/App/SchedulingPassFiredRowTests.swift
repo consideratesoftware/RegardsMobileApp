@@ -83,10 +83,10 @@ struct SchedulingPassFiredRowTests {
     /// run has nothing to mark.
     @Test(
         "A row written into the slot in progress is fired, and the next run writes nothing",
-        arguments: RepositoryContractBackend.allCases
+        arguments: RepositoryContractBackend.allCases, ["18:30", "18:00"]
     )
-    func joiningTheSlotInProgressWritesAFiredRow(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:30")
+    func joiningTheSlotInProgressWritesAFiredRow(backend: RepositoryContractBackend, time: String) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 \(time)")
         let contact = try await fixture.addContact(1)
 
         try await fixture.pass.runFull()
