@@ -105,7 +105,7 @@ public protocol NotificationScheduling: Sendable {
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// Delivers at once when the fire date, cut to the whole second, is at or
-    /// before now, even if it is a fraction of a second ahead (§9 contract 5).
+    /// before now, even if it is a fraction of a second ahead of now (§9 contract 5).
     func schedule(_ request: ReminderNotificationRequest) async throws
     /// Removes pending requests. Unknown identifiers are ignored.
     func cancel(identifiers: [String]) async
