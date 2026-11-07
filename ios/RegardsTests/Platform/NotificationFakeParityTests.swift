@@ -88,6 +88,25 @@ struct NotificationFakeParityTests {
         }
     }
 
+    /// The other side of the boundary above: 1 s ahead of a whole-second `now`
+    /// names a later second, so the request stays pending and nothing is
+    /// delivered. Matches the adapter-level 3-way boundary in
+    /// `UserNotificationsAdapterRequestTests`.
+    @Test("A request exactly 1 second ahead is pending and not delivered", arguments: Fake.allCases)
+    func requestOneSecondAheadIsPending(_ fake: Fake) async throws {
+        let now = Self.now
+        let scheduling = fake.make(clock: { now })
+        let sent = Self.request(fireDate: now.addingTimeInterval(1))
+
+        try await scheduling.schedule(sent)
+
+        #expect(await scheduling.pendingRequests() == [sent])
+        if fake == .scripted {
+            let scripted = try #require(scheduling as? ScriptedNotifications)
+            #expect(await scripted.delivered.isEmpty)
+        }
+    }
+
     @Test("An immediate add replaces a pending request with the same identifier", arguments: Fake.allCases)
     func immediateAddReplacesAPendingRequest(_ fake: Fake) async throws {
         let now = Self.now

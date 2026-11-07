@@ -280,6 +280,28 @@ struct UserNotificationsAdapterRequestTests {
         )
     }
 
+    // MARK: Calendar edges
+
+    /// A leap day and the year boundary, each with a device zone whose local
+    /// date or year differs from GMT's at that instant, so a field read from
+    /// the device calendar instead of GMT would show.
+    @Test(
+        "Leap-day and year-boundary fire dates round trip, and the trigger carries their GMT fields",
+        arguments: [
+            ("2028-02-29T00:00:00Z", "America/Los_Angeles", (2028, 2, 29, 0, 0, 0)),  // device date is Feb 28
+            ("2028-02-29T12:00:00Z", "Pacific/Auckland", (2028, 2, 29, 12, 0, 0)),  // device date is Mar 1
+            ("2027-12-31T23:59:59Z", "Pacific/Auckland", (2027, 12, 31, 23, 59, 59)),  // device year is 2028
+            ("2028-01-01T00:00:00Z", "America/Los_Angeles", (2028, 1, 1, 0, 0, 0)),  // device year is 2027
+        ]
+    )
+    func calendarEdgeFireDatesRoundTrip(
+        fireDate: String, zone: String, fields: (Int, Int, Int, Int, Int, Int)
+    ) throws {
+        let mapped = try Self.expectGMTTrigger(zone: zone, fireDate: fireDate, fields: fields)
+
+        #expect(UserNotificationsAdapter.decode(mapped) == Self.cadenceRequest(fireDate: try Self.utc(fireDate)))
+    }
+
     // MARK: Foreground presentation
 
     @Test("A notification that arrives while Regards is in the foreground shows a banner, the list and sound")
@@ -359,25 +381,29 @@ struct UserNotificationsAdapterRequestTests {
 
     /// Passes `makeRequest` a calendar set to `zone` (the device zone), then
     /// asserts the trigger names GMT, carries the fixed UTC wall-clock fields
-    /// of `fireDate`, and reads back as exactly `fireDate`. It first checks
-    /// that `transition` really is a DST transition of `zone`, so a tz
-    /// database change fails here instead of silently testing a plain day.
+    /// of `fireDate`, and reads back as exactly `fireDate`. Given a
+    /// `transition`, it first checks that it really is a DST transition of
+    /// `zone`, so a tz database change fails here instead of silently testing
+    /// a plain day. Returns the built request.
+    @discardableResult
     private static func expectGMTTrigger(
         zone zoneIdentifier: String,
-        transition: String,
+        transition: String? = nil,
         fireDate fireDateISO: String,
         fields: (year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int),
         sourceLocation: SourceLocation = #_sourceLocation
-    ) throws {
+    ) throws -> UNNotificationRequest {
         let zone = try #require(TimeZone(identifier: zoneIdentifier), sourceLocation: sourceLocation)
-        let transitionDate = try utc(transition)
         let fireDate = try utc(fireDateISO)
         let now = try utc(Self.now)
-        #expect(
-            zone.nextDaylightSavingTimeTransition(after: transitionDate.addingTimeInterval(-1)) == transitionDate,
-            "\(transition) is not a DST transition in \(zoneIdentifier)",
-            sourceLocation: sourceLocation
-        )
+        if let transition {
+            let transitionDate = try utc(transition)
+            #expect(
+                zone.nextDaylightSavingTimeTransition(after: transitionDate.addingTimeInterval(-1)) == transitionDate,
+                "\(transition) is not a DST transition in \(zoneIdentifier)",
+                sourceLocation: sourceLocation
+            )
+        }
 
         var deviceCalendar = Calendar(identifier: .gregorian)
         deviceCalendar.timeZone = zone
@@ -394,5 +420,6 @@ struct UserNotificationsAdapterRequestTests {
             sourceLocation: sourceLocation
         )
         #expect(gmtCalendar.date(from: components) == fireDate, sourceLocation: sourceLocation)
+        return mapped
     }
 }
