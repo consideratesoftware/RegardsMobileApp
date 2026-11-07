@@ -77,6 +77,9 @@ while IFS= read -r -d '' meta; do
   done
   # Directory and agent-file names match in any case: a case-insensitive
   # checkout (macOS) treats .CLAUDE/ and .claude/ as the same directory.
+  # Only this one case block may sit between shopt -s and shopt -u. nocasematch
+  # also applies to every other case and [[ =~ ]] test while it is on, and the
+  # doc-path test below must stay case-sensitive.
   shopt -s nocasematch
   case "$path" in
     .claude/* | */.claude/* | .codex/* | */.codex/* | .agents/* | */.agents/* \
