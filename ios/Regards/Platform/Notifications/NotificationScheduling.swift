@@ -99,12 +99,13 @@ public protocol NotificationScheduling: Sendable {
     /// Content comes back, and the fire date comes back truncated to the whole
     /// second, so a caller can tell a moved or reworded request from an
     /// unchanged one under the same identifier. Every pending request is this
-    /// app's (iOS keeps one list per app). A request
-    /// `decode` can't read is left out; ARCHITECTURE.md §9a gives the rule for
-    /// retiring or adding a request shape.
+    /// app's (iOS keeps one list per app). A request `decode` can't read is
+    /// left out; ARCHITECTURE.md §9a gives the rule for retiring or adding a
+    /// request shape.
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
-    /// A `fireDate` that has already passed delivers at once (§9 contract 5).
+    /// Delivers at once when the fire date, cut to the whole second, is at or
+    /// before now, even if it is a fraction of a second ahead (§9 contract 5).
     func schedule(_ request: ReminderNotificationRequest) async throws
     /// Removes pending requests. Unknown identifiers are ignored.
     func cancel(identifiers: [String]) async
