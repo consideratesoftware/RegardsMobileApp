@@ -120,8 +120,10 @@ All of these, on the current head, with no averaging:
 1. Every required check green.
 2. Hosted `Regards staged review`: zero blockers in the review text for the
    current head. The check run is green whatever the verdict, so the release
-   manager reads the text, counts the blockers, and treats a malformed review
-   (no Blockers section) as unresolved. Only Sid can defer a hosted blocker,
+   manager reads the text, counts the blockers, and treats any MALFORMED from
+   `scripts/count-hosted-blockers.sh` as unresolved. Its 3 causes: no Blockers
+   section; a line under Blockers that is not a bullet; or no bullets with a
+   VERDICT other than APPROVE. Only Sid can defer a hosted blocker,
    and the deferral is recorded with a link to his PR comment. That comment
    names the blocker text and the head sha. It is void when the head moves,
    except for a blocker whose text reappears unchanged in the new head's
