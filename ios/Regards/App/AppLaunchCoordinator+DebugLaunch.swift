@@ -16,29 +16,7 @@ extension AppLaunchCoordinator {
         let environment = ProcessInfo.processInfo.environment
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--regards-mock-runtime") {
-            // `unavailable` passes no notification seam at all, so a UI test
-            // can check that Settings shows no Notifications section.
-            let notificationStatus = environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
-            return AppLaunchCoordinator(
-                mockRuntime: .makeMock(
-                    includeDuplicateFixture:
-                        environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1",
-                    seedCorruptRow:
-                        environment["REGARDS_UI_TEST_SEED_CORRUPT_ROW"] == "1"
-                ),
-                // Never the real adapter here: a system permission alert
-                // would cover the accessibility audits this launch serves.
-                notifications: notificationStatus == "unavailable"
-                    ? nil
-                    : DebugNotificationScheduling(
-                        status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined,
-                        // `fail` makes the system request throw, so a UI test
-                        // can reach the Settings request-error line.
-                        requestOutcome: environment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] == "fail"
-                            ? .fail
-                            : .grant
-                    )
-            )
+            return mockRuntimeLaunch(environment: environment)
         }
         if arguments.contains("--regards-launch-fails-once") {
             let runtimeFactory = FirstLaunchUITestRuntimeFactory()
@@ -79,6 +57,37 @@ extension AppLaunchCoordinator {
             )
         }
         return production()
+    }
+
+    /// The `--regards-mock-runtime` launch. It takes the environment, not
+    /// `ProcessInfo`, so a unit test can build it. The notification fake reads
+    /// the runtime's own clock: the runtime freezes time at the mock "now", so
+    /// a fake on the real clock would read every request this launch schedules
+    /// as already due and never list it as pending.
+    static func mockRuntimeLaunch(environment: [String: String]) -> AppLaunchCoordinator {
+        let runtime = AppRuntime.makeMock(
+            includeDuplicateFixture: environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1",
+            seedCorruptRow: environment["REGARDS_UI_TEST_SEED_CORRUPT_ROW"] == "1"
+        )
+        // `unavailable` passes no notification seam at all, so a UI test
+        // can check that Settings shows no Notifications section.
+        let notificationStatus = environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
+        return AppLaunchCoordinator(
+            mockRuntime: runtime,
+            // Never the real adapter here: a system permission alert
+            // would cover the accessibility audits this launch serves.
+            notifications: notificationStatus == "unavailable"
+                ? nil
+                : DebugNotificationScheduling(
+                    status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined,
+                    // `fail` makes the system request throw, so a UI test
+                    // can reach the Settings request-error line.
+                    requestOutcome: environment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] == "fail"
+                        ? .fail
+                        : .grant,
+                    clock: runtime.clock
+                )
+        )
     }
 #else
     static func configuredForCurrentProcess() -> AppLaunchCoordinator {
