@@ -76,3 +76,81 @@ if [[ "$missing" != PENDING* ]]; then
   exit 1
 fi
 echo 'PASS: a missing file is PENDING'
+
+# The counter, the hosted renderer and the check summary must agree on the
+# blocker count. The check summary carries counts only, and the release manager
+# quotes blockers from the rendered review, so a renderer change that the
+# counter cannot read must fail here. The renderer is the stdout of
+# scripts/validate-hosted-review-artifact.sh, which the hosted job publishes.
+validator="$repo_root/scripts/validate-hosted-review-artifact.sh"
+summary_renderer="$repo_root/scripts/render-review-check-summary.sh"
+head_sha="0123456789abcdef0123456789abcdef01234567"
+base_sha="76543210fedcba9876543210fedcba9876543210"
+pr_number=23
+run_id=30638934931
+
+# expect_contract <blocker count> <phrase the check summary must contain>
+expect_contract() {
+  local blockers="$1"
+  local phrase="$2"
+  local artifact="$work/artifact-$blockers.json"
+  local rendered="$work/rendered-$blockers.md"
+  local expected_status=2
+  local status counted expected summary
+
+  if [[ "$blockers" -eq 0 ]]; then
+    expected_status=0
+  fi
+
+  jq -n \
+    --arg head_sha "$head_sha" \
+    --arg base_sha "$base_sha" \
+    --argjson pr_number "$pr_number" \
+    --arg run_id "$run_id" \
+    --argjson blockers "$blockers" '
+      {
+        head_sha: $head_sha,
+        base_sha: $base_sha,
+        pr_number: $pr_number,
+        run_id: $run_id,
+        verdict: (if $blockers == 0 then "APPROVE" else "REQUEST_CHANGES" end),
+        blockers: [range($blockers) | "[pr-correctness] [file.swift:\(. + 1)] blocker \(. + 1)"],
+        should_fix: [],
+        nits: [],
+        questions_for_sid: [],
+        audit_trail: {
+          security_invariants: "INVARIANTS VERIFIED: checks 1-8 pass or are not applicable.",
+          accessibility_process: "PROCESS: not dispatched",
+          fit_finish_docs: "DOCS: register yes; accessibility docs not applicable.",
+          tests_criteria_map: "CRITERIA MAP: trusted gate cases pass."
+        }
+      }
+    ' > "$artifact"
+
+  set +e
+  "$validator" "$artifact" "$head_sha" "$base_sha" "$pr_number" "$run_id" > "$rendered"
+  status=$?
+  set -e
+  if [[ "$status" -ne "$expected_status" ]]; then
+    echo "FAIL: validator with $blockers blocker(s) (expected exit $expected_status, got $status)" >&2
+    exit 1
+  fi
+
+  counted="$(bash "$counter" "$rendered")"
+  expected="BLOCKERS $(jq '.blockers | length' "$artifact")"
+  if [[ "$counted" != "$expected" ]]; then
+    echo "FAIL: counter on the rendered review with $blockers blocker(s) (expected '$expected', got '$counted')" >&2
+    exit 1
+  fi
+
+  summary="$("$summary_renderer" "$artifact")"
+  if [[ "$summary" != *"$phrase"* ]]; then
+    echo "FAIL: check summary with $blockers blocker(s) lacks '$phrase' (got '$summary')" >&2
+    exit 1
+  fi
+  echo "PASS: renderer, counter and check summary agree on $blockers blocker(s)"
+}
+
+expect_contract 0 'no blockers'
+expect_contract 1 '1 blocker'
+expect_contract 3 '3 blockers'
