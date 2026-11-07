@@ -277,9 +277,12 @@ as OWNER QUESTIONS, never into the PR body.
 
 ## Report (exactly this shape)
 
+On `CODEX STALE`, write the reason after it, copied from the matching case in
+`/org` Stage 4 (for example `carry rejected: pr-tests`).
+
 ```
 PR: #n url @ head sha
-STATE: MERGED | GREEN, WAITING ON OWNER | CODEX STALE | RED (parked after 2 rounds) | DRAFT (stacked on #m)
+STATE: MERGED | GREEN, WAITING ON OWNER | CODEX STALE: <reason> | RED (parked after 2 rounds) | DRAFT (stacked on #m)
 CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n (counted from the review text for <head sha>), blockers verbatim
 /pr-review: verdict
