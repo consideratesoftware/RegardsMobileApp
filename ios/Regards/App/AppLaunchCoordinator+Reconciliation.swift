@@ -53,8 +53,9 @@ extension AppLaunchCoordinator {
                 // sync while the app is open), so the pass runs here too and
                 // cancels that contact's rows without waiting for a
                 // foreground. Only once `.ready`: onboarding's completion
-                // runs its own pass. A replayed change is followed by the
-                // `.ready` launch pass in `start()`.
+                // runs its own pass. A replayed change is followed by
+                // `start()`'s `.ready`-branch pass or, when onboarding is
+                // incomplete at launch, by onboarding completion's pass.
                 if self.phase == .ready {
                     await self.runSchedulingPass(runtime: runtime)
                 }

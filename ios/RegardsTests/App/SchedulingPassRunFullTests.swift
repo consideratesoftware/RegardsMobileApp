@@ -157,7 +157,7 @@ struct SchedulingPassRunFullTests {
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
     }
 
-    /// The slot has started, so the run marks the row fired: it was delivered.
+    /// The slot has started, so the run marks the row fired: it is treated as delivered.
     /// A window that can no longer fire at all cancels only pending rows, so
     /// the fired row stays as history while the contact is listed for the
     /// Settings badge.

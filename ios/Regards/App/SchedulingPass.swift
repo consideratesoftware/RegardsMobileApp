@@ -120,8 +120,8 @@ public actor SchedulingPass {
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
         let targetIds = Set(targets.map(\.id))
-        // §9 "Notification fired": a due covered pending row was delivered, so it becomes fired history.
-        // Every row this call writes at or before now is written fired, so after any run no covered pending row is due.
+        // §9 "Notification fired": a due covered pending row is treated as delivered and marked fired. Rows this
+        // call writes at or before now are written fired, so after a run that returns, no covered pending row is due.
         var rows = snapshot.reminders
         for (index, row) in rows.enumerated()
         where row.state == .pending && row.scheduledFor <= now && targetIds.contains(row.contactId) {
@@ -142,9 +142,9 @@ public actor SchedulingPass {
             for (occasion, occurrence) in occurrences {
                 let id = Self.reminderID(contactId: contact.id, kind: occasion.kind)
                 desiredIds.insert(id)
-                // A same-day occasion that has fired or is due stays put, so a
-                // "fire now" occurrence can't chase the clock or a rollback re-arm it.
-                if let existing = existingById[id], existing.state == .fired || existing.scheduledFor <= now,
+                // A same-day occasion that has fired (marking fires a due one) stays put,
+                // so a "fire now" occurrence can't chase the clock or a rollback re-arm it.
+                if let existing = existingById[id], existing.state == .fired,
                    calendar.isDate(existing.scheduledFor, inSameDayAs: occurrence) {
                     continue
                 }
@@ -173,7 +173,7 @@ public actor SchedulingPass {
             // The floor governs only while its slot is still ahead; once that
             // slot has started the snooze is spent.
             let floor = existing.flatMap { $0.state == .pending && $0.scheduledFor > now ? $0.snoozedUntil : nil }
-            // Capacity first: zero capacity records the id, and the sweep below cancels the pending row.
+            // Capacity first: zero capacity records the contact, and the sweep below cancels the pending row.
             guard let slot = Self.cadenceSlot(
                 overdueAt: overdueAt,
                 floor: floor,
@@ -188,11 +188,11 @@ public actor SchedulingPass {
                 continue
             }
             desiredIds.insert(id)
-            // No re-nag: a fired row stays while it is this cycle's: at or after the start of the slot
-            // holding overdueAt (a 25-hour day's 1-day cadence starts before its anchor; a clock set
-            // back leaves overdueAt ahead of now), or, once overdue, at or after the anchor (a window edit).
-            // No overdue check on the first: a fired row still here was written after the last interaction.
-            if let existing, existing.state == .fired || existing.scheduledFor <= now,
+            // No re-nag: a fired row stays while it is this cycle's: at or after the start of the slot holding
+            // overdueAt, or of the next slot if none does (a 25-hour day's 1-day cadence starts before its anchor;
+            // a clock set back leaves overdueAt ahead of now), or, once overdue, at or after the anchor (a window
+            // edit). No overdue check on the first: a fired row still here was written after the last interaction.
+            if let existing, existing.state == .fired,
                context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
                 .map({ $0 <= existing.scheduledFor }) == true
                 || (overdueAt <= now && anchor <= existing.scheduledFor) {
