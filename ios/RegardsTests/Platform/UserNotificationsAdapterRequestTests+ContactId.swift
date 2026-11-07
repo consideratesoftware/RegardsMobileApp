@@ -96,18 +96,17 @@ extension UserNotificationsAdapterRequestTests {
     /// request with `repeats: false`, which decodes.
     @Test("A repeating calendar trigger decodes to nothing")
     func repeatingCalendarTriggerDecodesToNil() {
-        let request = Self.handBuilt(
-            category: "regards.cadence", contactId: contactX.uuidString,
-            trigger: Self.calendarTrigger(repeats: true)
-        )
+        let request = Self.handBuilt(category: "regards.cadence", contactId: contactX.uuidString, repeats: true)
 
         #expect(UserNotificationsAdapter.decode(request) == nil)
     }
 
     @Test("A time-interval trigger decodes to nothing")
     func timeIntervalTriggerDecodesToNil() {
-        let request = Self.handBuilt(
-            category: "regards.cadence", contactId: contactX.uuidString,
+        let calendarRequest = Self.handBuilt(category: "regards.cadence", contactId: contactX.uuidString)
+        let request = UNNotificationRequest(
+            identifier: calendarRequest.identifier,
+            content: calendarRequest.content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false)
         )
 
@@ -115,12 +114,12 @@ extension UserNotificationsAdapterRequestTests {
     }
 
     /// A pending request as the system could hold one that `makeRequest` did not
-    /// build: the given category and contact id (none when nil), and by default
-    /// a non-repeating calendar trigger at 2026-10-01 03:00:00 GMT.
+    /// build: the given category and contact id (none when nil), and a calendar
+    /// trigger at 2026-10-01 03:00:00 GMT, non-repeating unless `repeats` is true.
     private static func handBuilt(
         category: String,
         contactId: String?,
-        trigger: UNNotificationTrigger = calendarTrigger(repeats: false)
+        repeats: Bool = false
     ) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = "Time to reach out"
@@ -129,13 +128,13 @@ extension UserNotificationsAdapterRequestTests {
         if let contactId {
             content.userInfo = ["contactId": contactId]
         }
-        return UNNotificationRequest(identifier: "hand-built", content: content, trigger: trigger)
-    }
-
-    private static func calendarTrigger(repeats: Bool) -> UNCalendarNotificationTrigger {
         let components = DateComponents(
             calendar: gmtCalendar, timeZone: .gmt, year: 2026, month: 10, day: 1, hour: 3, minute: 0, second: 0
         )
-        return UNCalendarNotificationTrigger(dateMatching: components, repeats: repeats)
+        return UNNotificationRequest(
+            identifier: "hand-built",
+            content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: repeats)
+        )
     }
 }
