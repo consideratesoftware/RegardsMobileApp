@@ -105,11 +105,18 @@ actor ScriptedNotifications: NotificationScheduling {
             pending[request.identifier] = stored
         } else {
             pending[request.identifier] = nil
+            // The delivered fire date is the adapter's own whole second, read back
+            // from a request built at `.distantPast` so that it keeps a trigger.
+            guard let wholeSecond = UserNotificationsAdapter.decode(
+                UserNotificationsAdapter.makeRequest(request, now: .distantPast)
+            ) else {
+                preconditionFailure("The adapter can't read back its own request for \(request.identifier)")
+            }
             delivered.append(ReminderNotificationRequest(
                 identifier: request.identifier,
                 title: request.title,
                 body: request.body,
-                fireDate: Date(timeIntervalSince1970: request.fireDate.timeIntervalSince1970.rounded(.down)),
+                fireDate: wholeSecond.fireDate,
                 kind: request.kind
             ))
         }

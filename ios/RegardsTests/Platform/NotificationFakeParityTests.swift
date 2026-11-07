@@ -12,8 +12,10 @@ import Testing
 /// fakes; the scripted-only cases check its delivered record.
 ///
 /// Pending storage goes through the adapter's `makeRequest` and `decode`, which
-/// `UserNotificationsAdapterRequestTests` pins. The delivered floor is pinned
-/// against the adapter's own whole-second truncation.
+/// `UserNotificationsAdapterRequestTests` pins. The scripted fake's delivered
+/// floor is the adapter's own truncation, and the fake holds no rounding code
+/// of its own. `requestWhoseWholeSecondFireDateIsNotAfterNowIsNotPending` pins
+/// that floor against literal whole-second instants.
 struct NotificationFakeParityTests {
     enum Fake: String, CaseIterable, Sendable, CustomTestStringConvertible {
         case scripted
@@ -65,25 +67,25 @@ struct NotificationFakeParityTests {
     }
 
     @Test(
-        "A request not after now is not pending",
-        arguments: Fake.allCases, [0.0, -1.0, 0.4, 0.6]
+        "A request whose whole-second fire date is not after now is not pending",
+        arguments: Fake.allCases,
+        [(0.0, 0.0), (-1.0, -1.0), (0.4, 0.0), (0.6, 0.0)]
     )
-    func requestNotAfterNowIsNotPending(_ fake: Fake, offset: TimeInterval) async throws {
+    func requestWhoseWholeSecondFireDateIsNotAfterNowIsNotPending(
+        _ fake: Fake, offsets: (sent: TimeInterval, wholeSecond: TimeInterval)
+    ) async throws {
         let now = Self.now
         let scheduling = fake.make(clock: { now })
-        let sent = Self.request(fireDate: now.addingTimeInterval(offset))
+        let sent = Self.request(fireDate: now.addingTimeInterval(offsets.sent))
 
         try await scheduling.schedule(sent)
 
         #expect(await scheduling.pendingRequests().isEmpty)
         if fake == .scripted {
             let scripted = try #require(scheduling as? ScriptedNotifications)
-            // The adapter's own truncation: built from an instant well before
-            // the fire date, so `makeRequest` keeps a trigger for `decode` to
-            // read back.
-            let built = UserNotificationsAdapter.makeRequest(sent, now: now.addingTimeInterval(-3600))
-            let truncated = try #require(UserNotificationsAdapter.decode(built))
-            let expected = Self.request(fireDate: truncated.fireDate)
+            // The expected instant is a literal whole second from `now`, so it
+            // doesn't depend on the fake or on the adapter's truncation.
+            let expected = Self.request(fireDate: now.addingTimeInterval(offsets.wholeSecond))
             #expect(await scripted.delivered == [expected])
         }
     }
