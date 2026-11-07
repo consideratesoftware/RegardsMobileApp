@@ -45,6 +45,9 @@ expect_output 'a non-bullet line next to bullets is MALFORMED' \
 expect_output 'REQUEST_CHANGES with no bullets is MALFORMED' \
   'MALFORMED: no blockers listed but VERDICT is REQUEST_CHANGES' \
   $'VERDICT: REQUEST_CHANGES\n### Blockers\n\nNone.\n'
+expect_output 'the first VERDICT line wins over a later one' \
+  'MALFORMED: no blockers listed but VERDICT is REQUEST_CHANGES' \
+  $'VERDICT: REQUEST_CHANGES\n### Blockers\n\nNone.\n\n### Should fix\n- a\nVERDICT: APPROVE\n'
 expect_output 'a missing VERDICT with no bullets is MALFORMED' \
   'MALFORMED: no blockers listed but VERDICT is missing' \
   $'### Blockers\n\nNone.\n'
