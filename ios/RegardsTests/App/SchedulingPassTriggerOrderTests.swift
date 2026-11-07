@@ -10,7 +10,10 @@ import Testing
 /// pass that ran before the reconcile would not schedule it.
 ///
 /// The production runtime uses the real clock, so these tests assert that a
-/// long-overdue contact has a cadence row, not when it fires.
+/// long-overdue contact has a cadence row, not when it fires. Inside an
+/// allowed slot (weekdays 12:00-13:00 and 18:00-22:00 in the default window)
+/// the run writes that row fired, outside one pending, so a test looks the row
+/// up in either state.
 @MainActor
 struct SchedulingPassTriggerOrderTests {
     private let now = Date(timeIntervalSince1970: 1_785_600_000)
@@ -47,8 +50,10 @@ struct SchedulingPassTriggerOrderTests {
             clock: { now }))
     }
 
+    /// A pending or fired cadence row, whichever the wall clock makes it.
     private static func hasCadenceRow(_ environment: AppEnvironment, _ contact: Contact) async throws -> Bool {
-        try await environment.reminders.fetchPending(forContact: contact.id).contains { $0.kind == .cadence }
+        try await environment.reminders.fetchSchedule().reminders
+            .contains { $0.contactId == contact.id && $0.kind == .cadence }
     }
 
     @Test("Launch runs the pass after the Contacts reconcile, so a contact the reconcile un-archives is scheduled")
@@ -142,8 +147,8 @@ struct SchedulingPassTriggerOrderTests {
 
         try await runtime.scheduler.runFull()
 
-        let pending = try await environment.reminders.fetchAllPending()
-        #expect(pending.contains { $0.kind == .cadence }, "the run did schedule")
-        #expect(pending.filter { $0.kind != .cadence }.isEmpty)
+        let rows = try await environment.reminders.fetchSchedule().reminders
+        #expect(rows.contains { $0.kind == .cadence }, "the run did schedule")
+        #expect(rows.filter { $0.kind != .cadence }.isEmpty)
     }
 }

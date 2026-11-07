@@ -90,4 +90,83 @@ struct SchedulingPassCancellationTests {
         let pending = try await fixture.repositories.reminders.fetchPending(forContact: contact.id)
         #expect(pending.map(\.id) == [fixture.cadenceID(contact)])
     }
+
+    // MARK: - A due row outlives the cadence (§9 "Notification fired", Q3)
+
+    /// Pin. The row was due when the cadence went away (removed, or set to 0,
+    /// which is ineligible too), so the run marks it fired before the sweep
+    /// looks at it. It was delivered, so it is history: kept, never
+    /// cancelled. Passes on the code before this test was written.
+    @Test(
+        "A due cadence row of a contact that lost its cadence stays fired and is not cancelled",
+        arguments: RepositoryContractBackend.allCases, [nil, 0] as [Int?]
+    )
+    func dueRowOfAContactThatLostItsCadenceStaysFired(
+        backend: RepositoryContractBackend, cadenceDays: Int?
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let slot = PassFixture.at("2026-06-10 18:00")
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == slot)
+        fixture.setNow("2026-06-10 18:01")
+        var withoutCadence = contact
+        withoutCadence.cadenceDays = cadenceDays
+        try await fixture.repositories.contacts.upsert(withoutCadence)
+
+        try await fixture.pass.runFull()
+
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == slot)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        // The only change to the row is the fired mark: nothing was cancelled.
+        let transitions = await fixture.reminders.transitionLog.filter { $0.id == fired.id }
+        #expect(transitions == [TransitionCall(id: fired.id, from: .pending, to: .fired, applied: true)])
+        let writes = await fixture.reminders.writeCount
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
+    /// Pin. Continues the scenario above: the cadence comes back with no
+    /// interaction in between. The fired row is the cycle's delivered
+    /// reminder, so the contact is not nagged again: first inside the slot,
+    /// then a day later, once the slot is over. Passes on the code before
+    /// this test was written.
+    @Test(
+        "A cadence set again after its due row fired does not bring the reminder back",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func returnedCadenceDoesNotReNagAfterAFiredRow(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let slot = PassFixture.at("2026-06-10 18:00")
+        fixture.setNow("2026-06-10 18:01")
+        var withoutCadence = contact
+        withoutCadence.cadenceDays = nil
+        try await fixture.repositories.contacts.upsert(withoutCadence)
+        try await fixture.pass.runFull()
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == slot)
+        let writes = await fixture.reminders.writeCount
+
+        // The cadence is 7 days again; lastInteractedAt never moved.
+        try await fixture.repositories.contacts.upsert(contact)
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+
+        // The slot is over, and the contact is still overdue.
+        fixture.setNow("2026-06-11 10:00")
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
 }

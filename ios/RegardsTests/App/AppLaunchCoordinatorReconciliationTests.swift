@@ -251,12 +251,16 @@ struct AppLaunchCoordinatorReconciliationTests {
     /// pending row, and with it the OS notification, without waiting for a
     /// foreground. The second change is the confirming miss, `floor` after the
     /// first. The cancel is the only transition in this scenario, so its
-    /// arrival at the gated repository proves the change's pass ran.
-    @Test("A store change that archives a contact cancels its pending row without a foreground")
+    /// arrival at the gated repository proves the change's pass ran. The gate
+    /// stays closed until then; if the pass never runs, the arrival never
+    /// comes and the time limit ends the test.
+    @Test(
+        "A store change that archives a contact cancels its pending row without a foreground",
+        .timeLimit(.minutes(1))
+    )
     func storeChangeArchiveCancelsTheRowWithoutAForeground() async throws {
         let base = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let cancelSignal = AsyncGate()
-        await cancelSignal.open()
         let environment = AppEnvironment(
             contacts: base.contacts,
             groups: base.groups,
@@ -289,21 +293,18 @@ struct AppLaunchCoordinatorReconciliationTests {
 
         source.setContacts([staying])
         source.simulateChange()
-        #expect(await eventually { launch.reconciliationCount == 2 })
+        #expect(await eventuallyPumpingRunLoop { launch.reconciliationCount == 2 })
         clock.advance(by: ContactsReconciler.archiveDebounceFloor)
         source.simulateChange()
 
-        // Bounded poll for an arrival only a missing pass would withhold.
-        var turns = 0
-        while turns < 200_000, await cancelSignal.arrivalCount == 0 {
-            await Task.yield()
-            turns += 1
-        }
-        #expect(await cancelSignal.arrivalCount == 1, "the store change's pass cancelled nothing")
+        // The pass parks at its cancel; only the pass can bring it here.
+        await cancelSignal.waitUntilArrived()
+        await cancelSignal.open()
         // The pass holds the scheduler's lock from its read to its last write,
         // so this call returns only after that pass has finished.
         let scheduler = try #require(launch.runtime?.scheduler)
         try await scheduler.run(for: UUID())
+        #expect(await cancelSignal.arrivalCount == 1, "the store change's pass made one transition: the cancel")
         let archived = try await environment.contacts.fetch(id: leaving.id)
         #expect(archived?.archivedAt == clock.now())
         #expect(try await environment.reminders.fetchPending(forContact: leaving.id).isEmpty)
@@ -360,7 +361,7 @@ struct AppLaunchCoordinatorReconciliationTests {
         )
     }
 
-    private func coordinator(
+    func coordinator(
         environment: AppEnvironment,
         source: any ContactsSource,
         clock: (@Sendable () -> Date)? = nil,

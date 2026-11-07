@@ -307,6 +307,10 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == PassFixture.at("2026-06-17 18:00"))
         fixture.setNow("2026-06-17 18:30")
 
+        // Before any run the row is still pending with its floor, so only the
+        // answer's own check on the slot keeps it from reporting a past time.
+        #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == nil)
+
         try await fixture.pass.runFull()
 
         // The row is fired now and keeps its spent floor.

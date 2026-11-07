@@ -155,8 +155,8 @@ struct SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
-    /// Records accepted residual R68 (§19), a pending owner decision. The row
-    /// stores no fired cycle, so after a window edit moves the slot to 18:30
+    /// Records R68, an accepted residual (§19 R68, owner ruling 2026-11-04).
+    /// The row stores no fired cycle, so after a window edit moves the slot to 18:30
     /// and the clock is set back to 17:00, the pass derives the delivered
     /// row as pending again; it fires a second time once 18:30 arrives, then
     /// holds. A future fix that stores the fired cycle on the row should turn

@@ -202,20 +202,24 @@ extension AppLaunchCoordinatorTests {
         let han = try #require(picker.contacts.first { $0.displayName == "Han Solo" })
         picker.toggle(leia.id)
         #expect(await picker.save())
-        func pendingCadence(_ contact: Contact) async throws -> Bool {
-            try await environment.reminders.fetchPending(forContact: contact.id).contains { $0.kind == .cadence }
+        // Pending or fired: the real clock decides which (a slot in progress writes the row fired).
+        func cadenceRow(_ contact: Contact) async throws -> Bool {
+            try await environment.reminders.fetchSchedule().reminders
+                .contains { $0.contactId == contact.id && $0.kind == .cadence }
         }
-        #expect(try await pendingCadence(leia) == false, "Nothing is scheduled before onboarding finishes.")
+        func allRows() async throws -> [ScheduledReminder] {
+            try await environment.reminders.fetchSchedule().reminders.sorted { $0.id.uuidString < $1.id.uuidString }
+        }
+        #expect(try await cadenceRow(leia) == false, "Nothing is scheduled before onboarding finishes.")
 
         await launch.finishOnboarding()
 
         #expect(launch.phase == .ready)
-        #expect(try await pendingCadence(leia), "Completion's full pass schedules the starter.")
-        #expect(try await pendingCadence(han) == false)
-        let pending = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(try await cadenceRow(leia), "Completion's full pass schedules the starter.")
+        #expect(try await cadenceRow(han) == false)
+        let rows = try await allRows()
         try await #require(launch.runtime).scheduler.runFull()
-        let afterFull = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
-        #expect(afterFull == pending)
+        #expect(try await allRows() == rows)
     }
 
     // The launch flips .loading to .onboarding only if nothing else decided
