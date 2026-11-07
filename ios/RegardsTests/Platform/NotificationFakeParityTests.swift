@@ -1,0 +1,198 @@
+import Foundation
+import Testing
+@testable import Regards
+
+/// R57 / PR #71. Slice 4's diff against `pendingRequests()` depends on the
+/// fakes answering consistently. Both fakes store each request through the
+/// adapter's `makeRequest` and `decode` with an injected clock. These tests pin
+/// the fakes to those rules: add-time delivery, read-time delivery, whole-second
+/// truncation, replace by identifier and cancel. They don't show the real
+/// center behaves the same way; live-center behavior is left to device check
+/// (a) in TESTFLIGHT_PLAN.md. Every parameterized case runs against both
+/// fakes; the scripted-only cases check its delivered record.
+///
+/// Pending storage goes through the adapter's `makeRequest` and `decode`, which
+/// `UserNotificationsAdapterRequestTests` pins. The whole-second floor of the
+/// immediate-delivery record is the fake's own. `requestNotAfterNowIsNotPending`
+/// pins it against an independent floor computed in the test.
+struct NotificationFakeParityTests {
+    enum Fake: String, CaseIterable, Sendable, CustomTestStringConvertible {
+        case scripted
+        case debug
+
+        var testDescription: String { rawValue }
+
+        func make(clock: @escaping @Sendable () -> Date) -> any NotificationScheduling {
+            switch self {
+            case .scripted: ScriptedNotifications(clock: clock)
+            case .debug: DebugNotificationScheduling(clock: clock)
+            }
+        }
+    }
+
+    /// A whole second, so the cases below can name sub-second offsets from it.
+    private static let now = Date(timeIntervalSince1970: 1_785_600_000)
+
+    private static let contactId = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
+
+    private static func request(
+        id: String = "contact-5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B-cadence",
+        body: String = "It has been a while since you talked to Ada.",
+        fireDate: Date
+    ) -> ReminderNotificationRequest {
+        ReminderNotificationRequest(
+            identifier: id,
+            title: "Time to reach out",
+            body: body,
+            fireDate: fireDate,
+            kind: .cadence(contactId: contactId)
+        )
+    }
+
+    @Test("A future request is pending at its whole second, with every other field equal", arguments: Fake.allCases)
+    func futureRequestIsPendingAtWholeSeconds(_ fake: Fake) async throws {
+        let now = Self.now
+        let scheduling = fake.make(clock: { now })
+        let sent = Self.request(fireDate: now.addingTimeInterval(60.7))
+
+        try await scheduling.schedule(sent)
+
+        let expected = Self.request(fireDate: now.addingTimeInterval(60))
+        #expect(await scheduling.pendingRequests() == [expected])
+        if fake == .scripted {
+            let scripted = try #require(scheduling as? ScriptedNotifications)
+            #expect(await scripted.delivered.isEmpty)
+        }
+    }
+
+    @Test(
+        "A request not after now is not pending",
+        arguments: Fake.allCases, [0.0, -1.0, 0.4]
+    )
+    func requestNotAfterNowIsNotPending(_ fake: Fake, offset: TimeInterval) async throws {
+        let now = Self.now
+        let scheduling = fake.make(clock: { now })
+        let sent = Self.request(fireDate: now.addingTimeInterval(offset))
+
+        try await scheduling.schedule(sent)
+
+        #expect(await scheduling.pendingRequests().isEmpty)
+        if fake == .scripted {
+            let scripted = try #require(scheduling as? ScriptedNotifications)
+            let floored = sent.fireDate.timeIntervalSince1970.rounded(.down)
+            let expected = Self.request(fireDate: Date(timeIntervalSince1970: floored))
+            #expect(await scripted.delivered == [expected])
+        }
+    }
+
+    @Test("An immediate add replaces a pending request with the same identifier", arguments: Fake.allCases)
+    func immediateAddReplacesAPendingRequest(_ fake: Fake) async throws {
+        let now = Self.now
+        let scheduling = fake.make(clock: { now })
+
+        try await scheduling.schedule(Self.request(fireDate: now.addingTimeInterval(3600)))
+        #expect(await scheduling.pendingRequests().count == 1)
+        try await scheduling.schedule(Self.request(fireDate: now.addingTimeInterval(-1)))
+
+        #expect(await scheduling.pendingRequests().isEmpty)
+    }
+
+    @Test("A pending request is delivered once the clock reaches its time", arguments: Fake.allCases)
+    func pendingRequestIsDeliveredOnceItsTimePasses(_ fake: Fake) async throws {
+        let clock = MutableClock(Self.now)
+        let scheduling = fake.make(clock: { clock.now() })
+        let sent = Self.request(fireDate: Self.now.addingTimeInterval(60))
+        try await scheduling.schedule(sent)
+        #expect(await scheduling.pendingRequests() == [sent])
+
+        clock.advance(by: 60)
+
+        #expect(await scheduling.pendingRequests().isEmpty)
+        if fake == .scripted {
+            let scripted = try #require(scheduling as? ScriptedNotifications)
+            #expect(await scripted.delivered == [sent])
+        }
+    }
+
+    @Test("A request just before its time is still pending", arguments: Fake.allCases)
+    func requestJustBeforeItsTimeIsStillPending(_ fake: Fake) async throws {
+        let clock = MutableClock(Self.now)
+        let scheduling = fake.make(clock: { clock.now() })
+        let sent = Self.request(fireDate: Self.now.addingTimeInterval(60))
+        try await scheduling.schedule(sent)
+
+        clock.advance(by: 59.9)
+
+        #expect(await scheduling.pendingRequests() == [sent])
+    }
+
+    @Test("A due request is delivered before a cancel of its id, with no read in between")
+    func dueRequestIsDeliveredBeforeACancel() async throws {
+        let clock = MutableClock(Self.now)
+        let scripted = ScriptedNotifications(clock: { clock.now() })
+        let sent = Self.request(fireDate: Self.now.addingTimeInterval(60))
+        try await scripted.schedule(sent)
+
+        clock.advance(by: 60)
+        await scripted.cancel(identifiers: [sent.identifier])
+
+        #expect(await scripted.delivered == [sent])
+        #expect(await scripted.pendingRequests().isEmpty)
+    }
+
+    @Test("A due request is delivered before a same-id schedule, with no read in between")
+    func dueRequestIsDeliveredBeforeASameIdSchedule() async throws {
+        let clock = MutableClock(Self.now)
+        let scripted = ScriptedNotifications(clock: { clock.now() })
+        let first = Self.request(body: "first", fireDate: Self.now.addingTimeInterval(60))
+        let second = Self.request(body: "second", fireDate: Self.now.addingTimeInterval(60 + 3600))
+        try await scripted.schedule(first)
+
+        clock.advance(by: 60)
+        try await scripted.schedule(second)
+
+        #expect(await scripted.delivered == [first])
+        #expect(await scripted.pendingRequests() == [second])
+    }
+
+    @Test("Requests that come due together are delivered in fire-date order")
+    func dueRequestsAreDeliveredInFireDateOrder() async throws {
+        let clock = MutableClock(Self.now)
+        let scripted = ScriptedNotifications(clock: { clock.now() })
+        let earlier = Self.request(id: "b", fireDate: Self.now.addingTimeInterval(30))
+        let later = Self.request(id: "a", fireDate: Self.now.addingTimeInterval(60))
+        try await scripted.schedule(later)
+        try await scripted.schedule(earlier)
+
+        clock.advance(by: 60)
+
+        #expect(await scripted.pendingRequests().isEmpty)
+        #expect(await scripted.delivered == [earlier, later])
+    }
+
+    @Test("Cancel removes only the named pending requests and ignores unknown ids", arguments: Fake.allCases)
+    func cancelRemovesOnlyTheNamedPendingRequests(_ fake: Fake) async throws {
+        let now = Self.now
+        let scheduling = fake.make(clock: { now })
+        try await scheduling.schedule(Self.request(id: "a", fireDate: now.addingTimeInterval(3600)))
+        try await scheduling.schedule(Self.request(id: "b", fireDate: now.addingTimeInterval(3600)))
+
+        await scheduling.cancel(identifiers: ["a", "missing"])
+        #expect(await scheduling.pendingRequests().map(\.identifier) == ["b"])
+
+        await scheduling.cancel(identifiers: ["b"])
+        #expect(await scheduling.pendingRequests().isEmpty)
+    }
+
+    @Test("A future add replaces the pending request with the same identifier", arguments: Fake.allCases)
+    func futureAddReplacesPendingWithSameIdentifier(_ fake: Fake) async throws {
+        let now = Self.now
+        let scheduling = fake.make(clock: { now })
+        try await scheduling.schedule(Self.request(id: "x", body: "first", fireDate: now.addingTimeInterval(3600)))
+        let second = Self.request(id: "x", body: "second", fireDate: now.addingTimeInterval(7200))
+
+        try await scheduling.schedule(second)
+
+        #expect(await scheduling.pendingRequests() == [second])
+    }
+}

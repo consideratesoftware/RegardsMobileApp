@@ -97,6 +97,14 @@ extension AppLaunchCoordinator {
 /// a request from `.notDetermined` resolves to the scripted `requestOutcome`,
 /// and `send(_:)` delivers an action as if the user tapped it.
 ///
+/// It also keeps an in-memory pending set that `schedule`, `cancel`, and
+/// `pendingRequests` honor, keyed by identifier like the system's. `schedule`
+/// stores each request through `UserNotificationsAdapter.makeRequest` and
+/// `decode` with `clock`. A request is delivered, so no longer pending, when
+/// its trigger instant (the fire date truncated to the whole second) is at or
+/// before now as it is added, or when `clock` passes its fire date later, as
+/// in the real center.
+///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
 /// `AsyncStream` and its `Continuation` are `Sendable` and thread-safe.
@@ -115,11 +123,18 @@ actor DebugNotificationScheduling: NotificationScheduling {
     private let requestOutcome: RequestOutcome
     /// How many times `requestAuthorization()` ran, prompt or not.
     private(set) var requestCount = 0
+    private let clock: @Sendable () -> Date
+    private var pending: [String: ReminderNotificationRequest] = [:]
 
-    init(status: NotificationAuthorizationStatus = .notDetermined, requestOutcome: RequestOutcome = .grant) {
+    init(
+        status: NotificationAuthorizationStatus = .notDetermined,
+        requestOutcome: RequestOutcome = .grant,
+        clock: @escaping @Sendable () -> Date = { Date() }
+    ) {
         (actions, continuation) = AsyncStream.makeStream(of: NotificationAction.self, bufferingPolicy: .unbounded)
         self.status = status
         self.requestOutcome = requestOutcome
+        self.clock = clock
     }
 
     /// Mirrors iOS: only `.notDetermined` prompts. Once decided, a request
@@ -140,6 +155,27 @@ actor DebugNotificationScheduling: NotificationScheduling {
     }
 
     func authorizationStatus() async -> NotificationAuthorizationStatus { status }
+
+    func pendingRequests() async -> [ReminderNotificationRequest] {
+        // A request whose time has come is delivered and no longer listed.
+        let now = clock()
+        pending = pending.filter { $0.value.fireDate > now }
+        return pending.values.sorted { $0.identifier < $1.identifier }
+    }
+
+    func schedule(_ request: ReminderNotificationRequest) async throws {
+        // Matches the real center: a request not after now is delivered at
+        // once, so it replaces any pending one and is not recorded.
+        pending[request.identifier] = UserNotificationsAdapter.decode(
+            UserNotificationsAdapter.makeRequest(request, now: clock())
+        )
+    }
+
+    func cancel(identifiers: [String]) async {
+        for identifier in identifiers {
+            pending[identifier] = nil
+        }
+    }
 
     /// Simulates the user changing the permission in iOS Settings.
     func setStatus(_ newStatus: NotificationAuthorizationStatus) {
