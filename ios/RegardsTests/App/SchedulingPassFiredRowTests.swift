@@ -24,14 +24,6 @@ struct SchedulingPassFiredRowTests {
     private static let zeroCapacityWindow = PassFixture.eveningWindow(
         quiet: TimeRange(start: TimeOfDay(hour: 17), end: TimeOfDay(hour: 20)))
 
-    /// Every day 00:00-23:59 in Los Angeles: on 2026-11-01, which is 25 hours
-    /// long, a 1-day cadence's slot can start before its anchor.
-    private static let allDayLosAngeles = ReminderWindow(
-        allowedDays: .allDays,
-        allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
-        quietHours: nil,
-        timezoneIdentifier: "America/Los_Angeles")
-
     // MARK: - Marking
 
     /// One hour ago and exactly now are both "has come": the rule is
@@ -88,9 +80,10 @@ struct SchedulingPassFiredRowTests {
     // MARK: - Clock rollback
 
     /// The device clock is set back 1 hour before the fired row's slot. The
-    /// row is fired, so a rollback never re-arms it: the contact's
-    /// overdue time (06-10 17:30) is still ahead of `now` (17:00), yet the
-    /// fired row at 18:00 is the slot holding it.
+    /// row is fired, so a rollback never re-arms it. The contact's overdue
+    /// time (06-10 17:30) is still ahead of `now` (17:00) and outside the
+    /// 18:00-19:00 window, so the hold uses the next slot, 18:00, which is
+    /// the fired row's.
     @Test(
         "A fired cadence row survives the clock being set back before its slot",
         arguments: RepositoryContractBackend.allCases
@@ -194,7 +187,7 @@ struct SchedulingPassFiredRowTests {
         "A zero-capacity round trip leaves the slot's row fired and makes no new row",
         arguments: RepositoryContractBackend.allCases
     )
-    func zeroCapacityRoundTripDoesNotReDeliverThePastSlot(backend: RepositoryContractBackend) async throws {
+    func zeroCapacityRoundTripDoesNotRefireThePastSlot(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:30")
         let contact = try await fixture.addContact(1)
         let slotStart = PassFixture.at("2026-06-10 18:00")
@@ -208,16 +201,16 @@ struct SchedulingPassFiredRowTests {
             id: contact.id, window: Self.zeroCapacityWindow)
         try await fixture.pass.run(for: contact.id)
 
-        let delivered = try #require(try await fixture.row(fixture.cadenceID(contact)))
-        #expect(delivered.state == .fired)
-        #expect(delivered.scheduledFor == slotStart)
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == slotStart)
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
         let writes = await fixture.reminders.writeCount
 
         _ = try await fixture.repositories.contacts.updateReminderWindowOverride(id: contact.id, window: nil)
         try await fixture.pass.run(for: contact.id)
 
-        #expect(try await fixture.row(fixture.cadenceID(contact)) == delivered)
+        #expect(try await fixture.row(fixture.cadenceID(contact)) == fired)
         #expect(try await fixture.cadenceRow(contact) == nil)
         #expect(await fixture.pass.zeroCapacityContactIds.isEmpty)
         #expect(await fixture.reminders.writeCount == writes)
@@ -235,7 +228,10 @@ struct SchedulingPassFiredRowTests {
         arguments: RepositoryContractBackend.allCases
     )
     func oneDayCadenceOnAFallBackDayDoesNotReNag(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(backend: backend, window: Self.allDayLosAngeles)
+        let fixture = try await PassFixture(backend: backend, window: ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            quietHours: nil, timezoneIdentifier: "America/Los_Angeles"))
         let contact = Contact(
             id: try contractUUID(7_001),
             systemContactRef: "pass-1",
@@ -338,7 +334,10 @@ struct SchedulingPassFiredRowTests {
         arguments: RepositoryContractBackend.allCases
     )
     func failedRescheduleAfterCatchUpOnAFallBackDayStillNotifies(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(backend: backend, window: Self.allDayLosAngeles)
+        let fixture = try await PassFixture(backend: backend, window: ReminderWindow(
+            allowedDays: .allDays,
+            allowedTimeRanges: [TimeRange(start: TimeOfDay(hour: 0), end: TimeOfDay(hour: 23, minute: 59))],
+            quietHours: nil, timezoneIdentifier: "America/Los_Angeles"))
         let contact = Contact(
             id: try contractUUID(7_001),
             systemContactRef: "pass-1",
