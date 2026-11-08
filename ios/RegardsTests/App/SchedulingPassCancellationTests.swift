@@ -235,6 +235,31 @@ struct SchedulingPassCancellationTests {
         #expect(try await fixture.cadenceRow(future)?.scheduledFor == futureSlot)
     }
 
+    /// Boundary pin. A row is due at `scheduledFor <= now` (§9, run
+    /// invariant), so the orphan sweep marks a row due exactly at now fired.
+    /// A sweep that tested `<` would cancel it.
+    @Test("An orphan row due exactly at now is marked fired", arguments: RepositoryContractBackend.allCases)
+    func orphanRowDueExactlyNowIsFiredNotCancelled(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        fixture.setNow("2026-06-10 18:00")
+        var untracked = contact
+        untracked.tracked = false
+        try await fixture.repositories.contacts.upsert(untracked)
+
+        try await fixture.pass.runFull()
+
+        let id = fixture.cadenceID(contact)
+        let transitions = await fixture.reminders.transitionLog.filter { $0.id == id }
+        #expect(transitions == [TransitionCall(id: id, from: .pending, to: .fired, applied: true)])
+        // The schedule snapshot hides an untracked contact's rows, so track the
+        // contact again (no run) to read the stored state.
+        try await fixture.repositories.contacts.upsert(contact)
+        #expect(try await fixture.row(id)?.state == .fired)
+    }
+
     /// The contact is untracked right after its 18:00 slot delivered. Tracked
     /// again, in the same slot or the next day, it is overdue on the same
     /// cycle, so the fired row holds and the run writes nothing.
