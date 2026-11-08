@@ -171,8 +171,8 @@ Run Stage 0 yourself, on the lane: resolve the target with `git -C <lane path>`,
 and stop if `git -C <lane path> diff --name-only origin/main...HEAD` prints
 nothing. Start the workflow and every plain-run agent from a session whose
 folder is the root checkout on `main`, never a PR checkout, so the reviewer,
-verifier and codex-reviewer contracts load from main. Then start the workflow
-once:
+verifier and codex-reviewer contracts load from main. `codex-reviewer` starts
+Codex in that checkout too. Then start the workflow once:
 
 ```
 Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
