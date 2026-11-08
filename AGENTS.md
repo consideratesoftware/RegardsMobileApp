@@ -93,9 +93,9 @@ Layout inside `ios/Regards/`:
 - `Platform/` — Apple-framework adapters. `Contacts/` provides the read-only
   `CNContactStore` source and resumable importer used by TF-02's first-launch
   flow; TF-03 owns ongoing reconciliation. `Notifications/` holds the
-  permission and action adapter (`NotificationScheduling.swift`); scheduling
-  waits for TF-07 (R57). `Calendar/`, `DeepLinks/`, and `Billing/` arrive in
-  Phases 1C–2 (ARCHITECTURE.md §12).
+  permission, action, and scheduling seam (`NotificationScheduling.swift`);
+  production scheduling waits for TF-07e slice 4 (R57). `Calendar/`,
+  `DeepLinks/`, and `Billing/` arrive in Phases 1C–2 (ARCHITECTURE.md §12).
 - `DesignSystem/` — `RegardsDS` tokens (colors, typography, WCAG contrast helpers) and shared primitives (`Avatar`, `ChannelGlyph`, `Tag`, `Wordmark`).
 - `Features/` — one folder per screen (`Overdue`, `Upcoming`, `Contacts`, `ContactDetail`, `EditContact`, `MergeDuplicates`, `ReminderWindows`, `Onboarding`, `Settings`, `Shared`). Each screen owns its `*Screen.swift` view and a `*ViewModel.swift` where stateful.
 - `Resources/` — `Info.plist`, asset catalog. (`PrivacyInfo.xcprivacy` lives at `ios/Regards/PrivacyInfo.xcprivacy`, not under `Resources/` — it's added as an explicit resource in `project.yml`.)
