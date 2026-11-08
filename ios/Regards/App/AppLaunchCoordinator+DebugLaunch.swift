@@ -16,29 +16,7 @@ extension AppLaunchCoordinator {
         let environment = ProcessInfo.processInfo.environment
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--regards-mock-runtime") {
-            // `unavailable` passes no notification seam at all, so a UI test
-            // can check that Settings shows no Notifications section.
-            let notificationStatus = environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
-            return AppLaunchCoordinator(
-                mockRuntime: .makeMock(
-                    includeDuplicateFixture:
-                        environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1",
-                    seedCorruptRow:
-                        environment["REGARDS_UI_TEST_SEED_CORRUPT_ROW"] == "1"
-                ),
-                // Never the real adapter here: a system permission alert
-                // would cover the accessibility audits this launch serves.
-                notifications: notificationStatus == "unavailable"
-                    ? nil
-                    : DebugNotificationScheduling(
-                        status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined,
-                        // `fail` makes the system request throw, so a UI test
-                        // can reach the Settings request-error line.
-                        requestOutcome: environment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] == "fail"
-                            ? .fail
-                            : .grant
-                    )
-            )
+            return mockRuntimeLaunch(environment: environment)
         }
         if arguments.contains("--regards-launch-fails-once") {
             let runtimeFactory = FirstLaunchUITestRuntimeFactory()
@@ -80,6 +58,38 @@ extension AppLaunchCoordinator {
         }
         return production()
     }
+
+    /// The `--regards-mock-runtime` launch. It takes the environment, not
+    /// `ProcessInfo`, so a unit test can build it. The notification fake reads
+    /// the runtime's own clock: the runtime freezes time at the mock "now", so
+    /// a fake on the real clock would read a request dated 60 s after that
+    /// instant, which is before the real current date, as already due and never
+    /// list it as pending. `mockLaunchFakeUsesTheFrozenClock` pins that case.
+    static func mockRuntimeLaunch(environment: [String: String]) -> AppLaunchCoordinator {
+        let runtime = AppRuntime.makeMock(
+            includeDuplicateFixture: environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1",
+            seedCorruptRow: environment["REGARDS_UI_TEST_SEED_CORRUPT_ROW"] == "1"
+        )
+        // `unavailable` passes no notification seam at all, so a UI test
+        // can check that Settings shows no Notifications section.
+        let notificationStatus = environment["REGARDS_UI_TEST_NOTIFICATION_STATUS"] ?? ""
+        return AppLaunchCoordinator(
+            mockRuntime: runtime,
+            // Never the real adapter here: a system permission alert
+            // would cover the accessibility audits this launch serves.
+            notifications: notificationStatus == "unavailable"
+                ? nil
+                : DebugNotificationScheduling(
+                    status: NotificationAuthorizationStatus(rawValue: notificationStatus) ?? .notDetermined,
+                    // `fail` makes the system request throw, so a UI test
+                    // can reach the Settings request-error line.
+                    requestOutcome: environment["REGARDS_UI_TEST_NOTIFICATION_REQUEST_OUTCOME"] == "fail"
+                        ? .fail
+                        : .grant,
+                    clock: runtime.clock
+                )
+        )
+    }
 #else
     static func configuredForCurrentProcess() -> AppLaunchCoordinator {
         production()
@@ -96,6 +106,17 @@ extension AppLaunchCoordinator {
 /// the caller passes (the mock launch reads `REGARDS_UI_TEST_NOTIFICATION_STATUS`),
 /// a request from `.notDetermined` resolves to the scripted `requestOutcome`,
 /// and `send(_:)` delivers an action as if the user tapped it.
+///
+/// It also keeps an in-memory pending set that `schedule`, `cancel`, and
+/// `pendingRequests` honor, keyed by identifier like the system's. `schedule`
+/// stores each request through `UserNotificationsAdapter.makeRequest` and
+/// `decode` with `clock`. A request is delivered, so no longer pending, when
+/// its trigger instant (the fire date truncated to the whole second) is at or
+/// before now as it is added, or when `clock` passes its fire date later, as
+/// in the real center. The set has no size limit, unlike the system's 64
+/// pending requests per app; see `NotificationFakeParityTests`.
+/// `pendingRequests()` sorts by identifier only to keep tests deterministic.
+/// The real center's order is unspecified, so a test must not rely on this one.
 ///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
@@ -115,11 +136,18 @@ actor DebugNotificationScheduling: NotificationScheduling {
     private let requestOutcome: RequestOutcome
     /// How many times `requestAuthorization()` ran, prompt or not.
     private(set) var requestCount = 0
+    private let clock: @Sendable () -> Date
+    private var pending: [String: ReminderNotificationRequest] = [:]
 
-    init(status: NotificationAuthorizationStatus = .notDetermined, requestOutcome: RequestOutcome = .grant) {
+    init(
+        status: NotificationAuthorizationStatus = .notDetermined,
+        requestOutcome: RequestOutcome = .grant,
+        clock: @escaping @Sendable () -> Date = { Date() }
+    ) {
         (actions, continuation) = AsyncStream.makeStream(of: NotificationAction.self, bufferingPolicy: .unbounded)
         self.status = status
         self.requestOutcome = requestOutcome
+        self.clock = clock
     }
 
     /// Mirrors iOS: only `.notDetermined` prompts. Once decided, a request
@@ -140,6 +168,27 @@ actor DebugNotificationScheduling: NotificationScheduling {
     }
 
     func authorizationStatus() async -> NotificationAuthorizationStatus { status }
+
+    func pendingRequests() async -> [ReminderNotificationRequest] {
+        // A request whose time has come is delivered and no longer listed.
+        let now = clock()
+        pending = pending.filter { $0.value.fireDate > now }
+        return pending.values.sorted { $0.identifier < $1.identifier }
+    }
+
+    func schedule(_ request: ReminderNotificationRequest) async throws {
+        // Matches the real center: a request not after now is delivered at
+        // once, so it replaces any pending one and is not recorded.
+        pending[request.identifier] = UserNotificationsAdapter.decode(
+            UserNotificationsAdapter.makeRequest(request, now: clock())
+        )
+    }
+
+    func cancel(identifiers: [String]) async {
+        for identifier in identifiers {
+            pending[identifier] = nil
+        }
+    }
 
     /// Simulates the user changing the permission in iOS Settings.
     func setStatus(_ newStatus: NotificationAuthorizationStatus) {
