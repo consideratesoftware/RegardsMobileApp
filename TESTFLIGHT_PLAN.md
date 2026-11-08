@@ -12,7 +12,7 @@ never pick up Android work.
 
 ## Current checkpoint
 
-- Updated: 2026-11-04
+- Updated: 2026-11-07
 - Baseline: `main` at `de3e308` (merge of PR #69). PR #67 (`TF-07c`) merged as `55c3d16` on 2026-10-30 (Pacific).
   PR #66 (`TF-07a`) merged as `0b784d7` on 2026-10-28. PR #65 (`TF-07b`) merged as
   `a09138d` on 2026-10-17. PR #64, the `TF-05` and `TF-06` fast-follow, merged as
