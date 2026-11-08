@@ -97,19 +97,17 @@ restarts.
   passes `id=<udid>` to `xcodebuild`, because a `name=RegardsTF##` destination can fall back to
   My Mac or to another iOS runtime. It also writes its logs to a fresh
   per-run directory, never to a shared file.
-- Lane notes live in `../RegardsMobileApp-lanes/` relative to the root
-  checkout, next to the lane worktrees: one `TF##/` folder per lane with
-  `plan.md` (the tech lead's plan, verbatim), `review-context.md` (review
-  target, §14 row (or "infra, no §14 row" for an infra PR), claimed R-numbers),
-  `pr-body.md` (the PR body draft),
-  `owner-answers.md` (Sid's answers given before the PR exists), and
-  `codex-<short sha>.md` (each full Codex review, named by the short sha its
-  verdict comment shows). The folder is outside the repo, so nothing in it
-  is committed.
-  The engineering manager never keeps these in the session scratchpad or
-  `/tmp`, and a restart reads the folder before asking a role to redo its
-  work. The branch, the PR, and `TESTFLIGHT_PLAN.md` win when a file
-  disagrees with them.
+- Lane notes live in `../RegardsMobileApp-lanes/` relative to the root checkout,
+  next to the lane worktrees: one `TF##/` folder per lane with `plan.md` (the
+  tech lead's plan, verbatim), `review-context.md` (review target, §14 row (or
+  "infra, no §14 row" for an infra PR), claimed R-numbers), `pr-body.md` (the PR
+  body draft), `owner-answers.md` (Sid's answers given before the PR exists),
+  and `codex-<short sha>.md` (each full Codex review, named by the short sha its
+  verdict comment shows). The folder is outside the repo, so nothing in it is
+  committed. The engineering manager never keeps these in the session scratchpad
+  or `/tmp`, and a restart reads the folder before asking a role to redo its
+  work. The branch, the PR, and `TESTFLIGHT_PLAN.md` win when a file disagrees
+  with them.
 - Lock files (from `TESTFLIGHT_PLAN.md`): `AppEnvironment`, `RegardsApp`,
   repository and migration files, `project.yml` and the generated project,
   SchedulingPass, Upcoming/Overdue/Contact Detail, Onboarding/Settings,
@@ -127,21 +125,20 @@ All of these, on the current head, with no averaging:
    manager reads the text, counts the blockers, and treats any MALFORMED from
    `scripts/count-hosted-blockers.sh` as unresolved. Its 3 causes: no Blockers
    section; a line under Blockers that is not a bullet; or no bullets with a
-   VERDICT other than APPROVE. Only Sid can defer a hosted blocker,
-   and the deferral is recorded with a link to his PR comment. That comment
-   names the blocker text and the head sha. It is void when the head moves,
-   except for a blocker whose text reappears unchanged in the new head's
-   review.
+   VERDICT other than APPROVE. Only Sid can defer a hosted blocker, and the
+   deferral is recorded with a link to his PR comment. That comment names the
+   blocker text and the head sha. It is void when the head moves, except for a
+   blocker whose text reappears unchanged in the new head's review.
 3. `/pr-review` verdict APPROVE, from the plain run or the verified run.
-4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES
-   with every Codex blocker disputed in that verdict's PR comment by the
-   engineering manager, citing the `ARCHITECTURE.md` section that settles it; the
-   release manager checks each cited section exists and addresses the
-   finding. This applies on APPROVE too. At the merge head, every blocker that the
-   comment's `BLOCKERS:` line counts needs its own `DISPUTED:` line. Fixing one
-   moves the head, and the new head needs a new Codex review. Verifier votes never
-   change this verdict: a refuted Codex BLOCKER still needs a `DISPUTED:` line.
-   RETRY and UNAVAILABLE never satisfy this condition.
+4. `codex-reviewer` verdict APPROVE on the current head, or REQUEST_CHANGES with
+   every Codex blocker disputed in that verdict's PR comment by the engineering
+   manager, citing the `ARCHITECTURE.md` section that settles it; the release
+   manager checks each cited section exists and addresses the finding. This
+   applies on APPROVE too. At the merge head, every blocker that the comment's
+   `BLOCKERS:` line counts needs its own `DISPUTED:` line. Fixing one moves the
+   head, and the new head needs a new Codex review. Verifier votes never change
+   this verdict: a refuted Codex BLOCKER still needs a `DISPUTED:` line. RETRY
+   and UNAVAILABLE never satisfy this condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
 7. The branch was up to date with `main` when conditions 3 and 4 were
@@ -155,11 +152,11 @@ engineering manager may recheck the fixes without asking Sid.
 `pr-security-privacy`, `pr-correctness`, `pr-fit-finish`, `pr-accessibility`
 (where the routing table requires them) and `codex-reviewer` on the whole
 `origin/main...HEAD` diff run again on every head. Only `pr-code-quality` and
-`pr-tests` may carry an approval over a Markdown-only change, and only under
-the carry rule. Sid is asked only if a blocker survives 2 rounds or a fix
-needs a product decision. The `PR REVIEW:` comment lists which reviewers reran
-and which approvals carry from which sha. The carry rule, the `CARRIED:` line
-format, and the check that runs `scripts/check-carried-approval.sh` are in
+`pr-tests` may carry an approval over a Markdown-only change, and only under the
+carry rule. Sid is asked only if a blocker survives 2 rounds or a fix needs a
+product decision. The `PR REVIEW:` comment lists which reviewers reran and which
+approvals carry from which sha. The carry rule, the `CARRIED:` line format, and
+the check that runs `scripts/check-carried-approval.sh` are in
 `.claude/agents/release-manager.md` (Merge conditions). Each reviewer the
 routing table requires needs APPROVE as its newest verdict, or a carry that
 holds under that rule. The newest `PR REVIEW:` comment, scoped or not, needs a
@@ -206,25 +203,24 @@ to find later.
 - Signing, provisioning, App Store Connect, TestFlight uploads.
 - Design rulings the tech lead marks OPEN FOR OWNER.
 - Codex, when a `CODEX REVIEW: UNAVAILABLE` verdict stands: either
-  `codex-reviewer` reported it (Codex needs setup) or the engineering
-  manager recorded it after a second RETRY on the same head. A RETRY gets 1
-  automatic rerun; a RETRY after the head moves is the first on the new
-  head. If Codex needs setup, run `/codex:setup` and `codex login` if it
-  asks. If the second RETRY was a timeout, rerun the review when OpenAI is
-  responsive, or split the PR, which is a scope change for Sid; Codex always
-  reviews the whole `origin/main...HEAD` diff. The PR waits; the org does not
-  merge without the Codex verdict. A new head doesn't clear it; Sid's answer does.
+  `codex-reviewer` reported it (Codex needs setup) or the engineering manager
+  recorded it after a second RETRY on the same head. A RETRY gets 1 automatic
+  rerun; a RETRY after the head moves is the first on the new head. If Codex
+  needs setup, run `/codex:setup` and `codex login` if it asks. If the second
+  RETRY was a timeout, rerun the review when OpenAI is responsive, or split the
+  PR, which is a scope change for Sid; Codex always reviews the whole
+  `origin/main...HEAD` diff. The PR waits; the org does not merge without the
+  Codex verdict. A new head doesn't clear it; Sid's answer does.
 - Scope changes to the queue or dependency graph.
 
-Not owner gates: the manual VoiceOver smoke
-(`ios/docs/accessibility-smoke.md`) for a diff touching `Features/`,
-`DesignSystem/`, or `App/` view code, and every physical-device run (A15
-budget, device matrix, TF-18). Owner ruling, 2026-10-28: they go to
-`TESTFLIGHT_PLAN.md`'s "Pre-release device pass", one pass before release.
-The release manager has the tech writer add each PR's steps there in that
-PR, and no merge waits on them. An entry may name a section of
-`ios/docs/accessibility-smoke.md` and its items instead of copying the steps,
-as long as the entry has its own Result line.
+Not owner gates: the manual VoiceOver smoke (`ios/docs/accessibility-smoke.md`)
+for a diff touching `Features/`, `DesignSystem/`, or `App/` view code, and every
+physical-device run (A15 budget, device matrix, TF-18). Owner ruling,
+2026-10-28: they go to `TESTFLIGHT_PLAN.md`'s "Pre-release device pass", one
+pass before release. The release manager has the tech writer add each PR's steps
+there in that PR, and no merge waits on them. An entry may name a section of
+`ios/docs/accessibility-smoke.md` and its items instead of copying the steps, as
+long as the entry has its own Result line.
 
 Simulator gates run on this Mac through `build-engineer`; GitHub-hosted
 macOS runners run the same gates plus the hosted review on every PR.

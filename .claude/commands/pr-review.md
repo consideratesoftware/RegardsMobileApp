@@ -14,8 +14,7 @@ Treat the literal target `worktree` as all tracked and untracked changes against
    - `worktree`: use `git status --short`, `git diff HEAD`, and full reads of
      every untracked file.
    - Plain run: `origin/main...HEAD in worktree <lane path>`, resolved with
-     `git -C <lane path>`.
-   If the target is empty, stop and say so.
+     `git -C <lane path>`. If the target is empty, stop and say so.
 2. Run the cheap mechanical checks an agent shouldn't burn tokens on. These
    4 are the whole set, with the exact commands in steps 2 to 4 of
    `.claude/agents/build-engineer.md`:
@@ -50,11 +49,9 @@ Launch all selected agents **in a single parallel batch**. Each agent prompt
 must contain: the resolved target, the lane worktree path, the instruction "Your
 session is not the PR. Run every git command as `git -C <worktree> ...` and read
 files by absolute path under <worktree>.", the stable `TF-##` work item when
-present,
-the §14 scope alias and acceptance-criteria row pasted verbatim (or "infra, no
-§14 row" for an infra PR), and the list
-of R-numbers the PR claims to close. Do not paste the diff itself into agent
-prompts; agents pull it with git.
+present, the §14 scope alias and acceptance-criteria row pasted verbatim (or
+"infra, no §14 row" for an infra PR), and the list of R-numbers the PR claims to
+close. Do not paste the diff itself into agent prompts; agents pull it with git.
 
 ## Stage 2 — cross-checks (sequential, only if needed)
 
@@ -106,12 +103,11 @@ If the PR claims R-closures (§19): verify each acceptance check yourself agains
 ## Claude Code org only
 
 The verified run is how the Claude Code org runs this review. It is the one
-exception to the Stage 3 rule that any BLOCKER means REQUEST_CHANGES. The
-hosted review reads this file but applies Stages 1 to 4 only, and its
-`Workflow` tool is disabled by `--disallowedTools` in
-`.github/workflows/claude-pr-review.yml`, so it never runs this section. The Codex
-skill cannot run workflows either, so it does not use this section. The hosted
-review stays a separate gate.
+exception to the Stage 3 rule that any BLOCKER means REQUEST_CHANGES. The hosted
+review reads this file but applies Stages 1 to 4 only, and its `Workflow` tool
+is disabled by `--disallowedTools` in `.github/workflows/claude-pr-review.yml`,
+so it never runs this section. The Codex skill cannot run workflows either, so
+it does not use this section. The hosted review stays a separate gate.
 
 Use the verified run when the Workflow tool is available and someone can
 approve its prompt in this session. Otherwise run Stages 1 to 3 as written,
@@ -128,8 +124,8 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    explicit `real: false` counts as a real vote.
 2. Only BLOCKER and FIX findings go to verifiers. ESCALATE findings and
    coverage holes are returned untouched for Stage 2.
-3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when at least one
-   of its findings was refuted, none of its BLOCKERs survived, it has no NOT
+3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when at least one of
+   its findings was refuted, none of its BLOCKERs survived, it has no NOT
    CHECKED entry, its `blockerCount` (its own `BLOCKERS: n` count) equals the
    number of BLOCKER findings it listed, and (pr-code-quality only) none of its
    FIX findings survived. A missing or non-integer `blockerCount` blocks the
@@ -143,8 +139,9 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    surviving BLOCKER of its own; when its `blockerCount` (its own `BLOCKERS: n`
    count) is not a whole number equal to the BLOCKER findings it listed; or when
    its report text is not empty and the first line starting with `VERDICT:` is
-   not `VERDICT: <the verdict it returned>` (trailing white space ignored). These checks cover an APPROVE
-   too, so an APPROVE cannot hide a blocker the reviewer counted but did not list.
+   not `VERDICT: <the verdict it returned>` (trailing white space ignored).
+   These checks cover an APPROVE too, so an APPROVE cannot hide a blocker the
+   reviewer counted but did not list.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line. A Codex entry
@@ -174,8 +171,8 @@ Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktr
 ```
 
 - `title`: the PR's short name.
-- `worktree`: the lane worktree's absolute path. Every agent runs its git commands
-  there.
+- `worktree`: the lane worktree's absolute path. Every agent runs its git
+  commands there.
 - `branch`: the lane worktree's branch.
 - `head`: the full 40-character head sha.
 - `since`: scoped recheck only, the last reviewed head. Leave it out otherwise.
@@ -188,8 +185,8 @@ Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktr
   Codex UNAVAILABLE owner gate is open (`org.md` Stage 3).
 - `contextFile`: the absolute path of the lane's `review-context.md`. It must
   hold the §14 row (or "infra, no §14 row" for an infra PR) and the R-numbers
-  verbatim. For the workflow it replaces
-  Stage 1's per-prompt paste of those two.
+  verbatim. For the workflow it replaces Stage 1's per-prompt paste of those
+  two.
 
 Always start the workflow by `scriptPath`, never by `name`. Point `scriptPath`
 at a copy of `.claude/workflows/pr-review-verified.js` exported from
@@ -197,16 +194,34 @@ at a copy of `.claude/workflows/pr-review-verified.js` exported from
 `check-carried-approval.sh`. Never run it by `name` from a lane: `name` resolves
 from the session's folder, and the lane's copy is PR-controlled.
 
-Self-edit PRs. A PR that adds or changes `.claude/workflows/pr-review-verified.js`
-gets run (a) and, optionally, run (b), on the same head. Run (a) is the counting review
-and the only run that includes Codex.
+Self-edit PRs. A PR that adds or changes
+`.claude/workflows/pr-review-verified.js` gets run (a) and, optionally, run (b),
+on the same head. Run (a) is the counting review and the only run that includes
+Codex.
 
-- (a) Main's copy. Export it with `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`, and start that copy by `scriptPath`. When `origin/main` has no copy, the plain run takes its place: Stages 1 to 4 dispatched as individual agent calls, not through any workflow script, with Codex run by the `codex-reviewer` agent. In the plain run, every reviewer BLOCKER counts. Run (a) is the only run with Codex. Save its review as `codex-<short sha>.md` and post it as the `CODEX REVIEW:` comment.
-- (b) Optional: the PR's own copy, in the lane worktree, started by `scriptPath` with `codex: false`. When it runs, each pr-* reviewer counts at the stricter of runs (a) and (b). Run (a) alone is a complete counting review.
+- (a) Main's copy. Export it with
+  `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`,
+  and start that copy by `scriptPath`. When `origin/main` has no copy, the plain
+  run takes its place: Stages 1 to 4 dispatched as individual agent calls, not
+  through any workflow script, with Codex run by the `codex-reviewer` agent. In
+  the plain run, every reviewer BLOCKER counts. Run (a) is the only run with
+  Codex. Save its review as `codex-<short sha>.md` and post it as the
+  `CODEX REVIEW:` comment.
+- (b) Optional: the PR's own copy, in the lane worktree, started by `scriptPath`
+  with `codex: false`. When it runs, each pr-* reviewer counts at the stricter
+  of runs (a) and (b). Run (a) alone is a complete counting review.
 
-When run (b) runs, each pr-* reviewer counts at the stricter of its 2 runs, in the order FAILED, then REQUEST_CHANGES, then APPROVE. BLOCKERS and SHOULD_FIX take the higher count. In run (b), they count every pr-* BLOCKER and FIX in `survivors` and `refuted`. A Codex RETRY or UNAVAILABLE follows the owner-gate rules under "Handle Codex by its case" below. A verdict from the PR's own copy never counts alone.
+When run (b) runs, each pr-* reviewer counts at the stricter of its 2 runs, in
+the order FAILED, then REQUEST_CHANGES, then APPROVE. BLOCKERS and SHOULD_FIX
+take the higher count. In run (b), they count every pr-* BLOCKER and FIX in
+`survivors` and `refuted`. A Codex RETRY or UNAVAILABLE follows the owner-gate
+rules under "Handle Codex by its case" below. A verdict from the PR's own copy
+never counts alone.
 
-For run (b), also make these hand checks. FAILED when `reviewedSha` is missing, under 7 characters, not lower-case hex, or not a prefix of head. REQUEST_CHANGES when `notChecked` is missing or not empty, or when it raised any BLOCKER, in `survivors` or in `refuted`. Refuted findings still get their `REFUTED:` lines.
+For run (b), also make these hand checks. FAILED when `reviewedSha` is missing,
+under 7 characters, not lower-case hex, or not a prefix of head. REQUEST_CHANGES
+when `notChecked` is missing or not empty, or when it raised any BLOCKER, in
+`survivors` or in `refuted`. Refuted findings still get their `REFUTED:` lines.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
 pr-correctness and pr-tests runs (the workflow's reviewers can't take a
@@ -228,8 +243,8 @@ says.
 - `codexReview`: Codex's full review, verbatim, or null. Save it as
   `codex-<short sha>.md` before you post. Its first line is the Codex verdict
   line, which the Codex entry's `codexLine` also carries. A Codex entry with
-  APPROVE or REQUEST_CHANGES but `codexReview` null has no review to save;
-  rerun `codex-reviewer` alone.
+  APPROVE or REQUEST_CHANGES but `codexReview` null has no review to save; rerun
+  `codex-reviewer` alone.
 - `refuted`: one entry per refuted finding, with its reviewer, severity,
   location, claim and votes. Each vote names a `lens` (`truth`, `scope` or
   `impact`) and `real` (`true`, `false` or `'failed'`).
@@ -239,10 +254,10 @@ says.
   read-only `tech-lead` agent. When its `notes` say the synthesizer returned
   nothing, repair from `survivors`.
 
-Don't post APPROVE while a pr-* reviewer is `FAILED` or has any verdict other than
-APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The workflow
-passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle Codex by
-its case:
+Don't post APPROVE while a pr-* reviewer is `FAILED` or has any verdict other
+than APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The
+workflow passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle
+Codex by its case:
 
 - No Codex verdict on a run with `codex: true` (its entry is `FAILED` or
   missing): rerun `codex-reviewer` alone and use its report. RETRY and
@@ -274,22 +289,22 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - The first line is APPROVE only when no pr-* BLOCKER survived (in Stage 1 or
   Stage 2) and every pr-* reviewer's verdict is APPROVE. Otherwise it is
   REQUEST_CHANGES.
-- BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and
-  FIX respectively), plus any Stage 2 items. A plain run has no `survivors`: it
+- BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and FIX
+  respectively), plus any Stage 2 items. A plain run has no `survivors`: it
   refutes nothing, so every pr-* finding counts. Refuted findings count for
-  neither, except on a self-edit PR (see "How to run it").
-  Codex's counts stay on its own comment.
+  neither, except on a self-edit PR (see "How to run it"). Codex's counts stay
+  on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
   verified run, or the Stage 1 verdict in a plain run. On a self-edit PR, the
-  counting verdicts are the ones "How to run it" sets. A Stage 2
-  blocker makes that reviewer REQUEST_CHANGES.
+  counting verdicts are the ones "How to run it" sets. A Stage 2 blocker makes
+  that reviewer REQUEST_CHANGES.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.
 - The paraphrase is your own words: at most 15 words, one physical line, no
   `@`. Never paste reviewer text.
-- `release-manager.md` reads the first line and the `REVIEWERS:` and
-  `CARRIED:` lines of this comment. It reads `DISPUTED:` lines from the CODEX
-  REVIEW comment. Its filter keeps only `REVIEWERS:` and `CARRIED:` lines, so a
+- `release-manager.md` reads the first line and the `REVIEWERS:` and `CARRIED:`
+  lines of this comment. It reads `DISPUTED:` lines from the CODEX REVIEW
+  comment. Its filter keeps only `REVIEWERS:` and `CARRIED:` lines, so a
   `REFUTED:` line never passes as a carry. `REFUTED:` lines are for Sid to see.
   They never count toward any check.
 

@@ -76,32 +76,32 @@ For `status`: print the Stage 5 report from this state and stop.
 
 For each open TF PR, and each open `infra:` PR (which occupies no lane):
 
-1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
-   comments that count under the rule in `release-manager.md` (Open). For
-   each one that is missing, or that names a sha other than the PR's current
-   head, or (for Codex) that is a RETRY or has no `codex-<short sha>.md` file
-   in the lane's folder, rerun that review, unless it is a Codex UNAVAILABLE:
-   check the head out with `git worktree add --detach <tmp> <head sha>`, then run
-   the verified run (`pr-review.md`, "Claude Code org only") from the root checkout
-   on `main`, never from `<tmp>`, with `worktree` set to `<tmp>` and `head` set to
+1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:` comments
+   that count under the rule in `release-manager.md` (Open). For each one that
+   is missing, or that names a sha other than the PR's current head, or (for
+   Codex) that is a RETRY or has no `codex-<short sha>.md` file in the lane's
+   folder, rerun that review, unless it is a Codex UNAVAILABLE: check the head
+   out with `git worktree add --detach <tmp> <head sha>`, then run the verified
+   run (`pr-review.md`, "Claude Code org only") from the root checkout on
+   `main`, never from `<tmp>`, with `worktree` set to `<tmp>` and `head` set to
    its sha, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR
    needs run (a), with Codex in run (a) only; run (b) is optional), or, when it
    can't run, `/pr-review origin/main...HEAD in worktree <tmp>` and the
-   `codex-reviewer` agent type. Post
-   the result as a new verdict comment, then `git worktree remove <tmp>`. A RETRY
-   gets the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
-   head: interview Sid before any rerun.
+   `codex-reviewer` agent type. Post the result as a new verdict comment, then
+   `git worktree remove <tmp>`. A RETRY gets the one rerun Stage 3 allows. A
+   Codex UNAVAILABLE is an owner gate on any head: interview Sid before any
+   rerun.
 2. In every case, launch `release-manager` with both current verdicts to
-   re-evaluate the PR. When `git -C <lane worktree> diff --name-only
-   origin/main...HEAD` lists `scripts/count-hosted-blockers.sh` or
-   `scripts/check-carried-approval.sh`, also pass the absolute path of the lane
-   worktree's copy of each listed script, labeled as the PR's own copy of that
-   script. Before the own copy runs, read the blob that its command exports, which
-   is the PR head's copy. Network use, writes outside `<scratch>`, or credential
-   reads mean fail closed. Otherwise run that blob with a scrubbed environment
-   (`env -i PATH=/usr/bin:/bin HOME=<scratch>`).
-   It will route red checks to `on-call-engineer`, park on owner gates,
-   or merge when all conditions hold.
+   re-evaluate the PR. When
+   `git -C <lane worktree> diff --name-only origin/main...HEAD` lists
+   `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
+   also pass the absolute path of the lane worktree's copy of each listed
+   script, labeled as the PR's own copy of that script. Before the own copy
+   runs, read the blob that its command exports, which is the PR head's copy.
+   Network use, writes outside `<scratch>`, or credential reads mean fail
+   closed. Otherwise run that blob with a scrubbed environment
+   (`env -i PATH=/usr/bin:/bin HOME=<scratch>`). It will route red checks to
+   `on-call-engineer`, park on owner gates, or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
@@ -149,28 +149,27 @@ After the last slice: launch `tech-writer` with the DOC SIBLINGS list and the
 facts from the slice reports. The tech writer commits its files; the review
 batch starts only when `git status --short` in the lane is empty. Write the
 target, the §14 row (or "infra, no §14 row" for an infra PR), and the claimed
-R-numbers to `review-context.md` in the
-lane's folder. Fetch, then run the verified run (`pr-review.md`, "Claude Code org only")
-from the root checkout on `main`, with `worktree` set to the lane path, `head` set
-to its 40-hex sha, and `codex: true`, so the review board and Codex
-run in one workflow. Start it by `scriptPath` to a copy exported from
-`origin/main`, never by `name`. For a PR that adds or changes
-`.claude/workflows/pr-review-verified.js`, the self-edit rule in that section
-applies: run (a), from `origin/main`'s copy or the plain run where main has none,
-is the counting review and the only one with Codex. The PR's own copy (run (b))
-is optional: the PR's own copy, run with `codex: false`. When it runs, each
-pr-* reviewer counts at the stricter run. Run (a) alone is a complete counting
-review. If it can't run, run
-`/pr-review origin/main...HEAD in worktree <lane path>` from the root checkout on
-`main`, and launch the
-`codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
-batch, with the target `origin/main...HEAD in worktree <lane path>`, the item's §14
-row (or "infra, no §14 row" for an infra PR), and its claimed R-numbers. The
-three-dot target compares against the merge base, so commits that landed on
-`main` after the lane branched don't show up as reversions. Treat blockers
-from both the same way: they go to the slice owner (design questions to
-`tech-lead` first), one round, then both review again. In a verified run, send
-each `workOrder` item by its `owner`:
+R-numbers to `review-context.md` in the lane's folder. Fetch, then run the
+verified run (`pr-review.md`, "Claude Code org only") from the root checkout on
+`main`, with `worktree` set to the lane path, `head` set to its 40-hex sha, and
+`codex: true`, so the review board and Codex run in one workflow. Start it by
+`scriptPath` to a copy exported from `origin/main`, never by `name`. For a PR
+that adds or changes `.claude/workflows/pr-review-verified.js`, the self-edit
+rule in that section applies: run (a), from `origin/main`'s copy or the plain
+run where main has none, is the counting review and the only one with Codex. The
+PR's own copy (run (b)) is optional: the PR's own copy, run with `codex: false`.
+When it runs, each pr-* reviewer counts at the stricter run. Run (a) alone is a
+complete counting review. If it can't run, run
+`/pr-review origin/main...HEAD in worktree <lane path>` from the root checkout
+on `main`, and launch the `codex-reviewer` agent type
+(`subagent_type: codex-reviewer`) in the same batch, with the target
+`origin/main...HEAD in worktree <lane path>`, the item's §14 row (or "infra, no
+§14 row" for an infra PR), and its claimed R-numbers. The three-dot target
+compares against the merge base, so commits that landed on `main` after the lane
+branched don't show up as reversions. Treat blockers from both the same way:
+they go to the slice owner (design questions to `tech-lead` first), one round,
+then both review again. In a verified run, send each `workOrder` item by its
+`owner`:
 
 - `on-call-engineer`: scripts, CI and workflow scripts.
 - `tech-writer`: prose.
@@ -183,18 +182,17 @@ each `workOrder` item by its `owner`:
 Before Stage 4, launch `on-call-engineer` in pre-PR mode: say no PR is open yet,
 and give the lane worktree, branch and items.
 
-Drop a Codex finding
-only when it contradicts `ARCHITECTURE.md`; you write the dispute on a
-`DISPUTED: blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
-comment, as `/pr-review` does for its own findings.
+Drop a Codex finding only when it contradicts `ARCHITECTURE.md`; you write the
+dispute on a `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>` line in that
+verdict's PR comment, as `/pr-review` does for its own findings.
 
 Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
 verdict, and give that path to `release-manager`; the release manager checks
 each `DISPUTED:` line against it. On a self-edit PR, only run (a)'s Codex review
-is saved and posted. A resumed PR whose head has no such file
-gets a fresh Codex run (Stage 1). In a verified run, the full review is the
-workflow's `codexReview`.
+is saved and posted. A resumed PR whose head has no such file gets a fresh Codex
+run (Stage 1). In a verified run, the full review is the workflow's
+`codexReview`.
 
 Once the lane has a PR, post every review result on it (`/pr-review` and
 Codex alike, RETRY included) as a verdict comment in the form
@@ -206,18 +204,18 @@ never paste a reviewer's output into a comment; the full review stays in the
 lane's report. A verified run's comment has the shape `pr-review.md` gives,
 with its `REFUTED:` lines.
 
-A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a
-dirty tree: the lane's owner commits the files, and never discards them
-without asking Sid), then rerun it once, on the head the fix produces. That
-is the one automatic rerun. A second RETRY on that head, a timeout included,
-is an owner gate:
-record it as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs
-origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
-of rerunning again. A RETRY after a repair moved the head is the first RETRY
-on the new head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the
-owner gate in `ENGINEERING_ORG.md`. This holds with or without a saved codex
-file, and on any head: an UNAVAILABLE is never rerun automatically. RETRY and UNAVAILABLE runs
-don't use up a review round. Two rounds maximum, then the second opinion.
+A `codex-reviewer` RETRY proves nothing. Fix its cause if it names one (a dirty
+tree: the lane's owner commits the files, and never discards them without asking
+Sid), then rerun it once, on the head the fix produces. That is the one
+automatic rerun. A second RETRY on that head, a timeout included, is an owner
+gate: record it as
+`CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs origin/main...HEAD | codex-cli <version>`,
+so a restart sees the gate instead of rerunning again. A RETRY after a repair
+moved the head is the first RETRY on the new head. On UNAVAILABLE, carry on to
+Stage 4; the PR waits on the owner gate in `ENGINEERING_ORG.md`. This holds with
+or without a saved codex file, and on any head: an UNAVAILABLE is never rerun
+automatically. RETRY and UNAVAILABLE runs don't use up a review round. Two
+rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
 fix), run the verified run again, or both `/pr-review origin/main...HEAD` and
@@ -227,22 +225,22 @@ the review on the new head runs with `codex: false`, and `codex-reviewer` is
 not launched. Sid's answer releases the gate.
 
 Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
-2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, you
-may recheck the fixes without asking Sid. Rerun `pr-security-privacy`,
-`pr-correctness`, `pr-fit-finish` and `pr-accessibility` (the last two where
-the routing table in `pr-review.md` requires them) on every head, plus
+2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, you may
+recheck the fixes without asking Sid. Rerun `pr-security-privacy`,
+`pr-correctness`, `pr-fit-finish` and `pr-accessibility` (the last two where the
+routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
-the current head, unless a Codex UNAVAILABLE gate is open. Rerun `pr-code-quality` and `pr-tests` unless the new
-commits are Markdown-only under the carry rule. A verified run for this
-recheck passes `since`, the last reviewed head, and the reviewers it reruns.
-Ask Sid only if a blocker survives 2 rounds or a fix needs a product decision.
-The `PR REVIEW:` comment
-lists every reviewer that ran on a `REVIEWERS:` line with its verdict. A
-scoped recheck adds a `RERAN:` line naming the reviewers that ran, and one
+the current head, unless a Codex UNAVAILABLE gate is open. Rerun
+`pr-code-quality` and `pr-tests` unless the new commits are Markdown-only under
+the carry rule. A verified run for this recheck passes `since`, the last
+reviewed head, and the reviewers it reruns. Ask Sid only if a blocker survives 2
+rounds or a fix needs a product decision. The `PR REVIEW:` comment lists every
+reviewer that ran on a `REVIEWERS:` line with its verdict. A scoped recheck adds
+a `RERAN:` line naming the reviewers that ran, and one
 `CARRIED: <reviewer> APPROVE from <sha>` line per `pr-code-quality` or
-`pr-tests` approval that stands. The other four reviewers and Codex never
-carry: they rerun on every head. Every reviewer the routing table runs needs
-APPROVE as its newest verdict.
+`pr-tests` approval that stands. The other four reviewers and Codex never carry:
+they rerun on every head. Every reviewer the routing table runs needs APPROVE as
+its newest verdict.
 
 The release manager reads every counting `PR REVIEW:` comment, oldest first,
 and takes each reviewer's newest verdict from the last `REVIEWERS:` line that
@@ -286,10 +284,9 @@ lists `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
 also pass the absolute path of the lane worktree's copy of each listed script,
 labeled as the PR's own copy of that script. Before the own copy runs, read its
 diff against `origin/main` and run it with a scrubbed environment. It opens the
-PR, watches CI and
-the hosted review, routes
-repairs, records the checkpoint via `tech-writer`, and merges only when all
-merge conditions in `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
+PR, watches CI and the hosted review, routes repairs, records the checkpoint via
+`tech-writer`, and merges only when all merge conditions in `ENGINEERING_ORG.md`
+hold. Stacked items open as drafts.
 
 Owner direction, 2026-11-02: a PR whose merge conditions all hold is
 merged. Don't ask Sid "ready to merge?" and don't hold a green PR for his
@@ -298,8 +295,8 @@ OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a hosted blocker that needs his
 deferral, a scope change, or a PR parked after its repair rounds.
 
 If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
-relaunch `release-manager` with the new verdicts (on a self-edit PR, the counting
-review is run (a); see "Self-edit PRs" in `pr-review.md`):
+relaunch `release-manager` with the new verdicts (on a self-edit PR, the
+counting review is run (a); see "Self-edit PRs" in `pr-review.md`):
 - a newest verdict names a sha other than the head, or the branch was just
   updated (`update-branch`): both reviews on the new head (one verified run
   covers both). While a Codex UNAVAILABLE gate is open, the run on the new head

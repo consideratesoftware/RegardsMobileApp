@@ -57,13 +57,12 @@ audited* table.
    order; use `.accessibilitySortPriority` only when the default is wrong.
    Every tappable view responds to the default accessibility action.
 9. **VoiceOver manual smoke in the pre-release device pass.** See
-   [`accessibility-smoke.md`](accessibility-smoke.md). A PR that changes UI
-   adds its steps to `TESTFLIGHT_PLAN.md`'s "Pre-release device pass", or names
-   a section of `accessibility-smoke.md` in place of copying them, as long as the
-   entry has its own Result line. The smoke is
-   not a merge gate (owner ruling, 2026-10-28). On a PR the gates are
-   the `pr-accessibility` review and the focused regressions; the broad
-   automated audits gate the release.
+   [`accessibility-smoke.md`](accessibility-smoke.md). A PR that changes UI adds
+   its steps to `TESTFLIGHT_PLAN.md`'s "Pre-release device pass", or names a
+   section of `accessibility-smoke.md` in place of copying them, as long as the
+   entry has its own Result line. The smoke is not a merge gate (owner ruling,
+   2026-10-28). On a PR the gates are the `pr-accessibility` review and the
+   focused regressions; the broad automated audits gate the release.
 10. **Documentation.** Every new screen gets a row in the table below.
 
 ## Labels mirror visible content

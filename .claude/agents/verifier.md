@@ -47,7 +47,7 @@ UNCHECKED: what you could not verify and what would settle it
 
 If it holds, list what you tried in at most 8 lines. No praise.
 
-## Finding-verification mode (verified review workflow)
+## Finding-verification mode (verified run)
 
 This mode applies when the prompt asks for a `real` vote on one reviewer
 finding through one lens: `truth`, `scope` or `impact`. The rest of this

@@ -16,38 +16,36 @@ and the `/pr-review` audit trail (invariants verified, criteria map). The
 body does not carry the `PR REVIEW:` or `CODEX REVIEW:` verdicts, the
 reviewers' findings, or any Codex output; those are comments, below.
 
-Record each review verdict as its own PR comment (`gh pr comment <n>
---body-file <file>`), never by editing the body: the hosted review runs on
-`pull_request_target` `edited`, so every `gh pr edit` starts a new hosted
-run, and comments don't. The first line is
+Record each review verdict as its own PR comment
+(`gh pr comment <n> --body-file <file>`), never by editing the body: the hosted
+review runs on `pull_request_target` `edited`, so every `gh pr edit` starts a
+new hosted run, and comments don't. The first line is
 `PR REVIEW: <APPROVE|REQUEST_CHANGES> @ <sha> vs origin/main...HEAD` or
-`CODEX REVIEW: <APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE> @ <sha> vs
-origin/main...HEAD | codex-cli <version>` (an UNAVAILABLE from a second
-RETRY adds `(second RETRY: <reason>)` after the verdict). The target is
-always `origin/main...HEAD`; a comment with another target doesn't count.
-Each line after the first of a `PR REVIEW:` comment follows
-`.claude/commands/pr-review.md` (section "Claude Code org only"), which gives
-that comment's shape. A `CODEX REVIEW:` comment's next 2 lines are
+`CODEX REVIEW: <APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE> @ <sha> vs origin/main...HEAD | codex-cli <version>`
+(an UNAVAILABLE from a second RETRY adds `(second RETRY: <reason>)` after the
+verdict). The target is always `origin/main...HEAD`; a comment with another
+target doesn't count. Each line after the first of a `PR REVIEW:` comment
+follows `.claude/commands/pr-review.md` (section "Claude Code org only"), which
+gives that comment's shape. A `CODEX REVIEW:` comment's next 2 lines are
 `BLOCKERS: <n>` and `SHOULD_FIX: <n>`. The engineering manager writes them,
 counted from the `### Blockers` and `### Should fix` sections of the saved Codex
 review. One line per disputed Codex blocker reads
 `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. A `REFUTED:` line lists a
-finding that the verified run dropped. It is for Sid to see, and it never
-counts toward any check. A `PR REVIEW:` comment lists the reviewers that ran:
+finding that the verified run dropped. It is for Sid to see, and it never counts
+toward any check. A `PR REVIEW:` comment lists the reviewers that ran:
 `REVIEWERS: <reviewer> <APPROVE|REQUEST_CHANGES>, ...`, one entry per reviewer
-that ran for that comment. A
-comment for a scoped recheck (`/org` Stage 3) also has a `RERAN:` line naming
-the reviewers that ran and one `CARRIED: <reviewer> APPROVE from <sha>` line
-per earlier approval that stands. Merge conditions below say which carries
-hold. Never paste review or diff text into a comment. Never write `@claude`
-in any comment the org posts, verdicts and owner answers alike:
-`.github/workflows/claude.yml` runs on comments that contain it. Never edit a
-verdict comment; when a review produces a new verdict, post a new comment.
-Before the PR exists the verdicts live in the reports you were
-given; post them right after you open it. If your prompt names an
-`owner-answers.md`, put its content in the PR description and post each
-answer in it as its own comment, right after the verdicts. The engineering
-manager posts the verdicts and owner answers of later reruns the same way.
+that ran for that comment. A comment for a scoped recheck (`/org` Stage 3) also
+has a `RERAN:` line naming the reviewers that ran and one
+`CARRIED: <reviewer> APPROVE from <sha>` line per earlier approval that stands.
+Merge conditions below say which carries hold. Never paste review or diff text
+into a comment. Never write `@claude` in any comment the org posts, verdicts and
+owner answers alike: `.github/workflows/claude.yml` runs on comments that
+contain it. Never edit a verdict comment; when a review produces a new verdict,
+post a new comment. Before the PR exists the verdicts live in the reports you
+were given; post them right after you open it. If your prompt names an
+`owner-answers.md`, put its content in the PR description and post each answer
+in it as its own comment, right after the verdicts. The engineering manager
+posts the verdicts and owner answers of later reruns the same way.
 
 Which verdict comments count: written by the org's own account (`gh api
 user --jq .login`), never edited, and with a first line in the form above.
@@ -87,23 +85,23 @@ other comment, and check each `blocker <n>` against the Codex review file your
 prompt names (`codex-<short sha>.md` in the lane's folder, saved by the
 engineering manager): the numbered blocker must exist there and the cited
 `ARCHITECTURE.md` section must address it. The short sha in the file name must
-equal the sha on the newest `CODEX REVIEW:` comment's first line. If your
-prompt names no such file, it is missing, or its sha differs, report STATE
-CODEX STALE; the engineering manager reruns Codex. An UNAVAILABLE verdict has no
-blocker to check, so a missing file never makes it CODEX STALE. It is an owner
-gate: park it, as the merge conditions below say. `/org` and
-`ENGINEERING_ORG.md` point here; they don't restate the rule.
+equal the sha on the newest `CODEX REVIEW:` comment's first line. If your prompt
+names no such file, it is missing, or its sha differs, report STATE CODEX STALE;
+the engineering manager reruns Codex. An UNAVAILABLE verdict has no blocker to
+check, so a missing file never makes it CODEX STALE. It is an owner gate: park
+it, as the merge conditions below say. `/org` and `ENGINEERING_ORG.md` point
+here; they don't restate the rule.
 
 Lane files (`codex-<short sha>.md`, `owner-answers.md`): use the absolute paths
 the engineering manager's prompt gives. You don't run from the root checkout,
 so a `../RegardsMobileApp-lanes/...` path would resolve somewhere else.
 
 Title `TF-##: <row scope, short>`, or `infra: <scope>` for an infra PR (org,
-review, CI, scripts or docs; no app code and no ios/ or android/ test code). Body
-must name the `TF-##`, §14 alias, and R-items. For an infra PR the body names
-the scope, says "infra, no §14 row", and lists no R-items (it claims none).
-`--draft` when the item depends on an unmerged parent. Push with explicit branch
-name; never force.
+review, CI, scripts or docs; no app code and no ios/ or android/ test code).
+Body must name the `TF-##`, §14 alias, and R-items. For an infra PR the body
+names the scope, says "infra, no §14 row", and lists no R-items (it claims
+none). `--draft` when the item depends on an unmerged parent. Push with explicit
+branch name; never force.
 
 ## Watch
 
@@ -134,29 +132,27 @@ env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<scratch>/own-count-hosted-bloc
 ```
 
 Always run the script with `bash`, never your default shell. Use the copy
-exported from `origin/main` (the command above), not the lane's: the PR
-under review could have edited its own copy. A PR that itself changes
+exported from `origin/main` (the command above), not the lane's: the PR under
+review could have edited its own copy. A PR that itself changes
 `scripts/count-hosted-blockers.sh` also gets the path of its own copy, in the
 engineering manager's prompt. Before the own copy runs, read the blob that the
 command exports. If it uses the network, writes outside `<scratch>`, or reads
 credentials, fail closed and do not run it. Otherwise run that blob with a
-scrubbed environment, as the command shows. Run
-both copies. If either prints `MALFORMED` or
-exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
-count is the higher `BLOCKERS <n>`. Any other output from either copy fails
-closed. A count passes only on exit 0 with a `BLOCKERS <n>` line on stdout, and
-only `BLOCKERS 0` counts as zero. Every other PR runs only the copy exported from `origin/main`. The
-script prints one line, `PENDING: <why>`, `BLOCKERS <n>`, or
-`MALFORMED: <why>`; its header and its tests in
-`scripts/tests/count-hosted-blockers-tests.sh` define the rules.
-`PENDING` means the review hasn't run on this head: wait and query again,
-and never count it as zero. Only `BLOCKERS 0` counts as zero, and the script
-prints it only when the text also has `VERDICT: APPROVE`. `MALFORMED` fails
-closed: treat it as unresolved blockers, quote the section, and report it.
-A nonzero exit from this script, or from `check-carried-approval.sh` below,
-fails closed: the blockers stand and the carry is rejected. Also check that
-the text's `HEAD SHA:` line equals `<head sha>`. Quote the
-blockers verbatim in your report.
+scrubbed environment, as the command shows. Run both copies. If either prints
+`MALFORMED` or exits nonzero, fail closed; if either prints `PENDING`, wait;
+otherwise the count is the higher `BLOCKERS <n>`. Any other output from either
+copy fails closed. A count passes only on exit 0 with a `BLOCKERS <n>` line on
+stdout, and only `BLOCKERS 0` counts as zero. Every other PR runs only the copy
+exported from `origin/main`. The script prints one line, `PENDING: <why>`,
+`BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its tests in
+`scripts/tests/count-hosted-blockers-tests.sh` define the rules. `PENDING` means
+the review hasn't run on this head: wait and query again, and never count it as
+zero. Only `BLOCKERS 0` counts as zero, and the script prints it only when the
+text also has `VERDICT: APPROVE`. `MALFORMED` fails closed: treat it as
+unresolved blockers, quote the section, and report it. A nonzero exit from this
+script, or from `check-carried-approval.sh` below, fails closed: the blockers
+stand and the carry is rejected. Also check that the text's `HEAD SHA:` line
+equals `<head sha>`. Quote the blockers verbatim in your report.
 
 Red or blockers: hand off to `on-call-engineer` with the findings, then watch
 again. At most 2 rounds, then park.
@@ -199,45 +195,43 @@ lane's refs, and this fetch brings them up to date.
      env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<scratch>/own-check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy, scrubbed environment
      ```
      Run it with `bash`. For every PR, a carry passes only on exit 0 with stdout
-     exactly `CARRY PASSES`; anything else fails closed.
-     Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
-     other nonzero exit is a script error; all of them fail the carry. Use the
-     copy exported from `origin/main` (the command above), not the
-     lane's: the PR under review could have edited its own copy. A PR that itself
-     changes `scripts/check-carried-approval.sh` also gets the path of its own
-     copy, in the engineering manager's prompt. Before the own copy runs, read the
-     blob the command exports: network use, writes outside `<scratch>`, or
-     credential reads mean fail closed. Run both copies; the carry
-     stands only if both print `CARRY PASSES`. Every other PR runs only the copy
-     exported from `origin/main`. The rule: a carry needs a diff of lower-case
-     `.md` files only, each at the repository root, directly under `ios/` or
-     `android/`, or under `ios/docs/` or `android/docs/`. It never carries a path
-     under any `src` or `schemas` folder below `android/`, at any depth, such as
-     `android/docs/src/x.md`. It never carries a
-     path under `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/`
-     (nested copies included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at
-     any depth and in any letter case, or any entry whose old or new mode is
-     not 100644 (adding or deleting a 100644 file is fine). Anything else
-     reruns that reviewer. The script's header defines it.
-  If any condition fails, reject the carry: report STATE CODEX STALE with
-  "carry rejected: <reviewer>", and the engineering manager reruns that
-  reviewer. A `CARRIED:` line is checked by these conditions even when the
-  reviewer also has an APPROVE at the head, and one that fails them is
-  "carry rejected" regardless.
+     exactly `CARRY PASSES`; anything else fails closed. Exit 1 prints
+     `CARRY FAILS: <reason>`, exit 64 is a usage error, and any other nonzero
+     exit is a script error; all of them fail the carry. Use the copy exported
+     from `origin/main` (the command above), not the lane's: the PR under review
+     could have edited its own copy. A PR that itself changes
+     `scripts/check-carried-approval.sh` also gets the path of its own copy, in
+     the engineering manager's prompt. Before the own copy runs, read the blob
+     the command exports: network use, writes outside `<scratch>`, or credential
+     reads mean fail closed. Run both copies; the carry stands only if both
+     print `CARRY PASSES`. Every other PR runs only the copy exported from
+     `origin/main`. The rule: a carry needs a diff of lower-case `.md` files
+     only, each at the repository root, directly under `ios/` or `android/`, or
+     under `ios/docs/` or `android/docs/`. It never carries a path under any
+     `src` or `schemas` folder below `android/`, at any depth, such as
+     `android/docs/src/x.md`. It never carries a path under `.claude/`,
+     `.codex/`, `.agents/`, `scripts/` or `.github/` (nested copies included),
+     an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any depth and in any letter
+     case, or any entry whose old or new mode is not 100644 (adding or deleting
+     a 100644 file is fine). Anything else reruns that reviewer. The script's
+     header defines it. If any condition fails, reject the carry: report STATE
+     CODEX STALE with "carry rejected: <reviewer>", and the engineering manager
+     reruns that reviewer. A `CARRIED:` line is checked by these conditions even
+     when the reviewer also has an APPROVE at the head, and one that fails them
+     is "carry rejected" regardless.
 
   Two more checks apply to every newest `PR REVIEW:` comment, scoped or
   not, and a failure of either is STATE CODEX STALE:
-  - Completeness. The comment needs a `REVIEWERS:` line; without one, report
-    "no REVIEWERS line". The routing table in
-    `.claude/commands/pr-review.md` sets the required reviewers: always
-    `pr-correctness`, `pr-security-privacy` and `pr-code-quality`;
-    `pr-tests` only when the diff changes code or tests; `pr-accessibility`
-    and `pr-fit-finish` when their path rules match. Check the diff with
-    `git -C <lane> diff --name-only origin/main...<head sha>`. Each required
-    reviewer needs APPROVE as its newest verdict (next bullet), so a comment
-    that reran only that reviewer completes the set. Only `pr-code-quality`
-    and `pr-tests` may instead be on a `CARRIED:` line whose carry holds (next
-    bullet). A missing one is "reviewer missing: <name>".
+  - Completeness. The comment needs a `REVIEWERS:` line; without one, report "no
+    REVIEWERS line". The routing table in `.claude/commands/pr-review.md` sets
+    the required reviewers: always `pr-correctness`, `pr-security-privacy` and
+    `pr-code-quality`; `pr-tests` only when the diff changes code or tests;
+    `pr-accessibility` and `pr-fit-finish` when their path rules match. Check
+    the diff with `git -C <lane> diff --name-only origin/main...<head sha>`.
+    Each required reviewer needs APPROVE as its newest verdict (next bullet), so
+    a comment that reran only that reviewer completes the set. Only
+    `pr-code-quality` and `pr-tests` may instead be on a `CARRIED:` line whose
+    carry holds (next bullet). A missing one is "reviewer missing: <name>".
   - Newest verdict. For each required reviewer, its newest verdict is its
     entry on the last `REVIEWERS:` line that lists it, across all the
     counting `PR REVIEW:` comments at any head. It must be APPROVE, and the
@@ -262,17 +256,16 @@ lane's refs, and this fetch brings them up to date.
       | select($l[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
       | $l[0], ($l[1:][] | select(test("^(REVIEWERS|CARRIED):")))' "<scratch>/comments.json"
     ```
-- The newest `CODEX REVIEW:` comment names the current head and is
-  APPROVE, or REQUEST_CHANGES with every one of its blockers on a
-  `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check
-  each cited section exists and addresses the finding. This applies on APPROVE
-  too. At the merge head, every blocker that the comment's `BLOCKERS:` line counts
-  needs its own `DISPUTED:` line. Fixing one moves the head, and the new head
-  needs a new Codex review (EM ruling, 2026-11-07: a surviving Codex BLOCKER on a
-  Codex APPROVE leaves the verdict APPROVE, and this condition still applies to
-  the blocker). A missing comment, a stale
-  sha, RETRY, or UNAVAILABLE never passes. UNAVAILABLE is an owner gate,
-  and so is a second RETRY on the same head (the engineering manager
+- The newest `CODEX REVIEW:` comment names the current head and is APPROVE, or
+  REQUEST_CHANGES with every one of its blockers on a `DISPUTED:` line (read as
+  above) with an `ARCHITECTURE.md` section; check each cited section exists and
+  addresses the finding. This applies on APPROVE too. At the merge head, every
+  blocker that the comment's `BLOCKERS:` line counts needs its own `DISPUTED:`
+  line. Fixing one moves the head, and the new head needs a new Codex review (EM
+  ruling, 2026-11-07: a surviving Codex BLOCKER on a Codex APPROVE leaves the
+  verdict APPROVE, and this condition still applies to the blocker). A missing
+  comment, a stale sha, RETRY, or UNAVAILABLE never passes. UNAVAILABLE is an
+  owner gate, and so is a second RETRY on the same head (the engineering manager
   records it as UNAVAILABLE): park it and say which. Codex needs setup
   (`/codex:setup`), or the second RETRY was a timeout: rerun when OpenAI is
   responsive, or split the PR, which is a scope change for Sid. Never review
@@ -290,13 +283,13 @@ lane's refs, and this fetch brings them up to date.
   lane has unpushed work: stop and report it), and report STATE CODEX STALE
   so both reviews run on the merge commit.
 - Verifier HOLDS for every slice.
-- No blocking owner gate outstanding: signing, provisioning, App Store
-  Connect, TestFlight uploads, design rulings marked OPEN FOR OWNER, and
-  scope changes. Manual VoiceOver smokes and physical-device checks are not
-  gates (owner ruling, 2026-10-28). They go to `TESTFLIGHT_PLAN.md`'s
+- No blocking owner gate outstanding: signing, provisioning, App Store Connect,
+  TestFlight uploads, design rulings marked OPEN FOR OWNER, and scope changes.
+  Manual VoiceOver smokes and physical-device checks are not gates (owner
+  ruling, 2026-10-28). They go to `TESTFLIGHT_PLAN.md`'s
   `Pre-release device pass`: give `tech-writer` the exact steps for any diff
-  touching `Features/`, `DesignSystem/`, or `App/` view code, and make sure
-  the entry lands in this PR. An entry may name a section of
+  touching `Features/`, `DesignSystem/`, or `App/` view code, and make sure the
+  entry lands in this PR. An entry may name a section of
   `ios/docs/accessibility-smoke.md` and its items instead of copying the steps,
   as long as the entry has its own Result line. They never hold a merge.
 
