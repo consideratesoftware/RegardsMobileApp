@@ -32,10 +32,15 @@ export const meta = {
 //      and coverage holes are returned untouched for Stage 2.
 //   3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when all of
 //      these hold: at least 1 of its findings was refuted, none of its
-//      BLOCKERs survived, it has no NOT CHECKED entry, its blockerCount (its
-//      own BLOCKERS count) equals the number of BLOCKER findings it listed,
-//      and (pr-code-quality only) none of its FIX findings survived.
-//   4. A pr-* reviewer with a surviving BLOCKER of its own is REQUEST_CHANGES.
+//      BLOCKERs survived, it has no NOT CHECKED entry, and (pr-code-quality
+//      only) none of its FIX findings survived. Rule 4 applies first.
+//   4. A pr-* reviewer is REQUEST_CHANGES, whatever it reported, when it has a
+//      surviving BLOCKER of its own; when its blockerCount (its own BLOCKERS
+//      count) is not a whole number equal to the BLOCKER findings it listed;
+//      or when its report text is not empty and the first line starting with
+//      "VERDICT:" is not exactly "VERDICT: <the verdict it returned>". These
+//      checks cover an APPROVE too, so an APPROVE cannot hide a blocker the
+//      reviewer counted but did not list.
 //   5. Codex's verdict is always Codex's own. The verifiers never change it.
 //      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
 //      UNAVAILABLE come back as written, so a Codex that could not review is
@@ -211,7 +216,7 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. ${NOT_CHECKED_RULE} Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Set blockerCount to the number on your BLOCKERS line, or 0 if your report has none. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. ${NOT_CHECKED_RULE} Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Set blockerCount to the number on your BLOCKERS line, or 0 if your report has none. Put your whole report, verbatim, in rawSummary; its first \`VERDICT:\` line must say the verdict you return. Then return the structured result.` }))
 if (a.codex) {
   reviewers.push({ type: 'codex-reviewer', schema: CODEX_FINDINGS, prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
@@ -262,15 +267,25 @@ function verdictAfterVerification(reviewer, review, verified) {
   // counts as "nothing was left unchecked".
   const nothingUnchecked = Array.isArray(review.notChecked) && review.notChecked.length === 0
   if (!nothingUnchecked) return 'REQUEST_CHANGES'
-  if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
-  const refutedSomething = verified.some(v => !v.survives)
   // The reviewer's own blocker count has to match the BLOCKER findings it
   // listed. A blocker it counted and did not list was never checked by a
-  // verifier, so a refuted finding beside it cannot clear the REQUEST_CHANGES.
+  // verifier, so no verdict, an APPROVE included, can stand on that report
+  // (rule 4).
   const blockersListed = review.findings.filter(f => f.severity === 'BLOCKER').length
-  const blockersAccountedFor = Number.isInteger(review.blockerCount) && review.blockerCount === blockersListed
+  if (!Number.isInteger(review.blockerCount) || review.blockerCount !== blockersListed) return 'REQUEST_CHANGES'
+  // The report text has to say the verdict the reviewer returned. The first
+  // line that starts with "VERDICT:" must be exactly "VERDICT: <verdict>". A
+  // report with no such line, or one that echoes the template
+  // "VERDICT: APPROVE | REQUEST_CHANGES", does not say it (rule 4). A reviewer
+  // that returned no report text has nothing to compare.
+  if (review.rawSummary) {
+    const verdictLine = review.rawSummary.split('\n').find(line => line.startsWith('VERDICT:'))
+    if (verdictLine === undefined || verdictLine.trim() !== `VERDICT: ${review.verdict}`) return 'REQUEST_CHANGES'
+  }
+  if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
+  const refutedSomething = verified.some(v => !v.survives)
   const qualityFixSurvived = reviewer === 'pr-code-quality' && verified.some(v => v.severity === 'FIX' && v.survives)
-  return refutedSomething && blockersAccountedFor && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
+  return refutedSomething && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
 }
 
 phase('Synthesize')

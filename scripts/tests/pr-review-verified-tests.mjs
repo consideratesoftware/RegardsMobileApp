@@ -396,6 +396,106 @@ test('a Codex review without a blockerCount keeps the Codex verdict', async () =
   assert.equal(verdictOf(result, 'codex-reviewer'), 'REQUEST_CHANGES')
 })
 
+// An APPROVE can stand only on a report that is consistent with itself: the
+// blockers it counted are the blockers it listed (so a verifier saw each one),
+// and its text says the verdict it returned (rule 4).
+test('a pr-* APPROVE that counted blockers it did not list is REQUEST_CHANGES', async () => {
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('APPROVE', [], { blockerCount: 2 }) },
+  })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
+  assert.equal(result.verdicts[0].reportedVerdict, 'APPROVE')
+})
+
+test('a pr-* APPROVE with no blockerCount, or one that is not a whole number, is REQUEST_CHANGES', async () => {
+  for (const blockerCount of [undefined, null, '0', 0.5, NaN]) {
+    const { result } = await runWorkflow({
+      reviews: { 'pr-correctness': review('APPROVE', [], { blockerCount }) },
+    })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES', String(blockerCount))
+  }
+  const noField = review('APPROVE')
+  delete noField.blockerCount
+  const { result } = await runWorkflow({ reviews: { 'pr-correctness': noField } })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES', 'no blockerCount field')
+})
+
+test('a pr-* APPROVE that lists fewer BLOCKERs than it counted, or more, is REQUEST_CHANGES', async () => {
+  // The listed BLOCKER is refuted, so it is not what holds the verdict back.
+  for (const blockerCount of [0, 2]) {
+    const { result } = await runWorkflow({
+      reviews: { 'pr-correctness': review('APPROVE', [finding('BLOCKER', 'Alpha.swift:10')], { blockerCount }) },
+      votes: { 'Alpha.swift:10': [false, false, false] },
+    })
+    assert.equal(result.refuted.length, 1)
+    assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES', `a count of ${blockerCount} for 1 listed`)
+  }
+})
+
+test('a pr-* APPROVE whose report says VERDICT: REQUEST_CHANGES is REQUEST_CHANGES', async () => {
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('APPROVE', [], { rawSummary: 'VERDICT: REQUEST_CHANGES\nBLOCKERS: 0\n' }) },
+  })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
+  assert.equal(result.verdicts[0].reportedVerdict, 'APPROVE')
+})
+
+test('a pr-* APPROVE with a blockerCount of 0, no findings and a matching report stays APPROVE', async () => {
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('APPROVE', [], { blockerCount: 0, rawSummary: 'VERDICT: APPROVE\nBLOCKERS: 0\n' }) },
+  })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
+})
+
+test('the first VERDICT: line of a pr-* report must be exactly the verdict it returned', async () => {
+  const cases = [
+    ['the verdict on the first line', 'VERDICT: APPROVE\nBLOCKERS: 0', 'APPROVE'],
+    ['a trailing carriage return', 'VERDICT: APPROVE\r\nBLOCKERS: 0', 'APPROVE'],
+    ['trailing spaces', 'VERDICT: APPROVE   \nBLOCKERS: 0', 'APPROVE'],
+    ['the VERDICT line after other lines', 'INVARIANTS VERIFIED: x\nVERDICT: APPROVE', 'APPROVE'],
+    ['no VERDICT line at all', 'INVARIANTS VERIFIED: x\nBLOCKERS: 0', 'REQUEST_CHANGES'],
+    ['the contract template echoed', 'VERDICT: APPROVE | REQUEST_CHANGES\nBLOCKERS: 0', 'REQUEST_CHANGES'],
+    ['a different verdict first, the same one later', 'VERDICT: REQUEST_CHANGES\nVERDICT: APPROVE', 'REQUEST_CHANGES'],
+    ['an indented VERDICT line', '  VERDICT: APPROVE', 'REQUEST_CHANGES'],
+    ['a bold VERDICT line', '**VERDICT:** APPROVE', 'REQUEST_CHANGES'],
+    ['a lower-case verdict word', 'VERDICT: approve', 'REQUEST_CHANGES'],
+    ['a lower-case VERDICT label', 'verdict: APPROVE', 'REQUEST_CHANGES'],
+    ['text after the verdict word', 'VERDICT: APPROVE with findings', 'REQUEST_CHANGES'],
+    ['only white space', '   \n  ', 'REQUEST_CHANGES'],
+  ]
+  for (const [what, rawSummary, expected] of cases) {
+    const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { rawSummary }) } })
+    assert.equal(verdictOf(result, 'pr-correctness'), expected, what)
+  }
+  // A reviewer that returned no report text has nothing to compare.
+  for (const rawSummary of ['', undefined]) {
+    const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { rawSummary }) } })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE', `rawSummary ${JSON.stringify(rawSummary)}`)
+  }
+})
+
+test('a refutation cannot flip a REQUEST_CHANGES whose report says VERDICT: APPROVE', async () => {
+  const reviews = rawSummary => ({
+    'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { rawSummary }),
+  })
+  const votes = { 'Alpha.swift:10': [false, false, false] }
+  const mismatch = await runWorkflow({ reviews: reviews('VERDICT: APPROVE\nBLOCKERS: 1'), votes })
+  assert.equal(verdictOf(mismatch.result, 'pr-correctness'), 'REQUEST_CHANGES')
+  // The same review with a report that agrees flips, as rule 3 says.
+  const agrees = await runWorkflow({ reviews: reviews('VERDICT: REQUEST_CHANGES\nBLOCKERS: 1'), votes })
+  assert.equal(verdictOf(agrees.result, 'pr-correctness'), 'APPROVE')
+})
+
+test('a pr-* reviewer is told its first VERDICT: line must match the verdict it returns, and Codex is not', async () => {
+  const { calls } = await runWorkflow({
+    args: { codex: true },
+    reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
+  })
+  const prPrompt = calls.find(c => c.opts.agentType === 'pr-correctness').prompt
+  assert.match(prPrompt, /its first `VERDICT:` line must say the verdict you return/)
+  assert.doesNotMatch(calls.find(c => c.opts.agentType === 'codex-reviewer').prompt, /first `VERDICT:` line/)
+})
+
 test('a BLOCKER with votes real, real, false survives and keeps REQUEST_CHANGES', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
@@ -1177,7 +1277,7 @@ test('a synthesizer that returns nothing does not erase the findings', async () 
 })
 
 test('a pr-* reviewer\'s whole report comes back on its verdict, and its prompt asks for it', async () => {
-  const report = 'INVARIANTS VERIFIED: x'
+  const report = 'VERDICT: APPROVE\nINVARIANTS VERIFIED: x'
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-security-privacy', 'pr-tests'] },
     reviews: {
