@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Fixture tests for scripts/check-carried-approval.sh. Each case builds a
 # change on top of a base commit in a throwaway repository and checks the
-# script's exit status: 0 = the carry is allowed, 1 = it fails.
+# script's exit status and its output text: exit 0 with the output
+# CARRY PASSES means the carry is allowed, and exit 1 with an output starting
+# "CARRY FAILS: " means it fails. The usage case checks exit 64 only.
 #
 # CARRY_CHECKER=<path> runs the cases against another copy of the script, for
 # mutation checks (remove one rule, confirm the matching case then fails).
@@ -356,7 +358,9 @@ no_tmp_output="$(PATH="$work/bin:$PATH" bash "$checker" "$repo" "$base" "$base" 
 no_tmp=$?
 backwards_output="$(bash "$checker" "$repo" "$sibling_a" "$sibling_b" 2>&1)"
 backwards=$?
-bash "$checker" "$repo" deadbeef "$base" > /dev/null 2>&1
+# git writes "fatal: Not a valid object name" to stderr ahead of the CARRY
+# FAILS line, so this case reads stdout only.
+bad_sha_output="$(bash "$checker" "$repo" deadbeef "$base" 2>/dev/null)"
 bad_sha=$?
 bash "$checker" > /dev/null 2>&1
 usage=$?
@@ -367,7 +371,8 @@ echo 'PASS: a non-ancestor sha fails'
 [[ "$no_tmp" -eq 1 && "$no_tmp_output" == CARRY\ FAILS:* ]] \
   || { echo "FAIL: a failed mktemp should print CARRY FAILS and exit 1, got $no_tmp: $no_tmp_output" >&2; exit 1; }
 echo 'PASS: a failed mktemp prints CARRY FAILS'
-[[ "$bad_sha" -eq 1 ]] || { echo "FAIL: an unknown sha should fail, got $bad_sha" >&2; exit 1; }
+[[ "$bad_sha" -eq 1 && "$bad_sha_output" == CARRY\ FAILS:* ]] \
+  || { echo "FAIL: an unknown sha should print CARRY FAILS and exit 1, got $bad_sha: $bad_sha_output" >&2; exit 1; }
 echo 'PASS: an unknown sha fails'
 [[ "$usage" -eq 64 ]] || { echo "FAIL: usage error should exit 64, got $usage" >&2; exit 1; }
 echo 'PASS: usage error exits 64'
