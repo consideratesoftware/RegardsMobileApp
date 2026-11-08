@@ -181,10 +181,11 @@ struct SchedulingPassCancellationTests {
 
     /// Two contacts each hold a pending cadence row: the first is due at
     /// 18:00, the second is 25 days out. Both leave the snapshot (archived,
-    /// untracked) after 18:00 and no run covers them. The sweep marks the due
-    /// row fired, since the pass treats a due row as delivered (§9), and
-    /// cancels the future one. Both contacts come back a day later: the fired
-    /// row is held, the future one is scheduled again.
+    /// untracked) after 18:00, so only the orphan sweep reaches their rows:
+    /// `runFull()` sweeps both, and `run(for:)` sweeps the contact it names.
+    /// The sweep marks the due row fired, since the pass treats a due row as
+    /// delivered (§9), and cancels the future one. Both contacts come back a
+    /// day later: the fired row is held, the future one is scheduled again.
     @Test(
         "The orphan sweep fires a due row and cancels a future one",
         arguments: RepositoryContractBackend.allCases, Sweep.allCases
@@ -232,9 +233,9 @@ struct SchedulingPassCancellationTests {
         try await fixture.repositories.contacts.upsert(future)
         try await fixture.pass.runFull()
 
-        let delivered = try #require(try await fixture.row(dueID))
-        #expect(delivered.state == .fired)
-        #expect(delivered.scheduledFor == dueSlot)
+        let fired = try #require(try await fixture.row(dueID))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == dueSlot)
         #expect(try await fixture.cadenceRow(due) == nil)
         #expect(try await fixture.cadenceRow(future)?.scheduledFor == futureSlot)
     }
@@ -290,10 +291,10 @@ struct SchedulingPassCancellationTests {
 
         try await fixture.pass.runFull()
 
-        let delivered = try #require(try await fixture.row(fixture.cadenceID(contact)))
-        #expect(delivered.state == .fired)
-        #expect(delivered.scheduledFor == PassFixture.at("2026-06-10 18:00"))
-        #expect(delivered.snoozedUntil == nil)
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        #expect(fired.snoozedUntil == nil)
         #expect(try await fixture.cadenceRow(contact) == nil)
         #expect(await fixture.reminders.writeCount == writes)
     }
