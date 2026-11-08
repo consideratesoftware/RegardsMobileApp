@@ -500,9 +500,10 @@ test('a reviewer whose run throws is still listed, as FAILED', async () => {
   assert.deepEqual(result.verdicts.map(v => `${v.reviewer}=${v.verdict}`), ['pr-correctness=FAILED', 'pr-tests=APPROVE'])
 })
 
-test('badArgsThrow: a bad head, or a reviewer that is not a known pr-* name, throws before any agent runs', async () => {
+test('badArgsThrow: a bad head, reviewer list or text arg throws before any agent runs', async () => {
   const badHead = /head must be/
   const badReviewers = /reviewers must be/
+  const text = key => new RegExp(`${key} must be a non-empty string`)
   const bad = [
     [{ head: 'abc1234' }, badHead],
     [{ head: HEAD.slice(0, 39) }, badHead],
@@ -519,6 +520,19 @@ test('badArgsThrow: a bad head, or a reviewer that is not a known pr-* name, thr
     [{ reviewers: ['pr-'] }, badReviewers],
     [{ reviewers: 'pr-tests' }, badReviewers],
     [{ reviewers: [] }, badReviewers],
+    [{ reviewers: ['pr-tests', 'pr-tests'] }, /reviewers must not repeat/],
+    [{ reviewers: ['pr-tests', 'pr-correctness', 'pr-tests'] }, /reviewers must not repeat/],
+    // The 4 text args go into every prompt.
+    [{ title: undefined }, text('title')],
+    [{ title: '' }, text('title')],
+    [{ title: '   ' }, text('title')],
+    [{ worktree: undefined }, text('worktree')],
+    [{ worktree: '' }, text('worktree')],
+    [{ branch: undefined }, text('branch')],
+    [{ branch: '' }, text('branch')],
+    [{ contextFile: undefined }, text('contextFile')],
+    [{ contextFile: '' }, text('contextFile')],
+    [{ contextFile: 42 }, text('contextFile')],
   ]
   for (const [args, message] of bad) {
     const calls = []

@@ -13,14 +13,14 @@ export const meta = {
 // read its header for how they run this file without Claude Code.
 //
 // args:
-//   title        short name of the PR
-//   worktree     path of the lane worktree
-//   branch       branch name
+//   title        short name of the PR (non-empty)
+//   worktree     path of the lane worktree (non-empty)
+//   branch       branch name (non-empty)
 //   head         full 40-character lower-case sha of the head to review
 //   since        scoped recheck only: the sha of the last full review
 //   reviewers    the Stage 1 set: names from KNOWN_REVIEWERS below, no others
 //   codex        true to add the Codex review
-//   contextFile  the lane's review-context.md (the TF row and R-numbers)
+//   contextFile  the lane's review-context.md (the TF row and R-numbers) (non-empty)
 //
 // Rules this script enforces:
 //   1. A finding is refuted only when 2 of its 3 verifiers explicitly say
@@ -136,8 +136,19 @@ const KNOWN_REVIEWERS = ['pr-correctness', 'pr-security-privacy', 'pr-tests', 'p
 if (!/^[0-9a-f]{40}$/.test(a.head)) {
   throw new Error(`head must be a full 40-character lower-case hex sha, got: ${a.head}`)
 }
+// These four go into every prompt. A missing one would put the word "undefined"
+// in front of the agent, most harmfully in place of the context file the scope
+// verifier reads.
+for (const key of ['title', 'worktree', 'branch', 'contextFile']) {
+  if (typeof a[key] !== 'string' || a[key].trim() === '') {
+    throw new Error(`${key} must be a non-empty string, got: ${JSON.stringify(a[key])}`)
+  }
+}
 if (!Array.isArray(a.reviewers) || a.reviewers.length === 0 || !a.reviewers.every(r => KNOWN_REVIEWERS.includes(r))) {
   throw new Error(`reviewers must be a non-empty array of names from ${KNOWN_REVIEWERS.join(', ')}, got: ${JSON.stringify(a.reviewers)}`)
+}
+if (new Set(a.reviewers).size !== a.reviewers.length) {
+  throw new Error(`reviewers must not repeat a name, got: ${JSON.stringify(a.reviewers)}`)
 }
 
 // The focus line goes into the pr-* review and verify prompts only. Codex
