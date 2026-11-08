@@ -159,13 +159,20 @@ three-dot target compares against the merge base, so commits that landed on
 `main` after the lane branched don't show up as reversions. Treat blockers
 from both the same way: they go to the slice owner (design questions to
 `tech-lead` first), one round, then both review again. In a verified run, send
-each `workOrder` item by its `owner`: `on-call-engineer` (scripts, CI and
-workflow scripts) (before Stage 4, launch it in pre-PR mode: say no PR is open
-yet and give the lane worktree, branch and items), `tech-writer`, `qa-engineer`,
-`ios-engineer` and `senior-ios-engineer` to that role; `EM-body` items you apply
-to the PR body
-yourself; `tech-lead-ruling` items to `tech-lead`; `owner-question` items to an
-interview with Sid. Drop a Codex finding
+each `workOrder` item by its `owner`:
+
+- `on-call-engineer`: scripts, CI and workflow scripts.
+- `tech-writer`: prose.
+- `qa-engineer`: test files.
+- `ios-engineer` or `senior-ios-engineer`: production code, to that role.
+- `EM-body`: PR body items, which you apply to the PR body yourself.
+- `tech-lead-ruling`: design items, to `tech-lead`.
+- `owner-question`: an interview with Sid.
+
+Before Stage 4, launch `on-call-engineer` in pre-PR mode: say no PR is open yet,
+and give the lane worktree, branch and items.
+
+Drop a Codex finding
 only when it contradicts `ARCHITECTURE.md`; you write the dispute on a
 `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
 comment, as `/pr-review` does for its own findings.
@@ -278,7 +285,8 @@ OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a hosted blocker that needs his
 deferral, a scope change, or a PR parked after its repair rounds.
 
 If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
-relaunch `release-manager` with the new verdicts:
+relaunch `release-manager` with the new verdicts (on a self-edit PR, the counting
+review is run (a); see "Self-edit PRs" in `pr-review.md`):
 - a newest verdict names a sha other than the head, or the branch was just
   updated (`update-branch`): both reviews on the new head (one verified run
   covers both). While a Codex UNAVAILABLE gate is open, the run on the new head
