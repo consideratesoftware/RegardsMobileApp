@@ -269,7 +269,8 @@ struct AppLaunchCoordinatorReconciliationTests {
             window: base.window,
             profile: base.profile
         )
-        try await environment.profile.save(onboardedProfile)
+        try await environment.profile.save(UserProfile(
+            onboardingCompletedAt: now, entitlementTier: .trial, entitlementRefreshedAt: now, trialStartedAt: now))
         // Talked yesterday on a 30-day cadence: the row's slot is weeks ahead,
         // so no run marks it fired and only the archive can remove it.
         let leaving = Contact(
@@ -318,7 +319,8 @@ struct AppLaunchCoordinatorReconciliationTests {
     @Test("A replayed store change is followed by a scheduling pass before start returns")
     func replayedStoreChangeIsFollowedByAPass() async throws {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
-        try await environment.profile.save(onboardedProfile)
+        try await environment.profile.save(UserProfile(
+            onboardingCompletedAt: now, entitlementTier: .trial, entitlementRefreshedAt: now, trialStartedAt: now))
         let leaving = Contact(
             systemContactRef: "gone-r", displayName: "Leaving", tracked: true, cadenceDays: 30,
             lastInteractedAt: now.addingTimeInterval(-86_400), createdAt: now.addingTimeInterval(-90 * 86_400))
@@ -350,15 +352,6 @@ struct AppLaunchCoordinatorReconciliationTests {
         let archived = try await environment.contacts.fetch(id: leaving.id)
         #expect(archived?.archivedAt != nil)
         #expect(try await environment.reminders.fetchPending(forContact: leaving.id).isEmpty)
-    }
-
-    private var onboardedProfile: UserProfile {
-        UserProfile(
-            onboardingCompletedAt: now,
-            entitlementTier: .trial,
-            entitlementRefreshedAt: now,
-            trialStartedAt: now
-        )
     }
 
     func coordinator(
