@@ -16,6 +16,8 @@ enum ScriptedRequestStep: Sendable {
 }
 
 actor ScriptedNotifications: NotificationScheduling {
+    // MARK: - State
+
     private var status: NotificationAuthorizationStatus
     private var steps: [ScriptedRequestStep]
     private(set) var requestCount = 0
@@ -56,6 +58,8 @@ actor ScriptedNotifications: NotificationScheduling {
         self.holdsRemaining = heldReads
     }
 
+    // MARK: - Authorization
+
     nonisolated var actions: AsyncStream<NotificationAction> {
         AsyncStream { $0.finish() }
     }
@@ -86,6 +90,8 @@ actor ScriptedNotifications: NotificationScheduling {
     func setStatus(_ newStatus: NotificationAuthorizationStatus) {
         status = newStatus
     }
+
+    // MARK: - Scheduling
 
     /// Scheduling members: a pending set keyed by identifier like the
     /// system's (`schedule` replaces, `cancel` removes), plus a record of every
@@ -150,6 +156,8 @@ actor ScriptedNotifications: NotificationScheduling {
             delivered.append(request)
         }
     }
+
+    // MARK: - Held status reads
 
     var heldReadCount: Int { heldReads.count }
 
