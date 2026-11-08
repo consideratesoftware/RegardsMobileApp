@@ -89,10 +89,10 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.cadenceRow(contact) == row)
     }
 
-    /// A failed log restores the snooze with its floor, and the next run
-    /// keeps it. Passes on the old two-step code too; it fails if the restore
-    /// is dropped, because the row would stay `userCaughtUp` and the run
-    /// would then write a floorless row at the overdue slot.
+    /// A failed log puts the snoozed row back as it was, floor included, and
+    /// the next run keeps it. Fails if the restore is dropped: the row would
+    /// stay `userCaughtUp`, and the run would then write a floorless row at
+    /// the overdue slot.
     @Test(
         "A failed Caught up throws, leaves the snoozed row as it was, and the next run keeps its floor",
         .timeLimit(.minutes(1)),

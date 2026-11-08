@@ -117,7 +117,8 @@ struct SchedulingPassFiredRowTests {
         var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 18:00"), in: fixture)
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
-        // Settles the mock backend's seed cast; the fired row is held.
+        // The mock backend's seed cast has no rows until a run writes them. This run does,
+        // so the write count below covers only the run after the rollback.
         try await fixture.pass.runFull()
         #expect(try await fixture.row(fired.id) == fired)
         fixture.setNow("2026-06-10 17:00")
@@ -171,9 +172,6 @@ struct SchedulingPassFiredRowTests {
         var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 18:00"), in: fixture)
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
-        // Settles the mock backend's seed cast; the fired row is held.
-        try await fixture.pass.runFull()
-        #expect(try await fixture.row(fired.id) == fired)
 
         // The window now opens at 18:30. The 18:00 row is still held.
         let range = TimeRange(start: TimeOfDay(hour: 18, minute: 30), end: TimeOfDay(hour: 19))
@@ -357,7 +355,8 @@ struct SchedulingPassFiredRowTests {
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
         fixture.setNow(EngineFixtures.date("2026-11-01T00:05:00-07:00"))
-        // Settles the mock backend's seed cast; the fired row is held.
+        // The mock backend's seed cast has no rows until a run writes them. This run does,
+        // so the last run below writes only this contact's row.
         try await fixture.pass.runFull()
         #expect(try await fixture.row(fired.id) == fired)
         fixture.setNow(EngineFixtures.date("2026-11-01T00:10:00-07:00"))

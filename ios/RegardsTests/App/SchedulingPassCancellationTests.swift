@@ -263,11 +263,12 @@ struct SchedulingPassCancellationTests {
         #expect(try await fixture.row(id)?.state == .fired)
     }
 
-    /// The contact is untracked right after its 18:00 slot delivered. Tracked
-    /// again, in the same slot or the next day, it is overdue on the same
-    /// cycle, so the fired row holds and the run writes nothing.
+    /// The contact is untracked at 18:01, after its 18:00 row came due, so the
+    /// orphan sweep marks that row fired. Tracked again, in the same slot or
+    /// the next day, it is overdue on the same cycle, so the fired row holds
+    /// and the run writes nothing.
     @Test(
-        "A re-tracked contact is not notified again for the slot that was delivered",
+        "A re-tracked contact is not notified again for the slot that already fired",
         arguments: RepositoryContractBackend.allCases, ["2026-06-10 18:30", "2026-06-11 10:00"]
     )
     func reTrackedContactIsNotNotifiedAgainForItsDeliveredSlot(
@@ -299,7 +300,7 @@ struct SchedulingPassCancellationTests {
     /// A birthday at 09:00 and a cadence row (moved to 06-11 by contract 6)
     /// are both pending when the contact is untracked at 09:30. The sweep
     /// fires the due birthday and cancels the future cadence row. Tracked
-    /// again at 10:00, the birthday is not delivered a second time.
+    /// again at 10:00, the birthday row stays fired and no pending one returns.
     @Test(
         "The orphan sweep fires a due occasion row and cancels a future cadence row",
         arguments: RepositoryContractBackend.allCases
