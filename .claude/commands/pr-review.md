@@ -168,7 +168,7 @@ workflow's `workOrder`. Send each one to its owner, as Stage 3 says.
   location, claim and votes. Each vote names a `lens` (`truth`, `scope` or
   `impact`) and `real` (`true`, `false` or `'failed'`).
 
-Don't post APPROVE while a reviewer is `FAILED` or has any verdict other than
+Don't post APPROVE while a pr-* reviewer is `FAILED` or has any verdict other than
 APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The workflow
 passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle Codex by
 its case:
