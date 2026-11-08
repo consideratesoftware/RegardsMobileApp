@@ -322,8 +322,10 @@ return {
     } else if (review.verdict !== 'REQUEST_CHANGES') {
       verdict = review.verdict
     } else {
-      // A REQUEST_CHANGES flips to APPROVE only when something was refuted and,
-      // for pr-code-quality, no FIX finding survived (rule 3).
+      // Reaching here means no BLOCKER of its own survived, notChecked is empty,
+      // and blockerCount and the report passed rule 4 (the branches above). A
+      // REQUEST_CHANGES then flips to APPROVE only when something was refuted
+      // and, for pr-code-quality, no FIX finding survived (rule 3).
       const refutedSomething = d.verified.some(v => !v.survives)
       const qualityFixSurvived = d.reviewer === 'pr-code-quality' && d.verified.some(v => v.severity === 'FIX' && v.survives)
       verdict = refutedSomething && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
