@@ -35,7 +35,7 @@ export const meta = {
 //      BLOCKERs survived, it has no NOT CHECKED entry, its blockerCount (its
 //      own BLOCKERS count) equals the number of BLOCKER findings it listed,
 //      and (pr-code-quality only) none of its FIX findings survived.
-//   4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
+//   4. A pr-* reviewer with a surviving BLOCKER of its own is REQUEST_CHANGES.
 //   5. Codex's verdict is always Codex's own. The verifiers never change it.
 //      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
 //      UNAVAILABLE come back as written, so a Codex that could not review is

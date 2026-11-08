@@ -614,6 +614,23 @@ test('a pr-code-quality APPROVE with a surviving FIX stays APPROVE: the FIX clau
   assert.equal(result.survivors.length, 2)
 })
 
+// Pin: rule 4 is about the reviewer's own BLOCKER. A BLOCKER that survives in
+// another pr-* reviewer, or in Codex, leaves this reviewer's verdict alone.
+test('a surviving BLOCKER changes only the verdict of the reviewer that raised it', async () => {
+  const { result } = await runWorkflow({
+    args: { reviewers: ['pr-security-privacy', 'pr-tests'], codex: true },
+    reviews: {
+      'pr-security-privacy': review('APPROVE', [finding('BLOCKER', 'Secret.swift:3')]),
+      'pr-tests': review('APPROVE'),
+      'codex-reviewer': review('APPROVE', [finding('BLOCKER', 'Codex.swift:7')]),
+    },
+    votes: { 'Secret.swift:3': [true, true, true], 'Codex.swift:7': [true, true, true] },
+  })
+  assert.equal(verdictOf(result, 'pr-security-privacy'), 'REQUEST_CHANGES')
+  assert.equal(verdictOf(result, 'pr-tests'), 'APPROVE')
+  assert.equal(verdictOf(result, 'codex-reviewer'), 'APPROVE')
+})
+
 test('an APPROVE reviewer whose BLOCKER survives becomes REQUEST_CHANGES', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-security-privacy'] },
