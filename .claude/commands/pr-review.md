@@ -320,14 +320,14 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
   `<lens>` names the verifiers that voted `real=false`.
 - The paraphrase is your own words: at most 15 words, one physical line, no
   `@`. Never paste reviewer text.
-- Fast-follow rule. Owner ruling, 2026-11-08 (PR #72 comment 6724444034): when
-  a round ends with `BLOCKERS: 0`, you may carry every remaining should-fix,
+- Fast-follow rule. Owner ruling, 2026-11-08 (PR #72 comment 6724444034): when a
+  round ends with `BLOCKERS: 0`, you may carry every remaining should-fix,
   Codex's included, to a named fast-follow PR. Add one
   `FAST-FOLLOW: <named PR>: <items>` line: the PR's number, or the queue item
   that will open it, then each carried item. A reviewer's REQUEST_CHANGES
   carries only when every finding behind it is a should-fix. A BLOCKER, a NOT
-  CHECKED entry, a FAILED reviewer or a rule 4 check is fixed or rerun, never
-  carried. `REVIEWERS:` keeps each reviewer's own verdict. A carried
+  CHECKED entry, a FAILED reviewer or a failed rule 4 check is fixed or rerun,
+  never carried. `REVIEWERS:` keeps each reviewer's own verdict. A carried
   REQUEST_CHANGES holds only at this comment's head, and it is never a
   `CARRIED:` source.
 - `release-manager.md` reads the first line and the `BLOCKERS:`, `REVIEWERS:`,

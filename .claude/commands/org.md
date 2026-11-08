@@ -304,7 +304,7 @@ lists `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
 also pass the absolute path of the lane worktree's copy of each listed script,
 labeled as the PR's own copy of that script. The release manager exports that
 copy from the head sha, reads that file, fails closed on network use, writes
-outside `<scratch>` or credential reads and otherwise runs that same file under
+outside `<scratch>` or credential reads, and otherwise runs that same file under
 `env -i PATH=/usr/bin:/bin HOME=<scratch> TMPDIR=<scratch>`, as Stage 1 says. It
 opens the PR, watches CI and the hosted review, routes repairs, records the
 checkpoint via `tech-writer`, and merges only when all merge conditions in
