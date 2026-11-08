@@ -213,8 +213,10 @@ APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The workflow
 passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle Codex by
 its case:
 
-- No Codex verdict (its entry is `FAILED`, or `codexReview` is null): rerun
-  `codex-reviewer` alone and use its report.
+- No Codex verdict on a run with `codex: true` (its entry is `FAILED`, or
+  `codexReview` is null): rerun `codex-reviewer` alone and use its report. On a
+  run with `codex: false` (an open UNAVAILABLE gate), don't launch it; the gate
+  waits for Sid (`org.md` Stage 3).
 - RETRY: the one automatic rerun that `org.md` Stage 3 allows. A second RETRY
   on that head, a timeout included, is an owner gate.
 - UNAVAILABLE: an owner gate. Interview Sid before rerunning it (`org.md`
