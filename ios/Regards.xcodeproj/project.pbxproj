@@ -159,6 +159,7 @@
 		9D872359157DA01ECDBB62A0 /* RepositoryFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0ABE512E2B05FB378890460 /* RepositoryFakes.swift */; };
 		A014E843B51D4756241CEE84 /* MergeDuplicatesViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E06DD4E5622574D16D1559B7 /* MergeDuplicatesViewModelTests.swift */; };
 		A1E87B76C389D824AE7CD74D /* SettingsNotificationsHostingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43C83076CB67828B7C40E17 /* SettingsNotificationsHostingTests.swift */; };
+		A4D82212A458F42B0030D583 /* DatabaseMigratorV4Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3327C7AC957F1135BB3FF4 /* DatabaseMigratorV4Tests.swift */; };
 		A5D9F43AF9DAEB2B469E469C /* ContactsSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11810902C3217ECA1F287118 /* ContactsSource.swift */; };
 		A708FFAF946E893F9E9A686D /* Records.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41C65FC7F190CCD94311E1CA /* Records.swift */; };
 		A8875687A7350049E9019ACE /* OverdueViewModelActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFEAB693894E205010B8179E /* OverdueViewModelActionTests.swift */; };
@@ -502,6 +503,7 @@
 		EA3C46E8CED7412E12D16392 /* DayOfWeek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayOfWeek.swift; sourceTree = "<group>"; };
 		EA572793D3C00A1A6C26838A /* UpcomingViewModel+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UpcomingViewModel+Formatting.swift"; sourceTree = "<group>"; };
 		EEAC7D0796929127167DE692 /* ReminderWindowsScreenAnnouncementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowsScreenAnnouncementTests.swift; sourceTree = "<group>"; };
+		EF3327C7AC957F1135BB3FF4 /* DatabaseMigratorV4Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseMigratorV4Tests.swift; sourceTree = "<group>"; };
 		EF960DCF1CFBA791F6A75D44 /* NotificationCallerGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCallerGateTests.swift; sourceTree = "<group>"; };
 		EFCB01A0AB276C59369DCF5F /* ContactRepositoryOverrideFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactRepositoryOverrideFallbackTests.swift; sourceTree = "<group>"; };
 		F0554DB8A736749004658979 /* NotificationFakeParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationFakeParityTests.swift; sourceTree = "<group>"; };
@@ -565,6 +567,7 @@
 				C34F3B77FC1249E22E2AB870 /* DatabaseEncodingTests.swift */,
 				0F801281CA1EC0111165A9B8 /* DatabaseMigratorTests.swift */,
 				AA0ED82A6D4AF73A19B55814 /* DatabaseMigratorV3Tests.swift */,
+				EF3327C7AC957F1135BB3FF4 /* DatabaseMigratorV4Tests.swift */,
 				23563203660E749AE7290FAB /* MockOccasionSeedingTests.swift */,
 				7ABF76C0C5D07E0E054F54E3 /* MockRepositoriesTests.swift */,
 				E76FF8E82467D75A2AB9932C /* ReconciledFieldsContractTests.swift */,
@@ -1233,6 +1236,7 @@
 				C55A581F07D2B3ACC5964E9E /* DatabaseEncodingTests.swift in Sources */,
 				1047270A81B933694BD9B8F8 /* DatabaseMigratorTests.swift in Sources */,
 				25AED5127B2A6248E63C5447 /* DatabaseMigratorV3Tests.swift in Sources */,
+				A4D82212A458F42B0030D583 /* DatabaseMigratorV4Tests.swift in Sources */,
 				70BDE3ED7D6ECD99828DE4A2 /* DeepLinkBuilderTests.swift in Sources */,
 				99AB35948075A597695E82D5 /* DispatchWaitHelpers.swift in Sources */,
 				480ADB8111662E1E1846371C /* DuplicateDetectorTests.swift in Sources */,
