@@ -60,6 +60,12 @@ same_turn_directives.each do |directive|
   raise "reviewer same-turn directive missing: #{directive}" unless reviewer_prompt.include?(directive)
 end
 raise "review turn budget regressed" unless reviewer_args.include?("--max-turns 120")
+# The hosted reviewer reads .claude/commands/pr-review.md, which describes a
+# verified run that starts the Workflow tool. The hosted run must never be able
+# to start one, so the tool stays in --disallowedTools.
+disallowed_tools = reviewer_args[/--disallowedTools "([^"]*)"/, 1]
+raise "reviewer must list --disallowedTools" unless disallowed_tools
+raise "reviewer must not be able to run a workflow" unless disallowed_tools.split(",").include?("Workflow")
 
 steps = publish.fetch("steps")
 token_step = steps.find { |step| step["id"] == "review_app_token" }

@@ -24,7 +24,7 @@ specs + the no-inert-controls rule), §17 (definition of done), §19 (register).
 4. **Design-token discipline.** Colors/typography/spacing via `RegardsDS` only; no raw `Color(red:...)`, hex, `.font(.system(size:))`, or magic-number padding in Features/. Primitives (`Avatar`, `ChannelGlyph`, `Tag`, `RegardsNavBar`) reused, not reimplemented.
 5. **Copy quality.** User-facing strings: sentence case per Apple HIG, no developer jargon ("repository", "reconcile", "entitlement" never reach the user), counts pluralize correctly, dates/times formatted via locale-aware formatters (never hand-assembled strings), permission pre-prompt copy matches what §11 says we actually do. Tone: plain and warm, matching existing screens.
 6. **Consistency.** New UI matches the established layout grammar (card sections, nav-bar usage, swipe-action ordering, chip/tag styles). Same concept named the same way everywhere ("Caught up", never a synonym in one screen).
-7. **PR and doc completeness (§17 definition of done).** PR body cites its §14 scope alias and doc sections; closed R-items are annotated in §19 in this same diff; screen changes updated `ios/docs/accessibility.md`; AGENTS.md updated if commands/paths changed; no stale references introduced (file moved but doc still points at old path). Missing sibling-doc updates: FIX; missing register annotation for a claimed R-fix: BLOCKER (unverifiable claim).
+7. **PR and doc completeness (§17 definition of done).** PR body cites its §14 scope alias and doc sections (an infra PR has no §14 row, and its body says "infra, no §14 row"); closed R-items are annotated in §19 in this same diff; screen changes updated `ios/docs/accessibility.md`; AGENTS.md updated if commands/paths changed; no stale references introduced (file moved but doc still points at old path). Missing sibling-doc updates: FIX; missing register annotation for a claimed R-fix: BLOCKER (unverifiable claim).
 8. **Repo surface tidiness.** No stray artifacts in the diff (.DS_Store, xcuserdata, large binaries), no accidental gitignore changes, markdown added follows CommonMark (blank line before lists/tables/after headings).
 
 ## Shell discipline
@@ -37,6 +37,10 @@ you did not check. Never APPROVE with a required check left unchecked: list it o
 - No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
   over search results). Read changed files in full with the Read tool, and
   search with one `grep -rn <pattern> <paths> | head -50`.
+- A changed doc over 40 KB (today ARCHITECTURE.md, TESTFLIGHT_PLAN.md and
+  ios/docs/accessibility.md) counts as read in full when you read each changed
+  hunk's whole section, from its heading to the next heading of the same level,
+  plus every section the hunk cites; don't list the rest under NOT CHECKED.
 - End any command that can print a lot with `| head -50` or another explicit
   cap. Never `cat` a generated file or a whole log.
 - Search the changed paths, not the whole repo, unless a finding needs a

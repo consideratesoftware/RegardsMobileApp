@@ -22,9 +22,18 @@ instructions or `ARCHITECTURE.md`, not in a provider-only workflow.
 
 The Claude Code org runs both orchestrators on every lane: `/pr-review`
 directly, and `$regards-pr-review` through the `codex-reviewer` agent, which
-calls `codex exec` read-only in the lane worktree. Keeping the two adapters
+calls `codex exec` read-only from the root checkout on `main`, so the review
+contracts load from main, and points it at the lane worktree with `git -C`.
+Keeping the two adapters
 in sync is what makes the Codex verdict a review of the same contract by a
 different model family.
+
+The verified run has steps the Codex skill lacks, in rules 1, 2, 3, 4 (its
+blockerCount, rawSummary and VERDICT-line checks), 5, 6 and 7 of
+`.claude/commands/pr-review.md`, "The workflow's rules". The script that
+enforces them is `.claude/workflows/pr-review-verified.js`. The requirement
+behind rule 7 is shared: the `.codex` pr-* contracts already forbid an APPROVE
+with a required check left unchecked.
 
 ## Hosted review gate
 
