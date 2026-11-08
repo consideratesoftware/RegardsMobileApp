@@ -86,7 +86,9 @@ engineering manager): the numbered blocker must exist there and the cited
 `ARCHITECTURE.md` section must address it. The short sha in the file name must
 equal the sha on the newest `CODEX REVIEW:` comment's first line. If your
 prompt names no such file, it is missing, or its sha differs, report STATE
-CODEX STALE; the engineering manager reruns Codex. `/org` and
+CODEX STALE; the engineering manager reruns Codex. An UNAVAILABLE verdict has no
+blocker to check, so a missing file never makes it CODEX STALE. It is an owner
+gate: park it, as the merge conditions below say. `/org` and
 `ENGINEERING_ORG.md` point here; they don't restate the rule.
 
 Lane files (`codex-<short sha>.md`, `owner-answers.md`): use the absolute paths

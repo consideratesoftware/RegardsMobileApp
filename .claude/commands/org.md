@@ -178,7 +178,8 @@ record it as `CODEX REVIEW: UNAVAILABLE (second RETRY: <reason>) @ <sha> vs
 origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
 of rerunning again. A RETRY after a repair moved the head is the first RETRY
 on the new head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the
-owner gate in `ENGINEERING_ORG.md`. RETRY and UNAVAILABLE runs don't use up a
+owner gate in `ENGINEERING_ORG.md`. This holds with or without a saved codex
+file: an UNAVAILABLE is never rerun automatically. RETRY and UNAVAILABLE runs don't use up a
 review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
@@ -261,8 +262,8 @@ covers both);
   repeats every `CARRIED:` line that still stands;
 - no `REVIEWERS:` line on the newest `PR REVIEW:` comment: `/pr-review` in
   full;
-- the Codex review file is missing or its sha differs: Codex, and save the
-  new file;
+- the Codex review file is missing or its sha differs, and the verdict is not
+  UNAVAILABLE (an owner gate, Stage 1): Codex, and save the new file;
 - more than 100 comments: check the PR's verdict comments yourself, and
   repost any that scrolled out of the newest 100.
 
