@@ -888,7 +888,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 3. Full test action green locally: `xcodebuild -project Regards.xcodeproj -scheme Regards -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -onlyUsePackageVersionsFromResolvedFile test`.
 4. UI/test-code touched → focused affected accessibility regressions green; repeated stress is owned by nightly/pre-release automation unless investigating a reproduced flake or validating a release candidate.
 5. New/changed screens → accessibility audit test + row in `ios/docs/accessibility.md` + VoiceOver smoke steps in the pre-release device pass (owner ruling, 2026-10-28).
-6. §14 acceptance criteria for the PR demonstrably met (device test where the criteria say "on device"). An infra PR (org, review, CI or scripts; no app or test code) has no §14 row; its body says "infra, no §14 row".
+6. §14 acceptance criteria for the PR demonstrably met (device test where the criteria say "on device"). An infra PR (org, review, CI or scripts; no app code and no ios/ or android/ test code) has no §14 row; its body says "infra, no §14 row".
 7. Doc siblings updated (this file, CLAUDE.md if commands/paths changed, accessibility.md).
 8. No new warnings (they're errors anyway), no force-unwraps in Domain, no `@unchecked Sendable` without a written justification comment.
 
