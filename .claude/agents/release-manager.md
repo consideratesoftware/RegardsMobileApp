@@ -202,7 +202,9 @@ lane's refs, and this fetch brings them up to date.
      stands only if both print `CARRY PASSES`. Every other PR runs only the copy
      exported from `origin/main`. The rule: a carry needs a diff of lower-case
      `.md` files only, each at the repository root, directly under `ios/` or
-     `android/`, or under `ios/docs/` or `android/docs/`. It never carries a
+     `android/`, or under `ios/docs/` or `android/docs/`. Under `android/`, it
+     never carries a path under `android/*/src/` or `android/*/schemas/`, such as
+     `android/docs/src/x.md`. It never carries a
      path under `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/`
      (nested copies included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at
      any depth and in any letter case, or any entry whose old or new mode is
