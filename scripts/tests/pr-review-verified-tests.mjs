@@ -960,7 +960,7 @@ test('the Codex prompt carries its safeguards', async () => {
     reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
   })
   const prompt = calls.find(c => c.opts.agentType === 'codex-reviewer').prompt
-  assert.match(prompt, /Run `git fetch origin main` first\./)
+  assert.match(prompt, /Run `git -C \/tmp\/worktree fetch origin main` first\./)
   assert.match(prompt, /Never report APPROVE unless Codex did\./)
   // The whole review comes back verbatim, and its first line is the verdict
   // line that codexLine reads.
@@ -1389,8 +1389,10 @@ test('the prompts name a scoped recheck only when since is given', async () => {
 
 // Pin: an agent that is not told the head, worktree, branch, context file and
 // target would review whatever it finds, and one that is not told the review is
-// read-only could edit files or post to GitHub.
-test('every agent prompt names the head, worktree, branch, context file and target, and says the review is read-only', async () => {
+// read-only could edit files or post to GitHub. An agent's session starts in
+// the root checkout, not in the PR, so each prompt also says to run git with
+// -C and to read files by absolute path under the worktree.
+test('every agent prompt names the head, worktree, branch, context file and target, says the review is read-only, and says the session is not the PR', async () => {
   const { calls } = await runWorkflow({
     args: { reviewers: ['pr-correctness'], codex: true },
     reviews: {
@@ -1406,7 +1408,7 @@ test('every agent prompt names the head, worktree, branch, context file and targ
       'verify:pr-correctness:impact', 'verify:pr-correctness:scope', 'verify:pr-correctness:truth'],
   )
   for (const c of calls) {
-    for (const text of ['Test PR', HEAD, '/tmp/worktree', 'test-branch', '/tmp/worktree/review-context.md', 'origin/main...HEAD', 'No commits land during this review.', 'Do not edit files or post to GitHub.']) {
+    for (const text of ['Test PR', HEAD, '/tmp/worktree', 'test-branch', '/tmp/worktree/review-context.md', 'origin/main...HEAD', 'No commits land during this review.', 'Do not edit files or post to GitHub.', 'Your session is not the PR. Run every git command as `git -C /tmp/worktree ...` and read files by absolute path under /tmp/worktree.']) {
       assert.ok(c.prompt.includes(text), `${c.opts.label} does not name ${text}`)
     }
   }

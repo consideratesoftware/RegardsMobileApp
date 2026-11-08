@@ -209,7 +209,7 @@ if (new Set(a.reviewers).size !== a.reviewers.length) {
 // pr-* findings only. Codex always reviews all of origin/main...HEAD, so neither
 // its prompt nor the verify prompts for its findings get it.
 const scopedRecheck = a.since ? ` This is a scoped recheck: focus on \`git diff ${a.since}..${a.head}\` plus anything it can break.` : ''
-const base = `${a.title}. Worktree ${a.worktree}, branch ${a.branch}, head ${a.head}. Target: origin/main...HEAD. Context, scope, rulings and owner decisions: ${a.contextFile}. No commits land during this review. Do not edit files or post to GitHub.`
+const base = `${a.title}. Worktree ${a.worktree}, branch ${a.branch}, head ${a.head}. Target: origin/main...HEAD. Your session is not the PR. Run every git command as \`git -C ${a.worktree} ...\` and read files by absolute path under ${a.worktree}. Context, scope, rulings and owner decisions: ${a.contextFile}. No commits land during this review. Do not edit files or post to GitHub.`
 
 // The order of LENSES is the order of each finding's votes.
 const LENSES = [
@@ -221,7 +221,7 @@ const LENSES = [
 phase('Review')
 const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. ${NOT_CHECKED_RULE} Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Set blockerCount to the number on your BLOCKERS line, or 0 if your report has none. Put your whole report, verbatim, in rawSummary; its first \`VERDICT:\` line must say the verdict you return. Then return the structured result.` }))
 if (a.codex) {
-  reviewers.push({ type: 'codex-reviewer', schema: CODEX_FINDINGS, prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
+  reviewers.push({ type: 'codex-reviewer', schema: CODEX_FINDINGS, prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git -C ${a.worktree} fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
 
 const results = await pipeline(
