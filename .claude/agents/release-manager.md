@@ -99,7 +99,7 @@ the engineering manager's prompt gives. You don't run from the root checkout,
 so a `../RegardsMobileApp-lanes/...` path would resolve somewhere else.
 
 Title `TF-##: <row scope, short>`, or `infra: <scope>` for an infra PR (org,
-review, CI or scripts; no app code and no ios/ or android/ test code). Body
+review, CI, scripts or docs; no app code and no ios/ or android/ test code). Body
 must name the `TF-##`, §14 alias, and R-items. For an infra PR the body names
 the scope, says "infra, no §14 row", and lists no R-items (it claims none). `--draft` when the item depends on an unmerged parent. Push
 with explicit branch name; never force.
