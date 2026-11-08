@@ -12,10 +12,14 @@
 # pass it. The 4 root instruction-file cases (root_claude_local_md,
 # root_architecture_md, root_agents_md, root_claude_md) are the exception:
 # they sit at the root, which the allowlist also passes, so they too fail only
-# on their exclusion. Deleting that exclusion from the script then breaks that
-# case and no other. The script has no exclusion for a behavior folder at the
-# root, so the cases there (.claude/x.md and the like) fail on the allowlist
-# alone and check the outcome.
+# on their exclusion. Deleting one pattern from the script's exclusion list
+# breaks its own case. Three patterns also break another case (checked by
+# deleting each pattern in turn): `*/.claude/*` breaks upper_claude_dir too,
+# `CLAUDE*.md` breaks root_claude_local_md too, and `*/AGENTS*.md` breaks
+# nested_agents_override_md and lower_case_agents_override_md too. The script
+# has no exclusion for a behavior folder at the root, so the cases there
+# (.claude/x.md and the like) fail on the allowlist alone and check the
+# outcome.
 
 set -euo pipefail
 
