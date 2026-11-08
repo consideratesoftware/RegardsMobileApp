@@ -61,7 +61,9 @@ lane="$1"
 from="$2"
 to="$3"
 
-tmp="$(mktemp -d)" || fail "cannot create a temp directory"
+# A template, because a bare mktemp -d on macOS ignores TMPDIR.
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/check-carried-approval.XXXXXX")" \
+  || fail "cannot create a temp directory"
 trap 'rm -rf "$tmp"' EXIT
 
 git -C "$lane" merge-base --is-ancestor "$from" "$to" \

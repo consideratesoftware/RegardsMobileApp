@@ -353,9 +353,23 @@ mkdir "$work/bin"
 printf '#!/bin/sh\nexit 1\n' > "$work/bin/mktemp"
 chmod +x "$work/bin/mktemp"
 
+# A mktemp that logs its arguments, then runs the real one. The real one is
+# found before PATH changes, so the shim never calls itself.
+real_mktemp="$(command -v mktemp)"
+mkdir "$work/rec-bin" "$work/tmpdir"
+cat > "$work/rec-bin/mktemp" <<SHIM
+#!/bin/sh
+echo "\$@" >> "$work/mktemp-args"
+exec "$real_mktemp" "\$@"
+SHIM
+chmod +x "$work/rec-bin/mktemp"
+
 set +e
 no_tmp_output="$(PATH="$work/bin:$PATH" bash "$checker" "$repo" "$base" "$base" 2>&1)"
 no_tmp=$?
+# A passing carry (sibling_a only changes an ios/docs .md file) with TMPDIR set.
+tmpdir_output="$(PATH="$work/rec-bin:$PATH" TMPDIR="$work/tmpdir" bash "$checker" "$repo" "$base" "$sibling_a" 2>&1)"
+tmpdir_status=$?
 backwards_output="$(bash "$checker" "$repo" "$sibling_a" "$sibling_b" 2>&1)"
 backwards=$?
 # git writes "fatal: Not a valid object name" to stderr ahead of the CARRY
@@ -368,6 +382,12 @@ set -e
 [[ "$backwards" -eq 1 && "$backwards_output" == CARRY\ FAILS:* ]] \
   || { echo "FAIL: a non-ancestor carry should print CARRY FAILS and exit 1, got $backwards: $backwards_output" >&2; exit 1; }
 echo 'PASS: a non-ancestor sha fails'
+# On macOS a bare mktemp -d ignores TMPDIR, so the script has to pass a
+# template.
+mktemp_args="$(cat "$work/mktemp-args" 2>/dev/null || true)"
+[[ "$tmpdir_status" -eq 0 && "$tmpdir_output" == "CARRY PASSES" && " $mktemp_args" == *" $work/tmpdir/"* ]] \
+  || { echo "FAIL: with TMPDIR set, the carry should pass and mktemp should get a template under TMPDIR, got $tmpdir_status: $tmpdir_output; mktemp args: $mktemp_args" >&2; exit 1; }
+echo 'PASS: the temp folder is made under TMPDIR'
 [[ "$no_tmp" -eq 1 && "$no_tmp_output" == CARRY\ FAILS:* ]] \
   || { echo "FAIL: a failed mktemp should print CARRY FAILS and exit 1, got $no_tmp: $no_tmp_output" >&2; exit 1; }
 echo 'PASS: a failed mktemp prints CARRY FAILS'
