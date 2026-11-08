@@ -37,9 +37,9 @@ public actor SchedulingPass {
     private let occasions: @Sendable ([Contact]) async -> [ContactOccasion]
     private let clock: @Sendable () -> Date
 
-    /// Contacts whose effective window has zero capacity, as of the last run that covered them
-    /// (§9 contract 2, R4). They get no cadence row; occasion rows ignore capacity (contract 4).
-    /// TF-07g shows the Settings badge from this.
+    /// Cadence-eligible contacts whose effective window has zero capacity, as of the last run that
+    /// covered them (§9 contract 2, R4). They get no cadence row; occasion rows ignore capacity
+    /// (contract 4). TF-07g shows the Settings badge from this.
     public private(set) var zeroCapacityContactIds: Set<UUID> = []
 
     /// One FIFO lock over every mutation (R59). Each mutation suspends
