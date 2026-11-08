@@ -25,9 +25,11 @@ run, and comments don't. The first line is
 origin/main...HEAD | codex-cli <version>` (an UNAVAILABLE from a second
 RETRY adds `(second RETRY: <reason>)` after the verdict). The target is
 always `origin/main...HEAD`; a comment with another target doesn't count.
-Each line after the first follows `.claude/commands/pr-review.md` (section
-"Claude Code org only"), which also gives the verdict comment's shape. One
-line per disputed Codex blocker reads
+Each line after the first of a `PR REVIEW:` comment follows
+`.claude/commands/pr-review.md` (section "Claude Code org only"), which gives
+that comment's shape. A `CODEX REVIEW:` comment's next 2 lines are Codex's own
+counts, `BLOCKERS: <n>` and `SHOULD_FIX: <n>`. One line per disputed Codex
+blocker reads
 `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>`. A `REFUTED:` line lists a
 finding that the verified run dropped. It is for Sid to see, and it never
 counts toward any check. A `PR REVIEW:` comment lists the reviewers that ran:
