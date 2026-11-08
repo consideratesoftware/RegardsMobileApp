@@ -262,10 +262,11 @@ lane's refs, and this fetch brings them up to date.
   APPROVE, or REQUEST_CHANGES with every one of its blockers on a
   `DISPUTED:` line (read as above) with an `ARCHITECTURE.md` section; check
   each cited section exists and addresses the finding. This applies on APPROVE
-  too: every blocker that the comment's `BLOCKERS:` line counts needs its own
-  `DISPUTED:` line (EM ruling, 2026-11-07: a surviving Codex BLOCKER on a Codex
-  APPROVE leaves the verdict APPROVE, and this condition still applies to the
-  blocker). A missing comment, a stale
+  too. At the merge head, every blocker that the comment's `BLOCKERS:` line counts
+  needs its own `DISPUTED:` line. Fixing one moves the head, and the new head
+  needs a new Codex review (EM ruling, 2026-11-07: a surviving Codex BLOCKER on a
+  Codex APPROVE leaves the verdict APPROVE, and this condition still applies to
+  the blocker). A missing comment, a stale
   sha, RETRY, or UNAVAILABLE never passes. UNAVAILABLE is an owner gate,
   and so is a second RETRY on the same head (the engineering manager
   records it as UNAVAILABLE): park it and say which. Codex needs setup
