@@ -173,10 +173,11 @@ struct SchedulingPassCancellationTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
-    /// Pin. The contact fired as overdue under a 7-day cadence on 05-08, and the cadence is then lengthened to
-    /// 30 days (overdue 05-31) with no interaction in between. The contact is still overdue, and the anchor has
-    /// not moved, so the fired row stands for this cycle. Its slot (05-08 18:00) is before the new overdue
-    /// slot (05-31 18:00), so only the anchor fallback holds it. The converse of
+    /// The contact fired as overdue under a 7-day cadence on 05-08 (stored cycle 05-08 10:00), and the cadence is
+    /// then lengthened to 30 days (overdue 05-31) with no interaction in between. The contact is still overdue,
+    /// and the anchor has not moved, so the fired row stands for this cycle. Its stored cycle is before the new
+    /// overdue time, so only the anchor fallback holds it, and it stores the new cycle (05-31 10:00) on the row
+    /// in one upsert. Later runs find the stored cycle and write nothing. The converse of
     /// `dueRowIsRederivedWhenTheCadenceLengthens`, where the new overdue time is still ahead.
     @Test(
         "A cadence lengthened while the contact is still overdue keeps the fired row",
@@ -189,15 +190,25 @@ struct SchedulingPassCancellationTests {
         let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
         #expect(fired.scheduledFor == PassFixture.at("2026-05-08 18:00"), "overdue at 10:00, joined the 18:00 slot")
         #expect(fired.state == .fired)
+        #expect(fired.firedCycle == PassFixture.at("2026-05-08 10:00"))
         fixture.setNow("2026-06-10 10:00")
         var longer = contact
         longer.cadenceDays = 30
         try await fixture.repositories.contacts.upsert(longer)
+        let writes = await fixture.reminders.writeCount
 
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.row(fired.id) == fired)
+        var stamped = fired
+        stamped.firedCycle = PassFixture.at("2026-05-31 10:00")
+        #expect(try await fixture.row(fired.id) == stamped)
         #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes + 1, "the stamp is one upsert")
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == stamped)
+        #expect(await fixture.reminders.writeCount == writes + 1)
     }
 
     // MARK: - The orphan sweep (§9 "Notification fired", §13)

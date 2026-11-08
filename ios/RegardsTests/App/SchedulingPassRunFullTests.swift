@@ -339,10 +339,10 @@ struct SchedulingPassRunFullTests {
 
     /// A pending row due at 18:00 for a contact overdue by a 7-day cadence.
     /// Lengthening the cadence to 60 days makes the contact not overdue, so
-    /// the no-re-nag guard no longer holds and the row follows the new due date.
+    /// the no-re-nag guard no longer holds and the row follows the new due date,
+    /// with the new overdue time as its cycle.
     @Test(
-        "A due row is derived again when the cadence lengthens past it",
-        arguments: RepositoryContractBackend.allCases
+        "A due row is derived again when the cadence lengthens past it", arguments: RepositoryContractBackend.allCases
     )
     func dueRowIsRederivedWhenTheCadenceLengthens(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
@@ -357,6 +357,7 @@ struct SchedulingPassRunFullTests {
 
         // 2026-05-01 10:00 plus 60 days is 06-30 10:00.
         #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-30 18:00"))
+        #expect(try await fixture.cadenceRow(contact)?.firedCycle == PassFixture.at("2026-06-30 10:00"))
     }
 
     // MARK: - Cadence anchor and slot (§9 contract 3, R8, R48)

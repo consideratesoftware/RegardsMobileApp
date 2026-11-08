@@ -91,6 +91,138 @@ extension SchedulingPassFiredRowTests {
         }
     }
 
+    // MARK: - Cadence edits then a clock rollback
+
+    /// A cadence edit moves the cycle once. The contact fired as overdue on 05-08 (7 days after 05-01 10:00).
+    /// On 06-10 the cadence becomes 30 days (overdue 05-31 10:00), still in the past, so the first run stores
+    /// the new cycle on the fired row: one upsert. A clock set back before 05-31 10:00, and then moved past it,
+    /// must not derive a pending row for 05-31 18:00, as the pass before the cycle was stored did.
+    @Test(
+        "A cadence edit then a clock rollback does not re-arm a fired cadence row",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func cadenceEditThenClockRollbackDoesNotReArm(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-05-08 18:30")
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == PassFixture.at("2026-05-08 18:00"), "overdue at 10:00, joined the 18:00 slot")
+        #expect(fired.firedCycle == PassFixture.at("2026-05-08 10:00"))
+        fixture.setNow("2026-06-10 10:00")
+        var longer = contact
+        longer.cadenceDays = 30
+        try await fixture.repositories.contacts.upsert(longer)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        var stamped = fired
+        stamped.firedCycle = PassFixture.at("2026-05-31 10:00")
+        #expect(try await fixture.row(fired.id) == stamped)
+        #expect(await fixture.reminders.writeCount == writes + 1, "the stamp is one upsert")
+
+        for clock in ["2026-05-20 10:00", "2026-05-31 18:01"] {
+            fixture.setNow(clock)
+            try await fixture.pass.runFull()
+
+            #expect(try await fixture.row(fired.id) == stamped, "at \(clock)")
+            #expect(try await fixture.cadenceRow(contact) == nil, "at \(clock)")
+            #expect(await fixture.reminders.writeCount == writes + 1, "at \(clock)")
+        }
+    }
+
+    /// The hold is `firedCycle >= overdueAt`, not `==`. The contact fired at its 30-day overdue time (05-31
+    /// 10:00), then the cadence is shortened to 7 days (overdue 05-08 10:00) with no run in between. The stored
+    /// cycle is after the new overdue time, and a clock set back to before that time must not re-arm the row.
+    @Test(
+        "A shortened cadence then a clock rollback does not re-arm a fired cadence row",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func shortenedCadenceThenClockRollbackDoesNotReArm(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-05-31 18:30")
+        let contact = try await fixture.addContact(1, cadenceDays: 30, lastInteracted: "2026-05-01 10:00")
+        try await fixture.pass.runFull()
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == PassFixture.at("2026-05-31 18:00"), "overdue at 10:00, joined the 18:00 slot")
+        #expect(fired.firedCycle == PassFixture.at("2026-05-31 10:00"))
+        var shorter = contact
+        shorter.cadenceDays = 7
+        try await fixture.repositories.contacts.upsert(shorter)
+        fixture.setNow("2026-05-07 10:00")
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
+    // MARK: - Rows written before v4
+
+    /// A cadence row written before v4 has no cycle. The first run gives it the contact's overdue time and
+    /// leaves its slot, state and floor as they were: one upsert, then nothing. A pending row is rewritten by the
+    /// derivation; a due fired row by the anchor fallback.
+    @Test(
+        "A cadence row written before v4 gets its cycle on the first run, with its slot, state and floor unchanged",
+        arguments: RepositoryContractBackend.allCases, [ReminderState.pending, .fired]
+    )
+    func preV4CadenceRowGetsItsCycleOnTheFirstRun(
+        backend: RepositoryContractBackend, state: ReminderState
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        // The mock backend's seed cast has no rows until a run writes them. This run writes them, so the
+        // counts below cover only the runs after the seed.
+        try await fixture.pass.runFull()
+        let isPending = state == .pending
+        let seeded = ScheduledReminder(
+            id: fixture.cadenceID(contact),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: PassFixture.at(isPending ? "2026-06-17 18:00" : "2026-06-02 18:00"),
+            osNotificationId: "contact-\(contact.id.uuidString)-cadence",
+            state: state,
+            snoozedUntil: PassFixture.at(isPending ? "2026-06-17 10:00" : "2026-06-02 10:00"))
+        try await fixture.repositories.reminders.upsert(seeded)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        var stamped = seeded
+        stamped.firedCycle = PassFixture.at("2026-05-08 10:00")
+        #expect(try await fixture.row(seeded.id) == stamped)
+        #expect(await fixture.reminders.writeCount == writes + 1)
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(seeded.id) == stamped)
+        #expect(await fixture.reminders.writeCount == writes + 1)
+    }
+
+    // MARK: - Snooze
+
+    /// Snooze stores the cycle the run derives for the row, so the next run finds nothing to change. A Snooze
+    /// that wrote no cycle would make every run rewrite each snoozed row once.
+    @Test("A snoozed row is not rewritten by the next run", arguments: RepositoryContractBackend.allCases)
+    func snoozedRowIsNotRewrittenByTheNextRun(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        // The mock backend's seed cast has no rows until a run writes them. This run does.
+        try await fixture.pass.runFull()
+        #expect(try await fixture.pass.snooze(contactId: contact.id))
+        let snoozed = try #require(try await fixture.cadenceRow(contact))
+        #expect(snoozed.firedCycle == PassFixture.at("2026-05-08 10:00"))
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.cadenceRow(contact) == snoozed)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
     // MARK: - Occasion rolled back a year
 
     /// A fired occasion holds every occurrence up to its day, not only the same day. A clock set back a year
