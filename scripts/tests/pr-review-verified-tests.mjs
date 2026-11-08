@@ -626,6 +626,25 @@ test('the prompts name a scoped recheck only when since is given', async () => {
   assert.match(scoped.calls[0].prompt, new RegExp(`git diff ${since}\\.\\.${HEAD}`))
 })
 
+test('a scoped recheck reaches the pr-* reviewers and their verifiers, never Codex', async () => {
+  const since = 'f'.repeat(40)
+  const { calls } = await runWorkflow({
+    args: { since, codex: true },
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]),
+      'codex-reviewer': review('APPROVE'),
+    },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  const focus = new RegExp(`git diff ${since}\\.\\.${HEAD}`)
+  const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
+  assert.doesNotMatch(codexCall.prompt, /scoped recheck|git diff/)
+  assert.match(calls.find(c => c.opts.label === 'review:pr-correctness').prompt, focus)
+  const checks = verifierCalls(calls)
+  assert.equal(checks.length, 3)
+  for (const c of checks) assert.match(c.prompt, focus)
+})
+
 test('the script avoids what the sandbox forbids, and meta is a literal that matches the phases', async () => {
   assert.doesNotMatch(source, /Date\.now|Math\.random|new Date\(\s*\)/)
 

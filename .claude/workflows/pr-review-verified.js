@@ -137,8 +137,10 @@ if (!Array.isArray(a.reviewers) || a.reviewers.length === 0 || !a.reviewers.ever
   throw new Error(`reviewers must be a non-empty array of pr-* agent names, got: ${JSON.stringify(a.reviewers)}`)
 }
 
+// The focus line goes into the pr-* review and verify prompts only. Codex
+// always reviews all of origin/main...HEAD, so its prompt never gets it.
 const scopedRecheck = a.since ? ` This is a scoped recheck: focus on \`git diff ${a.since}..${a.head}\` plus anything it can break.` : ''
-const base = `${a.title}. Worktree ${a.worktree}, branch ${a.branch}, head ${a.head}. Target: origin/main...HEAD.${scopedRecheck} Context, scope, rulings and owner decisions: ${a.contextFile}. No commits land during this review. Do not edit files or post to GitHub.`
+const base = `${a.title}. Worktree ${a.worktree}, branch ${a.branch}, head ${a.head}. Target: origin/main...HEAD. Context, scope, rulings and owner decisions: ${a.contextFile}. No commits land during this review. Do not edit files or post to GitHub.`
 
 // The order of LENSES is the order of each finding's votes.
 const LENSES = [
@@ -148,7 +150,7 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
 if (a.codex) {
   reviewers.push({ type: 'codex-reviewer', prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first; retry once on a timeout or capacity error. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
@@ -163,7 +165,7 @@ const results = await pipeline(
     // throw, so every entry of `verified` is an object.
     const verified = await parallel(toCheck.map(f => async () => {
       const answers = await parallel(LENSES.map(l => () => agent(
-        `${base}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nUse your finding-verification mode (verifier.md). Try to REFUTE it under this lens. Set real=false only when you cite file:line evidence that the finding is wrong, out of scope, or harmless. If your verdict would be UNPROVEN, set real=true. Cite file:line evidence either way.`,
+        `${base}${scopedRecheck}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nUse your finding-verification mode (verifier.md). Try to REFUTE it under this lens. Set real=false only when you cite file:line evidence that the finding is wrong, out of scope, or harmless. If your verdict would be UNPROVEN, set real=true. Cite file:line evidence either way.`,
         { label: `verify:${r.type}:${l.key}`, phase: 'Verify', agentType: 'verifier', schema: VERDICT })))
       // answers[i] belongs to LENSES[i], and is null when that verifier failed.
       // Keep the null in its place so the lens names stay right.
