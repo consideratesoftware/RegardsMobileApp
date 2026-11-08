@@ -31,7 +31,7 @@ struct ScheduleFetchContractTests {
         }
         let rows = try [
             Self.row(1_611, tracked, .cadence, state: .pending, offset: 300, snoozed: true),
-            Self.row(1_612, tracked, .birthday, state: .fired, offset: 100),
+            Self.row(1_612, tracked, .birthday, state: .fired, offset: 100, cycle: true),
             Self.row(1_613, second, .cadence, state: .cancelled, offset: 200),
             Self.row(1_614, second, .anniversary, state: .userCaughtUp, offset: 250),
             Self.row(1_615, untracked, .cadence, state: .pending, offset: 150),
@@ -56,6 +56,10 @@ struct ScheduleFetchContractTests {
         #expect(try Set(fetched.reminders.map(\.id)).isSuperset(of: [contractUUID(1_611), contractUUID(1_612)]))
         #expect(try Set(fetched.reminders.map(\.id)).isDisjoint(
             with: [contractUUID(1_613), contractUUID(1_614), contractUUID(1_615), contractUUID(1_616)]))
+        // The snapshot carries the cycle itself, not just two equal snapshots (a dropped field would be equal).
+        let firedRowID = try contractUUID(1_612)
+        #expect(fetched.reminders.first { $0.id == firedRowID }?.firedCycle
+                == Date(timeIntervalSince1970: 1_799_999_980))
     }
 
     /// The observation finishes with no value when the window row is missing
@@ -76,10 +80,12 @@ struct ScheduleFetchContractTests {
     }
 
     /// A row for `contact` at a fixed base time plus `offset` seconds, so the
-    /// snapshot's `scheduledFor` order is the offsets' order.
+    /// snapshot's `scheduledFor` order is the offsets' order. `snoozed` sets a
+    /// floor 60 seconds before the row, and `cycle` a `firedCycle` 120 seconds
+    /// before it.
     private static func row(
         _ number: Int, _ contact: Contact, _ kind: ReminderKind,
-        state: ReminderState, offset: TimeInterval, snoozed: Bool = false
+        state: ReminderState, offset: TimeInterval, snoozed: Bool = false, cycle: Bool = false
     ) throws -> ScheduledReminder {
         let isOccasion = kind != .cadence
         let scheduledFor = Date(timeIntervalSince1970: 1_800_000_000 + offset)
@@ -92,7 +98,8 @@ struct ScheduleFetchContractTests {
             scheduledFor: scheduledFor,
             osNotificationId: "fetch-\(number)",
             state: state,
-            snoozedUntil: snoozed ? scheduledFor.addingTimeInterval(-60) : nil
+            snoozedUntil: snoozed ? scheduledFor.addingTimeInterval(-60) : nil,
+            firedCycle: cycle ? scheduledFor.addingTimeInterval(-120) : nil
         )
     }
 }
