@@ -36,8 +36,8 @@ actor ScriptedNotifications: NotificationScheduling {
     private var pending: [String: ReminderNotificationRequest] = [:]
     private(set) var scheduleCalls: [ReminderNotificationRequest] = []
     private(set) var cancelCalls: [[String]] = []
-    /// Fake-only bookkeeping for tests. The real center exposes no fire date
-    /// for a delivered notification, so nothing here is a device contract.
+    /// Fake-only bookkeeping for tests, not a model of the real center's
+    /// delivered list.
     /// These are the requests the fake treats as delivered, at once on add or
     /// once their time passes (checked at the start of every call to any of
     /// the 3 live members), each with its whole-second fire date. Due requests
