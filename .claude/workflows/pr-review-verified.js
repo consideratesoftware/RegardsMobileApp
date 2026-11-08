@@ -181,7 +181,7 @@ const results = await pipeline(
   },
 )
 
-// The verdict for one reviewer once its findings have been checked.
+// One call site; a function keeps these early returns out of the verdicts map below.
 function verdictAfterVerification(reviewer, review, verified) {
   if (!review) return 'FAILED'
   if (reviewer === 'codex-reviewer') return review.verdict

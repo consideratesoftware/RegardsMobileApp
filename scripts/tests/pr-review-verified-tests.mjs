@@ -69,6 +69,7 @@ function finding(severity, location) {
 
 // The first top-level field of `answer` that holds a value its schema's enum
 // does not list, described in words, or null.
+// One call site; a name keeps the enum check readable inside agent().
 function schemaRefusal(answer, schema) {
   for (const [key, spec] of Object.entries(schema.properties)) {
     if (spec.enum && key in answer && !spec.enum.includes(answer[key])) {
