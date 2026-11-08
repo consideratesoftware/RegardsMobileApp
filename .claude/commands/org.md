@@ -97,12 +97,16 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    `git -C <lane worktree> diff --name-only origin/main...HEAD` lists
    `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
    also pass the absolute path of the lane worktree's copy of each listed
-   script, labeled as the PR's own copy of that script. Before the own copy
-   runs, read the blob that its command exports, which is the PR head's copy.
-   Network use, writes outside `<scratch>`, or credential reads mean fail
-   closed. Otherwise run that blob with a scrubbed environment
-   (`env -i PATH=/usr/bin:/bin HOME=<scratch>`). It will route red checks to
-   `on-call-engineer`, park on owner gates, or merge when all conditions hold.
+   script, labeled as the PR's own copy of that script. The release manager
+   exports that copy from the head sha with
+   `git -C <lane> show <head sha>:scripts/<name>.sh > <scratch>/own-<name>.sh`
+   and reads that file before it runs. Network use, writes outside
+   `<scratch>`, or credential reads mean fail closed. Otherwise it runs that
+   same file with a scrubbed environment
+   (`env -i PATH=/usr/bin:/bin HOME=<scratch> TMPDIR=<scratch>`), so a
+   `mktemp` in the script stays inside `<scratch>`. It will route red checks
+   to `on-call-engineer`, park on owner gates, or merge when all conditions
+   hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
@@ -289,11 +293,13 @@ Save the PR body draft to `pr-body.md` in the lane's folder, then launch
 review file. When `git -C <lane worktree> diff --name-only origin/main...HEAD`
 lists `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
 also pass the absolute path of the lane worktree's copy of each listed script,
-labeled as the PR's own copy of that script. Before the own copy runs, read its
-diff against `origin/main` and run it with a scrubbed environment. It opens the
-PR, watches CI and the hosted review, routes repairs, records the checkpoint via
-`tech-writer`, and merges only when all merge conditions in `ENGINEERING_ORG.md`
-hold. Stacked items open as drafts.
+labeled as the PR's own copy of that script. The release manager exports that
+copy from the head sha, reads that file, fails closed on network use, writes
+outside `<scratch>` or credential reads and otherwise runs that same file under
+`env -i PATH=/usr/bin:/bin HOME=<scratch> TMPDIR=<scratch>`, as Stage 1 says. It
+opens the PR, watches CI and the hosted review, routes repairs, records the
+checkpoint via `tech-writer`, and merges only when all merge conditions in
+`ENGINEERING_ORG.md` hold. Stacked items open as drafts.
 
 Owner direction, 2026-11-02: a PR whose merge conditions all hold is
 merged. Don't ask Sid "ready to merge?" and don't hold a green PR for his
