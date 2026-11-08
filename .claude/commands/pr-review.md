@@ -136,9 +136,9 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    whatever it reported. A missing, malformed or under-7-character sha is FAILED
    too. Rerun that reviewer alone. Codex's sha is not checked here.
 7. A pr-* reviewer's APPROVE becomes REQUEST_CHANGES when its `notChecked` is
-   not empty. Every pr-* contract says "Never APPROVE with a required check left
-   unchecked." `notChecked` holds required checks only. Anything else a reviewer
-   could not run goes in its report.
+   missing or not empty. Every pr-* contract says "Never APPROVE with a required
+   check left unchecked." `notChecked` holds required checks only. Anything else
+   a reviewer could not run goes in its report.
 
 Each verifier votes under the finding-verification mode in
 `.claude/agents/verifier.md`.
