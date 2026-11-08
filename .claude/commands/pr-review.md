@@ -166,10 +166,16 @@ workflow's `workOrder`. Send each one to its owner, as Stage 3 says.
   `impact`) and `real` (`true`, `false` or `'failed'`).
 
 Don't post APPROVE while a reviewer is `FAILED` or has any verdict other than
-APPROVE or REQUEST_CHANGES. Rerun that reviewer alone. The workflow passes
-Codex's RETRY and UNAVAILABLE through as its `verdict`. When Codex reports
-UNAVAILABLE, or returns no verdict, rerun `codex-reviewer` alone and use its
-report.
+APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The workflow
+passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle Codex by
+its case:
+
+- No Codex verdict (its entry is `FAILED`, or `codexReview` is null): rerun
+  `codex-reviewer` alone and use its report.
+- RETRY: the one automatic rerun that `org.md` Stage 3 allows. A second RETRY
+  on that head, a timeout included, is an owner gate.
+- UNAVAILABLE: an owner gate. Interview Sid before rerunning it (`org.md`
+  Stage 1 and Stage 3).
 
 ### The PR REVIEW comment
 

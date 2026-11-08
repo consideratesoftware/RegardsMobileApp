@@ -78,9 +78,9 @@ For each open TF PR:
 1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
    comments that count under the rule in `release-manager.md` (Open). For
    each one that is missing, names a sha other than the PR's current head,
-   or (for Codex) is a RETRY or has no `codex-<short sha>.md` file in the
-   lane's folder, rerun that review: check the head
-   out with `git worktree add --detach <tmp> <head sha>`, run
+   or (for Codex) is a RETRY or, unless it is UNAVAILABLE, has no
+   `codex-<short sha>.md` file in the lane's folder, rerun that review: check
+   the head out with `git worktree add --detach <tmp> <head sha>`, run
    the verified run (`pr-review.md`, "Claude Code org only") there with that
    target, or, when it can't run, `/pr-review origin/main...HEAD` and the
    `codex-reviewer` agent type. Post the result as a new verdict comment, then
