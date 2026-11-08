@@ -179,8 +179,8 @@ origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
 of rerunning again. A RETRY after a repair moved the head is the first RETRY
 on the new head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the
 owner gate in `ENGINEERING_ORG.md`. This holds with or without a saved codex
-file: an UNAVAILABLE is never rerun automatically. RETRY and UNAVAILABLE runs don't use up a
-review round. Two rounds maximum, then the second opinion.
+file: an UNAVAILABLE is never rerun automatically. RETRY and UNAVAILABLE runs
+don't use up a review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
 fix), run the verified run again, or both `/pr-review origin/main...HEAD` and
@@ -196,8 +196,8 @@ the routing table in `pr-review.md` requires them) on every head, plus
 the current head. Rerun `pr-code-quality` and `pr-tests` unless the new
 commits are Markdown-only under the carry rule. A verified run for this
 recheck passes `since`, the last reviewed head, and the reviewers it reruns.
-Ask Sid only if a blocker
-survives 2 rounds or a fix needs a product decision. The `PR REVIEW:` comment
+Ask Sid only if a blocker survives 2 rounds or a fix needs a product decision.
+The `PR REVIEW:` comment
 lists every reviewer that ran on a `REVIEWERS:` line with its verdict. A
 scoped recheck adds a `RERAN:` line naming the reviewers that ran, and one
 `CARRIED: <reviewer> APPROVE from <sha>` line per `pr-code-quality` or
@@ -256,12 +256,13 @@ If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
 relaunch `release-manager` with the new verdicts:
 - a newest verdict names a sha other than the head, or the branch was just
   updated (`update-branch`): both reviews on the new head (one verified run
-covers both);
+  covers both);
 - `carry rejected: <reviewer>` or `reviewer missing: <name>`: that reviewer
   only, and post a new `PR REVIEW:` comment that lists it in `RERAN:` and
   repeats every `CARRIED:` line that still stands;
-- no `REVIEWERS:` line on the newest `PR REVIEW:` comment: `/pr-review` in
-  full;
+- no `REVIEWERS:` line on the newest `PR REVIEW:` comment: the verified run
+  (`pr-review.md`, "Claude Code org only"), or `/pr-review` in full when it
+  can't run;
 - the Codex review file is missing or its sha differs, and the verdict is not
   UNAVAILABLE (an owner gate, Stage 1): Codex, and save the new file;
 - more than 100 comments: check the PR's verdict comments yourself, and
