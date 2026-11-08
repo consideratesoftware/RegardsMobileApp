@@ -143,7 +143,7 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    surviving BLOCKER of its own; when its `blockerCount` (its own `BLOCKERS: n`
    count) is not a whole number equal to the BLOCKER findings it listed; or when
    its report text is not empty and the first line starting with `VERDICT:` is
-   not exactly `VERDICT: <the verdict it returned>`. These checks cover an APPROVE
+   not `VERDICT: <the verdict it returned>` (trailing white space ignored). These checks cover an APPROVE
    too, so an APPROVE cannot hide a blocker the reviewer counted but did not list.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
