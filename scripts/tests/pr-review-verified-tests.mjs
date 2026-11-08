@@ -256,6 +256,9 @@ test('verifiersAreRepoVerifier: every verifier call uses the repo verifier agent
     assert.match(c.prompt, /Set real=false only when you cite file:line evidence/)
     assert.match(c.prompt, /If your verdict would be UNPROVEN, set real=true/)
     assert.doesNotMatch(c.prompt, /Default to real=false/)
+    // The vote schema asks for a boolean `real` and a `reason`, both required.
+    assert.deepEqual(c.opts.schema.required, ['real', 'reason'])
+    assert.equal(c.opts.schema.properties.real.type, 'boolean')
   }
 })
 
