@@ -199,7 +199,8 @@ rules match. Any blocker means `REQUEST_CHANGES`. Claimed R-closures are
 verified against §19 acceptance checks. The Claude Code org
 (`ENGINEERING_ORG.md`) runs both orchestrators on each lane and needs both
 verdicts before merge. The verified run has steps the Codex skill lacks, in rules
-1, 2, 3, 5, 6 and 7 of `.claude/commands/pr-review.md`, "The workflow's rules".
+1, 2, 3, 4 (its blockerCount and VERDICT-line checks), 5, 6 and 7 of
+`.claude/commands/pr-review.md`, "The workflow's rules".
 The script that enforces them is `.claude/workflows/pr-review-verified.js`. The
 requirement behind
 rule 7 is shared: the `.codex` pr-* contracts already forbid an APPROVE with a
