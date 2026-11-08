@@ -134,8 +134,8 @@ under review could have edited its own copy. A PR that itself changes
 `scripts/count-hosted-blockers.sh` also gets the path of its own copy, in the
 engineering manager's prompt. Run both copies. If either prints `MALFORMED` or
 exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
-count is the higher `BLOCKERS <n>`. Every other PR runs only the copy exported
-from `origin/main`. The script prints one line,
+count is the higher `BLOCKERS <n>`. Any other output from either copy fails
+closed. Every other PR runs only the copy exported from `origin/main`. The script prints one line,
 `PENDING: <why>`, `BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its
 tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
 `PENDING` means the review hasn't run on this head: wait and query again,

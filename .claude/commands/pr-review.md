@@ -177,9 +177,9 @@ has no trusted copy that can judge it. For that PR only, run the PR's own copy
 by `scriptPath` to get the reviews. Each pr-* reviewer counts as the strictest
 (FAILED, then REQUEST_CHANGES, then APPROVE) of its `verdict`, its
 `reportedVerdict`, and these checks you make by hand: FAILED, rerun alone, when
-its `reviewedSha` is not a prefix of head; REQUEST_CHANGES when its
-`notChecked` is not empty or it raised any BLOCKER, in `survivors` or in
-`refuted`. A refutation never makes a verdict less strict. BLOCKERS and
+its `reviewedSha` is missing, under 7 characters, not lower-case hex, or not a
+prefix of head; REQUEST_CHANGES when its `notChecked` is missing or not empty,
+or it raised any BLOCKER, in `survivors` or in `refuted`. A refutation never makes a verdict less strict. BLOCKERS and
 SHOULD_FIX count every pr-* BLOCKER and FIX in `survivors` and `refuted`.
 Refuted findings still get their `REFUTED:` lines.
 
@@ -216,8 +216,9 @@ APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The workflow
 passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle Codex by
 its case:
 
-- No Codex verdict on a run with `codex: true` (its entry is `FAILED`, or
-  `codexReview` is null): rerun `codex-reviewer` alone and use its report. On a
+- No Codex verdict on a run with `codex: true` (its entry is `FAILED` or
+  missing): rerun `codex-reviewer` alone and use its report. RETRY and
+  UNAVAILABLE follow their own bullets below, whatever `codexReview` holds. On a
   run with `codex: false` (an open UNAVAILABLE gate), don't launch it; the gate
   waits for Sid (`org.md` Stage 3).
 - RETRY: the one automatic rerun that `org.md` Stage 3 allows. A second RETRY
