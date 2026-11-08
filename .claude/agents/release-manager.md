@@ -65,9 +65,9 @@ gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$
       [.data.repository.pullRequest.comments.nodes[]
        | select(.author.login == $me and .lastEditedAt == null)
        | .body] as $b
-      | ($b | map(select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none"),
+      | ($b | map(select(split("\n")[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD$"))) | last // "none"),
         "---",
-        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))) | last // "none"),
+        ($b | map(select(split("\n")[0] | test("^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE)( \\(.*\\))? @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( \\| codex-cli |$)"))) | last // "none"),
         "---",
         "total comments: \(.data.repository.pullRequest.comments.totalCount)"'
 ```
@@ -261,7 +261,7 @@ lane's refs, and this fetch brings them up to date.
       .data.repository.pullRequest.comments.nodes[]
       | select(.author.login == $me and .lastEditedAt == null) | .body
       | split("\n") as $l
-      | select($l[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
+      | select($l[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD$"))
       | $l[0], ($l[1:][] | select(test("^(BLOCKERS|REVIEWERS|CARRIED|FAST-FOLLOW):")))' "<scratch>/comments.json"
     ```
 - The newest `CODEX REVIEW:` comment names the current head and is APPROVE, or
