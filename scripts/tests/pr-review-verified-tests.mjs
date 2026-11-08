@@ -70,18 +70,6 @@ function finding(severity, location) {
   return { severity, location, claim: `claim at ${location}`, fix: `fix at ${location}` }
 }
 
-// The first top-level field of `answer` that holds a value its schema's enum
-// does not list, described in words, or null.
-// One call site; a name keeps the enum check readable inside agent().
-function schemaRefusal(answer, schema) {
-  for (const [key, spec] of Object.entries(schema.properties)) {
-    if (spec.enum && key in answer && !spec.enum.includes(answer[key])) {
-      return `${key} is ${JSON.stringify(answer[key])}, not one of ${spec.enum.join(', ')}`
-    }
-  }
-  return null
-}
-
 // Like the real parallel(): a thunk that throws becomes null in its place.
 function parallel(thunks) {
   return Promise.all(thunks.map(t => Promise.resolve().then(t).catch(() => null)))
@@ -126,7 +114,15 @@ function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes:
       }
       const answer = reviews[opts.agentType]
       if (answer instanceof Error) return Promise.reject(answer)
-      const refused = answer && schemaRefusal(answer, opts.schema)
+      // The first top-level field that holds a value its schema's enum does not
+      // list, described in words.
+      let refused = null
+      for (const [key, spec] of Object.entries(opts.schema.properties)) {
+        if (answer && spec.enum && key in answer && !spec.enum.includes(answer[key])) {
+          refused = `${key} is ${JSON.stringify(answer[key])}, not one of ${spec.enum.join(', ')}`
+          break
+        }
+      }
       if (refused) {
         unplanned.push(`a review by ${opts.agentType} that the script's schema refuses (${refused})`)
         return Promise.resolve(null)
@@ -997,14 +993,14 @@ test('RETRY and UNAVAILABLE are Codex\'s verdicts, and the schema refuses them f
     args: { codex: true },
     reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
   })
-  const enumOf = type => calls.find(c => c.opts.agentType === type).opts.schema.properties.verdict.enum
-  assert.deepEqual(enumOf('pr-correctness'), ['APPROVE', 'REQUEST_CHANGES'])
-  assert.deepEqual(enumOf('codex-reviewer'), ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'])
+  const prSchema = calls.find(c => c.opts.agentType === 'pr-correctness').opts.schema
+  const codexSchema = calls.find(c => c.opts.agentType === 'codex-reviewer').opts.schema
+  assert.deepEqual(prSchema.properties.verdict.enum, ['APPROVE', 'REQUEST_CHANGES'])
+  assert.deepEqual(codexSchema.properties.verdict.enum, ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'])
 
   // Both kinds of reviewer rate a finding on the same 5 severities.
-  const severitiesOf = type => calls.find(c => c.opts.agentType === type).opts.schema.properties.findings.items.properties.severity.enum
-  for (const type of ['pr-correctness', 'codex-reviewer']) {
-    assert.deepEqual(severitiesOf(type), ['BLOCKER', 'FIX', 'NIT', 'ESCALATE', 'QUESTION'], type)
+  for (const schema of [prSchema, codexSchema]) {
+    assert.deepEqual(schema.properties.findings.items.properties.severity.enum, ['BLOCKER', 'FIX', 'NIT', 'ESCALATE', 'QUESTION'])
   }
 
   // The fake refuses a verdict the schema does not list, as the runtime does.

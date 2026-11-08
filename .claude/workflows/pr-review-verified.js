@@ -249,48 +249,6 @@ const results = await pipeline(
   },
 )
 
-// One call site; a function keeps these early returns out of the verdicts map below.
-function verdictAfterVerification(reviewer, review, verified) {
-  if (!review) return 'FAILED'
-  if (reviewer === 'codex-reviewer') {
-    // Codex's first line is "CODEX REVIEW: <VERDICT> @ ...", the verdict that
-    // gets posted. The structured verdict has to be the same word. If they
-    // differ, or a first line is not a verdict line (a blank one included),
-    // one of them is wrong and the entry is FAILED. Only an absent or empty
-    // review text has no line to compare.
-    if (!review.rawSummary) return review.verdict
-    const firstLine = review.rawSummary.split('\n')[0]
-    const named = /^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE) @ /.exec(firstLine)
-    return named && named[1] === review.verdict ? review.verdict : 'FAILED'
-  }
-  if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) return 'FAILED'
-  if (verified.some(v => v.severity === 'BLOCKER' && v.survives)) return 'REQUEST_CHANGES'
-  // Any notChecked entry is a required check left undone: REQUEST_CHANGES,
-  // whatever the reviewer reported (rule 7). Only an array we can see is empty
-  // counts as "nothing was left unchecked".
-  const nothingUnchecked = Array.isArray(review.notChecked) && review.notChecked.length === 0
-  if (!nothingUnchecked) return 'REQUEST_CHANGES'
-  // The reviewer's own blocker count has to match the BLOCKER findings it
-  // listed. A blocker it counted and did not list was never checked by a
-  // verifier, so no verdict, an APPROVE included, can stand on that report
-  // (rule 4).
-  const blockersListed = review.findings.filter(f => f.severity === 'BLOCKER').length
-  if (!Number.isInteger(review.blockerCount) || review.blockerCount !== blockersListed) return 'REQUEST_CHANGES'
-  // The report text has to say the verdict the reviewer returned. The first
-  // line that starts with "VERDICT:" must be exactly "VERDICT: <verdict>". A
-  // report with no such line, or one that echoes the template
-  // "VERDICT: APPROVE | REQUEST_CHANGES", does not say it (rule 4). A reviewer
-  // that returned no report text has nothing to compare.
-  if (review.rawSummary) {
-    const verdictLine = review.rawSummary.split('\n').find(line => line.startsWith('VERDICT:'))
-    if (verdictLine === undefined || verdictLine.trim() !== `VERDICT: ${review.verdict}`) return 'REQUEST_CHANGES'
-  }
-  if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
-  const refutedSomething = verified.some(v => !v.survives)
-  const qualityFixSurvived = reviewer === 'pr-code-quality' && verified.some(v => v.severity === 'FIX' && v.survives)
-  return refutedSomething && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
-}
-
 phase('Synthesize')
 // results[i] is reviewers[i]. A reviewer whose stages threw comes back as
 // null; keep it in the list as a failed reviewer so it cannot go missing.
@@ -313,19 +271,68 @@ const codex = done.find(d => d.reviewer === 'codex-reviewer')
 
 return {
   head: a.head,
-  verdicts: done.map(d => ({
-    reviewer: d.reviewer,
-    verdict: verdictAfterVerification(d.reviewer, d.review, d.verified),
-    reportedVerdict: d.review ? d.review.verdict : 'FAILED',
-    reviewedSha: d.review ? d.review.reviewedSha : null,
-    codexLine: d.reviewer === 'codex-reviewer' && d.review ? (d.review.rawSummary || '').split('\n')[0] : undefined,
-    report: d.review && d.review.rawSummary ? d.review.rawSummary : null,
-    notChecked: d.review ? d.review.notChecked : [],
-    coverageHoles: d.review ? d.review.coverageHoles : [],
-    escalations: d.review ? d.review.findings.filter(f => f.severity === 'ESCALATE').map(f => `${f.location}: ${f.claim}`) : [],
-    nits: d.review ? d.review.findings.filter(f => f.severity === 'NIT').map(f => `${f.location}: ${f.claim}`) : [],
-    questions: d.review ? d.review.findings.filter(f => f.severity === 'QUESTION').map(f => `${f.location}: ${f.claim}`) : [],
-  })),
+  verdicts: done.map(d => {
+    const review = d.review
+
+    // The verdict once the findings have been checked. The first rule that
+    // applies wins, and the rules are the ones in the header.
+    let verdict
+    if (!review) {
+      verdict = 'FAILED'
+    } else if (d.reviewer === 'codex-reviewer') {
+      // Codex's first line is "CODEX REVIEW: <VERDICT> @ ...", the verdict that
+      // gets posted. The structured verdict has to be the same word. If they
+      // differ, or a first line is not a verdict line (a blank one included),
+      // one of them is wrong and the entry is FAILED. Only an absent or empty
+      // review text has no line to compare (rule 5).
+      const named = review.rawSummary ? /^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE) @ /.exec(review.rawSummary.split('\n')[0]) : null
+      verdict = !review.rawSummary || (named && named[1] === review.verdict) ? review.verdict : 'FAILED'
+    } else if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) {
+      verdict = 'FAILED'
+    } else if (d.verified.some(v => v.severity === 'BLOCKER' && v.survives)) {
+      verdict = 'REQUEST_CHANGES'
+    } else if (!(Array.isArray(review.notChecked) && review.notChecked.length === 0)) {
+      // Any notChecked entry is a required check left undone, whatever the
+      // reviewer reported (rule 7). Only an array we can see is empty counts as
+      // "nothing was left unchecked".
+      verdict = 'REQUEST_CHANGES'
+    } else if (!Number.isInteger(review.blockerCount) || review.blockerCount !== review.findings.filter(f => f.severity === 'BLOCKER').length) {
+      // The reviewer's own blocker count has to match the BLOCKER findings it
+      // listed. A blocker it counted and did not list was never checked by a
+      // verifier, so no verdict, an APPROVE included, can stand on that report
+      // (rule 4).
+      verdict = 'REQUEST_CHANGES'
+    } else if (review.rawSummary && (review.rawSummary.split('\n').find(line => line.startsWith('VERDICT:')) || '').trim() !== `VERDICT: ${review.verdict}`) {
+      // The report text has to say the verdict the reviewer returned. The first
+      // line that starts with "VERDICT:" must be exactly "VERDICT: <verdict>". A
+      // report with no such line, or one that echoes the template
+      // "VERDICT: APPROVE | REQUEST_CHANGES", does not say it (rule 4). A
+      // reviewer that returned no report text has nothing to compare.
+      verdict = 'REQUEST_CHANGES'
+    } else if (review.verdict !== 'REQUEST_CHANGES') {
+      verdict = review.verdict
+    } else {
+      // A REQUEST_CHANGES flips to APPROVE only when something was refuted and,
+      // for pr-code-quality, no FIX finding survived (rule 3).
+      const refutedSomething = d.verified.some(v => !v.survives)
+      const qualityFixSurvived = d.reviewer === 'pr-code-quality' && d.verified.some(v => v.severity === 'FIX' && v.survives)
+      verdict = refutedSomething && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
+    }
+
+    return {
+      reviewer: d.reviewer,
+      verdict,
+      reportedVerdict: review ? review.verdict : 'FAILED',
+      reviewedSha: review ? review.reviewedSha : null,
+      codexLine: d.reviewer === 'codex-reviewer' && review ? (review.rawSummary || '').split('\n')[0] : undefined,
+      report: review && review.rawSummary ? review.rawSummary : null,
+      notChecked: review ? review.notChecked : [],
+      coverageHoles: review ? review.coverageHoles : [],
+      escalations: review ? review.findings.filter(f => f.severity === 'ESCALATE').map(f => `${f.location}: ${f.claim}`) : [],
+      nits: review ? review.findings.filter(f => f.severity === 'NIT').map(f => `${f.location}: ${f.claim}`) : [],
+      questions: review ? review.findings.filter(f => f.severity === 'QUESTION').map(f => `${f.location}: ${f.claim}`) : [],
+    }
+  }),
   codexReview: (codex && codex.review && codex.review.rawSummary) || null,
   workOrder,
   survivors: survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix, votes: s.votes })),
