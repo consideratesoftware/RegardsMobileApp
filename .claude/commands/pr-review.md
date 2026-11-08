@@ -152,11 +152,12 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    APPROVE cannot hide a blocker the reviewer counted but did not list, and an
    APPROVE with no report cannot stand.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
-   Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
-   `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line. A Codex entry
-   whose structured verdict and the verdict word in its first line disagree is
-   FAILED, and so is one whose first line is blank or is not a verdict line. A
-   Codex with no review text (absent or empty) keeps its reported verdict.
+   Codex BLOCKER still needs a `DISPUTED:` line at the merge head (merge
+   condition 4 in `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line. A
+   Codex entry whose structured verdict and the verdict word in its first line
+   disagree is FAILED, and so is one whose first line is blank or is not a
+   verdict line. A Codex with no review text (absent or empty) keeps its
+   reported verdict.
 6. A pr-* reviewer whose `reviewedSha` is missing, under 7 characters, not
    lower-case hex, or not a prefix of head is FAILED, whatever it reported.
    Rerun that reviewer alone. Codex's sha is not checked here.
