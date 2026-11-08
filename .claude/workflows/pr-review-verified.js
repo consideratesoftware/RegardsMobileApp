@@ -136,6 +136,7 @@ const CODEX_FINDINGS = {
   // Codex's verdict is never changed by a count, so it is not asked for one.
   required: FINDINGS.required.filter(key => key !== 'blockerCount'),
 }
+delete CODEX_FINDINGS.properties.blockerCount
 
 const VERDICT = {
   type: 'object',

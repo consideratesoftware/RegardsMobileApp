@@ -377,6 +377,9 @@ test('blockerCount is required from a pr-* reviewer, asked for in its prompt, an
 
   const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
   assert.ok(!codexCall.opts.schema.required.includes('blockerCount'))
+  assert.ok(!('blockerCount' in codexCall.opts.schema.properties), 'the Codex schema has no blockerCount property')
+  // Dropping it from Codex's schema leaves the pr-* schema alone.
+  assert.ok('blockerCount' in prCall.opts.schema.properties)
   assert.doesNotMatch(codexCall.prompt, /blockerCount/)
 })
 
@@ -703,7 +706,8 @@ test('a surviving FIX does not hold back another reviewer once its BLOCKER is re
 
 // Pin: the refuted BLOCKER gives the flip its "something was refuted", and the
 // surviving FIX is the pr-code-quality condition that stops it. For
-// pr-correctness the same findings flip to APPROVE (the test above this one).
+// pr-correctness the same findings flip to APPROVE (the test named "a surviving
+// FIX does not hold back another reviewer once its BLOCKER is refuted").
 test('a pr-code-quality review with a refuted BLOCKER and a surviving FIX stays REQUEST_CHANGES', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-code-quality'] },
