@@ -278,8 +278,8 @@ phase('Synthesize')
 // null; keep it in the list as a failed reviewer so it cannot go missing.
 const done = reviewers.map((r, i) => results[i] || { reviewer: r.type, review: null, verified: [] })
 const survivors = done.flatMap(d => d.verified.filter(v => v.survives))
-const killed = done.flatMap(d => d.verified.filter(v => !v.survives))
-log(`${survivors.length} findings survived verification, ${killed.length} refuted`)
+const refuted = done.flatMap(d => d.verified.filter(v => !v.survives))
+log(`${survivors.length} findings survived verification, ${refuted.length} refuted`)
 
 let workOrder = { items: [], notes: 'no surviving findings' }
 if (survivors.length) {
@@ -311,5 +311,5 @@ return {
   codexReview: (codex && codex.review && codex.review.rawSummary) || null,
   workOrder,
   survivors: survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix, votes: s.votes })),
-  refuted: killed.map(k => ({ reviewer: k.reviewer, severity: k.severity, location: k.location, claim: k.claim, votes: k.votes })),
+  refuted: refuted.map(f => ({ reviewer: f.reviewer, severity: f.severity, location: f.location, claim: f.claim, votes: f.votes })),
 }
