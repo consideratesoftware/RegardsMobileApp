@@ -468,6 +468,25 @@ test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILA
   assert.doesNotMatch(codexCall.prompt, /retry once/i)
 })
 
+test('prVerdictEnum: RETRY and UNAVAILABLE are Codex\'s verdicts, and the schema refuses them from a pr-* reviewer', async () => {
+  const { calls } = await runWorkflow({
+    args: { codex: true },
+    reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
+  })
+  const enumOf = type => calls.find(c => c.opts.agentType === type).opts.schema.properties.verdict.enum
+  assert.deepEqual(enumOf('pr-correctness'), ['APPROVE', 'REQUEST_CHANGES'])
+  assert.deepEqual(enumOf('codex-reviewer'), ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'])
+
+  // The fake refuses a verdict the schema does not list, as the runtime does.
+  for (const verdict of ['RETRY', 'UNAVAILABLE']) {
+    await assert.rejects(
+      runWorkflow({ reviews: { 'pr-correctness': review(verdict) } }),
+      /schema refuses/,
+      verdict,
+    )
+  }
+})
+
 test('codexReview is null when Codex was not asked for, or returned nothing', async () => {
   const without = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
   assert.equal(without.result.codexReview, null)

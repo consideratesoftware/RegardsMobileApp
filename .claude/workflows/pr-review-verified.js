@@ -61,10 +61,11 @@ export const meta = {
 //                nothing; `lens` names the verifier.
 //   codexReview  Codex's whole review, verbatim, or null.
 
+// The schema a pr-* reviewer answers with. Its contract has 2 verdicts.
 const FINDINGS = {
   type: 'object',
   properties: {
-    verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] },
+    verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES'] },
     reviewedSha: { type: 'string' },
     findings: {
       type: 'array',
@@ -92,6 +93,14 @@ const FINDINGS = {
     rawSummary: { type: 'string' },
   },
   required: ['verdict', 'reviewedSha', 'findings', 'notChecked', 'coverageHoles'],
+}
+
+// Codex's schema is the same with 2 more verdicts: RETRY (also when the head
+// moved) and UNAVAILABLE (Codex missing or not logged in). No pr-* contract
+// defines them, so the runtime refuses them from a pr-* reviewer.
+const CODEX_FINDINGS = {
+  ...FINDINGS,
+  properties: { ...FINDINGS.properties, verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] } },
 }
 
 const VERDICT = {
@@ -164,14 +173,14 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
 if (a.codex) {
-  reviewers.push({ type: 'codex-reviewer', prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
+  reviewers.push({ type: 'codex-reviewer', schema: CODEX_FINDINGS, prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
 
 const results = await pipeline(
   reviewers,
-  r => agent(r.prompt, { label: `review:${r.type}`, phase: 'Review', agentType: r.type, schema: FINDINGS }),
+  r => agent(r.prompt, { label: `review:${r.type}`, phase: 'Review', agentType: r.type, schema: r.schema }),
   async (review, r) => {
     if (!review) return { reviewer: r.type, review: null, verified: [] }
     const toCheck = review.findings.filter(f => f.severity === 'BLOCKER' || f.severity === 'FIX')
