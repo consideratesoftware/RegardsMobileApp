@@ -668,6 +668,54 @@ test('codexReviewReturned: the whole Codex review comes back verbatim', async ()
     'CODEX REVIEW: APPROVE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3')
 })
 
+test('codexLineMustAgree: a Codex whose structured verdict differs from its first line is FAILED', async () => {
+  const line = verdict => `CODEX REVIEW: ${verdict} @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\n\nBlockers: none\n`
+  const codexVerdict = async (structured, rawSummary) => {
+    const { result } = await runWorkflow({
+      args: { reviewers: ['pr-tests'], codex: true },
+      reviews: { 'pr-tests': review('APPROVE'), 'codex-reviewer': review(structured, [], { rawSummary }) },
+    })
+    return result.verdicts.find(v => v.reviewer === 'codex-reviewer')
+  }
+
+  // Each of the 4 verdicts, against every word that is not its own.
+  const words = ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE']
+  for (const structured of words) {
+    for (const word of words) {
+      const entry = await codexVerdict(structured, line(word))
+      assert.equal(entry.verdict, structured === word ? structured : 'FAILED', `structured ${structured}, first line ${word}`)
+      // The entry keeps what Codex reported, and its review stays readable.
+      assert.equal(entry.reportedVerdict, structured)
+      assert.equal(entry.report, line(word))
+    }
+  }
+
+  // A first line that is not a verdict line cannot agree with anything.
+  for (const rawSummary of ['Looks fine to me.\nAPPROVE', 'APPROVE', 'CODEX REVIEW: APPROVE', 'CODEX REVIEW: MAYBE @ 0123456', 'codex review: approve @ 0123456', '## CODEX REVIEW: APPROVE @ 0123456']) {
+    const entry = await codexVerdict('APPROVE', rawSummary)
+    assert.equal(entry.verdict, 'FAILED', JSON.stringify(rawSummary))
+  }
+
+  // Only the first line is read.
+  const later = await codexVerdict('APPROVE', `${line('APPROVE')}VERDICT: REQUEST_CHANGES\n`)
+  assert.equal(later.verdict, 'APPROVE')
+})
+
+// Pin: a Codex with no review text has no first line to compare, so the verdict
+// it reported stands. The docs rerun a Codex whose codexReview is null.
+test('a Codex with no review text keeps its reported verdict', async () => {
+  const noText = review('REQUEST_CHANGES', [], { rawSummary: '' })
+  const noField = review('APPROVE')
+  delete noField.rawSummary
+  for (const [codexReview, expected] of [[noText, 'REQUEST_CHANGES'], [noField, 'APPROVE']]) {
+    const { result } = await runWorkflow({
+      args: { reviewers: ['pr-tests'], codex: true },
+      reviews: { 'pr-tests': review('APPROVE'), 'codex-reviewer': codexReview },
+    })
+    assert.equal(verdictOf(result, 'codex-reviewer'), expected)
+  }
+})
+
 test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILABLE, never APPROVE', async () => {
   const text = 'CODEX REVIEW: UNAVAILABLE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nWORKTREE: /tmp/worktree\nVERDICT: UNAVAILABLE\nREASON: not logged in\nREVIEW:\nNot logged in\n'
   const { result, calls } = await runWorkflow({

@@ -39,7 +39,10 @@ export const meta = {
 //   5. Codex's verdict is always Codex's own. The verifiers never change it.
 //      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
 //      UNAVAILABLE come back as written, so a Codex that could not review is
-//      never read as APPROVE.
+//      never read as APPROVE. One check only: the verdict word on the first
+//      line of Codex's review (codexLine) must be the same as its structured
+//      verdict, or the entry is FAILED and codex-reviewer is rerun alone. A
+//      Codex with no review text has no line to compare and keeps its verdict.
 //   6. A pr-* reviewer whose reviewedSha is not a prefix of head is FAILED,
 //      whatever it reported: it reviewed some other head. A missing, malformed
 //      or too-short (under 7 characters) sha is FAILED too. Rerun that
@@ -242,7 +245,16 @@ const results = await pipeline(
 // One call site; a function keeps these early returns out of the verdicts map below.
 function verdictAfterVerification(reviewer, review, verified) {
   if (!review) return 'FAILED'
-  if (reviewer === 'codex-reviewer') return review.verdict
+  if (reviewer === 'codex-reviewer') {
+    // Codex's first line is "CODEX REVIEW: <VERDICT> @ ...", the verdict that
+    // gets posted. The structured verdict has to be the same word. If they
+    // differ, or a first line is not a verdict line, one of them is wrong and
+    // the entry is FAILED. No review text means no line to compare.
+    const firstLine = (review.rawSummary || '').split('\n')[0]
+    if (firstLine === '') return review.verdict
+    const named = /^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE) @ /.exec(firstLine)
+    return named && named[1] === review.verdict ? review.verdict : 'FAILED'
+  }
   if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) return 'FAILED'
   if (verified.some(v => v.severity === 'BLOCKER' && v.survives)) return 'REQUEST_CHANGES'
   // Any notChecked entry is a required check left undone: REQUEST_CHANGES,
