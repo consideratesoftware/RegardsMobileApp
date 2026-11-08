@@ -3,10 +3,10 @@ import Testing
 @testable import Regards
 
 /// Fired rows (TF-07e, §9 "Notification fired"): each run marks the rows
-/// whose time has come as fired, and a fired row is history that the pass
-/// neither re-delivers nor re-nags. Dates are New York local times
-/// (`PassFixture`) unless a test sets its own zone. The default window opens a
-/// slot at 18:00 every day.
+/// whose time has come as fired. A fired row is history: the pass keeps it and
+/// does not replace it with a pending row for the same cycle (no re-nag).
+/// Dates are New York local times (`PassFixture`) unless a test sets its own
+/// zone. The default window opens a slot at 18:00 every day.
 struct SchedulingPassFiredRowTests {
 
     private static func pendingCadenceRow(
@@ -104,7 +104,7 @@ struct SchedulingPassFiredRowTests {
     // MARK: - Clock rollback
 
     /// The device clock is set back 1 hour before the fired row's slot. The
-    /// row was delivered, so a rollback never re-arms it: the contact's
+    /// row is fired, so a rollback never re-arms it: the contact's
     /// overdue time (06-10 17:30) is still ahead of `now` (17:00), yet the
     /// fired row at 18:00 is the slot holding it.
     @Test(
@@ -134,7 +134,7 @@ struct SchedulingPassFiredRowTests {
     /// A contact who becomes overdue at 18:30 joins the 18:00 slot already in
     /// progress at 18:45, so the row is written fired. The clock then moves
     /// back to 18:15, before the contact's overdue time. The rollback must
-    /// not turn that delivered row into a pending one for the next day.
+    /// not turn that fired row into a pending one for the next day.
     @Test(
         "A cadence row written into the slot in progress survives the clock being set back before its due time",
         arguments: RepositoryContractBackend.allCases
@@ -158,7 +158,7 @@ struct SchedulingPassFiredRowTests {
 
     /// Records R68, an accepted residual (§19 R68, owner ruling 2026-11-04).
     /// The row stores no fired cycle, so after a window edit moves the slot to 18:30
-    /// and the clock is set back to 17:00, the pass derives the delivered
+    /// and the clock is set back to 17:00, the pass derives the fired
     /// row as pending again; it fires a second time once 18:30 arrives, then
     /// holds. A future fix that stores the fired cycle on the row should turn
     /// step 3 (the re-arm) red on purpose; update this test with that change.
@@ -203,11 +203,11 @@ struct SchedulingPassFiredRowTests {
 
     // MARK: - Zero capacity round trip (contract 2)
 
-    /// The slot in progress was delivered: the row is fired at its start `S`.
+    /// The slot in progress has started, so its row is fired at the start `S`.
     /// A window that loses all capacity and then regains it must not turn that
-    /// delivered slot into a new pending row, which would deliver it again.
+    /// fired slot into a new pending row for the same cycle.
     @Test(
-        "A zero-capacity round trip leaves the delivered slot fired and makes no new row",
+        "A zero-capacity round trip leaves the slot's row fired and makes no new row",
         arguments: RepositoryContractBackend.allCases
     )
     func zeroCapacityRoundTripDoesNotReDeliverThePastSlot(backend: RepositoryContractBackend) async throws {
@@ -301,8 +301,8 @@ struct SchedulingPassFiredRowTests {
 
     // MARK: - Occasions
 
-    /// The birthday was delivered at 09:00 and the device clock was then set
-    /// back to 08:00 the same day. The occurrence is 09:00 again, in the
+    /// The birthday row was marked fired at 09:00 and the device clock was then
+    /// set back to 08:00 the same day. The occurrence is 09:00 again, in the
     /// future, but the row is history: it stays fired and nothing is written.
     @Test(
         "A fired same-day occasion survives the clock moving back before its time",
@@ -320,7 +320,7 @@ struct SchedulingPassFiredRowTests {
         let birthdayID = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
         let pending = try #require(try await fixture.occasionRow(contact, .birthday))
         #expect(pending.scheduledFor == PassFixture.at("2026-06-12 09:00"))
-        // The delivery, as the OS reports it, straight into the store.
+        // Marks the row fired straight in the store, as a run at 09:00 would.
         #expect(try await fixture.repositories.reminders.transitionState(id: birthdayID, from: .pending, to: .fired))
         var fired = pending
         fired.state = .fired
@@ -381,8 +381,8 @@ struct SchedulingPassFiredRowTests {
     }
 
     /// The log write fails after the catch-up cleared a fired row. The row goes
-    /// back to fired, not pending, so the failed action neither re-arms a
-    /// delivered notification nor loses the history. The error is rethrown.
+    /// back to fired, not pending, so the failed action neither re-arms the
+    /// row nor loses the history. The error is rethrown.
     @Test(
         "A failed log puts a cleared fired row back as fired and rethrows",
         .timeLimit(.minutes(1)),

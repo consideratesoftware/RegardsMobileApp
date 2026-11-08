@@ -96,8 +96,9 @@ struct SchedulingPassCancellationTests {
 
     /// Pin. The row was due when the cadence went away (removed, or set to 0,
     /// which is ineligible too), so the run marks it fired before the sweep
-    /// looks at it. A due row is treated as delivered (§9), so it is history:
-    /// kept as fired, never cancelled, and a second run writes nothing.
+    /// looks at it: the pass treats a due row as delivered (§9). A fired row is
+    /// history, kept as fired and never cancelled, and a second run writes
+    /// nothing.
     @Test(
         "A due cadence row of a contact that lost its cadence stays fired and is not cancelled",
         arguments: RepositoryContractBackend.allCases, [nil, 0] as [Int?]
@@ -181,9 +182,9 @@ struct SchedulingPassCancellationTests {
     /// Two contacts each hold a pending cadence row: the first is due at
     /// 18:00, the second is 25 days out. Both leave the snapshot (archived,
     /// untracked) after 18:00 and no run covers them. The sweep marks the due
-    /// row fired, since a due row is treated as delivered (§9), and cancels
-    /// the future one. Both contacts come back a day later: the fired row is
-    /// held, the future one is scheduled again.
+    /// row fired, since the pass treats a due row as delivered (§9), and
+    /// cancels the future one. Both contacts come back a day later: the fired
+    /// row is held, the future one is scheduled again.
     @Test(
         "The orphan sweep fires a due row and cancels a future one",
         arguments: RepositoryContractBackend.allCases, Sweep.allCases
@@ -271,7 +272,7 @@ struct SchedulingPassCancellationTests {
         "A re-tracked contact is not notified again for the slot that already fired",
         arguments: RepositoryContractBackend.allCases, ["2026-06-10 18:30", "2026-06-11 10:00"]
     )
-    func reTrackedContactIsNotNotifiedAgainForItsDeliveredSlot(
+    func reTrackedContactIsNotNotifiedAgainForItsFiredSlot(
         backend: RepositoryContractBackend, returnAt: String
     ) async throws {
         let fixture = try await PassFixture(backend: backend)

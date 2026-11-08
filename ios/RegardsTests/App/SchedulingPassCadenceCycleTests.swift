@@ -41,7 +41,7 @@ struct SchedulingPassCadenceCycleTests {
     )
     func caughtUpRePendsFiredRow(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
-        // Talked this morning, after the 06-09 18:00 reminder fired.
+        // Talked this morning, after the 06-09 18:00 row was fired.
         let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-10 09:00")
         try await fixture.repositories.reminders.upsert(
             Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", in: fixture))
@@ -71,8 +71,8 @@ struct SchedulingPassCadenceCycleTests {
     ) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1, cadenceDays: 14)
-        // Gives the mock backend's seed cast their rows, so the run below has
-        // nothing left to write for anyone.
+        // The mock backend's seed cast has no rows until a run writes them. This run does,
+        // so the last run below has no seed rows left to write.
         try await fixture.pass.runFull()
         #expect(try await fixture.pass.snooze(contactId: contact.id))
         #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
@@ -118,8 +118,8 @@ struct SchedulingPassCadenceCycleTests {
     /// A `userCaughtUp` row can linger: the reschedule after a catch-up failed,
     /// or the contact lost capacity. The restore is for a row this call
     /// cleared, so a later failed log must not turn that lingering row back
-    /// into a pending one, which would notify for a catch-up the user already
-    /// made. Fails if the restore runs without `cleared`.
+    /// into a pending one for a catch-up the user already made. Fails if the
+    /// restore runs without `cleared`.
     @Test(
         "A failed log does not turn a lingering caught-up row back into a pending one",
         .timeLimit(.minutes(1)),
@@ -147,7 +147,7 @@ struct SchedulingPassCadenceCycleTests {
     /// Pin of today's behavior, not a goal. When the contact has no capacity or
     /// is no longer tracked by the time of an in-app catch-up, the interaction
     /// is logged, the snooze is cleared, and no pending row replaces it: the
-    /// row stays `userCaughtUp`, which notifies nothing. For zero capacity the
+    /// row stays `userCaughtUp`, which is not pending. For zero capacity the
     /// contact is recorded in `zeroCapacityContactIds`, and once capacity
     /// returns the next run writes the next cycle's row.
     @Test(
