@@ -145,7 +145,7 @@ Each verifier votes under the finding-verification mode in
 Run Stage 0 yourself. Then start the workflow once:
 
 ```
-Workflow({ name: "pr-review-verified", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
+Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
 ```
 
 - `title`: the PR's short name.
@@ -159,9 +159,18 @@ Workflow({ name: "pr-review-verified", args: { title, worktree, branch, head, si
   hold the §14 row and the R-numbers verbatim. For the workflow it replaces
   Stage 1's per-prompt paste of those two.
 
-If the name does not resolve, pass `scriptPath` instead, pointing at the root
-checkout's copy of `.claude/workflows/pr-review-verified.js`. Point it at the
-lane's copy only while this PR is in review, as the scripts are handled.
+Always start the workflow by `scriptPath`, never by `name`. Point `scriptPath`
+at a copy of `.claude/workflows/pr-review-verified.js` exported from
+`origin/main`, the same way `release-manager.md` takes
+`check-carried-approval.sh`. Never run it by `name` from a lane: `name` resolves
+from the session's folder, and the lane's copy is PR-controlled.
+
+Exception: a PR that adds or changes `.claude/workflows/pr-review-verified.js`
+has no trusted copy that can judge it. For that PR only, run the PR's own copy
+by `scriptPath` to get the reviews. Each reviewer's verdict for counting is then
+its `reportedVerdict`, so the first line and the `REVIEWERS:` line use it.
+Verifier refutations still get their `REFUTED:` lines, but they change no
+verdict.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
 pr-correctness and pr-tests runs (the workflow's reviewers can't take a
@@ -226,8 +235,9 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
   refutes nothing, so every pr-* finding counts. Refuted findings count for
   neither. Codex's counts stay on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
-  verified run, or the Stage 1 verdict in a plain run. A Stage 2 blocker makes
-  that reviewer REQUEST_CHANGES.
+  verified run, or the Stage 1 verdict in a plain run. In the exception under
+  "How to run it", it takes `reportedVerdict`. A Stage 2 blocker makes that
+  reviewer REQUEST_CHANGES.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.
 - The paraphrase is your own words: at most 15 words, one physical line, no

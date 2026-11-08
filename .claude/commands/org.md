@@ -82,7 +82,7 @@ For each open TF PR:
    `codex-<short sha>.md` file in the lane's folder, rerun that review: check
    the head out with `git worktree add --detach <tmp> <head sha>`, run
    the verified run (`pr-review.md`, "Claude Code org only") there with that
-   target, or, when it can't run, `/pr-review origin/main...HEAD` and the
+   target, started by the `scriptPath` rule in `pr-review.md`, or, when it can't run, `/pr-review origin/main...HEAD` and the
    `codex-reviewer` agent type. Post the result as a new verdict comment, then
    `git worktree remove <tmp>`. A RETRY gets
    the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate:
@@ -137,9 +137,13 @@ After the last slice: launch `tech-writer` with the DOC SIBLINGS list and the
 facts from the slice reports. The tech writer commits its files; the review
 batch starts only when `git status --short` in the lane is empty. Write the
 target, the §14 row, and the claimed R-numbers to `review-context.md` in the
-lane's folder. Fetch, then run the verified run from inside the lane's
-worktree (`pr-review.md`, "Claude Code org only") with `codex: true`, so the
-review board and Codex run in one workflow. If it can't run, run
+lane's folder. Fetch, then run the verified run (`pr-review.md`, "Claude Code org only")
+against the lane's worktree with `codex: true`, so the review board and Codex
+run in one workflow. Start it by `scriptPath` to a copy exported from
+`origin/main`, never by `name`. For a PR that adds or changes
+`.claude/workflows/pr-review-verified.js`, the exception in that section
+applies: the PR's own copy runs, and the counts use each reviewer's
+`reportedVerdict`. If it can't run, run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
 batch, with the worktree, the same target `origin/main...HEAD`, the item's §14
