@@ -442,6 +442,22 @@ test('reviewedShaMustMatchHead: a pr-* reviewer whose sha is not a prefix of hea
   }
 })
 
+// Pin: a reviewer that copies its sha out of a command's output can bring a
+// newline or a space with it. That sha is not the head, and is not trimmed into it.
+test('a reviewedSha with a trailing newline or a stray space stays FAILED', async () => {
+  const stray = [
+    ['a short sha and a newline', HEAD.slice(0, 7) + '\n'],
+    ['a full sha and a newline', HEAD + '\n'],
+    ['a full sha and a carriage return', HEAD + '\r\n'],
+    ['a short sha and a space', HEAD.slice(0, 7) + ' '],
+    ['a space and a short sha', ' ' + HEAD.slice(0, 7)],
+  ]
+  for (const [what, reviewedSha] of stray) {
+    const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { reviewedSha }) } })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'FAILED', what)
+  }
+})
+
 test('a wrong reviewedSha is FAILED even with a surviving BLOCKER, and the finding is still returned', async () => {
   const { result } = await runWorkflow({
     reviews: {
