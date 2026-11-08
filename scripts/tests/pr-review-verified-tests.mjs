@@ -33,7 +33,9 @@
 //   votes    what the 3 verifiers of a finding return, keyed by the finding's
 //            location. [true, null, false] means: the truth verifier says
 //            real, the scope verifier failed, the impact verifier says
-//            not real. The order is truth, scope, impact.
+//            not real. The order is truth, scope, impact. A vote can also be
+//            an object, which the verifier returns as written: { reason: 'x' }
+//            is an answer with no `real` field.
 // runWorkflow() returns { result, calls, phases, logs }: the script's return
 // value, every agent() call in order, and the phase() and log() messages.
 //
@@ -143,7 +145,9 @@ function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes:
       }
       const lens = label.split(':').pop()
       const vote = votes[location][LENS_ORDER.indexOf(lens)]
-      return Promise.resolve(vote === null ? null : { real: vote, reason: `stub ${lens}` })
+      if (vote === null) return Promise.resolve(null)
+      if (typeof vote === 'object') return Promise.resolve(vote)
+      return Promise.resolve({ real: vote, reason: `stub ${lens}` })
     }
 
     unplanned.push(`an agent call labeled "${label}"`)
@@ -182,6 +186,32 @@ test('votes are matched by exact location: Delta.swift:1 does not take the votes
   })
   assert.deepEqual(result.refuted.map(r => r.location), ['Delta.swift:1'])
   assert.deepEqual(result.survivors.map(s => s.location), ['Delta.swift:10'])
+})
+
+// Pin: passes on the old script. Rule 1 refutes on 2 explicit real=false votes.
+// An answer with no `real` field, or one that is not a boolean, is a vote for
+// real. That is the fail-safe: a malformed answer can never drop a finding.
+test('only an explicit real=false refutes: an answer with no real field counts as real', async () => {
+  const noReal = { reason: 'no real field' }
+  // truth has no real field, scope says false, impact says true. One explicit
+  // false is not enough. Under `!!answer.real` the truth vote would be false
+  // and the finding refuted.
+  for (const answer of [noReal, { real: null }, { real: 0 }, { real: '' }, { real: 'false' }]) {
+    const { result } = await runWorkflow({
+      reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+      votes: { 'Alpha.swift:10': [answer, false, true] },
+    })
+    assert.equal(result.refuted.length, 0, JSON.stringify(answer))
+    assert.equal(result.survivors[0].votes[0].real, true, JSON.stringify(answer))
+  }
+
+  // Two explicit false votes still refute, whatever the third answer holds.
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [noReal, false, false] },
+  })
+  assert.equal(result.refuted.length, 1)
+  assert.equal(result.refuted[0].votes[0].real, true)
 })
 
 test('failedVoteCountsReal: votes real, failed, false leave the finding standing', async () => {
