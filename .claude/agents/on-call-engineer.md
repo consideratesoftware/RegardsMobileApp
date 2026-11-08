@@ -55,6 +55,6 @@ PR: #n | none (pre-PR) @ new head sha
 RESULT: PUSHED | COMMITTED (pre-PR) | STILL RED | OWNER NEEDED
 FINDINGS:
 - finding (source) → commit sha | DISPUTED (§) | OWNER | TECH LEAD
-GATE: build-engineer RESULT line
+GATE: build-engineer RESULT line; scripts/tests suite(s) run with pass/fail counts, or none
 UNADDRESSED: with why
 ```
