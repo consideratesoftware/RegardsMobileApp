@@ -188,10 +188,10 @@ public actor SchedulingPass {
                 continue
             }
             desiredIds.insert(id)
-            // No re-nag: a fired row stays while it is this cycle's: at or after the start of the slot holding
-            // overdueAt, or of the next slot if none does (a 25-hour day's 1-day cadence starts before its anchor;
-            // a clock set back leaves overdueAt ahead of now), or, once overdue, at or after the anchor (a window
-            // edit). No overdue check on the first: a fired row still here was written after the last interaction.
+            // No re-nag: keep a fired row at or after the start of the slot holding overdueAt (or of the next
+            // slot), which covers a clock set back and a 25-hour day whose slot starts before the anchor, or,
+            // once overdue, at or after the anchor, the fallback when a window or cadence edit moves that
+            // slot past it. No overdue check on the first: the row was written after the last interaction.
             if let existing, existing.state == .fired,
                context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
                 .map({ $0 <= existing.scheduledFor }) == true
