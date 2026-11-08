@@ -1,21 +1,12 @@
 import Foundation
 import UserNotifications
 
-// R57 gate (ARCHITECTURE.md §19, owner ruling 2026-08-22): TF-06 must not
-// ship notification scheduling. Snooze now resolves through the contact's
-// effective window, with a floor of the tap time plus 7 calendar days, so a
-// snoozed row is already in-window. The gate stays until request building
-// returns: this file carries permission and actions only, builds no
-// notification request, and has no path that hands one to the system
-// notification center. TF-07e restores request building plus `schedule`,
-// `cancel`, and `pendingIdentifiers` in the PR that resolves R57.
-//
-// `NotificationSchedulingGateTests` enforces this on raw source text:
-// G1, no other app file names the center type; G2, this file never
-// contains the center's enqueue verb; G3, this file names the center type
-// exactly 4 times (3 `.current()` calls and the delegate parameter); G4, no
-// app file, this one included, names the system's notification request type
-// or any of its trigger types.
+// Request building and the scheduling members came back in TF-07e (R57). The
+// adapter maps one `ReminderNotificationRequest` to one OS request and back.
+// It decides nothing: `SchedulingPass` chooses what to schedule, the copy and
+// the fire dates (§9a). Titles and bodies arrive as parameters and hold
+// display names only. A contact id appears in the request identifier and in
+// `userInfo`, never in visible text.
 
 /// Permission state mirrored from `UNAuthorizationStatus`, so callers outside
 /// the Platform layer never import UserNotifications.
@@ -25,11 +16,13 @@ public enum NotificationAuthorizationStatus: String, Sendable, Equatable {
     case authorized
 }
 
-/// The two notification shapes §9 contract 5 defines: one contact's cadence
-/// reminder, or a digest for every contact sharing a slot start.
-public enum NotificationCategory: String, Sendable, Equatable {
+/// The notification shapes §9 contract 5 defines: one contact's cadence
+/// reminder, a digest for every contact sharing a slot start, or an occasion
+/// (birthday or anniversary). Occasions are never part of a digest.
+public enum NotificationCategory: String, Sendable, Equatable, CaseIterable {
     case cadence = "regards.cadence"
     case digest = "regards.digest"
+    case occasion = "regards.occasion"
 }
 
 /// A notification action the user took, decoded from the OS response.
@@ -38,11 +31,62 @@ public enum NotificationAction: Sendable, Equatable {
     case snooze(UUID)
 }
 
+/// One OS notification to schedule. `fireDate` is the absolute instant
+/// `SchedulingPass` resolved through the engine (§9); the adapter never
+/// re-derives it from wall-clock fields in another zone.
+public struct ReminderNotificationRequest: Sendable, Equatable {
+    /// What the notification is. A cadence or occasion notification is about
+    /// one contact and can't be built without its id. A cadence's Caught up
+    /// and Snooze act on that contact; an occasion has no actions. A digest
+    /// covers several contacts and carries none.
+    public enum Kind: Equatable, Sendable {
+        case cadence(contactId: UUID)
+        case occasion(contactId: UUID)
+        case digest
+    }
+
+    /// `contact-{uuid}-{kind}` or `digest-{slotStartEpoch}` (§9 contract 5).
+    public let identifier: String
+    /// Display names only. Never an identifier (privacy).
+    public let title: String
+    public let body: String
+    public let fireDate: Date
+    public let kind: Kind
+
+    public var category: NotificationCategory {
+        switch kind {
+        case .cadence: return .cadence
+        case .occasion: return .occasion
+        case .digest: return .digest
+        }
+    }
+
+    /// The contact a single-contact notification is about. Nil for a digest.
+    public var contactId: UUID? {
+        switch kind {
+        case .cadence(let contactId), .occasion(let contactId): return contactId
+        case .digest: return nil
+        }
+    }
+
+    public init(
+        identifier: String,
+        title: String,
+        body: String,
+        fireDate: Date,
+        kind: Kind
+    ) {
+        self.identifier = identifier
+        self.title = title
+        self.body = body
+        self.fireDate = fireDate
+        self.kind = kind
+    }
+}
+
 /// Seam over the system notification center (§9a). Production wires
 /// `UserNotificationsAdapter.shared`; tests and the DEBUG mock launch inject
-/// a fake so they never raise the system permission alert. TF-06 ships 3 of
-/// §9a's members; `schedule`, `cancel`, and `pendingIdentifiers` arrive with
-/// R57's fix in TF-07 (see the file header).
+/// a fake so they never raise the system permission alert.
 public protocol NotificationScheduling: Sendable {
     /// Raises the system prompt on first call; returns whether alerts are allowed.
     func requestAuthorization() async throws -> Bool
@@ -51,6 +95,21 @@ public protocol NotificationScheduling: Sendable {
     /// consumer only: a second concurrent iterator would take some of the
     /// actions and run alongside the first, so they'd be handled out of order.
     var actions: AsyncStream<NotificationAction> { get }
+    /// The requests waiting to fire, decoded from the system's pending list.
+    /// Content comes back, and the fire date comes back truncated to the whole
+    /// second, so a caller can tell a moved or reworded request from an
+    /// unchanged one under the same identifier. Every pending request is this
+    /// app's (iOS keeps one list per app). A request `decode` can't read is
+    /// left out; ARCHITECTURE.md §9a gives the rule for retiring or adding a
+    /// request shape. The order is unspecified, because the real center
+    /// documents none, so a caller must not rely on it.
+    func pendingRequests() async -> [ReminderNotificationRequest]
+    /// Adds the request, or replaces a pending one with the same identifier.
+    /// Delivers at once when the fire date, cut to the whole second, is at or
+    /// before now, even if it is a fraction of a second ahead of now (§9 contract 5).
+    func schedule(_ request: ReminderNotificationRequest) async throws
+    /// Removes pending requests. Unknown identifiers are ignored.
+    func cancel(identifiers: [String]) async
 }
 
 /// Default `NotificationScheduling` backed by the system notification center.
@@ -105,7 +164,36 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
         return Self.status(from: settings.authorizationStatus)
     }
 
+    public func pendingRequests() async -> [ReminderNotificationRequest] {
+        let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
+        return pending.compactMap(Self.decode)
+    }
+
+    public func schedule(_ request: ReminderNotificationRequest) async throws {
+        // `Date()` is read here, once, immediately before the add, with no
+        // early margin: a fire date that passes between planning and this
+        // line gets no trigger and delivers now.
+        let built = Self.makeRequest(request, now: Date())
+        try await UNUserNotificationCenter.current().add(built)
+    }
+
+    public func cancel(identifiers: [String]) async {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
     // MARK: - UNUserNotificationCenterDelegate
+
+    /// What a notification shows while Regards is in the foreground. Without
+    /// the delegate method below, the system shows nothing.
+    static let foregroundPresentationOptions: UNNotificationPresentationOptions = [.banner, .list, .sound]
+
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler(Self.foregroundPresentationOptions)
+    }
 
     /// `UNNotificationResponse` and its `userInfo` aren't `Sendable`, so the
     /// response is copied out here, synchronously, before anything leaves
@@ -136,11 +224,129 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
 
     // MARK: - Pure mapping (tested without the notification center)
 
+    /// Builds the OS request. A future `fireDate` becomes a non-repeating
+    /// `UNCalendarNotificationTrigger` (§9 platform nuance) whose components
+    /// are pinned to UTC: UTC has no skipped or repeated hour, so the trigger
+    /// names one absolute instant whatever the device zone or DST does. A
+    /// request whose whole-second trigger instant is at or before `now` gets
+    /// no trigger, which delivers immediately (§9 contract 5: a past slot
+    /// start is an immediate delivery); a calendar trigger for a past instant
+    /// would never fire.
+    ///
+    /// The visible text is `request.title` and `request.body` as given. The
+    /// contact id goes to `userInfo` only.
+    ///
+    /// - Parameters:
+    ///   - now: read immediately before this request is added to the
+    ///     center, once per request.
+    ///   - deviceZone: the zone the calendar starts in before it is pinned to
+    ///     GMT. Production keeps the default. Tests pass a DST zone so the pin
+    ///     is tested on a UTC host. The calendar is always Gregorian, which
+    ///     `decode` relies on.
+    static func makeRequest(
+        _ request: ReminderNotificationRequest,
+        now: Date,
+        deviceZone: TimeZone = .current
+    ) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = request.title
+        content.body = request.body
+        content.sound = .default
+        content.categoryIdentifier = request.category.rawValue
+        switch request.kind {
+        case .cadence(let contactId), .occasion(let contactId):
+            content.userInfo = [contactIdKey: contactId.uuidString]
+        case .digest:
+            break
+        }
+
+        // `deviceZone` starts the calendar in a DST zone, so a test on a UTC host
+        // can show that the GMT pin below makes the trigger absolute. Without
+        // this line a missing pin would pass on CI. In production it is `.current`: a no-op.
+        // `.calendar` below stores this Gregorian GMT calendar in the components,
+        // which is meant to override the device's calendar (device check (f)).
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = deviceZone
+        utc.timeZone = .gmt
+        let components = utc.dateComponents(
+            [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second],
+            from: request.fireDate
+        )
+        // Components drop sub-second precision, so compare the instant the
+        // trigger would actually name. If that has already passed, a calendar
+        // trigger would never fire; deliver now instead.
+        let trigger: UNCalendarNotificationTrigger?
+        if let triggerInstant = utc.date(from: components), triggerInstant > now {
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        } else {
+            trigger = nil
+        }
+
+        return UNNotificationRequest(identifier: request.identifier, content: content, trigger: trigger)
+    }
+
+    /// The inverse of `makeRequest`, for a pending request. `makeRequest` only
+    /// writes Gregorian components in GMT, so the fire date is resolved in that
+    /// calendar, whatever calendar the components carry. It resolves them in
+    /// the zone they carry, which is GMT for every request `makeRequest`
+    /// builds, and in GMT when they carry none. It doesn't depend on the
+    /// current time or the device calendar, and it has whole-second precision.
+    /// Nil when the request isn't a shape this build leaves pending
+    /// (ARCHITECTURE.md §9a):
+    /// - a non-calendar trigger (or no trigger);
+    /// - a repeating trigger, because this build never makes one and a
+    ///   repeating request never leaves the pending list;
+    /// - an unknown category;
+    /// - components that lack a full date and time or don't resolve to one;
+    /// - a cadence or occasion request with no valid contact id, because
+    ///   `Kind` can't hold either without one and a cadence request's
+    ///   Caught up and Snooze would have nobody to act on.
+    static func decode(_ request: UNNotificationRequest) -> ReminderNotificationRequest? {
+        guard
+            let trigger = request.trigger as? UNCalendarNotificationTrigger,
+            !trigger.repeats,
+            let category = NotificationCategory(rawValue: request.content.categoryIdentifier)
+        else {
+            return nil
+        }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = .gmt
+        // `Calendar.date(from:)` fills in a field the components lack instead of
+        // returning nil, so require all 6 before resolving.
+        let parts = trigger.dateComponents
+        guard
+            parts.year != nil, parts.month != nil, parts.day != nil,
+            parts.hour != nil, parts.minute != nil, parts.second != nil,
+            let fireDate = utc.date(from: parts)
+        else {
+            return nil
+        }
+        let contactId = (request.content.userInfo[contactIdKey] as? String).flatMap { UUID(uuidString: $0) }
+        let kind: ReminderNotificationRequest.Kind
+        switch category {
+        case .cadence:
+            guard let contactId else { return nil }
+            kind = .cadence(contactId: contactId)
+        case .occasion:
+            guard let contactId else { return nil }
+            kind = .occasion(contactId: contactId)
+        case .digest:
+            kind = .digest
+        }
+        return ReminderNotificationRequest(
+            identifier: request.identifier,
+            title: request.content.title,
+            body: request.content.body,
+            fireDate: fireDate,
+            kind: kind
+        )
+    }
+
     /// Cadence notifications carry Caught up and Snooze 1 week; both open the
     /// app (owner ruling 2026-10-11, recorded in the PR #58 comment). There's
     /// no custom Open action: the OS default tap already opens the app, and an
     /// action that did nothing more would be an inert control (§10, R11).
-    /// Digests carry no actions.
+    /// Digests and occasions carry no actions.
     static var categories: Set<UNNotificationCategory> {
         let caughtUp = UNNotificationAction(
             identifier: caughtUpActionIdentifier,
@@ -161,6 +367,12 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
             ),
             UNNotificationCategory(
                 identifier: NotificationCategory.digest.rawValue,
+                actions: [],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: NotificationCategory.occasion.rawValue,
                 actions: [],
                 intentIdentifiers: [],
                 options: []
