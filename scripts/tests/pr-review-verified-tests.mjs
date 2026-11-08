@@ -330,6 +330,26 @@ test('approveWithNotCheckedStandsAsReported: a pr-* APPROVE with NOT CHECKED ent
   assert.deepEqual(result.verdicts[0].notChecked, ['swift test was not run'])
 })
 
+// Pin: passes on the old script. A REQUEST_CHANGES flips to APPROVE only when a
+// verifier refuted something. With no BLOCKER or FIX finding there is nothing
+// to refute, so nothing may flip it.
+test('failClosed: a pr-* REQUEST_CHANGES with no BLOCKER or FIX finding stays REQUEST_CHANGES', async () => {
+  const cases = [
+    ['no findings', []],
+    ['only a NIT', [finding('NIT', 'Delta.swift:1')]],
+    ['only a QUESTION', [finding('QUESTION', 'Delta.swift:2')]],
+    ['only an ESCALATE', [finding('ESCALATE', 'Gamma.swift:5')]],
+    ['a NIT, a QUESTION and an ESCALATE', [finding('NIT', 'Delta.swift:1'), finding('QUESTION', 'Delta.swift:2'), finding('ESCALATE', 'Gamma.swift:5')]],
+  ]
+  for (const [what, findings] of cases) {
+    // No votes are scripted: a verifier call here would fail the run.
+    const { result, calls } = await runWorkflow({ reviews: { 'pr-correctness': review('REQUEST_CHANGES', findings) } })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES', what)
+    assert.equal(verifierCalls(calls).length, 0, what)
+    assert.deepEqual(result.refuted, [], what)
+  }
+})
+
 test('a result with no notChecked field keeps REQUEST_CHANGES (an unknown is not "none")', async () => {
   const noField = review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')])
   delete noField.notChecked
