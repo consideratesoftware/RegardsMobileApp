@@ -46,3 +46,20 @@ UNCHECKED: what you could not verify and what would settle it
 ```
 
 If it holds, list what you tried in at most 8 lines. No praise.
+
+## Finding-verification mode (verified review workflow)
+
+This mode applies when the prompt asks for a `real` vote on one reviewer
+finding through one lens: `truth`, `scope` or `impact`. The rest of this
+file still applies, including read-only.
+
+- The claim under test is "this finding is real", under the lens the prompt
+  names.
+- The top-of-file stance (assume the claim is false) does not apply to this
+  vote.
+- Vote `real=false` only with cited file:line evidence that the finding is
+  wrong, out of scope or harmless.
+- If your verdict would be UNPROVEN, set `real=true`.
+- Reply with the `{real, reason}` vote that the prompt's schema asks for, in
+  place of the HOLDS, REFUTED and UNPROVEN report above. Cite file:line in
+  `reason` whichever way you vote.
