@@ -1200,6 +1200,33 @@ test('each verifier gets its own lens question', async () => {
 
   // The scope verifier is sent to the context file by name.
   assert.match(promptOf('scope'), /Check \/tmp\/worktree\/review-context\.md/)
+
+  // Every lens gets the finding itself: who raised it, its severity and
+  // location, the claim in quotes, and the proposed fix.
+  for (const lens of ['truth', 'scope', 'impact']) {
+    assert.ok(
+      promptOf(lens).includes('raised this BLOCKER at Alpha.swift:10:\n"claim at Alpha.swift:10"\nProposed fix: fix at Alpha.swift:10'),
+      `the ${lens} prompt does not carry the finding`,
+    )
+  }
+})
+
+test('a finding with no fix reaches the verifiers as Proposed fix: (none)', async () => {
+  // One finding has no fix key and one has an empty fix. Both read "(none)".
+  const noFix = { severity: 'BLOCKER', location: 'Alpha.swift:10', claim: 'claim at Alpha.swift:10' }
+  const emptyFix = { severity: 'FIX', location: 'Beta.swift:20', claim: 'claim at Beta.swift:20', fix: '' }
+  const { calls } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [noFix, emptyFix]) },
+    votes: { 'Alpha.swift:10': [true, true, true], 'Beta.swift:20': [true, true, true] },
+  })
+  assert.equal(verifierCalls(calls).length, 6)
+  for (const [location, claim] of [['Alpha.swift:10', 'claim at Alpha.swift:10'], ['Beta.swift:20', 'claim at Beta.swift:20']]) {
+    for (const lens of ['truth', 'scope', 'impact']) {
+      const prompt = verifierCalls(calls).find(c => c.opts.label === `verify:pr-correctness:${lens}` && c.prompt.includes(`at ${location}:`)).prompt
+      assert.ok(prompt.includes(`"${claim}"\nProposed fix: (none)`), `${lens} prompt for ${location}`)
+      assert.doesNotMatch(prompt, /Proposed fix: undefined/)
+    }
+  }
 })
 
 test('a scoped recheck reaches the pr-* reviewers and their verifiers, never Codex or its verifiers', async () => {
