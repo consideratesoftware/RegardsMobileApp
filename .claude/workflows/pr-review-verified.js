@@ -259,12 +259,13 @@ log(`${survivors.length} findings survived verification, ${refuted.length} refut
 
 let workOrder = { items: [], notes: 'no surviving findings' }
 if (survivors.length) {
-  // agent() returns null when the synthesizer fails. Without a fallback every
-  // surviving finding would vanish from the result, so say so and let the
-  // caller repair from `survivors`.
+  // The synthesizer runs as tech-lead, a read-only agent (no Edit or Write), so
+  // a finding's text cannot make it change a file. agent() returns null when it
+  // fails. Without a fallback every surviving finding would vanish from the
+  // result, so say so and let the caller repair from `survivors`.
   workOrder = (await agent(
     `${base}\n\nThese review findings survived adversarial verification:\n${JSON.stringify(survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix })), null, 2)}\n\nMerge duplicates (same root cause) into one item, keep the most severe rating, list every reviewer that raised it. Assign each item an owner: production code → ios-engineer (senior-ios-engineer for SchedulingPass, engine, schema, concurrency); test files under ios/ or android/ → qa-engineer; scripts and their tests under scripts/, files under .github/ other than .md, and workflow scripts under .claude/workflows/ → on-call-engineer; every .md file outside ios/Regards* and android/*/src (ios/docs, android/docs, .github/, and the root docs README.md, ANDROID_PORT.md, CLAUDE.md, AGENTS.md, ARCHITECTURE.md, TESTFLIGHT_PLAN.md and ENGINEERING_ORG.md), and prose under .claude/, .codex/ and .agents/ → tech-writer; PR body only → EM-body; a design choice → tech-lead-ruling; a product or owner-gate choice → owner-question. Write each change as an exact, minimal instruction.`,
-    { label: 'synthesize', phase: 'Synthesize', schema: WORKORDER })) || { items: [], notes: 'the synthesizer returned nothing; repair from survivors' }
+    { label: 'synthesize', phase: 'Synthesize', agentType: 'tech-lead', schema: WORKORDER })) || { items: [], notes: 'the synthesizer returned nothing; repair from survivors' }
 }
 
 const codex = done.find(d => d.reviewer === 'codex-reviewer')

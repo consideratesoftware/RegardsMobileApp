@@ -1255,6 +1255,24 @@ test('the synthesizer is told who owns infra files: on-call-engineer for scripts
   assert.ok(owners.includes('tech-writer'))
 })
 
+test('the synthesizer runs as the read-only tech-lead agent', async () => {
+  const { calls } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  const synth = calls.find(c => c.opts.label === 'synthesize')
+  assert.equal(synth.opts.agentType, 'tech-lead')
+
+  // The synthesizer reads reviewers' text, so it must not be able to write. The
+  // agent file lists its tools, and none of them edits.
+  const agent = readFileSync(path.join(here, '..', '..', '.claude', 'agents', 'tech-lead.md'), 'utf8')
+  const tools = /^tools: (.*)$/m.exec(agent)
+  assert.ok(tools, 'tech-lead.md has no tools line')
+  for (const tool of ['Edit', 'Write', 'NotebookEdit']) {
+    assert.ok(!tools[1].split(',').map(name => name.trim()).includes(tool), `tech-lead.md lists ${tool}`)
+  }
+})
+
 test('the work-order owner enum lists exactly the owners the synthesizer prompt can assign', async () => {
   const { calls } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
