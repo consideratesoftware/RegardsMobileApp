@@ -468,6 +468,40 @@ test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILA
   assert.doesNotMatch(codexCall.prompt, /retry once/i)
 })
 
+// Pin: passes on the old script. Rule 5 says Codex's RETRY comes back as
+// written, and only UNAVAILABLE had a test.
+test('codexRetryPassesThrough: a RETRY Codex comes back as RETRY, never APPROVE', async () => {
+  const text = 'CODEX REVIEW: RETRY @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nWORKTREE: /tmp/worktree\nVERDICT: RETRY\nREASON: timeout\nREVIEW:\nlast 20 lines of output\n'
+  const { result, calls } = await runWorkflow({
+    args: { reviewers: ['pr-tests'], codex: true },
+    reviews: {
+      'pr-tests': review('APPROVE'),
+      'codex-reviewer': review('RETRY', [], { rawSummary: text }),
+    },
+  })
+  const codex = result.verdicts.find(v => v.reviewer === 'codex-reviewer')
+  assert.equal(codex.verdict, 'RETRY')
+  assert.equal(codex.reportedVerdict, 'RETRY')
+  assert.equal(codex.codexLine, 'CODEX REVIEW: RETRY @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3')
+  assert.equal(result.codexReview, text)
+  assert.equal(verdictOf(result, 'pr-tests'), 'APPROVE')
+
+  // A RETRY with a stale reviewedSha is still a RETRY: the head may have moved,
+  // which is one of the reasons Codex reports RETRY.
+  const moved = await runWorkflow({
+    args: { reviewers: ['pr-tests'], codex: true },
+    reviews: {
+      'pr-tests': review('APPROVE'),
+      'codex-reviewer': review('RETRY', [], { reviewedSha: 'f'.repeat(40), rawSummary: text }),
+    },
+  })
+  assert.equal(verdictOf(moved.result, 'codex-reviewer'), 'RETRY')
+
+  // The agent has to be told it may report RETRY, or it would pick the
+  // nearest verdict it is allowed.
+  assert.match(calls.find(c => c.opts.agentType === 'codex-reviewer').prompt, /RETRY \(also when the head moved\)/)
+})
+
 test('prVerdictEnum: RETRY and UNAVAILABLE are Codex\'s verdicts, and the schema refuses them from a pr-* reviewer', async () => {
   const { calls } = await runWorkflow({
     args: { codex: true },
