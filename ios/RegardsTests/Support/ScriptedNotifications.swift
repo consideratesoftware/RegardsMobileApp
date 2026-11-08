@@ -1,20 +1,29 @@
 import Foundation
 @testable import Regards
 
-/// One scripted `NotificationScheduling` for the cases `DebugNotificationScheduling`
-/// can't express, because it has a single fixed request outcome and answers
-/// every status read at once:
-/// - request steps, consumed one per call: succeed or throw, and optionally
-///   record the user's decision first (a prompt answered and then erroring);
-///   once they run out a request grants;
-/// - held status reads: after `immediateReads` reads, the next `heldReads`
-///   suspend until the test releases each one with the value it should return,
-///   in any order, so a stale read can finish last.
+/// One scripted outcome of `requestAuthorization()`: it succeeds or throws,
+/// and may record the user's decision first (a prompt answered and then
+/// erroring).
 enum ScriptedRequestStep: Sendable {
     case succeeds(deciding: NotificationAuthorizationStatus?)
     case fails(deciding: NotificationAuthorizationStatus?)
 }
 
+/// One scripted `NotificationScheduling` for the cases `DebugNotificationScheduling`
+/// can't express, because it has a single fixed request outcome and answers
+/// every status read at once. It holds:
+/// - request steps, consumed one per call: succeed or throw, and optionally
+///   record the user's decision first (a prompt answered and then erroring);
+///   once they run out a request grants;
+/// - held status reads: after `immediateReads` reads, the next `heldReads`
+///   suspend until the test releases each one with the value it should return,
+///   in any order, so a stale read can finish last;
+/// - the pending set, keyed by identifier like the system's, with a record of
+///   every `schedule` and `cancel` call (`scheduleCalls`, `cancelCalls`);
+/// - `delivered`, the requests the fake treats as delivered: fake-only
+///   bookkeeping for tests;
+/// - `UnreadableRequest`, which `schedule` throws when the adapter can't read
+///   back the request it just built.
 actor ScriptedNotifications: NotificationScheduling {
     // MARK: - State
 
