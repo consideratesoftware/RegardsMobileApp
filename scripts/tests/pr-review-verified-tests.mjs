@@ -79,6 +79,26 @@ function schemaRefusal(answer, schema) {
   return null
 }
 
+// Like the real parallel(): a thunk that throws becomes null in its place.
+function parallel(thunks) {
+  return Promise.all(thunks.map(t => Promise.resolve().then(t).catch(() => null)))
+}
+
+// Like the real pipeline(): every stage gets (previous result, item, index), and
+// an item whose stage throws becomes null. These two hold no state, so
+// runWorkflow() and badArgsThrow share them.
+function pipeline(items, ...stages) {
+  return Promise.all(items.map(async (item, i) => {
+    try {
+      let previous = item
+      for (const stage of stages) previous = await stage(previous, item, i)
+      return previous
+    } catch {
+      return null
+    }
+  }))
+}
+
 function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes: 'stub' }, args = {} } = {}) {
   const calls = []
   const phases = []
@@ -128,25 +148,6 @@ function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes:
 
     unplanned.push(`an agent call labeled "${label}"`)
     return Promise.resolve(null)
-  }
-
-  // Like the real one: a thunk that throws becomes null in its place.
-  function parallel(thunks) {
-    return Promise.all(thunks.map(t => Promise.resolve().then(t).catch(() => null)))
-  }
-
-  // Like the real one: every stage gets (previous result, item, index), and an
-  // item whose stage throws becomes null.
-  function pipeline(items, ...stages) {
-    return Promise.all(items.map(async (item, i) => {
-      try {
-        let previous = item
-        for (const stage of stages) previous = await stage(previous, item, i)
-        return previous
-      } catch {
-        return null
-      }
-    }))
   }
 
   const baseArgs = {
@@ -739,15 +740,17 @@ test('badArgsThrow: a bad head, reviewer list, since, codex or text arg throws b
     [{ contextFile: 42 }, text('contextFile')],
   ]
   for (const [args, message] of bad) {
+    // The agent records its call and returns nothing. parallel and pipeline are
+    // the working fakes, so a workflow that got past its checks would reach the
+    // agent and the count below would not be 0.
     const calls = []
-    await assert.rejects(
-      workflow(() => { calls.push(1) }, () => {}, () => {}, () => {}, () => {}, {
-        title: 't', worktree: '/w', branch: 'b', head: HEAD, reviewers: ['pr-tests'], codex: false, contextFile: '/c', ...args,
-      }),
-      message,
-      JSON.stringify(args),
-    )
+    const agent = () => { calls.push(1); return Promise.resolve(null) }
+    const outcome = await workflow(agent, parallel, pipeline, () => {}, () => {}, {
+      title: 't', worktree: '/w', branch: 'b', head: HEAD, reviewers: ['pr-tests'], codex: false, contextFile: '/c', ...args,
+    }).then(() => null, error => error)
     assert.equal(calls.length, 0, `an agent ran for ${JSON.stringify(args)}`)
+    assert.ok(outcome instanceof Error, `no error for ${JSON.stringify(args)}`)
+    assert.match(outcome.message, message, JSON.stringify(args))
   }
 })
 
