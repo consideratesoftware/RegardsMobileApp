@@ -109,8 +109,8 @@ public actor SchedulingPass {
         try await reschedule(only: contactId)
     }
 
-    /// Writes the rows the snapshot says should exist, for every tracked contact or only `contactId`,
-    /// and cancels future pending rows that shouldn't; a due one is marked fired first.
+    /// Covered contacts are this run's `targets`: every tracked contact, or only `contactId`. Marks their due
+    /// pending rows fired, writes the rows they should have, and cancels future pending rows they shouldn't.
     private func reschedule(only contactId: UUID?) async throws {
         // One read holds the contacts, the pending and fired rows, and the
         // window. A one-shot fetch, never the observation: GRDB delivers that
@@ -241,9 +241,9 @@ public actor SchedulingPass {
             }
         } catch {
             // The fail-closed read failed (an undecodable row, or any other read error), so orphans stay
-            // pending. That row fails it in every `runFull()` and `run(for:)` for its own contact outside the
-            // snapshot (SQL filters by contact). Until TF-07f it hides every snooze and Upcoming occasion.
-            // The type only: an error can carry row or contact values.
+            // pending. An undecodable pending row fails this read in every `runFull()`, and in `run(for:)`
+            // for its own contact outside the snapshot (SQL filters by contact). Until TF-07f that row hides
+            // every snooze and Upcoming occasion. The type only: an error can carry row or contact values.
             let errorType = String(describing: type(of: error))
             Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
             return
