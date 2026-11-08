@@ -46,11 +46,12 @@ export const meta = {
 //
 // Result: { head, verdicts, codexReview, workOrder, survivors, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
-//                (what the reviewer said), reviewedSha, report (the reviewer's
-//                whole report, verbatim, or null), notChecked, coverageHoles,
-//                escalations, nits. A reviewer that returned nothing has
-//                verdict FAILED, and so does a pr-* reviewer whose reviewedSha
-//                is not a prefix of head (rule 6).
+//                (what the reviewer said), reviewedSha, codexLine (Codex only),
+//                report (the reviewer's whole report, verbatim, or null),
+//                notChecked, coverageHoles, escalations, nits, questions. A
+//                reviewer that returned nothing has verdict FAILED, and so
+//                does a pr-* reviewer whose reviewedSha is not a prefix of
+//                head (rule 6).
 //   survivors[]  one per surviving BLOCKER or FIX finding: reviewer, severity,
 //                location, claim, fix and votes. The work order is built from
 //                these; if the synthesizer returns nothing, workOrder.notes
@@ -224,7 +225,8 @@ return {
     notChecked: d.review ? d.review.notChecked : [],
     coverageHoles: d.review ? d.review.coverageHoles : [],
     escalations: d.review ? d.review.findings.filter(f => f.severity === 'ESCALATE').map(f => `${f.location}: ${f.claim}`) : [],
-    nits: d.review ? d.review.findings.filter(f => f.severity === 'NIT' || f.severity === 'QUESTION').map(f => `${f.location}: ${f.claim}`) : [],
+    nits: d.review ? d.review.findings.filter(f => f.severity === 'NIT').map(f => `${f.location}: ${f.claim}`) : [],
+    questions: d.review ? d.review.findings.filter(f => f.severity === 'QUESTION').map(f => `${f.location}: ${f.claim}`) : [],
   })),
   codexReview: (codex && codex.review && codex.review.rawSummary) || null,
   workOrder,

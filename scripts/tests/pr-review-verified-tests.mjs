@@ -234,7 +234,8 @@ test('only BLOCKER and FIX go to the verifiers: NIT and QUESTION do not', async 
     votes: { 'Delta.swift:1': [true, true, true], 'Delta.swift:2': [true, true, true] },
   })
   assert.equal(verifierCalls(calls).length, 0)
-  assert.equal(result.verdicts[0].nits.length, 2)
+  assert.deepEqual(result.verdicts[0].nits, ['Delta.swift:1: claim at Delta.swift:1'])
+  assert.deepEqual(result.verdicts[0].questions, ['Delta.swift:2: claim at Delta.swift:2'])
 })
 
 // ---- the per-reviewer verdict ---------------------------------------------
