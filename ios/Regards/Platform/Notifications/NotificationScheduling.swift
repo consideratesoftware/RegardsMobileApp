@@ -285,9 +285,10 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
 
     /// The inverse of `makeRequest`, for a pending request. `makeRequest` only
     /// writes Gregorian components in GMT, so the fire date is resolved in that
-    /// calendar, whatever calendar the components carry. It doesn't depend on
-    /// the current time, the device zone or the device calendar, and it has
-    /// whole-second precision.
+    /// calendar, whatever calendar the components carry. It resolves them in
+    /// the zone they carry, which is GMT for every request `makeRequest`
+    /// builds, and in GMT when they carry none. It doesn't depend on the
+    /// current time or the device calendar, and it has whole-second precision.
     /// Nil when the request isn't a shape this build leaves pending
     /// (ARCHITECTURE.md §9a):
     /// - a non-calendar trigger (or no trigger);
