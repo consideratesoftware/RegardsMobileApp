@@ -58,8 +58,9 @@ audited* table.
    Every tappable view responds to the default accessibility action.
 9. **VoiceOver manual smoke in the pre-release device pass.** See
    [`accessibility-smoke.md`](accessibility-smoke.md). A PR that changes UI
-   adds its steps to `TESTFLIGHT_PLAN.md`'s "Pre-release device pass"; the
-   smoke is not a merge gate (owner ruling, 2026-10-28). On a PR the gates are
+   adds its steps to `TESTFLIGHT_PLAN.md`'s "Pre-release device pass", or names
+   a section of `accessibility-smoke.md` in place of copying them. The smoke is
+   not a merge gate (owner ruling, 2026-10-28). On a PR the gates are
    the `pr-accessibility` review and the focused regressions; the broad
    automated audits gate the release.
 10. **Documentation.** Every new screen gets a row in the table below.
@@ -275,8 +276,9 @@ button are each announced correctly (section "Channel preview alert (Overdue
 and Upcoming)" in `accessibility-smoke.md`, part of the pre-release device
 pass), and record the result, pass or fail, on the Result line of that
 section's entry in `TESTFLIGHT_PLAN.md`'s "Pre-release device pass" once that
-entry is added (it does not exist yet; see `accessibility-smoke.md`), rather
-than leaving it open indefinitely.
+entry is added (it does not exist yet; see `accessibility-smoke.md`). Then
+update this entry with the outcome: keep the exclusion with the device result
+cited, or fix the alert. Do not leave it open indefinitely.
 
 ## Sensory-audit carve-outs
 
