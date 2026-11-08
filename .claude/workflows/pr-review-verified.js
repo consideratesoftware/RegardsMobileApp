@@ -181,8 +181,9 @@ if (new Set(a.reviewers).size !== a.reviewers.length) {
   throw new Error(`reviewers must not repeat a name, got: ${JSON.stringify(a.reviewers)}`)
 }
 
-// The focus line goes into the pr-* review and verify prompts only. Codex
-// always reviews all of origin/main...HEAD, so its prompt never gets it.
+// The focus line goes into the pr-* review prompts and the verify prompts for
+// pr-* findings only. Codex always reviews all of origin/main...HEAD, so neither
+// its prompt nor the verify prompts for its findings get it.
 const scopedRecheck = a.since ? ` This is a scoped recheck: focus on \`git diff ${a.since}..${a.head}\` plus anything it can break.` : ''
 const base = `${a.title}. Worktree ${a.worktree}, branch ${a.branch}, head ${a.head}. Target: origin/main...HEAD. Context, scope, rulings and owner decisions: ${a.contextFile}. No commits land during this review. Do not edit files or post to GitHub.`
 
@@ -209,7 +210,7 @@ const results = await pipeline(
     // throw, so every entry of `verified` is an object.
     const verified = await parallel(toCheck.map(f => async () => {
       const answers = await parallel(LENSES.map(l => () => agent(
-        `${base}${scopedRecheck}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nUse your finding-verification mode (verifier.md). Try to REFUTE it under this lens. Set real=false only when you cite file:line evidence that the finding is wrong, out of scope, or harmless. If your verdict would be UNPROVEN, set real=true. Cite file:line evidence either way.`,
+        `${base}${r.type === 'codex-reviewer' ? '' : scopedRecheck}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nUse your finding-verification mode (verifier.md). Try to REFUTE it under this lens. Set real=false only when you cite file:line evidence that the finding is wrong, out of scope, or harmless. If your verdict would be UNPROVEN, set real=true. Cite file:line evidence either way.`,
         { label: `verify:${r.type}:${l.key}`, phase: 'Verify', agentType: 'verifier', schema: VERDICT })))
       // answers[i] belongs to LENSES[i], and is null when that verifier failed.
       // Keep the null in its place so the lens names stay right.

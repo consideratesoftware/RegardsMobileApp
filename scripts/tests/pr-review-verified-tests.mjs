@@ -912,23 +912,28 @@ test('each verifier gets its own lens question', async () => {
   assert.match(promptOf('scope'), /Check \/tmp\/worktree\/review-context\.md/)
 })
 
-test('a scoped recheck reaches the pr-* reviewers and their verifiers, never Codex', async () => {
+test('a scoped recheck reaches the pr-* reviewers and their verifiers, never Codex or its verifiers', async () => {
   const since = 'f'.repeat(40)
   const { calls } = await runWorkflow({
     args: { since, codex: true },
     reviews: {
       'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]),
-      'codex-reviewer': review('APPROVE'),
+      'codex-reviewer': review('APPROVE', [finding('BLOCKER', 'Gamma.swift:30')]),
     },
-    votes: { 'Alpha.swift:10': [true, true, true] },
+    votes: { 'Alpha.swift:10': [true, true, true], 'Gamma.swift:30': [true, true, true] },
   })
   const focus = new RegExp(`git diff ${since}\\.\\.${HEAD}`)
   const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
   assert.doesNotMatch(codexCall.prompt, /scoped recheck|git diff/)
   assert.match(calls.find(c => c.opts.label === 'review:pr-correctness').prompt, focus)
-  const checks = verifierCalls(calls)
-  assert.equal(checks.length, 3)
-  for (const c of checks) assert.match(c.prompt, focus)
+
+  // 3 verifiers for the pr-correctness finding and 3 for the Codex finding.
+  assert.equal(verifierCalls(calls).length, 6)
+  const checksFor = reviewer => calls.filter(c => c.opts.label.startsWith(`verify:${reviewer}:`))
+  assert.equal(checksFor('pr-correctness').length, 3)
+  assert.equal(checksFor('codex-reviewer').length, 3)
+  for (const c of checksFor('pr-correctness')) assert.match(c.prompt, focus)
+  for (const c of checksFor('codex-reviewer')) assert.doesNotMatch(c.prompt, /scoped recheck|git diff/)
 })
 
 test('the script avoids what the sandbox forbids, and meta is a literal that matches the phases', async () => {
