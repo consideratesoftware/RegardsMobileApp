@@ -1093,7 +1093,7 @@ test('reportReturned: a pr-* reviewer\'s whole report comes back on its verdict,
   assert.match(prompt, /rawSummary/)
 })
 
-test('survivors lists each surviving BLOCKER or FIX with its votes, and not a refuted one', async () => {
+test('survivors lists each surviving BLOCKER or FIX with its votes, and refuted lists the refuted one with its claim', async () => {
   const { result } = await runWorkflow({
     reviews: {
       'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10'), finding('FIX', 'Beta.swift:20')]),
@@ -1112,6 +1112,21 @@ test('survivors lists each surviving BLOCKER or FIX with its votes, and not a re
       { lens: 'impact', real: false, reason: 'stub impact' },
     ],
   }])
+
+  // The refuted one is listed on its own, with its claim and its votes, and
+  // without a fix. The head is the one that was reviewed.
+  assert.deepEqual(result.refuted, [{
+    reviewer: 'pr-correctness',
+    severity: 'FIX',
+    location: 'Beta.swift:20',
+    claim: 'claim at Beta.swift:20',
+    votes: [
+      { lens: 'truth', real: false, reason: 'stub truth' },
+      { lens: 'scope', real: false, reason: 'stub scope' },
+      { lens: 'impact', real: true, reason: 'stub impact' },
+    ],
+  }])
+  assert.equal(result.head, HEAD)
 })
 
 test('the prompts name a scoped recheck only when since is given', async () => {
