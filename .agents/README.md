@@ -28,7 +28,8 @@ different model family.
 
 The verified run differs from the Codex skill in 3 enforcement steps: it can
 turn a reviewer's REQUEST_CHANGES into APPROVE when verifiers refute its findings
-(rule 3), marks a pr-* reviewer FAILED when its `reviewedSha` is not a prefix of
+and the reviewer's own blocker count matches the blockers it listed (rule 3),
+marks a pr-* reviewer FAILED when its `reviewedSha` is not a prefix of
 head (rule 6), and turns an APPROVE with NOT CHECKED entries into REQUEST_CHANGES
 (rule 7). See `.claude/commands/pr-review.md`, "The workflow's rules". The
 requirement behind rule 7 is shared: the `.codex` pr-* contracts already forbid
