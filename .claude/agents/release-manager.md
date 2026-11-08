@@ -131,7 +131,7 @@ bash "<lane>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   #
 ```
 
 Always run the script with `bash`, never your default shell. Use the copy
-exported from `origin/main` (the root checkout's copy), not the lane's: the PR
+exported from `origin/main` (the command above), not the lane's: the PR
 under review could have edited its own copy. A PR that itself changes
 `scripts/count-hosted-blockers.sh` also gets the path of its own copy, in the
 engineering manager's prompt. Run both copies. If either prints `MALFORMED` or
@@ -192,7 +192,7 @@ lane's refs, and this fetch brings them up to date.
      Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
      other nonzero exit is a script error; all of them fail the carry. Use the
-     copy exported from `origin/main` (the root checkout's copy), not the
+     copy exported from `origin/main` (the command above), not the
      lane's: the PR under review could have edited its own copy. A PR that itself
      changes `scripts/check-carried-approval.sh` also gets the path of its own
      copy, in the engineering manager's prompt. Run both copies; the carry
