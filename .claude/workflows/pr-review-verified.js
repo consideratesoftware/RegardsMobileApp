@@ -162,7 +162,7 @@ const results = await pipeline(
     // throw, so every entry of `verified` is an object.
     const verified = await parallel(toCheck.map(f => async () => {
       const answers = await parallel(LENSES.map(l => () => agent(
-        `${base}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nTry to REFUTE it under this lens. Default to real=false only if you can show why; cite file:line evidence either way.`,
+        `${base}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nUse your finding-verification mode (verifier.md). Try to REFUTE it under this lens. Set real=false only when you cite file:line evidence that the finding is wrong, out of scope, or harmless. If your verdict would be UNPROVEN, set real=true. Cite file:line evidence either way.`,
         { label: `verify:${r.type}:${l.key}`, phase: 'Verify', agentType: 'verifier', schema: VERDICT })))
       // answers[i] belongs to LENSES[i], and is null when that verifier failed.
       // Keep the null in its place so the lens names stay right.

@@ -197,7 +197,16 @@ test('verifiersAreRepoVerifier: every verifier call uses the repo verifier agent
   })
   const checks = verifierCalls(calls)
   assert.equal(checks.length, 6)
-  for (const c of checks) assert.equal(c.opts.agentType, 'verifier')
+  for (const c of checks) {
+    assert.equal(c.opts.agentType, 'verifier')
+    // verifier.md assumes a claim is false. A vote of real=false must rest on
+    // evidence, and doubt must count as real, so the prompt says both and names
+    // the mode that applies.
+    assert.match(c.prompt, /Use your finding-verification mode \(verifier\.md\)\./)
+    assert.match(c.prompt, /Set real=false only when you cite file:line evidence/)
+    assert.match(c.prompt, /If your verdict would be UNPROVEN, set real=true/)
+    assert.doesNotMatch(c.prompt, /Default to real=false/)
+  }
 })
 
 test('escalateNotVerified: an ESCALATE finding gets no verifier and is returned for Stage 2', async () => {
