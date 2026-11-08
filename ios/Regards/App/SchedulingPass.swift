@@ -18,10 +18,10 @@ import Foundation
 /// its calendar from that window's timezone. Nothing is cached, so a window
 /// edit never leaves the pass on a stale zone or needs a second pass.
 ///
-/// **Fired marking and no re-nag (§9 "Notification fired", owner ruling 5).**
-/// Each run first marks covered pending rows at or before `now` fired. Fired
-/// rows are history and never cancelled. A fired cadence row stays until an interaction
-/// or a longer cadence starts a new cycle; a clock rollback can re-arm it only after a window edit (R68).
+/// **Fired marking and no re-nag (§9 "Notification fired", owner ruling 5).** Each run first marks covered
+/// pending rows at or before `now` fired. Fired rows are never cancelled. A fired cadence row stays until an
+/// interaction, or a longer cadence whose new overdue time is still ahead, starts a new cycle. It re-arms
+/// once only if the window was edited since it fired and the clock is then set back before `overdueAt` (R68).
 ///
 /// **Corrupt rows.** Runs read one `fetchSchedule()` snapshot, which drops
 /// an undecodable contact (with its rows) or row. The pass never cancels what
@@ -120,8 +120,8 @@ public actor SchedulingPass {
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
         let targetIds = Set(targets.map(\.id))
-        // §9 "Notification fired": a due covered pending row is treated as delivered and marked fired. Rows this
-        // call writes at or before now are written fired, so after a run that returns, no covered pending row is due.
+        // §9 "Notification fired": a due covered pending row counts as delivered and is marked fired, and any
+        // due row this call writes is written fired, so after a run returns no covered pending row is due.
         var rows = snapshot.reminders
         for (index, row) in rows.enumerated()
         where row.state == .pending && row.scheduledFor <= now && targetIds.contains(row.contactId) {
