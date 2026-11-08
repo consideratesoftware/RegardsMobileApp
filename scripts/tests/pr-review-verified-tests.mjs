@@ -691,6 +691,26 @@ test('codexReview is null when Codex was not asked for, or returned nothing', as
   assert.equal(verdictOf(failed.result, 'codex-reviewer'), 'FAILED')
 })
 
+// Pin: passes on the old script. runWorkflow() always sends codex: false, so no
+// other test leaves `codex` out. A guard that rejected undefined would have
+// passed the suite and broken every caller that omits the key.
+test('codex left out runs no Codex, and nothing throws', async () => {
+  const base = { title: 't', worktree: '/w', branch: 'b', head: HEAD, reviewers: ['pr-tests'], contextFile: '/c' }
+  const scenarios = [
+    ['no codex key', base],
+    ['codex undefined', { ...base, codex: undefined }],
+    ['codex false', { ...base, codex: false }],
+  ]
+  for (const [what, args] of scenarios) {
+    const labels = []
+    const agent = async (prompt, opts) => { labels.push(opts.label); return review('APPROVE') }
+    const result = await workflow(agent, parallel, pipeline, () => {}, () => {}, args)
+    assert.deepEqual(labels, ['review:pr-tests'], what)
+    assert.deepEqual(result.verdicts.map(v => v.reviewer), ['pr-tests'], what)
+    assert.equal(result.codexReview, null, what)
+  }
+})
+
 // ---- failures and bad input -------------------------------------------------
 
 test('failedReviewer: a reviewer that returns nothing is FAILED, the others still count', async () => {
