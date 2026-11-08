@@ -240,9 +240,9 @@ public actor SchedulingPass {
                 pending = try await reminders.fetchAllPending()
             }
         } catch {
-            // The fail-closed read hit an undecodable row, so orphans stay pending. Until that row is
-            // fixed or replaced, the read fails in every `runFull()` and in a `run(for:)` for its
-            // contact. Until TF-07f that row also hides every snooze and Upcoming occasion row.
+            // The fail-closed read failed (an undecodable row, or any other read error), so orphans stay
+            // pending. That row fails it in every `runFull()` and `run(for:)` for its own contact outside the
+            // snapshot (SQL filters by contact). Until TF-07f it hides every snooze and Upcoming occasion.
             // The type only: an error can carry row or contact values.
             let errorType = String(describing: type(of: error))
             Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
