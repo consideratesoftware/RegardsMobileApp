@@ -207,9 +207,6 @@ extension AppLaunchCoordinatorTests {
             try await environment.reminders.fetchSchedule().reminders
                 .contains { $0.contactId == contact.id && $0.kind == .cadence }
         }
-        func allRows() async throws -> [ScheduledReminder] {
-            try await environment.reminders.fetchSchedule().reminders.sorted { $0.id.uuidString < $1.id.uuidString }
-        }
         #expect(try await cadenceRow(leia) == false, "Nothing is scheduled before onboarding finishes.")
 
         await launch.finishOnboarding()
@@ -217,9 +214,12 @@ extension AppLaunchCoordinatorTests {
         #expect(launch.phase == .ready)
         #expect(try await cadenceRow(leia), "Completion's full pass schedules the starter.")
         #expect(try await cadenceRow(han) == false)
-        let rows = try await allRows()
+        let rows = try await environment.reminders.fetchSchedule().reminders
+            .sorted { $0.id.uuidString < $1.id.uuidString }
         try await #require(launch.runtime).scheduler.runFull()
-        #expect(try await allRows() == rows)
+        let afterFull = try await environment.reminders.fetchSchedule().reminders
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(afterFull == rows)
     }
 
     // The launch flips .loading to .onboarding only if nothing else decided
