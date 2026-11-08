@@ -273,8 +273,8 @@ gate) with this paragraph cited at the call site. Resolve by a real-device
 VoiceOver pass confirming the alert's title, message, and Done button are
 each announced correctly (section "Channel preview alert (Overdue and
 Upcoming)" in `accessibility-smoke.md`, part of the pre-release device pass),
-and update this entry with the result either way rather than leaving it open
-indefinitely.
+and record the result, pass or fail, on the Result line of that device-pass
+entry in `TESTFLIGHT_PLAN.md`, rather than leaving it open indefinitely.
 
 ## Sensory-audit carve-outs
 
