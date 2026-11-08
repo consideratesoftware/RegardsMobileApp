@@ -685,11 +685,12 @@ test('a reviewer whose run throws is still listed, as FAILED', async () => {
   assert.deepEqual(result.verdicts.map(v => `${v.reviewer}=${v.verdict}`), ['pr-correctness=FAILED', 'pr-tests=APPROVE'])
 })
 
-test('badArgsThrow: a bad head, reviewer list or text arg throws before any agent runs', async () => {
+test('badArgsThrow: a bad head, reviewer list, since, codex or text arg throws before any agent runs', async () => {
   const badHead = /head must be/
   const badReviewers = /reviewers must be/
   const text = key => new RegExp(`${key} must be a non-empty string`)
   const badSince = /since must be a 7 to 40 character lower-case hex sha/
+  const badCodex = /codex must be true or false/
   const bad = [
     [{ head: 'abc1234' }, badHead],
     [{ head: HEAD.slice(0, 39) }, badHead],
@@ -718,6 +719,13 @@ test('badArgsThrow: a bad head, reviewer list or text arg throws before any agen
     [{ since: '' }, badSince],
     [{ since: null }, badSince],
     [{ since: 1234567 }, badSince],
+    // codex is a boolean. "false" is truthy and would launch Codex.
+    [{ codex: 'false' }, badCodex],
+    [{ codex: 'true' }, badCodex],
+    [{ codex: 'yes' }, badCodex],
+    [{ codex: 1 }, badCodex],
+    [{ codex: 0 }, badCodex],
+    [{ codex: null }, badCodex],
     // The 4 text args go into every prompt.
     [{ title: undefined }, text('title')],
     [{ title: '' }, text('title')],
