@@ -168,14 +168,10 @@ check fails (STATE CODEX STALE).
 Fast-follow should-fixes. Owner ruling, 2026-11-08 (PR #72 comment 6724444034):
 when a round ends with 0 blockers, the engineering manager may carry its
 remaining should-fixes, Codex's included, to a named fast-follow PR and merge.
-The `PR REVIEW:` comment keeps each reviewer's own verdict on its `REVIEWERS:`
-line, says `BLOCKERS: 0`, and adds one `FAST-FOLLOW: <named PR>: <items>` line.
-Its first line is APPROVE when every should-fix is carried. Only should-fix
-findings carry. A BLOCKER, a hosted blocker or a red check still stops the
-merge, and a NOT CHECKED entry or a FAILED reviewer still needs a rerun. A
-carried REQUEST_CHANGES holds only at the head its comment names.
-`.claude/commands/pr-review.md` ("The PR REVIEW comment") has the comment's
-rules.
+A BLOCKER, a hosted blocker or a red check still stops the merge. What may
+carry, and the `PR REVIEW:` comment lines that record it, are in
+`.claude/commands/pr-review.md` ("The PR REVIEW comment"). The release
+manager's check is in `.claude/agents/release-manager.md` (Merge conditions).
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his

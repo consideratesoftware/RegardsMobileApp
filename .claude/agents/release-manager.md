@@ -37,9 +37,11 @@ toward any check. A `PR REVIEW:` comment lists the reviewers that ran:
 that ran for that comment. A comment for a scoped recheck (`/org` Stage 3) also
 has a `RERAN:` line naming the reviewers that ran and one
 `CARRIED: <reviewer> APPROVE from <sha>` line per earlier approval that stands.
-A comment that carries should-fixes to a fast-follow PR says `BLOCKERS: 0` and
-has one `FAST-FOLLOW: <named PR>: <items>` line (owner ruling, 2026-11-08;
-`ENGINEERING_ORG.md`, Merge conditions). Merge conditions below say which
+A `PR REVIEW:` comment also has a `NOT CHECKED: none | <reviewer>, ...` line. A
+comment that carries should-fixes to a fast-follow PR says `BLOCKERS: 0` and
+`NOT CHECKED: none` and has one `FAST-FOLLOW: <named PR>: <items>` line (owner
+ruling, 2026-11-08; `.claude/commands/pr-review.md`, "The PR REVIEW comment").
+Merge conditions below say which
 carries hold. Never paste review or diff text into a comment. Never write
 `@claude` in any comment the org posts, verdicts and owner answers alike:
 `.github/workflows/claude.yml` runs on comments that contain it. Never edit a
@@ -245,9 +247,11 @@ lane's refs, and this fetch brings them up to date.
     `PR REVIEW:` comments at any head. It must be APPROVE, and the comment that
     holds it must name the current head (the comment's sha is a prefix of the
     full head sha, at least 7 characters). A REQUEST_CHANGES passes too when the
-    comment that holds it names the current head, says `BLOCKERS: 0` and has a
-    `FAST-FOLLOW:` line (owner ruling, 2026-11-08: its should-fixes go to the
-    named PR). It never carries to another head. For `pr-code-quality` or
+    comment that holds it names the current head, its first line is APPROVE, and
+    it has `BLOCKERS: 0`, `NOT CHECKED: none` and a `FAST-FOLLOW:` line (owner
+    ruling, 2026-11-08: its should-fixes go to the
+    named PR). It never carries to another head. A comment with no
+    `NOT CHECKED:` line does not pass. For `pr-code-quality` or
     `pr-tests` only, the comment that holds the APPROVE may instead name an
     older sha S, as a carry that holds under the carry rule above. Anything else
     is "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
@@ -257,14 +261,15 @@ lane's refs, and this fetch brings them up to date.
     arguments. Run the same `gh api graphql` command into a file
     (`> "<scratch>/comments.json"`) and give that file to `jq`. For every
     counting `PR REVIEW:` comment it prints, oldest first, the first line and
-    its `BLOCKERS:`, `REVIEWERS:`, `CARRIED:` and `FAST-FOLLOW:` lines:
+    its `BLOCKERS:`, `REVIEWERS:`, `NOT CHECKED:`, `CARRIED:` and `FAST-FOLLOW:`
+    lines:
     ```
     jq -r --arg me "$(gh api user --jq .login)" '
       .data.repository.pullRequest.comments.nodes[]
       | select(.author.login == $me and .lastEditedAt == null) | .body
       | split("\n") as $l
       | select($l[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD$"))
-      | $l[0], ($l[1:][] | select(test("^(BLOCKERS|REVIEWERS|CARRIED|FAST-FOLLOW):")))' "<scratch>/comments.json"
+      | $l[0], ($l[1:][] | select(test("^(BLOCKERS|REVIEWERS|NOT CHECKED|CARRIED|FAST-FOLLOW):")))' "<scratch>/comments.json"
     ```
 - The newest `CODEX REVIEW:` comment names the current head and is APPROVE, or
   REQUEST_CHANGES with every one of its blockers on a `DISPUTED:` line (read as
@@ -338,6 +343,7 @@ CHECKS: name: pass/fail/stale
 HOSTED REVIEW: verdict, blockers n (counted from the review text for <head sha>), blockers verbatim
 /pr-review: verdict
 CARRIED: <reviewer>: pass | carry rejected (<why>)   (one line per carried reviewer, or none)
+FAST-FOLLOW: <named PR>: <items>, or none
 CODEX REVIEW: APPROVE | REQUEST_CHANGES | RETRY | UNAVAILABLE | STALE @ reviewed sha vs target, codex-cli version | disputed blockers with ARCHITECTURE.md §, or none
 OWNER QUESTIONS: what Sid must decide or do, with exact steps for any physical task, or none
 DEVICE PASS: steps added to TESTFLIGHT_PLAN.md Pre-release device pass, or none

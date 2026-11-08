@@ -283,6 +283,7 @@ PR REVIEW: <APPROVE|REQUEST_CHANGES> @ <40-hex head sha> vs origin/main...HEAD
 BLOCKERS: <n>
 SHOULD_FIX: <n>
 REVIEWERS: <pr-reviewer> <APPROVE|REQUEST_CHANGES>, ...
+NOT CHECKED: none | <pr-reviewer>, ...
 RERAN: <pr-reviewer>, ...                                  (scoped recheck only, as today)
 CARRIED: <pr-code-quality|pr-tests> APPROVE from <sha>     (scoped recheck only; 1 per carry)
 FAST-FOLLOW: <named PR>: <items>   (0-blocker round that carries its should-fixes only)
@@ -299,6 +300,8 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
   verified run, or the Stage 1 verdict in a plain run. A Stage 2 blocker makes
   that reviewer REQUEST_CHANGES.
+- NOT CHECKED names each pr-* reviewer with a NOT CHECKED entry, or says `none`.
+  It names reviewers only; their entries stay in the lane's report.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.
 - The paraphrase is your own words: at most 15 words, one physical line, no
@@ -307,15 +310,18 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
   round ends with `BLOCKERS: 0`, you may carry every remaining should-fix,
   Codex's included, to a named fast-follow PR. Add one
   `FAST-FOLLOW: <named PR>: <items>` line: the PR's number, or the queue item
-  that will open it, then each carried item. A reviewer's REQUEST_CHANGES
-  carries only when every finding behind it is a should-fix. A BLOCKER, a NOT
-  CHECKED entry, a FAILED reviewer or a failed rule 4 check is fixed or rerun,
-  never carried. `REVIEWERS:` keeps each reviewer's own verdict. A carried
+  that will open it, then each carried item in your own words, on one physical
+  line. A reviewer's REQUEST_CHANGES carries only when every finding behind it
+  is a should-fix. A BLOCKER, a NOT CHECKED entry, a FAILED reviewer or a failed
+  rule 4 check is fixed or rerun, never carried, so a carrying comment says
+  `NOT CHECKED: none`. `REVIEWERS:` keeps each reviewer's own verdict. A carried
   REQUEST_CHANGES holds only at this comment's head, and it is never a
-  `CARRIED:` source.
+  `CARRIED:` source. `ENGINEERING_ORG.md` and `org.md` point here, and
+  `release-manager.md` (Merge conditions) checks it.
 - `release-manager.md` reads the first line and the `BLOCKERS:`, `REVIEWERS:`,
-  `CARRIED:` and `FAST-FOLLOW:` lines of this comment. It reads `DISPUTED:`
-  lines from the CODEX REVIEW comment. Its filter keeps only those 4 kinds of
+  `NOT CHECKED:`, `CARRIED:` and `FAST-FOLLOW:` lines of this comment. It reads
+  `DISPUTED:`
+  lines from the CODEX REVIEW comment. Its filter keeps only those 5 kinds of
   line, so a `REFUTED:` line never passes as a carry. `REFUTED:` lines are for
   Sid to see. They never count toward any check.
 

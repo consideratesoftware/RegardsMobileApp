@@ -209,8 +209,9 @@ Once the lane has a PR, post every review result on it (`/pr-review` and
 Codex alike, RETRY included) as a verdict comment in the form
 `release-manager.md` (Open) defines, never as a body edit: a body edit
 starts a new hosted review run. A comment carries the verdict line, the
-counts, the `DISPUTED:` lines, a `/pr-review` comment's `REVIEWERS:` line,
-and, on a scoped recheck, its `RERAN:` and `CARRIED:` lines. Nothing else:
+counts, the `DISPUTED:` lines, a `/pr-review` comment's `REVIEWERS:` and
+`NOT CHECKED:` lines, on a scoped recheck its `RERAN:` and `CARRIED:` lines, and
+on a fast-follow round its `FAST-FOLLOW:` line. Nothing else:
 never paste a reviewer's output into a comment; the full review stays in the
 lane's report. A verified run's comment has the shape `pr-review.md` gives,
 with its `REFUTED:` lines.
@@ -263,9 +264,9 @@ Fast-follow should-fixes. Owner ruling, 2026-11-08 (PR #72 comment 6724444034):
 when a round ends with 0 blockers, you may carry its remaining should-fixes,
 Codex's included, to a named fast-follow PR instead of running another repair
 round, and go to Stage 4. Write the `PR REVIEW:` comment as `pr-review.md` ("The
-PR REVIEW comment") says, with its `FAST-FOLLOW: <named PR>: <items>` line. Save
-the carried items in the lanes folder under the named PR, so its tech lead plans
-them. A BLOCKER, a NOT CHECKED entry or a FAILED reviewer never carries.
+PR REVIEW comment") says; that section lists what never carries. Save the
+carried items in the lanes folder under the named PR, so its tech lead plans
+them.
 
 The release manager reads every counting `PR REVIEW:` comment, oldest first,
 and takes each reviewer's newest verdict from the last `REVIEWERS:` line that
