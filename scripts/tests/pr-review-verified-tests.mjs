@@ -1275,14 +1275,20 @@ test('the synthesizer runs as the read-only tech-lead agent', async () => {
   })
   const synth = calls.find(c => c.opts.label === 'synthesize')
   assert.equal(synth.opts.agentType, 'tech-lead')
+})
 
-  // The synthesizer reads reviewers' text, so it must not be able to write. The
-  // agent file lists its tools, and none of them edits.
-  const agent = readFileSync(path.join(here, '..', '..', '.claude', 'agents', 'tech-lead.md'), 'utf8')
-  const tools = /^tools: (.*)$/m.exec(agent)
-  assert.ok(tools, 'tech-lead.md has no tools line')
-  for (const tool of ['Edit', 'Write', 'NotebookEdit']) {
-    assert.ok(!tools[1].split(',').map(name => name.trim()).includes(tool), `tech-lead.md lists ${tool}`)
+// tech-lead (the synthesizer) and verifier read text that reviewers wrote, and
+// both have Bash. They are read-only by contract: no Edit or Write in `tools`,
+// and `permissionMode: plan` for Bash, the same posture as every pr-* reviewer.
+test('tech-lead and verifier list no edit tool and run under permissionMode: plan', () => {
+  for (const file of ['tech-lead.md', 'verifier.md']) {
+    const agent = readFileSync(path.join(here, '..', '..', '.claude', 'agents', file), 'utf8')
+    const tools = /^tools: (.*)$/m.exec(agent)
+    assert.ok(tools, `${file} has no tools line`)
+    for (const tool of ['Edit', 'Write', 'NotebookEdit']) {
+      assert.ok(!tools[1].split(',').map(name => name.trim()).includes(tool), `${file} lists ${tool}`)
+    }
+    assert.match(agent, /^permissionMode: plan$/m, `${file} is not under permissionMode: plan`)
   }
 })
 
