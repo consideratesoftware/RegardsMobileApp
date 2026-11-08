@@ -25,8 +25,9 @@
 #     (AGENTS.override.md, CLAUDE.local.md);
 #   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
 #     from it, so an edit there changes what the tests must prove);
-#   - the path is inside an android/<module>/src/ or android/<module>/schemas/
-#     folder (android/docs/src/x.md), which the Android build reads as data.
+#   - the path is inside any src or schemas folder below android/, at any depth
+#     (android/docs/src/x.md, android/docs/guide/src/x.md), which the Android
+#     build reads as data.
 #     ios/Regards*/ and shared/testvectors/ are not listed: the allowlist
 #     rejects them;
 #   - the entry has a mode change (only 100644, or add/delete, is allowed).
