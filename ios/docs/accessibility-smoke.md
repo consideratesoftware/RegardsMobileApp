@@ -155,8 +155,8 @@ it starts with "Would text Han Solo." The button is labelled Done.
       finding. It is not a pass.
 - [ ] Upcoming: repeat both steps on an Upcoming row.
 
-The PR's entry in `TESTFLIGHT_PLAN.md`'s "Pre-release device pass" names this
-section and has its own Result line.
+`TESTFLIGHT_PLAN.md`'s "Pre-release device pass" has no entry for this section
+yet. When one is added, it names this section and has its own Result line.
 
 ## Screen checklist
 
