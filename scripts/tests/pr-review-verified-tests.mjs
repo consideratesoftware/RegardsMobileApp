@@ -215,7 +215,7 @@ test('only an explicit real=false refutes: an answer with no real field counts a
   assert.equal(result.refuted[0].votes[0].real, true)
 })
 
-test('failedVoteCountsReal: votes real, failed, false leave the finding standing', async () => {
+test('votes real, failed, false leave the finding standing', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
     votes: { 'Alpha.swift:10': [true, null, false] },
@@ -224,7 +224,7 @@ test('failedVoteCountsReal: votes real, failed, false leave the finding standing
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
-test('lensNamesKeptOnFailure: a failed first verifier does not shift the other lens names', async () => {
+test('a failed first verifier does not shift the other lens names', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
     votes: { 'Alpha.swift:10': [null, false, false] },
@@ -236,7 +236,7 @@ test('lensNamesKeptOnFailure: a failed first verifier does not shift the other l
   )
 })
 
-test('verifiersAreRepoVerifier: every verifier call uses the repo verifier agent', async () => {
+test('every verifier call uses the repo verifier agent', async () => {
   const { calls } = await runWorkflow({
     args: { reviewers: ['pr-correctness', 'pr-tests'] },
     reviews: {
@@ -272,7 +272,7 @@ test('verifier.md carries the finding-verification mode the verify prompt names'
   assert.match(verifier, /UNPROVEN, set `real=true`/)
 })
 
-test('escalateNotVerified: an ESCALATE finding gets no verifier and is returned for Stage 2', async () => {
+test('an ESCALATE finding gets no verifier and is returned for Stage 2', async () => {
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-code-quality'] },
     reviews: {
@@ -303,7 +303,7 @@ test('only BLOCKER and FIX go to the verifiers: NIT and QUESTION do not', async 
 
 // ---- the per-reviewer verdict ---------------------------------------------
 
-test('refutedBlockerFlipsReviewer: a refuted BLOCKER turns REQUEST_CHANGES into APPROVE', async () => {
+test('a refuted BLOCKER turns REQUEST_CHANGES into APPROVE', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
     votes: { 'Alpha.swift:10': [false, false, true] },
@@ -316,7 +316,7 @@ test('refutedBlockerFlipsReviewer: a refuted BLOCKER turns REQUEST_CHANGES into 
   assert.equal(result.refuted[0].severity, 'BLOCKER')
 })
 
-test('blockerCount: a REQUEST_CHANGES that counted more blockers than it listed does not flip to APPROVE', async () => {
+test('a REQUEST_CHANGES that counted more blockers than it listed does not flip to APPROVE', async () => {
   // The report said 2 blockers and listed 1. Both verifiers agree the 1 is
   // not real, but the second blocker was never listed, so nothing checked it.
   const { result } = await runWorkflow({
@@ -329,7 +329,7 @@ test('blockerCount: a REQUEST_CHANGES that counted more blockers than it listed 
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
-test('blockerCount: only a count that equals the BLOCKER findings listed lets a refutation flip the verdict', async () => {
+test('only a blockerCount that equals the BLOCKER findings listed lets a refutation flip the verdict', async () => {
   const cases = [
     ['a count of 1 for 1 listed', { blockerCount: 1 }, 'APPROVE'],
     ['a count of 2 for 1 listed', { blockerCount: 2 }, 'REQUEST_CHANGES'],
@@ -360,7 +360,7 @@ test('blockerCount: only a count that equals the BLOCKER findings listed lets a 
   }
 })
 
-test('blockerCount: a REQUEST_CHANGES with FIX findings only and a count of 0 flips when they are refuted', async () => {
+test('a REQUEST_CHANGES with FIX findings only and a blockerCount of 0 flips when they are refuted', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-code-quality'] },
     reviews: { 'pr-code-quality': review('REQUEST_CHANGES', [finding('FIX', 'One.swift:1')], { blockerCount: 0 }) },
@@ -421,7 +421,7 @@ test('a NOT CHECKED entry keeps REQUEST_CHANGES even when every finding is refut
   assert.equal(result.verdicts[0].reviewedSha, HEAD)
 })
 
-test('reviewedShaMustMatchHead: a pr-* reviewer whose sha is not a prefix of head is FAILED', async () => {
+test('a pr-* reviewer whose sha is not a prefix of head is FAILED', async () => {
   const wrong = [
     ['another head', 'f'.repeat(40)],
     ['no sha', undefined],
@@ -485,7 +485,7 @@ test('a pr-* reviewer is told where its reviewedSha comes from, and the schema r
 // Every pr-* contract says never to APPROVE with a required check left
 // unchecked, and notChecked holds required checks only. The script enforces it
 // (rule 7), and tells the reviewer what belongs in notChecked.
-test('approveWithNotCheckedBecomesRequestChanges: a pr-* APPROVE with NOT CHECKED entries is REQUEST_CHANGES', async () => {
+test('a pr-* APPROVE with NOT CHECKED entries is REQUEST_CHANGES', async () => {
   const { result, calls } = await runWorkflow({
     reviews: { 'pr-correctness': review('APPROVE', [], { notChecked: ['swift test was not run'] }) },
   })
@@ -532,7 +532,7 @@ test('a Codex APPROVE with notChecked entries stays APPROVE, and Codex is not to
 // Pin: a REQUEST_CHANGES flips to APPROVE only when a verifier refuted
 // something. With no BLOCKER or FIX finding there is nothing to refute, so
 // nothing may flip it.
-test('failClosed: a pr-* REQUEST_CHANGES with no BLOCKER or FIX finding stays REQUEST_CHANGES', async () => {
+test('a pr-* REQUEST_CHANGES with no BLOCKER or FIX finding stays REQUEST_CHANGES', async () => {
   const cases = [
     ['no findings', []],
     ['only a NIT', [finding('NIT', 'Delta.swift:1')]],
@@ -678,7 +678,7 @@ test('an APPROVE reviewer whose BLOCKER survives becomes REQUEST_CHANGES', async
 
 // ---- Codex -----------------------------------------------------------------
 
-test('codexVerdictUnchanged: a refuted Codex BLOCKER leaves Codex REQUEST_CHANGES, and is still listed', async () => {
+test('a refuted Codex BLOCKER leaves Codex REQUEST_CHANGES, and is still listed', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-tests'], codex: true },
     reviews: {
@@ -717,7 +717,7 @@ test('a surviving Codex BLOCKER leaves a Codex APPROVE alone: the verdict is Cod
   assert.equal(verdictOf(result, 'codex-reviewer'), 'APPROVE')
 })
 
-test('codexReviewReturned: the whole Codex review comes back verbatim', async () => {
+test('the whole Codex review comes back verbatim', async () => {
   const text = 'CODEX REVIEW: APPROVE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\n\nBlockers: none\nShould fix: none\n'
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-tests'], codex: true },
@@ -746,7 +746,7 @@ test('a Codex verdict with an empty or missing rawSummary returns codexReview nu
   }
 })
 
-test('codexLineMustAgree: a Codex whose structured verdict differs from its first line is FAILED', async () => {
+test('a Codex whose structured verdict differs from its first line is FAILED', async () => {
   const line = verdict => `CODEX REVIEW: ${verdict} @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\n\nBlockers: none\n`
   const codexVerdict = async (structured, rawSummary) => {
     const { result } = await runWorkflow({
@@ -794,7 +794,7 @@ test('a Codex with no review text keeps its reported verdict', async () => {
   }
 })
 
-test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILABLE, never APPROVE', async () => {
+test('an UNAVAILABLE Codex comes back as UNAVAILABLE, never APPROVE', async () => {
   const text = 'CODEX REVIEW: UNAVAILABLE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nWORKTREE: /tmp/worktree\nVERDICT: UNAVAILABLE\nREASON: not logged in\nREVIEW:\nNot logged in\n'
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-tests'], codex: true },
@@ -838,7 +838,7 @@ test('the Codex prompt carries its safeguards', async () => {
 })
 
 // Pin: rule 5 says Codex's RETRY comes back as written.
-test('codexRetryPassesThrough: a RETRY Codex comes back as RETRY, never APPROVE', async () => {
+test('a RETRY Codex comes back as RETRY, never APPROVE', async () => {
   const text = 'CODEX REVIEW: RETRY @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nWORKTREE: /tmp/worktree\nVERDICT: RETRY\nREASON: timeout\nREVIEW:\nlast 20 lines of output\n'
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-tests'], codex: true },
@@ -870,7 +870,7 @@ test('codexRetryPassesThrough: a RETRY Codex comes back as RETRY, never APPROVE'
   assert.match(calls.find(c => c.opts.agentType === 'codex-reviewer').prompt, /RETRY \(also when the head moved\)/)
 })
 
-test('prVerdictEnum: RETRY and UNAVAILABLE are Codex\'s verdicts, and the schema refuses them from a pr-* reviewer', async () => {
+test('RETRY and UNAVAILABLE are Codex\'s verdicts, and the schema refuses them from a pr-* reviewer', async () => {
   const { calls } = await runWorkflow({
     args: { codex: true },
     reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
@@ -929,7 +929,7 @@ test('codex left out runs no Codex, and nothing throws', async () => {
 
 // ---- failures and bad input -------------------------------------------------
 
-test('failedReviewer: a reviewer that returns nothing is FAILED, the others still count', async () => {
+test('a reviewer that returns nothing is FAILED, the others still count', async () => {
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-correctness', 'pr-tests'] },
     reviews: { 'pr-correctness': null, 'pr-tests': review('APPROVE') },
@@ -952,7 +952,7 @@ test('a reviewer whose run throws is still listed, as FAILED', async () => {
   assert.deepEqual(result.verdicts.map(v => `${v.reviewer}=${v.verdict}`), ['pr-correctness=FAILED', 'pr-tests=APPROVE'])
 })
 
-test('badArgsThrow: a bad head, reviewer list, since, codex or text arg throws before any agent runs', async () => {
+test('a bad head, reviewer list, since, codex or text arg throws before any agent runs', async () => {
   const badHead = /head must be/
   const badReviewers = /reviewers must be/
   const text = key => new RegExp(`${key} must be a non-empty string`)
@@ -1038,7 +1038,7 @@ test('every known pr-* reviewer is accepted', async () => {
 
 // ---- the rest of the contract ---------------------------------------------
 
-test('noFindings: no verifier runs, nothing is refuted, no work order is requested', async () => {
+test('a run with no findings runs no verifier, refutes nothing and requests no work order', async () => {
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-correctness', 'pr-tests'], codex: true },
     reviews: {
@@ -1152,7 +1152,7 @@ test('the work-order owner enum lists exactly the owners the synthesizer prompt 
 })
 
 // Pin: the work order the synthesizer returns comes back as it was written.
-test('workOrderReturned: the synthesizer\'s work order comes back as it was written', async () => {
+test('the synthesizer\'s work order comes back as it was written', async () => {
   const stub = { items: [{ id: '1', severity: 'BLOCKER', owner: 'ios-engineer', change: 'x' }] }
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
@@ -1162,7 +1162,7 @@ test('workOrderReturned: the synthesizer\'s work order comes back as it was writ
   assert.deepEqual(result.workOrder, stub)
 })
 
-test('failedSynthesizerKeepsSurvivors: a synthesizer that returns nothing does not erase the findings', async () => {
+test('a synthesizer that returns nothing does not erase the findings', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
     votes: { 'Alpha.swift:10': [true, true, true] },
@@ -1176,7 +1176,7 @@ test('failedSynthesizerKeepsSurvivors: a synthesizer that returns nothing does n
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
-test('reportReturned: a pr-* reviewer\'s whole report comes back on its verdict, and its prompt asks for it', async () => {
+test('a pr-* reviewer\'s whole report comes back on its verdict, and its prompt asks for it', async () => {
   const report = 'INVARIANTS VERIFIED: x'
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-security-privacy', 'pr-tests'] },
