@@ -123,20 +123,22 @@ const FINDINGS = {
   required: ['verdict', 'reviewedSha', 'findings', 'notChecked', 'coverageHoles', 'blockerCount', 'rawSummary'],
 }
 
-// Codex's schema is the same with 2 more verdicts: RETRY (also when the head
-// moved) and UNAVAILABLE (Codex missing or not logged in). No pr-* contract
-// defines them, so the runtime refuses them from a pr-* reviewer.
+// Codex's schema differs from the pr-* one in 3 ways. It has 2 more verdicts:
+// RETRY (also when the head moved) and UNAVAILABLE (Codex missing or not logged
+// in). No pr-* contract defines them, so the runtime refuses them from a pr-*
+// reviewer. It has no blockerCount, because Codex's verdict is never changed by
+// a count. Its notChecked has its own description, because Codex has no NOT
+// CHECKED line.
+const { blockerCount, ...sharedProperties } = FINDINGS.properties
 const CODEX_FINDINGS = {
   ...FINDINGS,
   properties: {
-    ...FINDINGS.properties,
+    ...sharedProperties,
     verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] },
     notChecked: { type: 'array', items: { type: 'string' }, description: 'Codex has no NOT CHECKED line. Return an empty array.' },
   },
-  // Codex's verdict is never changed by a count, so it is not asked for one.
   required: FINDINGS.required.filter(key => key !== 'blockerCount'),
 }
-delete CODEX_FINDINGS.properties.blockerCount
 
 const VERDICT = {
   type: 'object',
