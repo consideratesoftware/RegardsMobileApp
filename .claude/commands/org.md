@@ -95,7 +95,9 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    origin/main...HEAD` lists `scripts/count-hosted-blockers.sh` or
    `scripts/check-carried-approval.sh`, also pass the absolute path of the lane
    worktree's copy of each listed script, labeled as the PR's own copy of that
-   script. It will route red checks to `on-call-engineer`, park on owner gates,
+   script. Before the own copy runs, read its diff against `origin/main`, and run
+   it with a scrubbed environment (`env -i PATH=/usr/bin:/bin HOME=<scratch>`).
+   It will route red checks to `on-call-engineer`, park on owner gates,
    or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
@@ -278,7 +280,9 @@ Save the PR body draft to `pr-body.md` in the lane's folder, then launch
 review file. When `git -C <lane worktree> diff --name-only origin/main...HEAD`
 lists `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
 also pass the absolute path of the lane worktree's copy of each listed script,
-labeled as the PR's own copy of that script. It opens the PR, watches CI and
+labeled as the PR's own copy of that script. Before the own copy runs, read its
+diff against `origin/main` and run it with a scrubbed environment. It opens the
+PR, watches CI and
 the hosted review, routes
 repairs, records the checkpoint via `tech-writer`, and merges only when all
 merge conditions in `ENGINEERING_ORG.md` hold. Stacked items open as drafts.

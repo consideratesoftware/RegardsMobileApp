@@ -128,14 +128,17 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
   > "<scratch>/hosted-review.txt"
 git -C "<root checkout>" show origin/main:scripts/count-hosted-blockers.sh > "<scratch>/count-hosted-blockers.sh" \
   && bash "<scratch>/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
-bash "<lane>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   # own copy: only if the PR changes this script
+git -C "<lane>" diff origin/main...<head sha> -- scripts/count-hosted-blockers.sh   # read it first; own copy only if the PR changes this script
+env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<lane>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   # own copy, scrubbed environment
 ```
 
 Always run the script with `bash`, never your default shell. Use the copy
 exported from `origin/main` (the command above), not the lane's: the PR
 under review could have edited its own copy. A PR that itself changes
 `scripts/count-hosted-blockers.sh` also gets the path of its own copy, in the
-engineering manager's prompt. Run both copies. If either prints `MALFORMED` or
+engineering manager's prompt. Before the own copy runs, read its diff against
+`origin/main` and run it with a scrubbed environment, as the command shows. Run
+both copies. If either prints `MALFORMED` or
 exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
 count is the higher `BLOCKERS <n>`. Any other output from either copy fails
 closed. A count passes only on exit 0 with a `BLOCKERS <n>` line on stdout, and
@@ -189,7 +192,8 @@ lane's refs, and this fetch brings them up to date.
      ```
      git -C "<root checkout>" show origin/main:scripts/check-carried-approval.sh > "<scratch>/check-carried-approval.sh" \
        && bash "<scratch>/check-carried-approval.sh" "<lane>" <S> <head sha>
-     bash "<lane>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy: only if the PR changes this script
+     git -C "<lane>" diff origin/main...<head sha> -- scripts/check-carried-approval.sh   # read it first; own copy only if the PR changes this script
+     env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<lane>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy, scrubbed environment
      ```
      Run it with `bash`. For every PR, a carry passes only on exit 0 with stdout
      exactly `CARRY PASSES`; anything else fails closed.
