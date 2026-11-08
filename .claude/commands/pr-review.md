@@ -46,7 +46,8 @@ Decide the agent set from the diff's touched paths:
 
 Launch all selected agents **in a single parallel batch**. Each agent prompt
 must contain: the resolved target, the stable `TF-##` work item when present,
-the §14 scope alias and acceptance-criteria row pasted verbatim, and the list
+the §14 scope alias and acceptance-criteria row pasted verbatim (or "infra, no
+§14 row" for an infra PR), and the list
 of R-numbers the PR claims to close. Do not paste the diff itself into agent
 prompts; agents pull it with git.
 
@@ -164,7 +165,8 @@ Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktr
 - `codex`: `true`, so Codex reviews in the same workflow. Use `false` while a
   Codex UNAVAILABLE owner gate is open (`org.md` Stage 3).
 - `contextFile`: the absolute path of the lane's `review-context.md`. It must
-  hold the §14 row and the R-numbers verbatim. For the workflow it replaces
+  hold the §14 row (or "infra, no §14 row" for an infra PR) and the R-numbers
+  verbatim. For the workflow it replaces
   Stage 1's per-prompt paste of those two.
 
 Always start the workflow by `scriptPath`, never by `name`. Point `scriptPath`

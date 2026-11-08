@@ -141,7 +141,8 @@ For each slice in the tech lead's plan:
 After the last slice: launch `tech-writer` with the DOC SIBLINGS list and the
 facts from the slice reports. The tech writer commits its files; the review
 batch starts only when `git status --short` in the lane is empty. Write the
-target, the §14 row, and the claimed R-numbers to `review-context.md` in the
+target, the §14 row (or "infra, no §14 row" for an infra PR), and the claimed
+R-numbers to `review-context.md` in the
 lane's folder. Fetch, then run the verified run (`pr-review.md`, "Claude Code org only")
 against the lane's worktree with `codex: true`, so the review board and Codex
 run in one workflow. Start it by `scriptPath` to a copy exported from
@@ -153,7 +154,7 @@ is optional and runs with `codex: false`. If it can't run, run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
 batch, with the worktree, the same target `origin/main...HEAD`, the item's §14
-row, and its claimed R-numbers. The
+row (or "infra, no §14 row" for an infra PR), and its claimed R-numbers. The
 three-dot target compares against the merge base, so commits that landed on
 `main` after the lane branched don't show up as reversions. Treat blockers
 from both the same way: they go to the slice owner (design questions to
