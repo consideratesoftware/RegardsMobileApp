@@ -142,8 +142,8 @@ against the lane's worktree with `codex: true`, so the review board and Codex
 run in one workflow. Start it by `scriptPath` to a copy exported from
 `origin/main`, never by `name`. For a PR that adds or changes
 `.claude/workflows/pr-review-verified.js`, the exception in that section
-applies: the PR's own copy runs, and the counts use each reviewer's
-`reportedVerdict`. If it can't run, run
+applies: the PR's own copy runs, refutations change no verdict, and the counts
+follow the hand checks in that exception. If it can't run, run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
 batch, with the worktree, the same target `origin/main...HEAD`, the item's §14

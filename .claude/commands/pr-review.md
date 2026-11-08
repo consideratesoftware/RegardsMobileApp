@@ -171,10 +171,14 @@ from the session's folder, and the lane's copy is PR-controlled.
 
 Exception: a PR that adds or changes `.claude/workflows/pr-review-verified.js`
 has no trusted copy that can judge it. For that PR only, run the PR's own copy
-by `scriptPath` to get the reviews. Each reviewer's verdict for counting is then
-its `reportedVerdict`, so the first line and the `REVIEWERS:` line use it.
-Verifier refutations still get their `REFUTED:` lines, but they change no
-verdict.
+by `scriptPath` to get the reviews. Refutations then change no verdict, and the counts follow a plain run. Each
+pr-* reviewer counts as the strictest (FAILED, then REQUEST_CHANGES, then
+APPROVE) of its `verdict`, its `reportedVerdict`, and these checks you make by
+hand: FAILED, rerun alone, when its `reviewedSha` is not a prefix of head;
+REQUEST_CHANGES when its `notChecked` is not empty or it raised any BLOCKER, in
+`survivors` or in `refuted`. BLOCKERS and SHOULD_FIX count every pr-* BLOCKER
+and FIX in `survivors` and `refuted`. Refuted findings still get their
+`REFUTED:` lines.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
 pr-correctness and pr-tests runs (the workflow's reviewers can't take a
@@ -237,10 +241,10 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and
   FIX respectively), plus any Stage 2 items. A plain run has no `survivors`: it
   refutes nothing, so every pr-* finding counts. Refuted findings count for
-  neither. Codex's counts stay on its own comment.
+  neither (except in the exception under "How to run it", where they count). Codex's counts stay on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
   verified run, or the Stage 1 verdict in a plain run. In the exception under
-  "How to run it", it takes `reportedVerdict`. A Stage 2 blocker makes that
+  "How to run it", it takes the strictest verdict that section names. A Stage 2 blocker makes that
   reviewer REQUEST_CHANGES.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.
