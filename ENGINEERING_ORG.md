@@ -22,7 +22,7 @@ from skipping steps inside an item.
 | QA engineer | `qa-engineer` | sonnet | tests only | Writes the test plan's tests, runs suites, investigates flakes |
 | Verifier | `verifier` | opus | no | Tries to refute a slice's correctness claim before review, and each BLOCKER or FIX finding in the Claude Code verified run (`.claude/commands/pr-review.md`) |
 | Build engineer | `build-engineer` | haiku | no | Mechanical gates; no judgment needed |
-| On-call engineer | `on-call-engineer` | sonnet | yes | Red checks and review blockers on open PRs |
+| On-call engineer | `on-call-engineer` | sonnet | yes | Red checks and review blockers on open PRs, or a lane's pre-PR verified-run work order |
 | Release manager | `release-manager` | sonnet | no | PR lifecycle, CI, checkpoint, merge execution |
 | Tech writer | `tech-writer` | haiku | docs only | Sibling doc edits from facts other roles supply |
 | Review board | `pr-correctness` (opus), `pr-security-privacy` (sonnet), `pr-tests` (sonnet), `pr-accessibility` (sonnet), `pr-code-quality` (haiku), `pr-fit-finish` (haiku) via `/pr-review`, or its verified run (Claude Code only) | as listed | no | Unchanged; mirrored to `.codex/agents/` and checked by CI |
@@ -69,6 +69,8 @@ TF-## READY
   → tech-writer: doc siblings, register, a11y rows
   → /pr-review (review board) + codex-reviewer, in parallel
     (or the verified run, which includes Codex; Claude Code only)
+  → on-call-engineer, pre-PR mode: the verified run's scripts, CI and workflow
+    items, committed and not pushed
   → release-manager: PR, CI, hosted review, on-call repairs, checkpoint
   → merge as soon as every condition below holds; a PR that needs Sid waits
     while the engineering manager interviews him in the session
