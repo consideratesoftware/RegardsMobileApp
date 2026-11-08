@@ -143,10 +143,17 @@ Run this on a physical device with VoiceOver on. The audit excludes
 `.elementDetection` for this alert, so the device check decides whether its
 title, message, and Done button are announced (see `accessibility.md`).
 
+Expected values: the title is the row's channel label. The message is
+`Channel.tapPreviewMessage(for:)` for the contact's name. For SMS and Han Solo,
+it starts with "Would text Han Solo." The button is labelled Done.
+
 - [ ] Overdue: tap a row. VoiceOver announces the alert's title, then its
       message, then Done. Check each one.
 - [ ] Activate Done. The alert dismisses. Note where VoiceOver focus lands.
 - [ ] Upcoming: repeat both steps on an Upcoming row.
+
+Record the result in the `## Manual accessibility smoke` block under Reporting,
+at the end of this file.
 
 ## Screen checklist
 
