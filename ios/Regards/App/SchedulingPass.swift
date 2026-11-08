@@ -120,7 +120,7 @@ public actor SchedulingPass {
         let (now, global, calendar) = (context.now, context.global, context.calendar)
         let targets = snapshot.contacts.filter { contactId == nil || $0.id == contactId }
         let targetIds = Set(targets.map(\.id))
-        // §9 "Notification fired": a due covered pending row counts as delivered and is marked fired, and any
+        // §9 "Notification fired": a due covered pending row counts as delivered and is marked fired, and a
         // due row this call writes is written fired, so after a run returns no covered pending row is due.
         var rows = snapshot.reminders
         for (index, row) in rows.enumerated()
