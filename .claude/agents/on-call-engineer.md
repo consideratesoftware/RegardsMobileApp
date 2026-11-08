@@ -45,7 +45,8 @@ scripts/tests/pr-review-verified-tests.mjs` for
 `.claude/workflows/pr-review-verified.js`, `bash scripts/tests/<name>-tests.sh`
 for `scripts/<name>.sh` where that file exists) and treat a failure as a gate
 FAIL. In pre-PR mode, commit and do not push; Stage 4 publishes the branch.
-Push only on PASS. Then report; the release manager watches CI.
+Push only on PASS, and never in pre-PR mode. Then report; the release manager
+watches CI.
 
 ## Report (exactly this shape)
 
