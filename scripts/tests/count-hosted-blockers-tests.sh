@@ -150,6 +150,16 @@ expect_contract() {
     exit 1
   fi
 
+  # Each blocker's text comes through verbatim, as a bullet of its own. The
+  # counter counts bullets, so a renderer that shortened a blocker would still
+  # count right.
+  while IFS= read -r blocker; do
+    if ! grep -qxF -- "- $blocker" "$rendered"; then
+      echo "FAIL: rendered review with $blockers blocker(s) lacks the bullet '- $blocker'" >&2
+      exit 1
+    fi
+  done < <(jq -r '.blockers[]' "$artifact")
+
   summary="$("$summary_renderer" "$artifact")"
   if [[ "$summary" != *"$phrase"* ]]; then
     echo "FAIL: check summary with $blockers blocker(s) lacks '$phrase' (got '$summary')" >&2
