@@ -728,6 +728,24 @@ test('codexReviewReturned: the whole Codex review comes back verbatim', async ()
     'CODEX REVIEW: APPROVE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3')
 })
 
+// Pin: a Codex with no review text returns no codexReview and an empty
+// codexLine, and its verdict stands. The docs rerun such a Codex alone.
+test('a Codex verdict with an empty or missing rawSummary returns codexReview null and an empty codexLine', async () => {
+  const empty = review('REQUEST_CHANGES')
+  const missing = review('REQUEST_CHANGES')
+  delete missing.rawSummary
+  for (const [what, codexReview] of [['an empty rawSummary', empty], ['no rawSummary', missing]]) {
+    const { result } = await runWorkflow({
+      args: { reviewers: ['pr-tests'], codex: true },
+      reviews: { 'pr-tests': review('APPROVE'), 'codex-reviewer': codexReview },
+    })
+    assert.equal(result.codexReview, null, what)
+    const entry = result.verdicts.find(v => v.reviewer === 'codex-reviewer')
+    assert.equal(entry.verdict, 'REQUEST_CHANGES', what)
+    assert.equal(entry.codexLine, '', what)
+  }
+})
+
 test('codexLineMustAgree: a Codex whose structured verdict differs from its first line is FAILED', async () => {
   const line = verdict => `CODEX REVIEW: ${verdict} @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\n\nBlockers: none\n`
   const codexVerdict = async (structured, rawSummary) => {
