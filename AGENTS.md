@@ -198,10 +198,12 @@ changes; and `pr-accessibility` plus `pr-fit-finish` when their UI/docs path
 rules match. Any blocker means `REQUEST_CHANGES`. Claimed R-closures are
 verified against §19 acceptance checks. The Claude Code org
 (`ENGINEERING_ORG.md`) runs both orchestrators on each lane and needs both
-verdicts before merge. The one rule that differs: Claude Code's verified run can
-turn a reviewer's REQUEST_CHANGES into APPROVE when verifiers refute its
-findings, and the Codex skill has no such step (`.claude/commands/pr-review.md`,
-section "Claude Code org only"). `.agents/README.md` describes the adapters, and
+verdicts before merge. Three rules differ. Claude Code's verified run can turn a
+reviewer's REQUEST_CHANGES into APPROVE when verifiers refute its findings
+(rule 3), marks a pr-* reviewer FAILED when its `reviewedSha` is not the head
+(rule 6), and turns an APPROVE with NOT CHECKED entries into REQUEST_CHANGES
+(rule 7). The Codex skill has none of these steps (`.claude/commands/pr-review.md`,
+"The workflow's rules"). `.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
 The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions
