@@ -569,6 +569,15 @@ test('a wrong reviewedSha is FAILED even with a surviving BLOCKER, and the findi
   assert.equal(result.survivors.length, 1)
 })
 
+// Pin: the fields the verdict rules read are required, so the runtime refuses a
+// reviewer that leaves one out. A finding needs its severity, location and claim.
+test('the pr-* schema requires notChecked, and each finding requires severity, location and claim', async () => {
+  const { calls } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
+  const schema = calls[0].opts.schema
+  assert.ok(schema.required.includes('notChecked'))
+  assert.deepEqual(schema.properties.findings.items.required, ['severity', 'location', 'claim'])
+})
+
 test('a pr-* reviewer is told where its reviewedSha comes from, and the schema requires one', async () => {
   const { calls } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
   assert.match(calls[0].prompt, /reviewedSha to the output of `git -C \/tmp\/worktree rev-parse HEAD`/)
