@@ -9,16 +9,20 @@
 # Fixture layout. The script allows only the doc roots (the repository root,
 # ios/, android/, ios/docs/, android/docs/), so every case that tests one
 # exclusion puts its path under ios/docs/, where the allowlist alone would
-# pass it. The 2 android cases (android_docs_src_md, android_docs_schemas_md)
-# use android/docs/ for the same reason, because their exclusions match only
-# android paths. The 4 root instruction-file cases (root_claude_local_md,
+# pass it. The 4 android exclusion cases (android_docs_src_md,
+# android_docs_schemas_md and their nested twins, android_docs_nested_src_md
+# and android_docs_nested_schemas_md) use android/docs/ for the same reason,
+# because their exclusions match only android paths. The 4 root
+# instruction-file cases (root_claude_local_md,
 # root_architecture_md, root_agents_md, root_claude_md) are the exception:
 # they sit at the root, which the allowlist also passes, so they too fail only
 # on their exclusion. Deleting one pattern from the script's exclusion list
-# breaks its own case. Three patterns also break another case (checked by
+# breaks its own case. Five patterns also break another case (checked by
 # deleting each pattern in turn): `*/.claude/*` breaks upper_claude_dir too,
-# `CLAUDE*.md` breaks root_claude_local_md too, and `*/AGENTS*.md` breaks
-# nested_agents_override_md and lower_case_agents_override_md too. The script
+# `CLAUDE*.md` breaks root_claude_local_md too, `*/AGENTS*.md` breaks
+# nested_agents_override_md and lower_case_agents_override_md too,
+# `android/*/src/*` breaks android_docs_nested_src_md too, and
+# `android/*/schemas/*` breaks android_docs_nested_schemas_md too. The script
 # has no exclusion for a behavior folder at the root, so the cases there
 # (.claude/x.md and the like) fail on the allowlist alone and check the
 # outcome.
@@ -162,6 +166,9 @@ lower_case_architecture_md() { put ios/docs/architecture.md '# Architecture note
 lower_case_agents_override_md() { put ios/docs/agents.override.md '# Agents override notes'; }
 android_docs_src_md() { put android/docs/src/x.md '# Read as data'; }
 android_docs_schemas_md() { put android/docs/schemas/x.md '# Read as data'; }
+android_docs_nested_src_md() { put android/docs/guide/src/x.md '# Read as data'; }
+android_docs_nested_schemas_md() { put android/docs/guide/schemas/x.md '# Read as data'; }
+android_app_notes_md() { put android/app/notes.md '# Notes'; }
 ios_bundle_md() { put ios/Regards/Resources/x.md '# Resource'; }
 android_app_md() { put android/app/src/main/x.md '# Resource'; }
 android_module_asset_md() { put android/feature/overdue/src/main/assets/x.md '# Asset'; }
@@ -251,6 +258,9 @@ expect 'an added lower-case ios/docs/architecture.md fails' 1 lower_case_archite
 expect 'an added lower-case ios/docs/agents.override.md fails' 1 lower_case_agents_override_md
 expect 'an added android/docs/src/x.md fails' 1 android_docs_src_md
 expect 'an added android/docs/schemas/x.md fails' 1 android_docs_schemas_md
+expect 'an added android/docs/guide/src/x.md (src below another folder) fails' 1 android_docs_nested_src_md
+expect 'an added android/docs/guide/schemas/x.md (schemas below another folder) fails' 1 android_docs_nested_schemas_md
+expect 'an added android/app/notes.md (a folder below android/) fails' 1 android_app_notes_md
 expect 'an added ios/Regards/Resources/x.md fails' 1 ios_bundle_md
 expect 'an added android/app/src/main/x.md fails' 1 android_app_md
 expect 'an added android/feature/overdue/src/main/assets/x.md fails' 1 android_module_asset_md
