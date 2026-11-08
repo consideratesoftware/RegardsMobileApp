@@ -851,6 +851,35 @@ test('the work order is built from surviving findings only', async () => {
   assert.doesNotMatch(synth[0].prompt, /Beta\.swift:20/)
 })
 
+test('the synthesizer is told that every .md file outside the app folders goes to tech-writer', async () => {
+  // A finding in ios/docs and one in a root doc reach the synthesizer, and the
+  // owner rule names both places.
+  const { calls } = await runWorkflow({
+    reviews: {
+      'pr-fit-finish': review('REQUEST_CHANGES', [
+        finding('FIX', 'ios/docs/accessibility.md:275'),
+        finding('FIX', 'README.md:12'),
+      ]),
+    },
+    args: { reviewers: ['pr-fit-finish'] },
+    votes: {
+      'ios/docs/accessibility.md:275': [true, true, true],
+      'README.md:12': [true, true, true],
+    },
+  })
+  const synth = calls.find(c => c.opts.label === 'synthesize')
+  assert.match(synth.prompt, /ios\/docs\/accessibility\.md:275/)
+  assert.match(synth.prompt, /README\.md:12/)
+
+  const rule = /every \.md file outside ios\/Regards\* and android\/\*\/src \(([^)]*)\)/.exec(synth.prompt)
+  assert.ok(rule, 'the prompt has no rule for .md files outside the app folders')
+  for (const place of ['ios/docs', 'android/docs', 'README.md', 'ANDROID_PORT.md', 'CLAUDE.md', 'AGENTS.md', 'ARCHITECTURE.md', 'TESTFLIGHT_PLAN.md']) {
+    assert.ok(rule[1].includes(place), `the rule does not name ${place}`)
+  }
+  // The rule's owner is tech-writer, and it comes before the PR-body owner.
+  assert.match(synth.prompt, /\) *, and prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer; PR body only/)
+})
+
 test('the synthesizer is told who owns infra files: on-call-engineer for scripts, CI and workflow code, tech-writer for prose', async () => {
   // Findings in a CI file and in a workflow script reach the synthesizer too.
   const { calls } = await runWorkflow({
@@ -875,7 +904,8 @@ test('the synthesizer is told who owns infra files: on-call-engineer for scripts
   assert.match(synth.prompt, /\.claude\/workflows\/pr-review-verified\.js:200/)
   // .github/ is split by file type: .md is prose, everything else is CI.
   assert.match(synth.prompt, /scripts and their tests under scripts\/, files under \.github\/ other than \.md, and workflow scripts under \.claude\/workflows\/ → on-call-engineer/)
-  assert.match(synth.prompt, /\.md files under \.github\/, and prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer/)
+  assert.match(synth.prompt, /and prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer/)
+  assert.match(synth.prompt, /every \.md file outside ios\/Regards\* and android\/\*\/src \(ios\/docs, android\/docs, \.github\/, and the root docs/)
   // The wording that left a .github/ .md file with 2 owners is gone.
   assert.doesNotMatch(synth.prompt, /CI files under \.github\//)
   assert.doesNotMatch(synth.prompt, /\.agents\/ and \.github\/ → tech-writer/)
