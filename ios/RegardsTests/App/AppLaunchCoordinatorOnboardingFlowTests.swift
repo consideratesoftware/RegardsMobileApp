@@ -192,7 +192,17 @@ extension AppLaunchCoordinatorTests {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .authorized, contacts: [Self.systemContact, Self.han, Self.luke])
-        let launch = coordinator(environment: environment, source: source)
+        // The pass runs on the test's clock, a Saturday outside every default slot, so no run crosses a slot
+        // and the second run can be compared row for row.
+        let now = self.now
+        let launch = AppLaunchCoordinator(dependencies: .init(
+            makeRuntime: {
+                AppRuntime(
+                    environment: environment, window: try await environment.window.fetchGlobal(),
+                    userCalendar: Calendar(identifier: .gregorian), clock: { now }, occasions: { _ in [] })
+            },
+            contactsSource: source,
+            clock: { now }))
         await launch.start()
         #expect(launch.onboardingStep == .starter)
         // The onboarding picker, as OnboardingFlowView builds it: no pass of its own.
@@ -202,7 +212,7 @@ extension AppLaunchCoordinatorTests {
         let han = try #require(picker.contacts.first { $0.displayName == "Han Solo" })
         picker.toggle(leia.id)
         #expect(await picker.save())
-        // Pending or fired: the real clock decides which (a slot in progress writes the row fired).
+        // Pending or fired, whichever the pass writes.
         func cadenceRow(_ contact: Contact) async throws -> Bool {
             try await environment.reminders.fetchSchedule().reminders
                 .contains { $0.contactId == contact.id && $0.kind == .cadence }
