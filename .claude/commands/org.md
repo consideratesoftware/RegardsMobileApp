@@ -82,7 +82,8 @@ For each open TF PR:
    in the lane's folder, rerun that review, unless it is a Codex UNAVAILABLE:
    check the head out with `git worktree add --detach <tmp> <head sha>`, run
    the verified run (`pr-review.md`, "Claude Code org only") there with that
-   target, started by the `scriptPath` rule in `pr-review.md`, or, when it can't
+   target, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR needs
+   both runs that section gives), or, when it can't
    run, `/pr-review origin/main...HEAD` and the `codex-reviewer` agent type. Post
    the result as a new verdict comment, then `git worktree remove <tmp>`. A RETRY
    gets the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
@@ -145,9 +146,9 @@ lane's folder. Fetch, then run the verified run (`pr-review.md`, "Claude Code or
 against the lane's worktree with `codex: true`, so the review board and Codex
 run in one workflow. Start it by `scriptPath` to a copy exported from
 `origin/main`, never by `name`. For a PR that adds or changes
-`.claude/workflows/pr-review-verified.js`, the exception in that section
-applies: the PR's own copy runs, refutations change no verdict, and the counts
-follow the hand checks in that exception. If it can't run, run
+`.claude/workflows/pr-review-verified.js`, the self-edit rule in that section
+applies: 2 independent runs, one from `origin/main`'s copy and one from the PR's
+own copy, counted as that section says. If it can't run, run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
 batch, with the worktree, the same target `origin/main...HEAD`, the item's §14

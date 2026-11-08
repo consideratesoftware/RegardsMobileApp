@@ -173,17 +173,15 @@ at a copy of `.claude/workflows/pr-review-verified.js` exported from
 `check-carried-approval.sh`. Never run it by `name` from a lane: `name` resolves
 from the session's folder, and the lane's copy is PR-controlled.
 
-Exception: a PR that adds or changes `.claude/workflows/pr-review-verified.js`
-has no trusted copy that can judge it. For that PR only, run the PR's own copy
-by `scriptPath` to get the reviews. Each pr-* reviewer counts as the strictest
-(FAILED, then REQUEST_CHANGES, then APPROVE) of its `verdict`, its
-`reportedVerdict`, and these checks you make by hand: FAILED, rerun alone, when
-its `reviewedSha` is missing, under 7 characters, not lower-case hex, or not a
-prefix of head; REQUEST_CHANGES when its `notChecked` is missing or not empty,
-or it raised any BLOCKER, in `survivors` or in `refuted`. A refutation never
-makes a verdict less strict. BLOCKERS and SHOULD_FIX count every pr-* BLOCKER
-and FIX in `survivors` and `refuted`. Refuted findings still get their
-`REFUTED:` lines.
+Self-edit PRs. A PR that adds or changes `.claude/workflows/pr-review-verified.js`
+gets 2 independent review runs on the same head.
+
+- (a) Main's copy. Export it with `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`, and start that copy by `scriptPath`. When `origin/main` has no copy, the plain run takes its place: Stages 1 to 4 dispatched as individual agent calls, not through any workflow script, with Codex run by the `codex-reviewer` agent. In the plain run, every reviewer BLOCKER counts.
+- (b) The PR's own copy, in the lane worktree, started by `scriptPath`.
+
+Each reviewer counts at the stricter of its 2 runs (FAILED, then REQUEST_CHANGES, then APPROVE). BLOCKERS and SHOULD_FIX take the higher count. In run (b), they count every pr-* BLOCKER and FIX in `survivors` and `refuted`. Codex counts at the stricter of its 2 verdicts. A verdict from the PR's own copy never counts alone: if either run is missing, the PR has no counting review.
+
+For run (b), also make these hand checks. FAILED when `reviewedSha` is missing, under 7 characters, not lower-case hex, or not a prefix of head. REQUEST_CHANGES when `notChecked` is missing or not empty, or when it raised any BLOCKER, in `survivors` or in `refuted`. Refuted findings still get their `REFUTED:` lines.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
 pr-correctness and pr-tests runs (the workflow's reviewers can't take a
@@ -251,11 +249,11 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and
   FIX respectively), plus any Stage 2 items. A plain run has no `survivors`: it
   refutes nothing, so every pr-* finding counts. Refuted findings count for
-  neither (except in the exception under "How to run it", where they count).
+  neither, except on a self-edit PR (see "How to run it").
   Codex's counts stay on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
-  verified run, or the Stage 1 verdict in a plain run. In the exception under
-  "How to run it", it takes the strictest verdict that section names. A Stage 2
+  verified run, or the Stage 1 verdict in a plain run. On a self-edit PR, the
+  counting verdicts are the ones "How to run it" sets. A Stage 2
   blocker makes that reviewer REQUEST_CHANGES.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.
