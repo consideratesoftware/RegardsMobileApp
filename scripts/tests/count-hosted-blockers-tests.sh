@@ -159,5 +159,5 @@ expect_contract() {
 }
 
 expect_contract 0 'no blockers'
-expect_contract 1 '1 blocker'
-expect_contract 3 '3 blockers'
+expect_contract 1 'Changes requested: 1 blocker,'
+expect_contract 3 'Changes requested: 3 blockers,'
