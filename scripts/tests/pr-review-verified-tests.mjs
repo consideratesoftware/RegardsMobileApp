@@ -20,6 +20,12 @@
 //      supplies and records every call.
 // No model runs and nothing touches the network or git.
 //
+// The fake agent() also checks each scripted review against the schema the
+// script passed it: a top-level field with an enum must hold one of the listed
+// values. The real runtime refuses any other value at the tool-call layer, so
+// a reviewer can never return it. Without this check a scripted verdict the
+// schema forbids would pass through the fake and hide a missing enum value.
+//
 // How a test reads. Each case calls runWorkflow() with a scenario:
 //   reviews  what each reviewer agent returns, by agent name
 //            (a result object, null for an agent that failed, or an Error to
@@ -61,14 +67,26 @@ function finding(severity, location) {
   return { severity, location, claim: `claim at ${location}`, fix: `fix at ${location}` }
 }
 
+// The first top-level field of `answer` that holds a value its schema's enum
+// does not list, described in words, or null.
+function schemaRefusal(answer, schema) {
+  for (const [key, spec] of Object.entries(schema.properties)) {
+    if (spec.enum && key in answer && !spec.enum.includes(answer[key])) {
+      return `${key} is ${JSON.stringify(answer[key])}, not one of ${spec.enum.join(', ')}`
+    }
+  }
+  return null
+}
+
 function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes: 'stub' }, args = {} } = {}) {
   const calls = []
   const phases = []
   const logs = []
 
-  // A call the scenario did not plan for is a mistake in the test or in the
-  // script. It is recorded and reported when the run ends, because a throw
-  // here would be swallowed by parallel() and pipeline().
+  // A call the scenario did not plan for, or a scripted answer the schema
+  // forbids, is a mistake in the test or in the script. It is recorded and
+  // reported when the run ends, because a throw here would be swallowed by
+  // parallel() and pipeline().
   const unplanned = []
 
   function agent(prompt, opts = {}) {
@@ -84,6 +102,11 @@ function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes:
       }
       const answer = reviews[opts.agentType]
       if (answer instanceof Error) return Promise.reject(answer)
+      const refused = answer && schemaRefusal(answer, opts.schema)
+      if (refused) {
+        unplanned.push(`a review by ${opts.agentType} that the script's schema refuses (${refused})`)
+        return Promise.resolve(null)
+      }
       return Promise.resolve(answer)
     }
 
@@ -132,7 +155,7 @@ function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes:
   }
   return workflow(agent, parallel, pipeline, p => phases.push(p), m => logs.push(m), { ...baseArgs, ...args })
     .then(result => {
-      if (unplanned.length) throw new Error(`the script made calls the test did not plan for: ${unplanned.join('; ')}`)
+      if (unplanned.length) throw new Error(`the run did not match the scenario: ${unplanned.join('; ')}`)
       return { result, calls, phases, logs }
     })
 }
@@ -354,6 +377,28 @@ test('codexReviewReturned: the whole Codex review comes back verbatim', async ()
   assert.equal(result.codexReview, text)
   assert.equal(result.verdicts.find(v => v.reviewer === 'codex-reviewer').codexLine,
     'CODEX REVIEW: APPROVE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3')
+})
+
+test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILABLE, never APPROVE', async () => {
+  const text = 'CODEX REVIEW: UNAVAILABLE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nWORKTREE: /tmp/worktree\nVERDICT: UNAVAILABLE\nREASON: not logged in\nREVIEW:\nNot logged in\n'
+  const { result, calls } = await runWorkflow({
+    args: { reviewers: ['pr-tests'], codex: true },
+    reviews: {
+      'pr-tests': review('APPROVE'),
+      'codex-reviewer': review('UNAVAILABLE', [], { rawSummary: text }),
+    },
+  })
+  const codex = result.verdicts.find(v => v.reviewer === 'codex-reviewer')
+  assert.equal(codex.verdict, 'UNAVAILABLE')
+  assert.equal(codex.reportedVerdict, 'UNAVAILABLE')
+  assert.equal(codex.codexLine, 'CODEX REVIEW: UNAVAILABLE @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3')
+  assert.equal(result.codexReview, text)
+  assert.equal(verdictOf(result, 'pr-tests'), 'APPROVE')
+
+  // The agent has to be told it may report UNAVAILABLE, or it would pick the
+  // nearest verdict it is allowed.
+  const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
+  assert.match(codexCall.prompt, /UNAVAILABLE/)
 })
 
 test('codexReview is null when Codex was not asked for, or returned nothing', async () => {

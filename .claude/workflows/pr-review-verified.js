@@ -34,7 +34,9 @@ export const meta = {
 //      only) none of its FIX findings survived.
 //   4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
 //   5. Codex's verdict is always Codex's own. The verifiers never change it.
-//      A refuted Codex finding is still listed in `refuted`.
+//      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
+//      UNAVAILABLE come back as written, so a Codex that could not review is
+//      never read as APPROVE.
 //
 // Result: { head, verdicts, codexReview, workOrder, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
@@ -49,7 +51,7 @@ export const meta = {
 const FINDINGS = {
   type: 'object',
   properties: {
-    verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY'] },
+    verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] },
     reviewedSha: { type: 'string' },
     findings: {
       type: 'array',
@@ -135,7 +137,7 @@ const LENSES = [
 phase('Review')
 const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Then return the structured result.` }))
 if (a.codex) {
-  reviewers.push({ type: 'codex-reviewer', prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first; retry once on a timeout or capacity error. In the structured result, set verdict from Codex's verdict line (RETRY if the head moved), reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
+  reviewers.push({ type: 'codex-reviewer', prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first; retry once on a timeout or capacity error. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
 
 const results = await pipeline(

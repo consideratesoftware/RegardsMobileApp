@@ -166,9 +166,10 @@ workflow's `workOrder`. Send each one to its owner, as Stage 3 says.
   `impact`) and `real` (`true`, `false` or `'failed'`).
 
 Don't post APPROVE while a reviewer is `FAILED` or has any verdict other than
-APPROVE or REQUEST_CHANGES. Rerun that reviewer alone. The workflow's verdict
-values have no UNAVAILABLE. When Codex reports UNAVAILABLE, or returns no
-verdict, rerun `codex-reviewer` alone and use its report.
+APPROVE or REQUEST_CHANGES. Rerun that reviewer alone. The workflow passes
+Codex's RETRY and UNAVAILABLE through as its `verdict`. When Codex reports
+UNAVAILABLE, or returns no verdict, rerun `codex-reviewer` alone and use its
+report.
 
 ### The PR REVIEW comment
 
