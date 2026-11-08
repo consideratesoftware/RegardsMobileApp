@@ -160,9 +160,22 @@ product decision. The `PR REVIEW:` comment lists which reviewers reran and which
 approvals carry from which sha. The carry rule, the `CARRIED:` line format, and
 the check that runs `scripts/check-carried-approval.sh` are in
 `.claude/agents/release-manager.md` (Merge conditions). Each reviewer the
-routing table requires needs APPROVE as its newest verdict, or a carry that
-holds under that rule. The newest `PR REVIEW:` comment, scoped or not, needs a
-`REVIEWERS:` line, or the check fails (STATE CODEX STALE).
+routing table requires needs APPROVE as its newest verdict, a carry that holds
+under that rule, or a REQUEST_CHANGES under the fast-follow rule below. The
+newest `PR REVIEW:` comment, scoped or not, needs a `REVIEWERS:` line, or the
+check fails (STATE CODEX STALE).
+
+Fast-follow should-fixes. Owner ruling, 2026-11-08 (PR #72 comment 6724444034):
+when a round ends with 0 blockers, the engineering manager may carry its
+remaining should-fixes, Codex's included, to a named fast-follow PR and merge.
+The `PR REVIEW:` comment keeps each reviewer's own verdict on its `REVIEWERS:`
+line, says `BLOCKERS: 0`, and adds one `FAST-FOLLOW: <named PR>: <items>` line.
+Its first line is APPROVE when every should-fix is carried. Only should-fix
+findings carry. A BLOCKER, a hosted blocker or a red check still stops the
+merge, and a NOT CHECKED entry or a FAILED reviewer still needs a rerun. A
+carried REQUEST_CHANGES holds only at the head its comment names.
+`.claude/commands/pr-review.md` ("The PR REVIEW comment") has the comment's
+rules.
 
 When all 7 hold, the PR merges. Owner direction, 2026-11-02: the org
 doesn't ask Sid whether to merge and doesn't hold a green PR for his

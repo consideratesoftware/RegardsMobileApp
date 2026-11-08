@@ -107,11 +107,14 @@ If the PR claims R-closures (§19): verify each acceptance check yourself agains
 ## Claude Code org only
 
 The verified run is how the Claude Code org runs this review. It is the one
-exception to the Stage 3 rule that any BLOCKER means REQUEST_CHANGES. The hosted
-review reads this file but applies Stages 1 to 4 only, and its `Workflow` tool
-is disabled by `--disallowedTools` in `.github/workflows/claude-pr-review.yml`,
-so it never runs this section. The Codex skill cannot run workflows either, so
-it does not use this section. The hosted review stays a separate gate.
+exception to the Stage 3 rule that any BLOCKER means REQUEST_CHANGES. The
+fast-follow rule ("The PR REVIEW comment") is the one exception to the Stage 3
+rule that any agent's REQUEST_CHANGES makes the review REQUEST_CHANGES. The
+hosted review reads this file but applies Stages 1 to 4 only, and its `Workflow`
+tool is disabled by `--disallowedTools` in
+`.github/workflows/claude-pr-review.yml`, so it never runs this section. The
+Codex skill cannot run workflows either, so it does not use this section. The
+hosted review stays a separate gate.
 
 Use the verified run when the Workflow tool is available and someone can approve
 its prompt in this session. Otherwise take the plain run:
@@ -296,12 +299,13 @@ SHOULD_FIX: <n>
 REVIEWERS: <pr-reviewer> <APPROVE|REQUEST_CHANGES>, ...
 RERAN: <pr-reviewer>, ...                                  (scoped recheck only, as today)
 CARRIED: <pr-code-quality|pr-tests> APPROVE from <sha>     (scoped recheck only; 1 per carry)
+FAST-FOLLOW: <named PR>: <items>   (0-blocker round that carries its should-fixes only)
 REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <paraphrase>   (verified run only; else "REFUTED: none")
 ```
 
 - The first line is APPROVE only when no pr-* BLOCKER survived (in Stage 1 or
-  Stage 2) and every pr-* reviewer's verdict is APPROVE. Otherwise it is
-  REQUEST_CHANGES.
+  Stage 2) and every pr-* reviewer's verdict is APPROVE, or REQUEST_CHANGES
+  carried under the fast-follow rule below. Otherwise it is REQUEST_CHANGES.
 - BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and FIX
   respectively), plus any Stage 2 items. A plain run has no `survivors`: it
   refutes nothing, so every pr-* finding counts. Refuted findings count for
@@ -315,11 +319,21 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
   `<lens>` names the verifiers that voted `real=false`.
 - The paraphrase is your own words: at most 15 words, one physical line, no
   `@`. Never paste reviewer text.
-- `release-manager.md` reads the first line and the `REVIEWERS:` and `CARRIED:`
-  lines of this comment. It reads `DISPUTED:` lines from the CODEX REVIEW
-  comment. Its filter keeps only `REVIEWERS:` and `CARRIED:` lines, so a
-  `REFUTED:` line never passes as a carry. `REFUTED:` lines are for Sid to see.
-  They never count toward any check.
+- Fast-follow rule. Owner ruling, 2026-11-08 (PR #72 comment 6724444034): when
+  a round ends with `BLOCKERS: 0`, you may carry every remaining should-fix,
+  Codex's included, to a named fast-follow PR. Add one
+  `FAST-FOLLOW: <named PR>: <items>` line: the PR's number, or the queue item
+  that will open it, then each carried item. A reviewer's REQUEST_CHANGES
+  carries only when every finding behind it is a should-fix. A BLOCKER, a NOT
+  CHECKED entry, a FAILED reviewer or a rule 4 check is fixed or rerun, never
+  carried. `REVIEWERS:` keeps each reviewer's own verdict. A carried
+  REQUEST_CHANGES holds only at this comment's head, and it is never a
+  `CARRIED:` source.
+- `release-manager.md` reads the first line and the `BLOCKERS:`, `REVIEWERS:`,
+  `CARRIED:` and `FAST-FOLLOW:` lines of this comment. It reads `DISPUTED:`
+  lines from the CODEX REVIEW comment. Its filter keeps only those 4 kinds of
+  line, so a `REFUTED:` line never passes as a carry. `REFUTED:` lines are for
+  Sid to see. They never count toward any check.
 
 A scoped recheck passes `since`. Its comment carries `RERAN:` and `CARRIED:`
 lines as `org.md` Stage 3 says.

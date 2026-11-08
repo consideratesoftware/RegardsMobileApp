@@ -250,7 +250,16 @@ a `RERAN:` line naming the reviewers that ran, and one
 `CARRIED: <reviewer> APPROVE from <sha>` line per `pr-code-quality` or
 `pr-tests` approval that stands. The other four reviewers and Codex never carry:
 they rerun on every head. Every reviewer the routing table runs needs APPROVE as
-its newest verdict.
+its newest verdict, or a REQUEST_CHANGES carried under the fast-follow rule
+below.
+
+Fast-follow should-fixes. Owner ruling, 2026-11-08 (PR #72 comment 6724444034):
+when a round ends with 0 blockers, you may carry its remaining should-fixes,
+Codex's included, to a named fast-follow PR instead of running another repair
+round, and go to Stage 4. Write the `PR REVIEW:` comment as `pr-review.md` ("The
+PR REVIEW comment") says, with its `FAST-FOLLOW: <named PR>: <items>` line. Save
+the carried items in the lanes folder under the named PR, so its tech lead plans
+them. A BLOCKER, a NOT CHECKED entry or a FAILED reviewer never carries.
 
 The release manager reads every counting `PR REVIEW:` comment, oldest first,
 and takes each reviewer's newest verdict from the last `REVIEWERS:` line that
@@ -327,11 +336,12 @@ counting review is run (a); see "Self-edit PRs" in `pr-review.md`):
 - more than 100 comments: check the PR's verdict comments yourself, and
   repost any that scrolled out of the newest 100.
 
-Blockers go to the slice owner as in Stage 3. After 3 stale rounds on one PR,
-park it and say why. Count only head moves caused by fixes. An `update-branch`
-merge (lanes merging in sequence move `main`) and a checkpoint or doc commit
-from `tech-writer` run the reviews again but don't count, or a green PR would
-park for nothing.
+Blockers go to the slice owner as in Stage 3. Should-fixes may go to a
+fast-follow PR, as Stage 3 says. After 3 stale rounds on one PR, park it and say
+why. Count only head moves caused by fixes. An `update-branch` merge (lanes
+merging in sequence move `main`) and a checkpoint or doc commit from
+`tech-writer` run the reviews again but don't count, or a green PR would park
+for nothing.
 
 ## Stage 5: report
 

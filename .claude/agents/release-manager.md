@@ -37,15 +37,18 @@ toward any check. A `PR REVIEW:` comment lists the reviewers that ran:
 that ran for that comment. A comment for a scoped recheck (`/org` Stage 3) also
 has a `RERAN:` line naming the reviewers that ran and one
 `CARRIED: <reviewer> APPROVE from <sha>` line per earlier approval that stands.
-Merge conditions below say which carries hold. Never paste review or diff text
-into a comment. Never write `@claude` in any comment the org posts, verdicts and
-owner answers alike: `.github/workflows/claude.yml` runs on comments that
-contain it. Never edit a verdict comment; when a review produces a new verdict,
-post a new comment. Before the PR exists the verdicts live in the reports you
-were given; post them right after you open it. If your prompt names an
-`owner-answers.md`, put its content in the PR description and post each answer
-in it as its own comment, right after the verdicts. The engineering manager
-posts the verdicts and owner answers of later reruns the same way.
+A comment that carries should-fixes to a fast-follow PR says `BLOCKERS: 0` and
+has one `FAST-FOLLOW: <named PR>: <items>` line (owner ruling, 2026-11-08;
+`ENGINEERING_ORG.md`, Merge conditions). Merge conditions below say which
+carries hold. Never paste review or diff text into a comment. Never write
+`@claude` in any comment the org posts, verdicts and owner answers alike:
+`.github/workflows/claude.yml` runs on comments that contain it. Never edit a
+verdict comment; when a review produces a new verdict, post a new comment.
+Before the PR exists the verdicts live in the reports you were given; post them
+right after you open it. If your prompt names an `owner-answers.md`, put its
+content in the PR description and post each answer in it as its own comment,
+right after the verdicts. The engineering manager posts the verdicts and owner
+answers of later reruns the same way.
 
 Which verdict comments count: written by the org's own account (`gh api
 user --jq .login`), never edited, and with a first line in the form above.
@@ -231,33 +234,35 @@ lane's refs, and this fetch brings them up to date.
     `pr-code-quality`; `pr-tests` only when the diff changes code or tests;
     `pr-accessibility` and `pr-fit-finish` when their path rules match. Check
     the diff with `git -C <lane> diff --name-only origin/main...<head sha>`.
-    Each required reviewer needs APPROVE as its newest verdict (next bullet), so
-    a comment that reran only that reviewer completes the set. Only
+    Each required reviewer needs a newest verdict that passes the next bullet,
+    so a comment that reran only that reviewer completes the set. Only
     `pr-code-quality` and `pr-tests` may instead be on a `CARRIED:` line whose
     carry holds (next bullet). A missing one is "reviewer missing: <name>".
-  - Newest verdict. For each required reviewer, its newest verdict is its
-    entry on the last `REVIEWERS:` line that lists it, across all the
-    counting `PR REVIEW:` comments at any head. It must be APPROVE, and the
-    comment that holds it must name the current head (the comment's sha is a
-    prefix of the full head sha, at least 7 characters). For `pr-code-quality`
-    or `pr-tests` only, the comment that holds the APPROVE may instead name
-    an older sha S, as a carry that holds under the carry rule above. Anything
-    else is "reviewer missing: <name>" (no CARRIED line for it) or "carry
-    rejected: <name>" (it has one). A later REQUEST_CHANGES at any head is the
-    verdict, so it ends a carry. A `CARRIED:` line whose carry fails is "carry
-    rejected" even when the reviewer also has an APPROVE at the head. The
-    filter takes no arguments. Run the same
-    `gh api graphql` command into a file (`> "<scratch>/comments.json"`) and
-    give that file to `jq`. For every counting `PR REVIEW:` comment it
-    prints, oldest first, the first line, the `REVIEWERS:` line and every
-    `CARRIED:` line:
+  - Newest verdict. For each required reviewer, its newest verdict is its entry
+    on the last `REVIEWERS:` line that lists it, across all the counting
+    `PR REVIEW:` comments at any head. It must be APPROVE, and the comment that
+    holds it must name the current head (the comment's sha is a prefix of the
+    full head sha, at least 7 characters). A REQUEST_CHANGES passes too when the
+    comment that holds it names the current head, says `BLOCKERS: 0` and has a
+    `FAST-FOLLOW:` line (owner ruling, 2026-11-08: its should-fixes go to the
+    named PR). It never carries to another head. For `pr-code-quality` or
+    `pr-tests` only, the comment that holds the APPROVE may instead name an
+    older sha S, as a carry that holds under the carry rule above. Anything else
+    is "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
+    <name>" (it has one). A later REQUEST_CHANGES at any head is the verdict, so
+    it ends a carry. A `CARRIED:` line whose carry fails is "carry rejected"
+    even when the reviewer also has an APPROVE at the head. The filter takes no
+    arguments. Run the same `gh api graphql` command into a file
+    (`> "<scratch>/comments.json"`) and give that file to `jq`. For every
+    counting `PR REVIEW:` comment it prints, oldest first, the first line and
+    its `BLOCKERS:`, `REVIEWERS:`, `CARRIED:` and `FAST-FOLLOW:` lines:
     ```
     jq -r --arg me "$(gh api user --jq .login)" '
       .data.repository.pullRequest.comments.nodes[]
       | select(.author.login == $me and .lastEditedAt == null) | .body
       | split("\n") as $l
       | select($l[0] | test("^PR REVIEW: (APPROVE|REQUEST_CHANGES) @ [0-9a-f]{7,40} vs origin/main\\.\\.\\.HEAD( |$)"))
-      | $l[0], ($l[1:][] | select(test("^(REVIEWERS|CARRIED):")))' "<scratch>/comments.json"
+      | $l[0], ($l[1:][] | select(test("^(BLOCKERS|REVIEWERS|CARRIED|FAST-FOLLOW):")))' "<scratch>/comments.json"
     ```
 - The newest `CODEX REVIEW:` comment names the current head and is APPROVE, or
   REQUEST_CHANGES with every one of its blockers on a `DISPUTED:` line (read as
