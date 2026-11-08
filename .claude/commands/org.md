@@ -93,12 +93,12 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    `main`, never from `<tmp>`, with `worktree` set to `<tmp>` and `head` set to
    its sha, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR
    uses main's copy, or the plain run when main has none, and never its own
-   copy), or, when it
-   can't run, `/pr-review origin/main...HEAD in worktree <tmp>` and the
-   `codex-reviewer` agent type with the target `origin/main...HEAD` and the
-   worktree `<tmp>`, both from the root checkout on `main`. Post the result as a
-   new verdict comment, then `git worktree remove <tmp>`. A RETRY gets the one
-   rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any head:
+   copy), or, when it can't run,
+   `/pr-review origin/main...HEAD in worktree <tmp>` and the `codex-reviewer`
+   agent type with the target `origin/main...HEAD` and the worktree `<tmp>`,
+   both from the root checkout on `main`. Post the result as a new verdict
+   comment, then `git worktree remove <tmp>`. A RETRY gets the one rerun
+   Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any head:
    interview Sid before any rerun.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. When
@@ -170,9 +170,8 @@ verified run (`pr-review.md`, "Claude Code org only") from the root checkout on
 that adds or changes `.claude/workflows/pr-review-verified.js`, the self-edit
 rule in that section applies: main's copy, or the plain run where main has none,
 is the whole counting review, and the PR's own copy never runs. If it can't run,
-run
-`/pr-review origin/main...HEAD in worktree <lane path>` from the root checkout
-on `main`, and launch the `codex-reviewer` agent type
+run `/pr-review origin/main...HEAD in worktree <lane path>` from the root
+checkout on `main`, and launch the `codex-reviewer` agent type
 (`subagent_type: codex-reviewer`) in the same batch, with the target
 `origin/main...HEAD`, the worktree `<lane path>`, the item's §14 row (or "infra,
 no §14 row" for an infra PR), and its claimed R-numbers. The three-dot target
@@ -201,9 +200,8 @@ Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
 verdict, and give that path to `release-manager`; the release manager checks
 each `DISPUTED:` line against it. A resumed PR whose head has no such file gets
-a fresh Codex
-run (Stage 1). In a verified run, the full review is the workflow's
-`codexReview`.
+a fresh Codex run (Stage 1). In a verified run, the full review is the
+workflow's `codexReview`.
 
 Once the lane has a PR, post every review result on it (`/pr-review` and
 Codex alike, RETRY included) as a verdict comment in the form

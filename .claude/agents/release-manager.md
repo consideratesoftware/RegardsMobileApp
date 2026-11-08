@@ -41,16 +41,15 @@ A `PR REVIEW:` comment also has a `NOT CHECKED: none | <reviewer>, ...` line. A
 comment that carries should-fixes to a fast-follow PR says `BLOCKERS: 0` and
 `NOT CHECKED: none` and has one `FAST-FOLLOW: <named PR>: <items>` line (owner
 ruling, 2026-11-08; `.claude/commands/pr-review.md`, "The PR REVIEW comment").
-Merge conditions below say which
-carries hold. Never paste review or diff text into a comment. Never write
-`@claude` in any comment the org posts, verdicts and owner answers alike:
-`.github/workflows/claude.yml` runs on comments that contain it. Never edit a
-verdict comment; when a review produces a new verdict, post a new comment.
-Before the PR exists the verdicts live in the reports you were given; post them
-right after you open it. If your prompt names an `owner-answers.md`, put its
-content in the PR description and post each answer in it as its own comment,
-right after the verdicts. The engineering manager posts the verdicts and owner
-answers of later reruns the same way.
+Merge conditions below say which carries hold. Never paste review or diff text
+into a comment. Never write `@claude` in any comment the org posts, verdicts and
+owner answers alike: `.github/workflows/claude.yml` runs on comments that
+contain it. Never edit a verdict comment; when a review produces a new verdict,
+post a new comment. Before the PR exists the verdicts live in the reports you
+were given; post them right after you open it. If your prompt names an
+`owner-answers.md`, put its content in the PR description and post each answer
+in it as its own comment, right after the verdicts. The engineering manager
+posts the verdicts and owner answers of later reruns the same way.
 
 Which verdict comments count: written by the org's own account (`gh api
 user --jq .login`), never edited, and with a first line in the form above.
@@ -249,20 +248,19 @@ lane's refs, and this fetch brings them up to date.
     full head sha, at least 7 characters). A REQUEST_CHANGES passes too when the
     comment that holds it names the current head, its first line is APPROVE, and
     it has `BLOCKERS: 0`, `NOT CHECKED: none` and a `FAST-FOLLOW:` line (owner
-    ruling, 2026-11-08: its should-fixes go to the
-    named PR). It never carries to another head. A comment with no
-    `NOT CHECKED:` line does not pass. For `pr-code-quality` or
-    `pr-tests` only, the comment that holds the APPROVE may instead name an
-    older sha S, as a carry that holds under the carry rule above. Anything else
-    is "reviewer missing: <name>" (no CARRIED line for it) or "carry rejected:
-    <name>" (it has one). A later REQUEST_CHANGES at any head is the verdict, so
-    it ends a carry. A `CARRIED:` line whose carry fails is "carry rejected"
-    even when the reviewer also has an APPROVE at the head. The filter takes no
-    arguments. Run the same `gh api graphql` command into a file
-    (`> "<scratch>/comments.json"`) and give that file to `jq`. For every
-    counting `PR REVIEW:` comment it prints, oldest first, the first line and
-    its `BLOCKERS:`, `REVIEWERS:`, `NOT CHECKED:`, `CARRIED:` and `FAST-FOLLOW:`
-    lines:
+    ruling, 2026-11-08: its should-fixes go to the named PR). A comment with no
+    `NOT CHECKED:` line does not pass. Such a REQUEST_CHANGES never carries to
+    another head. For `pr-code-quality` or `pr-tests` only, the comment that
+    holds the APPROVE may instead name an older sha S, as a carry that holds
+    under the carry rule above. Anything else is "reviewer missing: <name>" (no
+    CARRIED line for it) or "carry rejected: <name>" (it has one). A later
+    REQUEST_CHANGES at any head is the verdict, so it ends a carry. A `CARRIED:`
+    line whose carry fails is "carry rejected" even when the reviewer also has
+    an APPROVE at the head. The filter takes no arguments. Run the same
+    `gh api graphql` command into a file (`> "<scratch>/comments.json"`) and
+    give that file to `jq`. For every counting `PR REVIEW:` comment it prints,
+    oldest first, the first line and its `BLOCKERS:`, `REVIEWERS:`,
+    `NOT CHECKED:`, `CARRIED:` and `FAST-FOLLOW:` lines:
     ```
     jq -r --arg me "$(gh api user --jq .login)" '
       .data.repository.pullRequest.comments.nodes[]

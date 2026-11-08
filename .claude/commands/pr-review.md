@@ -320,10 +320,9 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
   `release-manager.md` (Merge conditions) checks it.
 - `release-manager.md` reads the first line and the `BLOCKERS:`, `REVIEWERS:`,
   `NOT CHECKED:`, `CARRIED:` and `FAST-FOLLOW:` lines of this comment. It reads
-  `DISPUTED:`
-  lines from the CODEX REVIEW comment. Its filter keeps only those 5 kinds of
-  line, so a `REFUTED:` line never passes as a carry. `REFUTED:` lines are for
-  Sid to see. They never count toward any check.
+  `DISPUTED:` lines from the CODEX REVIEW comment. Its filter keeps only those 5
+  kinds of line, so a `REFUTED:` line never passes as a carry. `REFUTED:` lines
+  are for Sid to see. They never count toward any check.
 
 A scoped recheck passes `since`. Its comment carries `RERAN:` and `CARRIED:`
 lines as `org.md` Stage 3 says.
