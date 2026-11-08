@@ -98,6 +98,17 @@ check() {
     echo "FAIL: $name (expected $expected, got $status): $output" >&2
     exit 1
   fi
+  # release-manager.md passes a carry only on exit 0 with the output exactly
+  # CARRY PASSES, and a failure prints CARRY FAILS: <reason>. The output holds
+  # stderr too, so a stray warning on a pass fails the case.
+  if [[ "$expected" -eq 0 && "$output" != "CARRY PASSES" ]]; then
+    echo "FAIL: $name (expected the output CARRY PASSES, got: $output)" >&2
+    exit 1
+  fi
+  if [[ "$expected" -eq 1 && "$output" != "CARRY FAILS: "* ]]; then
+    echo "FAIL: $name (expected the output to start with \"CARRY FAILS: \", got: $output)" >&2
+    exit 1
+  fi
   echo "PASS: $name"
 }
 
