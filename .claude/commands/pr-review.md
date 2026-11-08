@@ -204,7 +204,9 @@ says.
   `questions` is the Stage 3 Owner questions list.
 - `codexReview`: Codex's full review, verbatim, or null. Save it as
   `codex-<short sha>.md` before you post. Its first line is the Codex verdict
-  line, which the Codex entry's `codexLine` also carries.
+  line, which the Codex entry's `codexLine` also carries. A Codex entry with
+  APPROVE or REQUEST_CHANGES but `codexReview` null has no review to save;
+  rerun `codex-reviewer` alone.
 - `refuted`: one entry per refuted finding, with its reviewer, severity,
   location, claim and votes. Each vote names a `lens` (`truth`, `scope` or
   `impact`) and `real` (`true`, `false` or `'failed'`).
