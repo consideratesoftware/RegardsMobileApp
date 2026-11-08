@@ -112,7 +112,11 @@ function runWorkflow({ reviews = {}, votes = {}, workOrder = { items: [], notes:
     }
 
     if (label.startsWith('verify:')) {
-      const location = Object.keys(votes).find(loc => prompt.includes(loc))
+      // The prompt says "raised this BLOCKER at Alpha.swift:10:". Read the
+      // location from there, whole. Searching the prompt for each scripted
+      // location would let Delta.swift:1 match a prompt about Delta.swift:10.
+      const named = /raised this [A-Z]+ at (\S+):\n/.exec(prompt)
+      const location = named && named[1] in votes ? named[1] : null
       if (!location) {
         unplanned.push(`a verifier call (${label}) with no votes scripted for it`)
         return Promise.resolve(null)
@@ -165,6 +169,19 @@ const verifierCalls = calls => calls.filter(c => c.opts.label.startsWith('verify
 const verdictOf = (result, reviewer) => result.verdicts.find(v => v.reviewer === reviewer).verdict
 
 // ---- how votes are counted -------------------------------------------------
+
+test('votes are matched by exact location: Delta.swift:1 does not take the votes for Delta.swift:10', async () => {
+  // Delta.swift:1 comes first in `votes` on purpose: a search of the prompt
+  // for each scripted location would find it inside Delta.swift:10 first.
+  const { result } = await runWorkflow({
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Delta.swift:1'), finding('BLOCKER', 'Delta.swift:10')]),
+    },
+    votes: { 'Delta.swift:1': [false, false, false], 'Delta.swift:10': [true, true, true] },
+  })
+  assert.deepEqual(result.refuted.map(r => r.location), ['Delta.swift:1'])
+  assert.deepEqual(result.survivors.map(s => s.location), ['Delta.swift:10'])
+})
 
 test('failedVoteCountsReal: votes real, failed, false leave the finding standing', async () => {
   const { result } = await runWorkflow({
