@@ -145,8 +145,9 @@ Workflow({ name: "pr-review-verified", args: { title, worktree, branch, head, si
 - `reviewers`: the pr-* reviewers this round runs: the Stage 1 set, or the set
   a scoped recheck reruns.
 - `codex`: `true`, so Codex reviews in the same workflow.
-- `contextFile`: the absolute path of the lane's `review-context.md` (the §14
-  row and the R-numbers).
+- `contextFile`: the absolute path of the lane's `review-context.md`. It must
+  hold the §14 row and the R-numbers verbatim. For the workflow it replaces
+  Stage 1's per-prompt paste of those two.
 
 If the name does not resolve, pass `scriptPath` instead, pointing at the root
 checkout's copy of `.claude/workflows/pr-review-verified.js`. Point it at the
