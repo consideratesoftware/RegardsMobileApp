@@ -147,7 +147,10 @@ Precondition: a Debug build on the device, with `--regards-mock-runtime` in the
 scheme's Arguments Passed On Launch. This loads the mock seed cast. Its clock is
 frozen, so the rows below stay the same on any day. Overdue then has Lando
 Calrissian (text) and Padmé Amidala (call). Upcoming has Anakin Skywalker (call),
-due in 6 days, inside the 14-day horizon.
+due in 6 days, inside the 14-day horizon. On a production build, use a tracked
+contact past its cadence for Overdue, and one inside the Upcoming horizon for
+Upcoming. Lando Calrissian is the SMS contact in the seed, with the title "Text"
+and a message that starts with "Would text Lando Calrissian."
 
 Expected values: the title is the channel's display name: "Text" for Lando
 Calrissian, and "Call" for Padmé Amidala and Anakin Skywalker. The spoken message
