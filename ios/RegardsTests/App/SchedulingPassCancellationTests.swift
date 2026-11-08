@@ -92,7 +92,7 @@ struct SchedulingPassCancellationTests {
         #expect(pending.map(\.id) == [fixture.cadenceID(contact)])
     }
 
-    // MARK: - A due row outlives the cadence (§9 "Notification fired", tech lead rulings, 2026-11-04/06 (tf07e-plan.md))
+    // MARK: - A due row outlives the cadence (§9 "Notification fired", §9a run invariant)
 
     /// Pin. The row was due when the cadence went away (removed, or set to 0,
     /// which is ineligible too), so the run marks it fired before the sweep

@@ -9,7 +9,7 @@ import Testing
 /// contact the system store still exposes: the reconcile un-archives it, so a
 /// pass that ran before the reconcile would not schedule it.
 ///
-/// The runtime is `makeProduction` with its clock pinned to `now`, a Saturday.
+/// The runtime is `makeProduction` with its clock pinned to `now`, a weekend day.
 /// The default window allows weekdays only, so every row the pass writes is
 /// pending, whatever day the suite runs on. `productionRuntimeWritesNoOccasionRows`
 /// keeps the wall clock: it asserts that rows exist, not when they fire.
