@@ -89,6 +89,32 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.cadenceRow(contact) == row)
     }
 
+    /// The reschedule that follows an interaction upserts the same id, so the
+    /// final row cannot show that the old one was cleared. The compare-and-set
+    /// log can: a fired row moved to `userCaughtUp`.
+    @Test(
+        "An interaction moves a fired cadence row to userCaughtUp before the reschedule",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases,
+        [SchedulingPass.Interaction.caughtUp, .caughtUpFromNotification, .other(.sms)]
+    )
+    func caughtUpClearsAFiredCadenceRow(
+        backend: RepositoryContractBackend, interaction: SchedulingPass.Interaction
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        let fired = Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", in: fixture)
+        try await fixture.repositories.reminders.upsert(fired)
+
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, interaction))
+
+        let cleared = TransitionCall(id: fired.id, from: .fired, to: .userCaughtUp, applied: true)
+        #expect(await fixture.reminders.transitionLog.contains(cleared))
+        let next = try #require(try await fixture.cadenceRow(contact))
+        #expect(next.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+        #expect(next.state == .pending)
+    }
+
     /// A failed log puts the snoozed row back as it was, floor included, and
     /// the next run keeps it. Fails if the restore is dropped: the row would
     /// stay `userCaughtUp`, and the run would then write a floorless row at

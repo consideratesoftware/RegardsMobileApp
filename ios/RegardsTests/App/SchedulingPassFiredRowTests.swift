@@ -20,10 +20,6 @@ struct SchedulingPassFiredRowTests {
             osNotificationId: "contact-\(contact.id.uuidString)-cadence")
     }
 
-    /// Quiet hours 17:00-20:00 cover the whole 18:00-19:00 range.
-    private static let zeroCapacityWindow = PassFixture.eveningWindow(
-        quiet: TimeRange(start: TimeOfDay(hour: 17), end: TimeOfDay(hour: 20)))
-
     // MARK: - Marking
 
     /// One hour ago and exactly now are both "has come": the rule is
@@ -197,8 +193,10 @@ struct SchedulingPassFiredRowTests {
         #expect(joined.state == .fired)
         fixture.setNow("2026-06-10 18:40")
 
+        // Quiet hours 17:00-20:00 cover the whole 18:00-19:00 range.
         _ = try await fixture.repositories.contacts.updateReminderWindowOverride(
-            id: contact.id, window: Self.zeroCapacityWindow)
+            id: contact.id,
+            window: PassFixture.eveningWindow(quiet: TimeRange(start: TimeOfDay(hour: 17), end: TimeOfDay(hour: 20))))
         try await fixture.pass.run(for: contact.id)
 
         let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
@@ -400,29 +398,5 @@ struct SchedulingPassFiredRowTests {
         let clearing = TransitionCall(id: fired.id, from: .fired, to: .userCaughtUp, applied: true)
         let restoring = TransitionCall(id: fired.id, from: .userCaughtUp, to: .fired, applied: true)
         #expect(await fixture.reminders.transitionLog.filter { $0.applied } == [clearing, restoring])
-    }
-
-    /// The reschedule that follows a catch-up upserts the same id, so the
-    /// final row cannot show that the old one was cleared. The compare-and-set
-    /// log can: a fired row moved to `userCaughtUp`.
-    @Test(
-        "Caught up moves a fired cadence row to userCaughtUp before the reschedule",
-        .timeLimit(.minutes(1)),
-        arguments: RepositoryContractBackend.allCases
-    )
-    func caughtUpClearsAFiredCadenceRow(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(backend: backend)
-        let contact = try await fixture.addContact(1)
-        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-09 18:00"), in: fixture)
-        fired.state = .fired
-        try await fixture.repositories.reminders.upsert(fired)
-
-        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
-
-        let cleared = TransitionCall(id: fired.id, from: .fired, to: .userCaughtUp, applied: true)
-        #expect(await fixture.reminders.transitionLog.contains(cleared))
-        let next = try #require(try await fixture.cadenceRow(contact))
-        #expect(next.scheduledFor == PassFixture.at("2026-06-17 18:00"))
-        #expect(next.state == .pending)
     }
 }
