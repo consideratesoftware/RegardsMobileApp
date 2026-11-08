@@ -109,8 +109,8 @@ public actor SchedulingPass {
         try await reschedule(only: contactId)
     }
 
-    /// Writes the rows the snapshot says should exist, for every tracked
-    /// contact or only `contactId`, and cancels future pending rows that shouldn't; a due one is marked fired first.
+    /// Writes the rows the snapshot says should exist, for every tracked contact or only `contactId`,
+    /// and cancels future pending rows that shouldn't; a due one is marked fired first.
     private func reschedule(only contactId: UUID?) async throws {
         // One read holds the contacts, the pending and fired rows, and the
         // window. A one-shot fetch, never the observation: GRDB delivers that
@@ -173,7 +173,7 @@ public actor SchedulingPass {
             // The floor governs only while its slot is still ahead; once that
             // slot has started the snooze is spent.
             let floor = existing.flatMap { $0.state == .pending && $0.scheduledFor > now ? $0.snoozedUntil : nil }
-            // Capacity first: zero capacity records the contact; the covered-row cancel loop cancels a future row.
+            // Capacity first: zero capacity records the contact; the cancel loop cancels a future row.
             guard let slot = Self.cadenceSlot(
                 overdueAt: overdueAt,
                 floor: floor,
