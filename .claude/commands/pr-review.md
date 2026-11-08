@@ -238,6 +238,8 @@ its case:
   on that head, a timeout included, is an owner gate.
 - UNAVAILABLE: an owner gate. Interview Sid before rerunning it (`org.md`
   Stage 1 and Stage 3).
+- Run (b): any Codex entry or `codexReview` in run (b)'s result is ignored. Only
+  run (a) gives Codex.
 
 ### The PR REVIEW comment
 
