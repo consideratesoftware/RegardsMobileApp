@@ -180,8 +180,8 @@ Self-edit PRs. A PR that adds or changes `.claude/workflows/pr-review-verified.j
 gets 2 independent review runs on the same head. Run (a) is the counting review
 and the only run that includes Codex.
 
-- (a) Main's copy. Export it with `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`, and start that copy by `scriptPath`. When `origin/main` has no copy, the plain run takes its place: Stages 1 to 4 dispatched as individual agent calls, not through any workflow script, with Codex run by the `codex-reviewer` agent. In the plain run, every reviewer BLOCKER counts. Only run (a)'s Codex review is saved as `codex-<short sha>.md` and posted as the `CODEX REVIEW:` comment.
-- (b) The PR's own copy, in the lane worktree, started by `scriptPath` with `codex: false`. It is optional.
+- (a) Main's copy. Export it with `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`, and start that copy by `scriptPath`. When `origin/main` has no copy, the plain run takes its place: Stages 1 to 4 dispatched as individual agent calls, not through any workflow script, with Codex run by the `codex-reviewer` agent. In the plain run, every reviewer BLOCKER counts. Run (a) is the only run with Codex. Save its review as `codex-<short sha>.md` and post it as the `CODEX REVIEW:` comment.
+- (b) The PR's own copy, in the lane worktree, started by `scriptPath` with `codex: false`.
 
 When run (b) runs, each pr-* reviewer counts at the stricter of its 2 runs, in the order FAILED, then REQUEST_CHANGES, then APPROVE. BLOCKERS and SHOULD_FIX take the higher count. In run (b), they count every pr-* BLOCKER and FIX in `survivors` and `refuted`. A Codex RETRY or UNAVAILABLE follows the owner-gate rules under "Handle Codex by its case" below. A verdict from the PR's own copy never counts alone.
 

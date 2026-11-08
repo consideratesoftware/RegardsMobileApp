@@ -83,7 +83,7 @@ For each open TF PR:
    check the head out with `git worktree add --detach <tmp> <head sha>`, run
    the verified run (`pr-review.md`, "Claude Code org only") there with that
    target, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR needs
-   both runs that section gives), or, when it can't
+   both runs that section gives, with Codex in run (a) only), or, when it can't
    run, `/pr-review origin/main...HEAD` and the `codex-reviewer` agent type. Post
    the result as a new verdict comment, then `git worktree remove <tmp>`. A RETRY
    gets the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
@@ -181,7 +181,7 @@ Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
 verdict, and give that path to `release-manager`; the release manager checks
 each `DISPUTED:` line against it. On a self-edit PR, only run (a)'s Codex review
-is saved. A resumed PR whose head has no such file
+is saved and posted. A resumed PR whose head has no such file
 gets a fresh Codex run (Stage 1). In a verified run, the full review is the
 workflow's `codexReview`.
 
