@@ -180,9 +180,10 @@ by `scriptPath` to get the reviews. Each pr-* reviewer counts as the strictest
 `reportedVerdict`, and these checks you make by hand: FAILED, rerun alone, when
 its `reviewedSha` is missing, under 7 characters, not lower-case hex, or not a
 prefix of head; REQUEST_CHANGES when its `notChecked` is missing or not empty,
-or it raised any BLOCKER, in `survivors` or in `refuted`. A refutation never makes a verdict less strict. BLOCKERS and
-SHOULD_FIX count every pr-* BLOCKER and FIX in `survivors` and `refuted`.
-Refuted findings still get their `REFUTED:` lines.
+or it raised any BLOCKER, in `survivors` or in `refuted`. A refutation never
+makes a verdict less strict. BLOCKERS and SHOULD_FIX count every pr-* BLOCKER
+and FIX in `survivors` and `refuted`. Refuted findings still get their
+`REFUTED:` lines.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
 pr-correctness and pr-tests runs (the workflow's reviewers can't take a
