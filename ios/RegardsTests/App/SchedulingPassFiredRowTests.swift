@@ -129,6 +129,36 @@ struct SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
+    /// The hold resolves the cycle's slot in the contact's own window. The override opens at 07:00 and the
+    /// global window at 18:00, so a hold resolved in the global window would see 18:00, after the row, and
+    /// the rollback would re-arm it. The clock is set back to 06:00, before the overdue time (06:30), so the
+    /// "overdue and past the anchor" clause of the hold no longer applies and only the slot check holds the row.
+    @Test(
+        "A fired cadence row in an override window survives the clock being set back before its slot",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func firedRowWithAnOverrideWindowSurvivesAClockRollback(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 07:10")
+        // A 7-day cadence (the default), so the contact is overdue at 2026-06-10 06:30.
+        let contact = try await fixture.addContact(
+            1, lastInteracted: "2026-06-03 06:30", override: PassFixture.eveningWindow(start: 7, end: 8))
+        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 07:00"), in: fixture)
+        fired.state = .fired
+        try await fixture.repositories.reminders.upsert(fired)
+        // The mock backend's seed cast has no rows until a run writes them. This run does,
+        // so the write count below covers only the run after the rollback.
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(fired.id) == fired)
+        fixture.setNow("2026-06-10 06:00")
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
     /// Records R68, an accepted residual (§19 R68, owner ruling 2026-11-04).
     /// The row stores no fired cycle, so after a window edit moves the slot to 18:30
     /// and the clock is set back to 17:00, the pass derives the fired
