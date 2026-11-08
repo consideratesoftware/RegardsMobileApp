@@ -19,9 +19,11 @@ import Foundation
 /// edit never leaves the pass on a stale zone or needs a second pass.
 ///
 /// **Fired marking and no re-nag (§9 "Notification fired").** Each run first marks covered
-/// pending rows at or before `now` fired. Fired rows are never cancelled. A fired cadence row stays until an
-/// interaction, or a longer cadence whose new overdue time is still ahead, starts a new cycle. It re-arms
-/// once only if the window was edited since it fired and the clock is then set back before `overdueAt` (R68).
+/// pending rows at or before `now` fired. Fired rows are never cancelled. Each row records its cycle in
+/// `firedCycle` (§7 v4). A fired cadence row stays while that cycle covers `overdueAt`. Only an interaction,
+/// or a longer cadence whose overdue time is still ahead at the first run after the edit, starts a new cycle.
+/// A fired occasion holds every occurrence up to its day. A clock set back re-arms neither, except an
+/// occasion whose next-year row was cancelled before the rollback (R69).
 ///
 /// **Corrupt rows.** Runs read one `fetchSchedule()` snapshot, which drops
 /// an undecodable contact (with its rows) or row. The pass never cancels what
@@ -142,10 +144,13 @@ public actor SchedulingPass {
             for (occasion, occurrence) in occurrences {
                 let id = Self.reminderID(contactId: contact.id, kind: occasion.kind)
                 desiredIds.insert(id)
-                // A same-day occasion that has fired (marking fires a due one) stays put,
-                // so a "fire now" occurrence can't chase the clock or a rollback re-arm it.
-                if let existing = existingById[id], existing.state == .fired,
-                   calendar.isDate(existing.scheduledFor, inSameDayAs: occurrence) {
+                // The fire time of the latest delivered occurrence (marking fires a due row), carried forward on
+                // every rewrite. An occurrence on or before that day is held, so a "fire now" occurrence can't
+                // chase the clock and a clock set back, even by a year, can't re-arm it.
+                let existing = existingById[id]
+                let lastFired = existing.flatMap { $0.state == .fired ? $0.scheduledFor : $0.firedCycle }
+                if let lastFired,
+                   calendar.compare(occurrence, to: lastFired, toGranularity: .day) != .orderedDescending {
                     continue
                 }
                 var desired = ScheduledReminder(
@@ -159,10 +164,11 @@ public actor SchedulingPass {
                         in: effective,
                         timeZone: calendar.timeZone
                     ) ?? occurrence,
-                    osNotificationId: Self.notificationId(contactId: contact.id, kind: occasion.kind)
+                    osNotificationId: Self.notificationId(contactId: contact.id, kind: occasion.kind),
+                    firedCycle: lastFired
                 )
                 if desired.scheduledFor <= now { desired.state = .fired }
-                if existingById[id] != desired { try await reminders.upsert(desired) }
+                if existing != desired { try await reminders.upsert(desired) }
             }
 
             guard contact.isCadenceEligible, let cadenceDays = contact.cadenceDays else { continue }
@@ -188,16 +194,22 @@ public actor SchedulingPass {
                 continue
             }
             desiredIds.insert(id)
-            // No re-nag: keep a fired row at or after the start of the slot holding overdueAt (or of the next
-            // slot), which covers a clock set back and a 25-hour day whose slot starts before the anchor, or,
-            // once overdue, at or after the anchor, the fallback when a window or cadence edit moves that
-            // slot past it. No overdue check on the first: the row was written after the last interaction.
-            if let existing, existing.state == .fired,
-               context.engine.nextAllowedSlot(from: overdueAt, in: effective, includingContainingSlot: true)
-                .map({ $0 <= existing.scheduledFor }) == true
-                || (overdueAt <= now && anchor <= existing.scheduledFor) {
-                continue
+            // No re-nag: keep a fired row whose stored cycle covers overdueAt, so a clock set back can't re-arm
+            // it. `>=` also holds a shorter cadence, by the invariant in `recordInteraction`. Otherwise, once
+            // overdue, keep a fired row slotted at or after the anchor and store the new cycle on it: a longer
+            // cadence that is already overdue, or a row with no cycle (written before v4). The first run that
+            // sees it reads the clock for that answer, and later runs keep the stored one.
+            if let existing, existing.state == .fired {
+                if let cycle = existing.firedCycle, cycle >= overdueAt { continue }
+                if overdueAt <= now && anchor <= existing.scheduledFor {
+                    var stamped = existing
+                    stamped.firedCycle = overdueAt
+                    try await reminders.upsert(stamped)
+                    continue
+                }
             }
+            // A pending row written before v4 has no cycle, so the first run after v4 rewrites it once, with
+            // the same slot, state and floor.
             let desired = ScheduledReminder(
                 id: id,
                 contactId: contact.id,
@@ -205,7 +217,8 @@ public actor SchedulingPass {
                 scheduledFor: slot,
                 osNotificationId: Self.notificationId(contactId: contact.id, kind: .cadence),
                 state: slot <= now ? .fired : .pending,
-                snoozedUntil: floor
+                snoozedUntil: floor,
+                firedCycle: overdueAt
             )
             if existing != desired { try await reminders.upsert(desired) }
         }
@@ -296,8 +309,9 @@ public actor SchedulingPass {
             context: context
         )
         let anchor = contact.lastInteractedAt ?? contact.createdAt
+        let overdueAt = anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400)
         guard let slot = Self.cadenceSlot(
-            overdueAt: anchor.addingTimeInterval(TimeInterval(cadenceDays) * 86_400),
+            overdueAt: overdueAt,
             floor: floor,
             window: contact.reminderWindowOverride ?? global,
             occurrences: occurrences.map(\.1),
@@ -312,7 +326,9 @@ public actor SchedulingPass {
             scheduledFor: slot,
             osNotificationId: Self.notificationId(contactId: contactId, kind: .cadence),
             state: .pending,
-            snoozedUntil: floor
+            snoozedUntil: floor,
+            // The run stores this too, so it doesn't rewrite a snoozed row.
+            firedCycle: overdueAt
         ))
         return true
     }
@@ -338,6 +354,8 @@ public actor SchedulingPass {
         let cadenceId = Self.reminderID(contactId: contactId, kind: .cadence)
         // Invariant: only this span moves `lastInteractedAt`, after clearing the row, so every fired cadence row was
         // derived after that move (its slot can precede it on a 25-hour day). The hold never keeps an answered row.
+        // So a fired row's `firedCycle` and the current `overdueAt` share an anchor and differ only by a cadence
+        // edit. The hold's `firedCycle >= overdueAt` relies on this to cover a shorter cadence.
         var clearedFrom: ReminderState?
         if try await reminders.transitionState(id: cadenceId, from: .pending, to: .userCaughtUp) {
             clearedFrom = .pending

@@ -40,7 +40,6 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     /// does: a cadence row stores the `overdueAt` its slot was derived from,
     /// and an occasion row stores the fire time of the latest occurrence
     /// delivered for that contact and kind. Nil means no cycle is recorded.
-    /// SchedulingPass doesn't write or read it yet (TF-07e slice 4).
     public var firedCycle: Date?
 
     public init(
