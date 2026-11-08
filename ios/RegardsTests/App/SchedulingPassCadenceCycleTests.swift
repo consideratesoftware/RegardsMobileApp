@@ -29,7 +29,8 @@ struct SchedulingPassCadenceCycleTests {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
         // Overdue since 05-08 10:00 (the 05-01 10:00 interaction plus 7 days): the row's cycle.
-        let fired = Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", cycle: "2026-05-08 10:00", in: fixture)
+        let fired = Self.firedRow(
+            for: contact, scheduledFor: "2026-06-09 18:00", cycle: "2026-05-08 10:00", in: fixture)
         try await fixture.repositories.reminders.upsert(fired)
 
         try await fixture.pass.runFull()
