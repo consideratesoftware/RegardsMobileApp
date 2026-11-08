@@ -35,7 +35,7 @@
 # Why a list of doc roots: the apps and their tests read repository files as
 # data from folders such as ios/Regards*/ and android/*/src/.
 # shared/testvectors/ has no reader yet, but ANDROID_PORT.md (A6, AN-02) plans
-# 2: the 2 test suites that shared/testvectors/README.md names,
+# readers in the 2 test suites that shared/testvectors/README.md names:
 # ios/RegardsTests and android/domain/src/test. A Markdown file there would be
 # read as data once one lands. Only the doc roots carry, and a new folder fails
 # closed until someone adds it here on purpose.
