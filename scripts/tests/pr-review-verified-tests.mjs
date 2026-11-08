@@ -1137,6 +1137,20 @@ test('the synthesizer is told who owns infra files: on-call-engineer for scripts
   assert.ok(owners.includes('tech-writer'))
 })
 
+test('the work-order owner enum lists exactly the owners the synthesizer prompt can assign', async () => {
+  const { calls } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  const synth = calls.find(c => c.opts.label === 'synthesize')
+  const owners = synth.opts.schema.properties.items.items.properties.owner.enum
+  const expected = ['EM-body', 'ios-engineer', 'on-call-engineer', 'owner-question', 'qa-engineer', 'senior-ios-engineer', 'tech-lead-ruling', 'tech-writer']
+  assert.deepEqual([...owners].sort(), expected, 'owner enum and synthesizer prompt disagree')
+  for (const name of expected) {
+    assert.ok(synth.prompt.includes(name), `synthesizer prompt does not name ${name}`)
+  }
+})
+
 // Pin: the work order the synthesizer returns comes back as it was written.
 test('workOrderReturned: the synthesizer\'s work order comes back as it was written', async () => {
   const stub = { items: [{ id: '1', severity: 'BLOCKER', owner: 'ios-engineer', change: 'x' }] }
