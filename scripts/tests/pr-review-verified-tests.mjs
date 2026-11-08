@@ -60,10 +60,13 @@ const workflow = new AsyncFunction('agent', 'parallel', 'pipeline', 'phase', 'lo
 const HEAD = '0123456789abcdef0123456789abcdef01234567'
 const LENS_ORDER = ['truth', 'scope', 'impact']
 
-// A reviewer result with nothing wrong in it. Override any field.
+// A reviewer result with nothing wrong in it. Override any field. The default
+// report suits either kind of reviewer: its first line is the verdict line
+// Codex's check reads, and its VERDICT: line is the one a pr-* check reads.
 function review(verdict, findings = [], more = {}) {
   const blockerCount = findings.filter(f => f.severity === 'BLOCKER').length
-  return { verdict, reviewedSha: HEAD, findings, notChecked: [], coverageHoles: [], blockerCount, rawSummary: '', ...more }
+  const rawSummary = `CODEX REVIEW: ${verdict} @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nVERDICT: ${verdict}\nBLOCKERS: ${blockerCount}\n`
+  return { verdict, reviewedSha: HEAD, findings, notChecked: [], coverageHoles: [], blockerCount, rawSummary, ...more }
 }
 
 function finding(severity, location) {
@@ -466,11 +469,46 @@ test('the first VERDICT: line of a pr-* report must be exactly the verdict it re
     const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { rawSummary }) } })
     assert.equal(verdictOf(result, 'pr-correctness'), expected, what)
   }
-  // A reviewer that returned no report text has nothing to compare.
-  for (const rawSummary of ['', undefined]) {
-    const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { rawSummary }) } })
-    assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE', `rawSummary ${JSON.stringify(rawSummary)}`)
+})
+
+// Pin: a pr-* verdict has to rest on a report. A missing or empty rawSummary
+// leaves nothing to check the verdict against, so the verdict is
+// REQUEST_CHANGES, an APPROVE included, and a refutation cannot flip it (rule 4).
+test('a pr-* verdict with a missing or empty report is REQUEST_CHANGES, and a matching VERDICT line keeps APPROVE', async () => {
+  const noField = review('APPROVE')
+  delete noField.rawSummary
+  const noReport = [
+    ['an empty report', review('APPROVE', [], { rawSummary: '' })],
+    ['no rawSummary field', noField],
+    ['a null report', review('APPROVE', [], { rawSummary: null })],
+  ]
+  for (const [what, reviewResult] of noReport) {
+    const { result } = await runWorkflow({ reviews: { 'pr-correctness': reviewResult } })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES', what)
+    assert.equal(result.verdicts[0].reportedVerdict, 'APPROVE', what)
+    assert.equal(result.verdicts[0].report, null, what)
   }
+
+  // A non-empty report whose VERDICT line matches leaves the APPROVE alone.
+  const matching = await runWorkflow({
+    reviews: { 'pr-correctness': review('APPROVE', [], { rawSummary: 'VERDICT: APPROVE\nBLOCKERS: 0\n' }) },
+  })
+  assert.equal(verdictOf(matching.result, 'pr-correctness'), 'APPROVE')
+
+  // The BLOCKER is refuted, which flips a REQUEST_CHANGES that has a report
+  // and does not flip one that has none.
+  const votes = { 'Alpha.swift:10': [false, false, false] }
+  const withReport = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { rawSummary: 'VERDICT: REQUEST_CHANGES\nBLOCKERS: 1\n' }) },
+    votes,
+  })
+  assert.equal(verdictOf(withReport.result, 'pr-correctness'), 'APPROVE')
+  const withoutReport = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { rawSummary: '' }) },
+    votes,
+  })
+  assert.equal(withoutReport.result.refuted.length, 1)
+  assert.equal(verdictOf(withoutReport.result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
 test('a refutation cannot flip a REQUEST_CHANGES whose report says VERDICT: APPROVE', async () => {
@@ -575,6 +613,7 @@ test('the pr-* schema requires notChecked, and each finding requires severity, l
   const { calls } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
   const schema = calls[0].opts.schema
   assert.ok(schema.required.includes('notChecked'))
+  assert.ok(schema.required.includes('rawSummary'))
   assert.deepEqual(schema.properties.findings.items.required, ['severity', 'location', 'claim'])
 })
 
@@ -840,7 +879,7 @@ test('the whole Codex review comes back verbatim', async () => {
 // Pin: a Codex with no review text returns no codexReview and an empty
 // codexLine, and its verdict stands. The docs rerun such a Codex alone.
 test('a Codex verdict with an empty or missing rawSummary returns codexReview null and an empty codexLine', async () => {
-  const empty = review('REQUEST_CHANGES')
+  const empty = review('REQUEST_CHANGES', [], { rawSummary: '' })
   const missing = review('REQUEST_CHANGES')
   delete missing.rawSummary
   for (const [what, codexReview] of [['an empty rawSummary', empty], ['no rawSummary', missing]]) {
@@ -1337,7 +1376,7 @@ test('a pr-* reviewer\'s whole report comes back on its verdict, and its prompt 
     args: { reviewers: ['pr-security-privacy', 'pr-tests'] },
     reviews: {
       'pr-security-privacy': review('APPROVE', [], { rawSummary: report }),
-      'pr-tests': review('APPROVE'),
+      'pr-tests': review('APPROVE', [], { rawSummary: '' }),
     },
   })
   const entry = result.verdicts.find(v => v.reviewer === 'pr-security-privacy')
