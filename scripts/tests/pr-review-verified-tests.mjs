@@ -513,14 +513,17 @@ test('a pr-* verdict with a missing or empty report is REQUEST_CHANGES, and a ma
 })
 
 test('a refutation cannot flip a REQUEST_CHANGES whose report says VERDICT: APPROVE', async () => {
-  const reviews = rawSummary => ({
-    'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { rawSummary }),
-  })
   const votes = { 'Alpha.swift:10': [false, false, false] }
-  const mismatch = await runWorkflow({ reviews: reviews('VERDICT: APPROVE\nBLOCKERS: 1'), votes })
+  const mismatch = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { rawSummary: 'VERDICT: APPROVE\nBLOCKERS: 1' }) },
+    votes,
+  })
   assert.equal(verdictOf(mismatch.result, 'pr-correctness'), 'REQUEST_CHANGES')
   // The same review with a report that agrees flips, as rule 3 says.
-  const agrees = await runWorkflow({ reviews: reviews('VERDICT: REQUEST_CHANGES\nBLOCKERS: 1'), votes })
+  const agrees = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { rawSummary: 'VERDICT: REQUEST_CHANGES\nBLOCKERS: 1' }) },
+    votes,
+  })
   assert.equal(verdictOf(agrees.result, 'pr-correctness'), 'APPROVE')
 })
 
