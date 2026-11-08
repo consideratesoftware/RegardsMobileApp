@@ -80,7 +80,8 @@ function parallel(thunks) {
 
 // Like the real pipeline(): every stage gets (previous result, item, index), and
 // an item whose stage throws becomes null. These two hold no state, so
-// runWorkflow() and badArgsThrow share them.
+// runWorkflow() and the test "a bad head, reviewer list, since, codex or text
+// arg throws before any agent runs" share them.
 function pipeline(items, ...stages) {
   return Promise.all(items.map(async (item, i) => {
     try {
