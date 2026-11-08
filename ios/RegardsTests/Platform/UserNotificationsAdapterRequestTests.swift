@@ -206,24 +206,18 @@ struct UserNotificationsAdapterRequestTests {
         #expect(Self.gmtCalendar.date(from: trigger.dateComponents) == fireDate)
     }
 
-    @Test("A fire date whose trigger instant is not after now delivers immediately", arguments: [-600.0, 0.0, 0.6])
-    func pastOrPresentFireDateDeliversImmediately(offsetFromNow: TimeInterval) throws {
+    /// Trigger components drop sub-second precision, so a fire date 0.4 s or
+    /// 0.6 s ahead of a whole-second `now` names the second that is already
+    /// `now`. A calendar trigger for that second never fires, so it must
+    /// deliver immediately instead. The 2 offsets sit on either side of half a
+    /// second, so rounding the fire date instead of truncating it fails 0.6.
+    @Test(
+        "A fire date whose trigger instant is not after now delivers immediately",
+        arguments: [-600.0, 0.0, 0.4, 0.6]
+    )
+    func triggerInstantNotAfterNowDeliversImmediately(offsetFromNow: TimeInterval) throws {
         let now = try Self.utc(Self.now)
         let fireDate = now.addingTimeInterval(offsetFromNow)
-
-        let mapped = UserNotificationsAdapter.makeRequest(Self.cadenceRequest(fireDate: fireDate), now: now)
-
-        #expect(mapped.trigger == nil)
-    }
-
-    /// Trigger components drop sub-second precision, so a fire date 0.4 s
-    /// ahead of a whole-second `now` names the second that is already `now`.
-    /// A calendar trigger for that second never fires, so it must deliver
-    /// immediately instead.
-    @Test("A trigger instant (fire date truncated to the second) not after now maps to no trigger")
-    func triggerInstantNotAfterNowDeliversImmediately() throws {
-        let now = try Self.utc(Self.now)
-        let fireDate = now.addingTimeInterval(0.4)
 
         let mapped = UserNotificationsAdapter.makeRequest(Self.cadenceRequest(fireDate: fireDate), now: now)
 
