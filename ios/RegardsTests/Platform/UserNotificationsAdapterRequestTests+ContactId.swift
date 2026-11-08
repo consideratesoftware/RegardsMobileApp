@@ -113,20 +113,24 @@ extension UserNotificationsAdapterRequestTests {
         #expect(UserNotificationsAdapter.decode(request) == nil)
     }
 
-    /// `Calendar.date(from:)` fills in a field the components lack, so this
-    /// trigger would decode to a made-up date unless `decode` requires year,
-    /// month, day, hour, minute and second first. The control is the same
-    /// request with all 6 fields, which decodes.
-    @Test("A calendar trigger with only an hour and minute decodes to nothing")
-    func triggerMissingDateFieldsDecodesToNil() {
+    /// `Calendar.date(from:)` fills in a field the components lack, so a trigger
+    /// missing any one of the 6 would decode to a made-up date unless `decode`
+    /// requires all 6. The control is `handBuiltRequestWithItsContactIdDecodesToItsKind`,
+    /// which has all 6.
+    @Test(
+        "A calendar trigger missing one date or time field decodes to nothing",
+        arguments: [Calendar.Component.year, .month, .day, .hour, .minute, .second]
+    )
+    func triggerMissingAnyDateOrTimeFieldDecodesToNil(missing: Calendar.Component) {
+        var components = DateComponents(
+            calendar: Self.gmtCalendar, timeZone: .gmt, year: 2026, month: 10, day: 1, hour: 3, minute: 0, second: 0
+        )
+        components.setValue(nil, for: missing)
         let calendarRequest = Self.handBuilt(category: "regards.cadence", contactId: contactX.uuidString)
         let request = UNNotificationRequest(
             identifier: calendarRequest.identifier,
             content: calendarRequest.content,
-            trigger: UNCalendarNotificationTrigger(
-                dateMatching: DateComponents(calendar: Self.gmtCalendar, timeZone: .gmt, hour: 3, minute: 0),
-                repeats: false
-            )
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         )
 
         #expect(UserNotificationsAdapter.decode(request) == nil)
