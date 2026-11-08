@@ -244,7 +244,7 @@ struct SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
-    // MARK: - No re-nag (§9, owner ruling 5)
+    // MARK: - No re-nag (§9 "Notification fired")
 
     /// America/Los_Angeles, Sunday 2026-11-01, is 25 hours long (PDT ends at
     /// 02:00). With a 1-day cadence and a range of 00:00-23:59, a contact

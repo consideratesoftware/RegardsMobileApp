@@ -48,7 +48,7 @@ extension SchedulingPassOccasionTests {
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
     }
 
-    /// A 23:00 birthday under quiet hours 22:30-07:30 (owner ruling 9), with `now` at its occurrence. No
+    /// A 23:00 birthday under quiet hours 22:30-07:30 (§9 contract 4), with `now` at its occurrence. No
     /// notification time exists, but the row's time has come, so the run writes it fired (§9 "Notification
     /// fired": every row a run writes at or before now is fired). A pass that wrote it pending would have the
     /// next run mark it fired. A run 30 minutes later, with the occurrence behind it, leaves the row alone

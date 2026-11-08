@@ -192,8 +192,9 @@ extension AppLaunchCoordinatorTests {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .authorized, contacts: [Self.systemContact, Self.han, Self.luke])
-        // The pass runs on the test's clock. The weekend day keeps every row pending, because the default window
-        // allows weekdays only.
+        // The pass runs on the coordinator's pinned clock. Leia is created at that instant with a 14-day cadence,
+        // so her row is at least 14 days ahead of now and pending on any day. The pin also keeps the second run
+        // on the same instant, so no slot start falls between the two runs.
         let now = self.now
         let launch = AppLaunchCoordinator(dependencies: .init(
             makeRuntime: { try await AppRuntime.makeProduction(environment: environment, clock: { now }) },

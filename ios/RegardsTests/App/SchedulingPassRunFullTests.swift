@@ -90,7 +90,7 @@ struct SchedulingPassRunFullTests {
         #expect(await fixture.reminders.observations == 0)
     }
 
-    /// No re-nag (§9, owner ruling 5): once a cadence row's time has passed,
+    /// No re-nag (§9 "Notification fired"): once a cadence row's time has passed,
     /// the run marks it fired, and a contact who is still overdue keeps that
     /// row. Re-deriving it would move it to the next window's slot on every
     /// later run.

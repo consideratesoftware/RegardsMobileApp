@@ -247,13 +247,13 @@ struct AppLaunchCoordinatorReconciliationTests {
 
     // MARK: - Scheduling pass after a store change (TF-07e, §9 triggers)
 
-    /// A contact archived while the app is open (an iCloud sync) must lose its
-    /// pending row, and with it the OS notification, without waiting for a
-    /// foreground. The second change is the confirming miss, `floor` after the
-    /// first. The cancel is the only transition in this scenario, so its
-    /// arrival at the gated repository proves the change's pass ran. The gate
-    /// stays closed until then; if the pass never runs, the arrival never
-    /// comes and the time limit ends the test.
+    /// A contact archived while the app is open (an iCloud sync) must have its
+    /// pending row cancelled, without waiting for a foreground. The OS request
+    /// follows in slice 4 (§9a). The second change is the confirming miss,
+    /// `floor` after the first. The cancel is the only transition in this
+    /// scenario, so its arrival at the gated repository proves the change's
+    /// pass ran. The gate stays closed until then; if the pass never runs, the
+    /// arrival never comes and the time limit ends the test.
     @Test(
         "A store change that archives a contact cancels its pending row without a foreground",
         .timeLimit(.minutes(1))

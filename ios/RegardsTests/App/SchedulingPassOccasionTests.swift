@@ -3,7 +3,7 @@ import Testing
 @testable import Regards
 
 /// Occasion rows and the cadence/occasion same-day rule (TF-07c, §9 contracts
-/// 4 and 6, R5, owner ruling 9). Dates are New York local times
+/// 4 and 6, R5). Dates are New York local times
 /// (`PassFixture`); occasions fire at the global window's occasion time,
 /// 09:00 unless a test says otherwise.
 struct SchedulingPassOccasionTests {
@@ -45,7 +45,7 @@ struct SchedulingPassOccasionTests {
     /// Quiet hours 08:00 to 07:00 next day swallow the 09:00 occasion, so it
     /// never notifies. Contract 6 defers a cadence reminder only to an
     /// occasion that will notify, so the 07:00 slot that day stands. The
-    /// occasion's row stays (owner ruling 9).
+    /// occasion's row stays (§9 contract 4).
     @Test(
         "A cadence slot is not moved for an occasion that will never notify",
         arguments: RepositoryContractBackend.allCases
@@ -178,7 +178,7 @@ struct SchedulingPassOccasionTests {
         #expect(try await fixture.occasionRow(contact, .birthday)?.scheduledFor == PassFixture.at("2026-06-12 08:30"))
     }
 
-    /// Owner ruling 9: quiet hours 22:30-07:30 run past a 23:00 occurrence's
+    /// §9 contract 4: quiet hours 22:30-07:30 run past a 23:00 occurrence's
     /// day, so no notification time exists. The row stays at the occurrence so
     /// Upcoming still shows the occasion.
     @Test(

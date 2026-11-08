@@ -5,7 +5,7 @@ import Testing
 /// Which pending rows the pass cancels, which it marks fired instead, and when
 /// it leaves one alone (TF-07c and TF-07e slice 2, §9 re-evaluation triggers
 /// and "Notification fired", §13 orphans). Dates are New York local times
-/// (`PassFixture`); the default window opens a slot at 18:00 every day.
+/// (`PassFixture`); the fixture window opens a slot at 18:00 every day.
 struct SchedulingPassCancellationTests {
 
     @Test(
@@ -95,10 +95,11 @@ struct SchedulingPassCancellationTests {
     // MARK: - A due row outlives the cadence (§9 "Notification fired", §9a run invariant)
 
     /// Pin. The row was due when the cadence went away (removed, or set to 0,
-    /// which is ineligible too), so the run marks it fired before the sweep
-    /// looks at it: the pass treats a due row as delivered (§9). A fired row is
-    /// history, kept as fired and never cancelled, and a second run writes
-    /// nothing.
+    /// which is ineligible too). The contact is still in the snapshot, so the
+    /// run's start marks the row fired, before the covered-row cancel loop in
+    /// `reschedule` would cancel it: the pass treats a due row as delivered
+    /// (§9). A fired row is history, kept as fired and never cancelled, and a
+    /// second run writes nothing.
     @Test(
         "A due cadence row of a contact that lost its cadence stays fired and is not cancelled",
         arguments: RepositoryContractBackend.allCases, [nil, 0] as [Int?]
