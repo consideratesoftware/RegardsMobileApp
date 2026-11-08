@@ -599,7 +599,7 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
 - PR #68 (TF-11, PR29 slices 1 to 4). The device steps are in `ios/docs/accessibility-smoke.md`, under "Onboarding steps and starter contacts" and "Settings Contacts access". That file is the one source for the list. Record each step's result in its smoke record.
   Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
-- TF-07e3 (notification adapter), five checks, one Result line per check.
+- TF-07e3 (notification adapter), six checks, one Result line per check.
 
   Slice 4's PR writes each check's procedure, pass condition, and fail condition. Each check must be performable on a slice 4 build and must fail when its target is broken. Nothing in a shipping build calls `schedule(_:)`, `pendingRequests()`, or `cancel(identifiers:)` before TF-07e slice 4, so these checks run on a build that includes slice 4.
 
@@ -615,6 +615,8 @@ Owner ruling 8 (2026-10-28): every device-only check is deferred to this one pas
   - (d) EM: deny notifications for Regards, then grant them in iOS Settings. The next reminder fires. Risk: iOS might drop requests added while notifications are not authorized.
     Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
   - (e) EM: no duplicate notification at a slot boundary. Risk: a changed request whose time passes between planning and the add gets no trigger and delivers at once.
+    Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
+  - (f) Tech lead, PR #71: with the iPhone's calendar set to Buddhist, a scheduled reminder fires at its scheduled time. Risk: iOS reads the trigger in the device calendar. Slice 4 writes its procedure, as for (a) to (e).
     Result: pending. Date: ___. Device: ___. iOS: ___. Build: ___ (sha ___). Findings: ___.
 
 Standing notes:
