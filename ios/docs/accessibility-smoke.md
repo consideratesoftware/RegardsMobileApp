@@ -155,8 +155,9 @@ it starts with "Would text Han Solo." The button is labelled Done.
       finding. It is not a pass.
 - [ ] Upcoming: repeat both steps on an Upcoming row.
 
-Record the result in the `## Manual accessibility smoke` block under Reporting,
-at the end of this file.
+Copy the `## Manual accessibility smoke` block under Reporting, at the end of
+this file, into the PR's entry in `TESTFLIGHT_PLAN.md`'s "Pre-release device
+pass", and fill it in there.
 
 ## Screen checklist
 
