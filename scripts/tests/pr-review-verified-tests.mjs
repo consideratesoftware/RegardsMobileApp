@@ -790,7 +790,7 @@ test('the work order is built from surviving findings only', async () => {
   assert.doesNotMatch(synth[0].prompt, /Beta\.swift:20/)
 })
 
-test('the synthesizer is told who owns infra files: chore for scripts, CI and workflow code, tech-writer for prose', async () => {
+test('the synthesizer is told who owns infra files: on-call-engineer for scripts, CI and workflow code, tech-writer for prose', async () => {
   // Findings in a CI file and in a workflow script reach the synthesizer too.
   const { calls } = await runWorkflow({
     reviews: {
@@ -809,15 +809,17 @@ test('the synthesizer is told who owns infra files: chore for scripts, CI and wo
   const synth = calls.find(c => c.opts.label === 'synthesize')
   assert.match(synth.prompt, /\.github\/workflows\/guards\.yml:12/)
   assert.match(synth.prompt, /\.claude\/workflows\/pr-review-verified\.js:200/)
-  assert.match(synth.prompt, /scripts and their tests under scripts\/, CI files under \.github\/, and workflow scripts under \.claude\/workflows\/ → chore/)
+  assert.match(synth.prompt, /scripts and their tests under scripts\/, CI files under \.github\/, and workflow scripts under \.claude\/workflows\/ → on-call-engineer/)
   assert.match(synth.prompt, /prose under \.claude\/, \.codex\/, \.agents\/ and \.github\/ → tech-writer/)
+  assert.doesNotMatch(synth.prompt, /→ chore/)
   assert.match(synth.prompt, /ENGINEERING_ORG\.md/)
   // App tests keep their owner, and the rules do not overlap.
   assert.match(synth.prompt, /test files under ios\/ or android\/ → qa-engineer/)
   assert.doesNotMatch(synth.prompt, /; test files → qa-engineer/)
   // The work order may name the new owner.
   const owners = synth.opts.schema.properties.items.items.properties.owner.enum
-  assert.ok(owners.includes('chore'))
+  assert.ok(owners.includes('on-call-engineer'))
+  assert.ok(!owners.includes('chore'), 'the old owner name is gone')
   assert.ok(owners.includes('tech-writer'))
 })
 
