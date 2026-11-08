@@ -613,13 +613,30 @@ test('a wrong reviewedSha is FAILED even with a surviving BLOCKER, and the findi
 })
 
 // Pin: the fields the verdict rules read are required, so the runtime refuses a
-// reviewer that leaves one out. A finding needs its severity, location and claim.
-test('the pr-* schema requires notChecked, and each finding requires severity, location and claim', async () => {
-  const { calls } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
-  const schema = calls[0].opts.schema
-  assert.ok(schema.required.includes('notChecked'))
-  assert.ok(schema.required.includes('rawSummary'))
-  assert.deepEqual(schema.properties.findings.items.required, ['severity', 'location', 'claim'])
+// reviewer that leaves one out. Each list is pinned whole, so a field added or
+// dropped shows here. A finding needs its severity, location and claim.
+test('the schemas require the fields the verdict rules read, each required list pinned whole', async () => {
+  const { calls } = await runWorkflow({
+    args: { codex: true },
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]),
+      'codex-reviewer': review('APPROVE'),
+    },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  const prSchema = calls.find(c => c.opts.agentType === 'pr-correctness').opts.schema
+  const codexSchema = calls.find(c => c.opts.agentType === 'codex-reviewer').opts.schema
+  const workOrderSchema = calls.find(c => c.opts.label === 'synthesize').opts.schema
+
+  assert.deepEqual(prSchema.required, ['verdict', 'reviewedSha', 'findings', 'notChecked', 'coverageHoles', 'blockerCount', 'rawSummary'])
+  // Codex's verdict is never changed by a count, so its list is the same
+  // without blockerCount.
+  assert.deepEqual(codexSchema.required, prSchema.required.filter(key => key !== 'blockerCount'))
+  for (const schema of [prSchema, codexSchema]) {
+    assert.deepEqual(schema.properties.findings.items.required, ['severity', 'location', 'claim'])
+  }
+  assert.deepEqual(workOrderSchema.required, ['items'])
+  assert.deepEqual(workOrderSchema.properties.items.items.required, ['id', 'severity', 'owner', 'change'])
 })
 
 test('a pr-* reviewer is told where its reviewedSha comes from, and the schema requires one', async () => {
