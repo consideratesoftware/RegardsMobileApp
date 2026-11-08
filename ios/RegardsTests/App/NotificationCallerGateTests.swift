@@ -24,11 +24,19 @@ import Testing
 /// and the scheduling members.
 ///
 /// It scans raw source text, comments included, so it catches accidental
-/// wiring only. It can't see 2 shapes: an implicit-self `schedule(...)` inside
-/// a conformer or extension (no leading dot), and a method reference with no
-/// parentheses, such as `let add = notifications.schedule`. Code review
-/// catches those and deliberate evasion. Slice 4 deletes this file in the PR
-/// that resolves R57.
+/// wiring only. It can't see 3 shapes:
+/// - an implicit-self `schedule(...)` inside a conformer or extension (no
+///   leading dot);
+/// - a method reference with no parentheses, such as
+///   `let add = notifications.schedule`;
+/// - request building that never spells a request or trigger type (G4 matches
+///   type names only). `DebugNotificationScheduling.schedule` in
+///   `AppLaunchCoordinator+DebugLaunch.swift` builds real requests outside the
+///   adapter folder this way, through `UserNotificationsAdapter.makeRequest`
+///   and `decode`.
+///
+/// Code review catches those and deliberate evasion. Slice 4 deletes this file
+/// in the PR that resolves R57.
 struct NotificationCallerGateTests {
     /// `.schedule(`, `.cancel(identifiers:` and `.pendingRequests(`. The
     /// leading dot skips the members' own declarations, and the `identifiers:`
@@ -132,14 +140,20 @@ struct NotificationCallerGateTests {
     }
 
     /// Positive control: a pattern that matches nothing would pass the test
-    /// above for every file.
-    @Test("The patterns match the fake tests' calls, split calls, the center, and request and trigger types")
+    /// above for every file. Negative control: the call pattern skips
+    /// `Task.cancel()` on purpose, and the 2 call shapes in the doc comment
+    /// above stay unmatched, so a pattern change that starts matching either one
+    /// fails here and not in an unrelated file.
+    @Test("The patterns match real calls, the center and request types, and skip Task.cancel() and the blind spots")
     func patternsMatchRealAndMultiLineCalls() throws {
         let parity = try #require(
             Self.sources().first { $0.path == "RegardsTests/Platform/NotificationFakeParityTests.swift" }
         )
         #expect(Self.makesACall(parity.text))
         #expect(Self.makesACall("await notifications.cancel(\n    identifiers: ids)"))
+        #expect(!Self.makesACall("task.cancel()"))
+        #expect(!Self.makesACall("let add = notifications.schedule"))
+        #expect(!Self.makesACall("try await schedule(request)"))
         let center = "let c = UNUserNotificationCenter.current()"
         #expect(center.range(of: Self.centerPattern, options: .regularExpression) != nil)
 
