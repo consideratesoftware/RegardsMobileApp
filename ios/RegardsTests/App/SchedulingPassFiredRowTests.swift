@@ -280,8 +280,8 @@ struct SchedulingPassFiredRowTests {
     /// (S, 06-03 18:00), then the contact was reached at S+1h and the
     /// reschedule that should have followed never ran. When the new cycle
     /// comes due (06-10 19:00 plus 30 minutes) the old fired row must give way
-    /// to a pending one for the next slot. Passes on the code before TF-07e
-    /// too; it fails if "fired" alone is enough to hold.
+    /// to a pending one for the next slot. The hold must also check that the
+    /// row belongs to the current cycle: this fails if "fired" alone holds.
     @Test(
         "An old cycle's fired row is replaced once the new cycle is overdue",
         arguments: RepositoryContractBackend.allCases

@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import Regards
 
-/// Which pending rows the pass cancels, and when it leaves one alone (TF-07c,
-/// §9 re-evaluation triggers, §13 orphans). Dates are New York local times
+/// Which pending rows the pass cancels, which it marks fired instead, and when
+/// it leaves one alone (TF-07c and TF-07e slice 2, §9 re-evaluation triggers
+/// and "Notification fired", §13 orphans). Dates are New York local times
 /// (`PassFixture`); the default window opens a slot at 18:00 every day.
 struct SchedulingPassCancellationTests {
 
@@ -95,8 +96,8 @@ struct SchedulingPassCancellationTests {
 
     /// Pin. The row was due when the cadence went away (removed, or set to 0,
     /// which is ineligible too), so the run marks it fired before the sweep
-    /// looks at it. It was delivered, so it is history: kept, never
-    /// cancelled. Passes on the code before this test was written.
+    /// looks at it. A due row is treated as delivered (§9), so it is history:
+    /// kept as fired, never cancelled, and a second run writes nothing.
     @Test(
         "A due cadence row of a contact that lost its cadence stays fired and is not cancelled",
         arguments: RepositoryContractBackend.allCases, [nil, 0] as [Int?]
@@ -130,10 +131,10 @@ struct SchedulingPassCancellationTests {
     }
 
     /// Pin. Continues the scenario above: the cadence comes back with no
-    /// interaction in between. The fired row is the cycle's delivered
-    /// reminder, so the contact is not nagged again: first inside the slot,
-    /// then a day later, once the slot is over. Passes on the code before
-    /// this test was written.
+    /// interaction in between. The fired row stands for the cycle's reminder,
+    /// so the contact is not nagged again: first inside the slot, then a day
+    /// later, once the slot is over. Neither run changes the row or writes
+    /// anything.
     @Test(
         "A cadence set again after its due row fired does not bring the reminder back",
         arguments: RepositoryContractBackend.allCases
@@ -180,9 +181,9 @@ struct SchedulingPassCancellationTests {
     /// Two contacts each hold a pending cadence row: the first is due at
     /// 18:00, the second is 25 days out. Both leave the snapshot (archived,
     /// untracked) after 18:00 and no run covers them. The sweep marks the due
-    /// row fired, since it was delivered, and cancels the future one. Both
-    /// contacts come back a day later: the delivered row is held, the future
-    /// one is scheduled again.
+    /// row fired, since a due row is treated as delivered (§9), and cancels
+    /// the future one. Both contacts come back a day later: the fired row is
+    /// held, the future one is scheduled again.
     @Test(
         "The orphan sweep fires a due row and cancels a future one",
         arguments: RepositoryContractBackend.allCases, Sweep.allCases
@@ -209,6 +210,8 @@ struct SchedulingPassCancellationTests {
             try await fixture.pass.runFull()
         case .runFor:
             try await fixture.pass.run(for: due.id)
+            // run(for:) sweeps only its own contact's rows.
+            #expect(try await fixture.cadenceRow(future)?.state == .pending)
             try await fixture.pass.run(for: future.id)
         }
 
@@ -278,8 +281,6 @@ struct SchedulingPassCancellationTests {
         untracked.tracked = false
         try await fixture.repositories.contacts.upsert(untracked)
         try await fixture.pass.run(for: contact.id)
-        // Settles the mock backend's seed cast.
-        try await fixture.pass.runFull()
         fixture.setNow(returnAt)
         try await fixture.pass.runFull()
         try await fixture.repositories.contacts.upsert(contact)
