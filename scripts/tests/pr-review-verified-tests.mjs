@@ -517,6 +517,23 @@ test('failedSynthesizerKeepsSurvivors: a synthesizer that returns nothing does n
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
+test('reportReturned: a pr-* reviewer\'s whole report comes back on its verdict, and its prompt asks for it', async () => {
+  const report = 'INVARIANTS VERIFIED: x'
+  const { result, calls } = await runWorkflow({
+    args: { reviewers: ['pr-security-privacy', 'pr-tests'] },
+    reviews: {
+      'pr-security-privacy': review('APPROVE', [], { rawSummary: report }),
+      'pr-tests': review('APPROVE'),
+    },
+  })
+  const entry = result.verdicts.find(v => v.reviewer === 'pr-security-privacy')
+  assert.equal(entry.report, report)
+  // A reviewer that wrote no report has null, not an empty string.
+  assert.equal(result.verdicts.find(v => v.reviewer === 'pr-tests').report, null)
+  const prompt = calls.find(c => c.opts.agentType === 'pr-security-privacy').prompt
+  assert.match(prompt, /rawSummary/)
+})
+
 test('survivors lists each surviving BLOCKER or FIX with its votes, and not a refuted one', async () => {
   const { result } = await runWorkflow({
     reviews: {

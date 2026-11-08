@@ -40,9 +40,10 @@ export const meta = {
 //
 // Result: { head, verdicts, codexReview, workOrder, survivors, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
-//                (what the reviewer said), reviewedSha, notChecked,
-//                coverageHoles, escalations, nits. A reviewer that returned
-//                nothing has verdict FAILED.
+//                (what the reviewer said), reviewedSha, report (the reviewer's
+//                whole report, verbatim, or null), notChecked, coverageHoles,
+//                escalations, nits. A reviewer that returned nothing has
+//                verdict FAILED.
 //   survivors[]  one per surviving BLOCKER or FIX finding: reviewer, severity,
 //                location, claim, fix and votes. The work order is built from
 //                these; if the synthesizer returns nothing, workOrder.notes
@@ -139,7 +140,7 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
 if (a.codex) {
   reviewers.push({ type: 'codex-reviewer', prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first; retry once on a timeout or capacity error. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
@@ -211,6 +212,7 @@ return {
     reportedVerdict: d.review ? d.review.verdict : 'FAILED',
     reviewedSha: d.review ? d.review.reviewedSha : null,
     codexLine: d.reviewer === 'codex-reviewer' && d.review ? (d.review.rawSummary || '').split('\n')[0] : undefined,
+    report: d.review && d.review.rawSummary ? d.review.rawSummary : null,
     notChecked: d.review ? d.review.notChecked : [],
     coverageHoles: d.review ? d.review.coverageHoles : [],
     escalations: d.review ? d.review.findings.filter(f => f.severity === 'ESCALATE').map(f => `${f.location}: ${f.claim}`) : [],
