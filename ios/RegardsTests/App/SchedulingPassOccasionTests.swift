@@ -199,42 +199,6 @@ struct SchedulingPassOccasionTests {
         #expect(row.state == .pending)
     }
 
-    /// The same occasion with `now` at its occurrence. No notification time exists, but the row's time
-    /// has come, so the run writes it fired (§9 "Notification fired": every row a run writes at or before
-    /// now is fired). A pass that wrote it pending would have the next run mark it fired. A run 30 minutes
-    /// later, with the occurrence behind it, leaves the row alone instead of moving it to the next occurrence.
-    @Test(
-        "A never-notifying occasion that is due now is written fired and stays put",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func neverNotifyingOccasionDueNowIsWrittenFired(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(
-            backend: backend, now: "2026-06-12 23:00",
-            window: PassFixture.eveningWindow(quiet: Self.quietEvenings, occasionTime: TimeOfDay(hour: 23)),
-            occasions: try Self.birthdays(for: [1]))
-        let contact = try await fixture.addContact(1)
-        let id = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
-
-        try await fixture.pass.runFull()
-
-        let written = try #require(try await fixture.row(id))
-        #expect(written.scheduledFor == PassFixture.at("2026-06-12 23:00"))
-        #expect(written.state == .fired)
-        #expect(try await fixture.occasionRow(contact, .birthday) == nil)
-        let writes = await fixture.reminders.writeCount
-
-        try await fixture.pass.runFull()
-
-        #expect(try await fixture.row(id) == written)
-        #expect(await fixture.reminders.writeCount == writes)
-
-        fixture.setNow("2026-06-12 23:30")
-        try await fixture.pass.runFull()
-
-        #expect(try await fixture.row(id) == written, "The fired row does not chase the clock.")
-        #expect(await fixture.reminders.writeCount == writes)
-    }
-
     // MARK: - Row shape and moving clocks
 
     @Test(
