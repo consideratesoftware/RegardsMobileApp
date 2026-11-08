@@ -466,6 +466,23 @@ test('REQUEST_CHANGES with nothing refuted stays REQUEST_CHANGES', async () => {
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
+// Pin: passes on the old script. The pr-code-quality FIX clause (rule 3) only
+// stops a REQUEST_CHANGES from flipping to APPROVE. It never turns a reported
+// APPROVE into REQUEST_CHANGES, for pr-code-quality or anyone else.
+test('a pr-code-quality APPROVE with a surviving FIX stays APPROVE: the FIX clause only blocks the flip', async () => {
+  const { result } = await runWorkflow({
+    args: { reviewers: ['pr-code-quality', 'pr-correctness'] },
+    reviews: {
+      'pr-code-quality': review('APPROVE', [finding('FIX', 'One.swift:1')]),
+      'pr-correctness': review('APPROVE', [finding('FIX', 'Two.swift:2')]),
+    },
+    votes: { 'One.swift:1': [true, true, true], 'Two.swift:2': [true, true, true] },
+  })
+  assert.equal(verdictOf(result, 'pr-code-quality'), 'APPROVE')
+  assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
+  assert.equal(result.survivors.length, 2)
+})
+
 test('an APPROVE reviewer whose BLOCKER survives becomes REQUEST_CHANGES', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-security-privacy'] },
