@@ -161,7 +161,7 @@ struct SchedulingPassFiredRowTests {
     /// and the clock is set back to 17:00, the pass derives the fired
     /// row as pending again; it fires a second time once 18:30 arrives, then
     /// holds. A future fix that stores the fired cycle on the row should turn
-    /// step 3 (the re-arm) red on purpose; update this test with that change.
+    /// the re-arm check after the rollback (`rearmed`) red on purpose; update this test with that change.
     @Test(
         "A window edit then a clock rollback re-arms a fired row once",
         arguments: RepositoryContractBackend.allCases
