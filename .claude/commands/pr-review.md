@@ -124,7 +124,7 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    CHECKED entry, and (pr-code-quality only) none of its FIX findings survived.
 4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
-   Codex finding still needs a fix or a `DISPUTED:` line (merge condition 4 in
+   Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line.
 
 ### How to run it
