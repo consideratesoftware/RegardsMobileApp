@@ -354,14 +354,15 @@ chmod +x "$work/bin/mktemp"
 set +e
 no_tmp_output="$(PATH="$work/bin:$PATH" bash "$checker" "$repo" "$base" "$base" 2>&1)"
 no_tmp=$?
-bash "$checker" "$repo" "$sibling_a" "$sibling_b" > /dev/null 2>&1
+backwards_output="$(bash "$checker" "$repo" "$sibling_a" "$sibling_b" 2>&1)"
 backwards=$?
 bash "$checker" "$repo" deadbeef "$base" > /dev/null 2>&1
 bad_sha=$?
 bash "$checker" > /dev/null 2>&1
 usage=$?
 set -e
-[[ "$backwards" -eq 1 ]] || { echo "FAIL: a non-ancestor carry should fail, got $backwards" >&2; exit 1; }
+[[ "$backwards" -eq 1 && "$backwards_output" == CARRY\ FAILS:* ]] \
+  || { echo "FAIL: a non-ancestor carry should print CARRY FAILS and exit 1, got $backwards: $backwards_output" >&2; exit 1; }
 echo 'PASS: a non-ancestor sha fails'
 [[ "$no_tmp" -eq 1 && "$no_tmp_output" == CARRY\ FAILS:* ]] \
   || { echo "FAIL: a failed mktemp should print CARRY FAILS and exit 1, got $no_tmp: $no_tmp_output" >&2; exit 1; }
