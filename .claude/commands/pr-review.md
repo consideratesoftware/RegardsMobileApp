@@ -132,9 +132,9 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line.
-6. A pr-* reviewer whose `reviewedSha` is not a prefix of head is FAILED,
-   whatever it reported. A missing, malformed or under-7-character sha is FAILED
-   too. Rerun that reviewer alone. Codex's sha is not checked here.
+6. A pr-* reviewer whose `reviewedSha` is missing, under 7 characters, not
+   lower-case hex, or not a prefix of head is FAILED, whatever it reported.
+   Rerun that reviewer alone. Codex's sha is not checked here.
 7. A pr-* reviewer's APPROVE becomes REQUEST_CHANGES when its `notChecked` is
    missing or not empty. Every pr-* contract says "Never APPROVE with a required
    check left unchecked." `notChecked` holds required checks only. Anything else
