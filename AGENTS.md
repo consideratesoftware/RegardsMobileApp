@@ -203,18 +203,19 @@ rules 1, 2, 3, 4 (its blockerCount, rawSummary and VERDICT-line checks), 5, 6
 and 7 of `.claude/commands/pr-review.md`, "The workflow's rules". The script
 that enforces them is `.claude/workflows/pr-review-verified.js`. The requirement
 behind rule 7 is shared: the `.codex` pr-* contracts already forbid an APPROVE
-with a required check left unchecked. `.agents/README.md` describes the
-adapters, and `scripts/check-review-agent-parity.sh` prevents their contracts
-from drifting. The hosted review check is bound to the dedicated Regards review
-GitHub App (app id `4461672`), not only to its context name, so a
-same-repository Actions job cannot satisfy it. A blocker still means
-`REQUEST_CHANGES`, but the check reports whether a valid review ran, not whether
-it approved; read the check output before merging. For a person, acting on a
-blocker is the author's call; the Claude Code org clears every blocker or
-records Sid's linked deferral first (`ENGINEERING_ORG.md`). The workflow runs
-only when a PR targets the default branch, so a stacked draft stays on its
-parent until the parent merges. Retarget and rebase the child, publish it, then
-push the rebased head to trigger the hosted review against the final base.
+with a required check left unchecked.
+`.agents/README.md` describes the adapters, and
+`scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
+The hosted review check is bound to the dedicated Regards review GitHub App
+(app id `4461672`), not only to its context name, so a same-repository Actions
+job cannot satisfy it. A blocker still means `REQUEST_CHANGES`, but the check
+reports whether a valid review ran, not whether it approved; read the check
+output before merging. For a person, acting on a blocker is the author's call;
+the Claude Code org clears every blocker or records Sid's linked deferral
+first (`ENGINEERING_ORG.md`). The workflow runs only when a PR targets the
+default branch, so a stacked draft stays on its parent until the parent
+merges. Retarget and rebase the child, publish it, then push the rebased head
+to trigger the hosted review against the final base.
 
 ## Things to avoid
 
