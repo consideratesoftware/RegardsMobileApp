@@ -879,6 +879,28 @@ test('a Codex whose structured verdict differs from its first line is FAILED', a
   assert.equal(later.verdict, 'APPROVE')
 })
 
+test('a Codex review whose first line is blank is FAILED, whatever it reported', async () => {
+  const body = 'CODEX REVIEW: REQUEST_CHANGES @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\n\nBlockers: 1\n'
+  const cases = [
+    ['a blank line, then a verdict line that disagrees', 'APPROVE', '\n' + body],
+    ['a blank line, then a verdict line that agrees', 'REQUEST_CHANGES', '\n' + body],
+    ['a line of spaces first', 'REQUEST_CHANGES', '   \n' + body],
+    ['a carriage return first', 'REQUEST_CHANGES', '\r\n' + body],
+    ['white space only', 'APPROVE', '  '],
+    ['a newline only', 'REQUEST_CHANGES', '\n'],
+  ]
+  for (const [what, structured, rawSummary] of cases) {
+    const { result } = await runWorkflow({
+      args: { reviewers: ['pr-tests'], codex: true },
+      reviews: { 'pr-tests': review('APPROVE'), 'codex-reviewer': review(structured, [], { rawSummary }) },
+    })
+    assert.equal(verdictOf(result, 'codex-reviewer'), 'FAILED', what)
+    // What Codex returned is still there for the EM to read.
+    assert.equal(result.verdicts.find(v => v.reviewer === 'codex-reviewer').reportedVerdict, structured, what)
+    assert.equal(result.codexReview, rawSummary, what)
+  }
+})
+
 // Pin: a Codex with no review text has no first line to compare, so the verdict
 // it reported stands. The docs rerun a Codex whose codexReview is null.
 test('a Codex with no review text keeps its reported verdict', async () => {

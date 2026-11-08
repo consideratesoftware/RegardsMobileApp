@@ -47,7 +47,9 @@ export const meta = {
 //      never read as APPROVE. One check only: the verdict word on the first
 //      line of Codex's review (codexLine) must be the same as its structured
 //      verdict, or the entry is FAILED and codex-reviewer is rerun alone. A
-//      Codex with no review text has no line to compare and keeps its verdict.
+//      first line that is blank or not a verdict line is FAILED too. A Codex
+//      whose review text is absent or empty has no line to compare and keeps
+//      its verdict.
 //   6. A pr-* reviewer whose reviewedSha is not a prefix of head is FAILED,
 //      whatever it reported: it reviewed some other head. A missing, malformed
 //      or too-short (under 7 characters) sha is FAILED too. Rerun that
@@ -253,10 +255,11 @@ function verdictAfterVerification(reviewer, review, verified) {
   if (reviewer === 'codex-reviewer') {
     // Codex's first line is "CODEX REVIEW: <VERDICT> @ ...", the verdict that
     // gets posted. The structured verdict has to be the same word. If they
-    // differ, or a first line is not a verdict line, one of them is wrong and
-    // the entry is FAILED. No review text means no line to compare.
-    const firstLine = (review.rawSummary || '').split('\n')[0]
-    if (firstLine === '') return review.verdict
+    // differ, or a first line is not a verdict line (a blank one included),
+    // one of them is wrong and the entry is FAILED. Only an absent or empty
+    // review text has no line to compare.
+    if (!review.rawSummary) return review.verdict
+    const firstLine = review.rawSummary.split('\n')[0]
     const named = /^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE) @ /.exec(firstLine)
     return named && named[1] === review.verdict ? review.verdict : 'FAILED'
   }
