@@ -92,7 +92,7 @@ struct SchedulingPassCancellationTests {
         #expect(pending.map(\.id) == [fixture.cadenceID(contact)])
     }
 
-    // MARK: - A due row outlives the cadence (§9 "Notification fired", Q3)
+    // MARK: - A due row outlives the cadence (§9 "Notification fired", tech lead ruling, 2026-11-06)
 
     /// Pin. The row was due when the cadence went away (removed, or set to 0,
     /// which is ineligible too), so the run marks it fired before the sweep
@@ -267,7 +267,7 @@ struct SchedulingPassCancellationTests {
         #expect(try await fixture.cadenceRow(future)?.scheduledFor == futureSlot)
     }
 
-    /// Boundary pin. A row is due at `scheduledFor <= now` (§9, run
+    /// Boundary pin. A row is due at `scheduledFor <= now` (§9a, run
     /// invariant), so the orphan sweep marks a row due exactly at now fired.
     /// A sweep that tested `<` would cancel it.
     @Test("An orphan row due exactly at now is marked fired", arguments: RepositoryContractBackend.allCases)
