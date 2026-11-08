@@ -605,6 +605,24 @@ test('a surviving FIX does not hold back another reviewer once its BLOCKER is re
   assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
 })
 
+// Pin: the refuted BLOCKER gives the flip its "something was refuted", and the
+// surviving FIX is the pr-code-quality condition that stops it. For
+// pr-correctness the same findings flip to APPROVE (the test above this one).
+test('a pr-code-quality review with a refuted BLOCKER and a surviving FIX stays REQUEST_CHANGES', async () => {
+  const { result } = await runWorkflow({
+    args: { reviewers: ['pr-code-quality'] },
+    reviews: {
+      'pr-code-quality': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10'), finding('FIX', 'Beta.swift:20')]),
+    },
+    votes: { 'Alpha.swift:10': [false, false, false], 'Beta.swift:20': [true, true, true] },
+  })
+  assert.equal(result.refuted.length, 1)
+  assert.equal(result.refuted[0].severity, 'BLOCKER')
+  assert.equal(result.survivors.length, 1)
+  assert.equal(result.survivors[0].severity, 'FIX')
+  assert.equal(verdictOf(result, 'pr-code-quality'), 'REQUEST_CHANGES')
+})
+
 test('REQUEST_CHANGES with nothing refuted stays REQUEST_CHANGES', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('FIX', 'Beta.swift:20')]) },
