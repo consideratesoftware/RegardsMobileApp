@@ -125,7 +125,9 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
   --jq '[.check_runs[] | select(.app.slug == "regards-staged-review")]
         | sort_by(.completed_at // .started_at) | last | .output.text // empty' \
   > "<scratch>/hosted-review.txt"
-bash "<root checkout>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
+git -C "<root checkout>" show origin/main:scripts/count-hosted-blockers.sh > "<scratch>/count-hosted-blockers.sh"
+bash "<scratch>/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
+bash "<lane>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   # own copy: only if the PR changes this script
 ```
 
 Always run the script with `bash`, never your default shell. Use the copy
@@ -183,7 +185,9 @@ lane's refs, and this fetch brings them up to date.
   3. This passes, with `<lane>` the absolute lane worktree path from your
      prompt:
      ```
-     bash "<root checkout>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>
+     git -C "<root checkout>" show origin/main:scripts/check-carried-approval.sh > "<scratch>/check-carried-approval.sh"
+     bash "<scratch>/check-carried-approval.sh" "<lane>" <S> <head sha>
+     bash "<lane>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy: only if the PR changes this script
      ```
      Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
