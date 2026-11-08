@@ -22,9 +22,10 @@
 //
 // The fake agent() also checks each scripted review against the schema the
 // script passed it: a top-level field with an enum must hold one of the listed
-// values. The real runtime refuses any other value at the tool-call layer, so
-// a reviewer can never return it. Without this check a scripted verdict the
-// schema forbids would pass through the fake and hide a missing enum value.
+// values. The Workflow tool's script API reference says a schema is validated
+// at the tool-call layer, so a reviewer can never return any other value.
+// Without this check a scripted verdict the schema forbids would pass through
+// the fake and hide a missing enum value.
 //
 // How a test reads. Each case calls runWorkflow() with a scenario:
 //   reviews  what each reviewer agent returns, by agent name

@@ -126,10 +126,11 @@ const FINDINGS = {
 
 // Codex's schema differs from the pr-* one in 3 ways. It has 2 more verdicts:
 // RETRY (also when the head moved) and UNAVAILABLE (Codex missing or not logged
-// in). No pr-* contract defines them, so the runtime refuses them from a pr-*
-// reviewer. It has no blockerCount, because Codex's verdict is never changed by
-// a count. Its notChecked has its own description, because Codex has no NOT
-// CHECKED line.
+// in). The Workflow tool's script API reference says a schema is validated at
+// the tool-call layer, so a pr-* reviewer cannot return RETRY or UNAVAILABLE.
+// It has no blockerCount, because Codex's verdict is never changed by a count.
+// Its notChecked has its own description, because Codex has no NOT CHECKED
+// line.
 const { blockerCount, ...sharedProperties } = FINDINGS.properties
 const CODEX_FINDINGS = {
   ...FINDINGS,
@@ -233,8 +234,9 @@ const results = await pipeline(
   async (review, r) => {
     if (!review) return { reviewer: r.type, review: null, verified: [] }
     const toCheck = review.findings.filter(f => f.severity === 'BLOCKER' || f.severity === 'FIX')
-    // parallel() never rejects and the function below has no code that can
-    // throw, so every entry of `verified` is an object.
+    // The Workflow tool's script API reference says parallel() never rejects:
+    // a thunk that fails resolves to null. The function below has no code that
+    // can throw, so every entry of `verified` is an object.
     const verified = await parallel(toCheck.map(f => async () => {
       const answers = await parallel(LENSES.map(l => () => agent(
         `${base}${r.type === 'codex-reviewer' ? '' : scopedRecheck}\n\nA ${r.type} reviewer raised this ${f.severity} at ${f.location}:\n"${f.claim}"\nProposed fix: ${f.fix || '(none)'}\n\nLens: ${l.ask}\nUse your finding-verification mode (verifier.md). Try to REFUTE it under this lens. Set real=false only when you cite file:line evidence that the finding is wrong, out of scope, or harmless. If your verdict would be UNPROVEN, set real=true. Cite file:line evidence either way.`,
