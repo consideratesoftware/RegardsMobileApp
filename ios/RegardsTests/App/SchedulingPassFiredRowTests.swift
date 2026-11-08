@@ -6,7 +6,7 @@ import Testing
 /// whose time has come as fired. A fired row is history: the pass keeps it and
 /// does not replace it with a pending row for the same cycle (no re-nag).
 /// Dates are New York local times (`PassFixture`) unless a test sets its own
-/// zone. The default window opens a slot at 18:00 every day.
+/// zone. The fixture window opens a slot at 18:00 every day.
 struct SchedulingPassFiredRowTests {
 
     private static func pendingCadenceRow(
@@ -316,9 +316,10 @@ struct SchedulingPassFiredRowTests {
 
     // MARK: - Occasions
 
-    /// The birthday row was marked fired at 09:00 and the device clock was then
-    /// set back to 08:00 the same day. The occurrence is 09:00 again, in the
-    /// future, but the row is history: it stays fired and nothing is written.
+    /// The birthday row is marked fired in the store while the device clock
+    /// reads 08:00, the state a rollback leaves after a run at 09:00. The pass
+    /// would derive a pending 09:00 row, still ahead of the clock, but the row
+    /// is history: it stays fired and nothing is written.
     @Test(
         "A fired same-day occasion survives the clock moving back before its time",
         arguments: RepositoryContractBackend.allCases

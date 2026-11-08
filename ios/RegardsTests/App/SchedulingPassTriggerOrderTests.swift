@@ -49,9 +49,10 @@ struct SchedulingPassTriggerOrderTests {
             clock: { now }))
     }
 
-    /// A pending or fired cadence row. `fetchSchedule()` hides the rows of an archived or untracked contact, so it
-    /// alone can't fail for one; `fetchPending(forContact:)` has no such filter, and the pinned clock makes every
-    /// row the pass writes pending, so a row of a hidden contact shows.
+    /// A cadence row in the snapshot (pending and fired rows) or in `fetchPending(forContact:)` (pending rows only).
+    /// `fetchSchedule()` hides the rows of an archived or untracked contact, so it alone can't fail for one;
+    /// `fetchPending(forContact:)` has no such filter, so a hidden contact's pending row shows. A hidden contact's
+    /// fired row is invisible to both.
     private static func hasCadenceRow(_ environment: AppEnvironment, _ contact: Contact) async throws -> Bool {
         let scheduled = try await environment.reminders.fetchSchedule().reminders
         let pending = try await environment.reminders.fetchPending(forContact: contact.id)

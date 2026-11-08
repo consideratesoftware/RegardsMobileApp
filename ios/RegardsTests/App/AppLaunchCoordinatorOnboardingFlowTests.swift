@@ -209,8 +209,10 @@ extension AppLaunchCoordinatorTests {
         let han = try #require(picker.contacts.first { $0.displayName == "Han Solo" })
         picker.toggle(leia.id)
         #expect(await picker.save())
-        // Pending or fired. `fetchSchedule()` hides the rows of an untracked contact (Han), so it alone can't fail
-        // for him; `fetchPending(forContact:)` has no such filter, and the pinned clock makes any row pending.
+        // A cadence row in the snapshot (pending and fired rows) or in `fetchPending(forContact:)` (pending rows
+        // only). `fetchSchedule()` hides the rows of an untracked contact (Han), so it alone can't fail for him;
+        // `fetchPending(forContact:)` has no such filter, so his pending row would show. His fired row would be
+        // invisible to both.
         func cadenceRow(_ contact: Contact) async throws -> Bool {
             let scheduled = try await environment.reminders.fetchSchedule().reminders
             let pending = try await environment.reminders.fetchPending(forContact: contact.id)
