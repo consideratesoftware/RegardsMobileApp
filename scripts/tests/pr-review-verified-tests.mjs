@@ -491,6 +491,53 @@ test('the work order is built from surviving findings only', async () => {
   assert.doesNotMatch(synth[0].prompt, /Beta\.swift:20/)
 })
 
+// Pin: this passes on the old script too. It fixes what the synthesizer's
+// answer looks like on its way out.
+test('workOrderReturned: the synthesizer\'s work order comes back as it was written', async () => {
+  const stub = { items: [{ id: '1', severity: 'BLOCKER', owner: 'ios-engineer', change: 'x' }] }
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+    workOrder: stub,
+  })
+  assert.deepEqual(result.workOrder, stub)
+})
+
+test('failedSynthesizerKeepsSurvivors: a synthesizer that returns nothing does not erase the findings', async () => {
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+    workOrder: null,
+  })
+  assert.notEqual(result.workOrder, null)
+  assert.match(result.workOrder.notes, /synthesizer returned nothing/)
+  assert.equal(result.survivors.length, 1)
+  assert.equal(result.survivors[0].location, 'Alpha.swift:10')
+  assert.equal(result.survivors[0].reviewer, 'pr-correctness')
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
+})
+
+test('survivors lists each surviving BLOCKER or FIX with its votes, and not a refuted one', async () => {
+  const { result } = await runWorkflow({
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10'), finding('FIX', 'Beta.swift:20')]),
+    },
+    votes: { 'Alpha.swift:10': [true, null, false], 'Beta.swift:20': [false, false, true] },
+  })
+  assert.deepEqual(result.survivors, [{
+    reviewer: 'pr-correctness',
+    severity: 'BLOCKER',
+    location: 'Alpha.swift:10',
+    claim: 'claim at Alpha.swift:10',
+    fix: 'fix at Alpha.swift:10',
+    votes: [
+      { lens: 'truth', real: true, reason: 'stub truth' },
+      { lens: 'scope', real: 'failed', reason: 'the verifier returned nothing' },
+      { lens: 'impact', real: false, reason: 'stub impact' },
+    ],
+  }])
+})
+
 test('the prompts name a scoped recheck only when since is given', async () => {
   const full = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
   assert.doesNotMatch(full.calls[0].prompt, /undefined|scoped recheck|git diff/)

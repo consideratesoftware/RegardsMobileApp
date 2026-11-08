@@ -38,11 +38,15 @@ export const meta = {
 //      UNAVAILABLE come back as written, so a Codex that could not review is
 //      never read as APPROVE.
 //
-// Result: { head, verdicts, codexReview, workOrder, refuted }
+// Result: { head, verdicts, codexReview, workOrder, survivors, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
 //                (what the reviewer said), reviewedSha, notChecked,
 //                coverageHoles, escalations, nits. A reviewer that returned
 //                nothing has verdict FAILED.
+//   survivors[]  one per surviving BLOCKER or FIX finding: reviewer, severity,
+//                location, claim, fix and votes. The work order is built from
+//                these; if the synthesizer returns nothing, workOrder.notes
+//                says so and the caller repairs from survivors.
 //   refuted[]    one per refuted finding, each with its votes. A vote's `real`
 //                is true, false, or 'failed' when that verifier returned
 //                nothing; `lens` names the verifier.
@@ -189,9 +193,12 @@ log(`${survivors.length} findings survived verification, ${killed.length} refute
 
 let workOrder = { items: [], notes: 'no surviving findings' }
 if (survivors.length) {
-  workOrder = await agent(
+  // agent() returns null when the synthesizer fails. Without a fallback every
+  // surviving finding would vanish from the result, so say so and let the
+  // caller repair from `survivors`.
+  workOrder = (await agent(
     `${base}\n\nThese review findings survived adversarial verification:\n${JSON.stringify(survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix })), null, 2)}\n\nMerge duplicates (same root cause) into one item, keep the most severe rating, list every reviewer that raised it. Assign each item an owner: production code → ios-engineer (senior-ios-engineer for SchedulingPass, engine, schema, concurrency); test files → qa-engineer; ARCHITECTURE.md/TESTFLIGHT_PLAN.md/AGENTS.md → tech-writer; PR body only → EM-body; a design choice → tech-lead-ruling; a product or owner-gate choice → owner-question. Write each change as an exact, minimal instruction.`,
-    { label: 'synthesize', phase: 'Synthesize', schema: WORKORDER })
+    { label: 'synthesize', phase: 'Synthesize', schema: WORKORDER })) || { items: [], notes: 'the synthesizer returned nothing; repair from survivors' }
 }
 
 const codex = done.find(d => d.reviewer === 'codex-reviewer')
@@ -211,5 +218,6 @@ return {
   })),
   codexReview: (codex && codex.review && codex.review.rawSummary) || null,
   workOrder,
+  survivors: survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix, votes: s.votes })),
   refuted: killed.map(k => ({ reviewer: k.reviewer, severity: k.severity, location: k.location, claim: k.claim, votes: k.votes })),
 }
