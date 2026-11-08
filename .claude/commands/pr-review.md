@@ -137,11 +137,12 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    their FIX findings are should-fix and do not block the flip.
 4. A pr-* reviewer is REQUEST_CHANGES, whatever it reported, when it has a
    surviving BLOCKER of its own; when its `blockerCount` (its own `BLOCKERS: n`
-   count) is not a whole number equal to the BLOCKER findings it listed; or when
-   its report text is not empty and the first line starting with `VERDICT:` is
-   not `VERDICT: <the verdict it returned>` (trailing white space ignored).
-   These checks cover an APPROVE too, so an APPROVE cannot hide a blocker the
-   reviewer counted but did not list.
+   count) is not a whole number equal to the BLOCKER findings it listed; when
+   its `rawSummary` (its report text) is missing or empty; or when the first
+   line starting with `VERDICT:` is not `VERDICT: <the verdict it returned>`
+   (trailing white space ignored). These checks cover an APPROVE too, so an
+   APPROVE cannot hide a blocker the reviewer counted but did not list, and an
+   APPROVE with no report cannot stand.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line. A Codex entry

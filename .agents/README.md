@@ -27,7 +27,7 @@ in sync is what makes the Codex verdict a review of the same contract by a
 different model family.
 
 The verified run has steps the Codex skill lacks, in rules 1, 2, 3, 4 (its
-blockerCount and VERDICT-line checks), 5, 6 and 7 of
+blockerCount, rawSummary and VERDICT-line checks), 5, 6 and 7 of
 `.claude/commands/pr-review.md`, "The workflow's rules". The script that
 enforces them is `.claude/workflows/pr-review-verified.js`. The requirement
 behind rule 7 is shared: the `.codex` pr-* contracts already forbid an APPROVE
