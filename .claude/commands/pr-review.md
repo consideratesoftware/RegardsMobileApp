@@ -153,20 +153,33 @@ If the name does not resolve, pass `scriptPath` instead, pointing at the root
 checkout's copy of `.claude/workflows/pr-review-verified.js`. Point it at the
 lane's copy only while this PR is in review, as the scripts are handled.
 
-Then run Stage 2 on the survivors, then Stage 4. Repair items come from the
-workflow's `workOrder`. Send each one to its owner, as Stage 3 says.
+Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
+pr-correctness and pr-tests runs (the workflow's reviewers can't take a
+SendMessage), then Stage 4. Repair items come from `workOrder`; `survivors`
+lists every surviving finding. Send each item to its owner as `org.md` Stage 3
+says.
 
 ### What the workflow returns
 
 - `verdicts`: one entry per reviewer. `verdict` is the verdict after
   verification, and the verdict comment uses it. `reportedVerdict` is what the
   reviewer said. A reviewer that returned nothing has `verdict: FAILED`.
+  `reviewedSha` is the sha the reviewer checked. A pr-* reviewer whose sha is
+  not a prefix of head comes back `FAILED`, so rerun it alone. `report` is its
+  whole report. Stage 3's audit trail quotes INVARIANTS VERIFIED, CRITERIA MAP,
+  PROCESS and DOCS from it. `notChecked` is the Not checked line. `escalations`
+  and `coverageHoles` are Stage 2 input. `nits` is the Stage 3 Nits list, and
+  `questions` is the Stage 3 Owner questions list.
 - `codexReview`: Codex's full review, verbatim, or null. Save it as
   `codex-<short sha>.md` before you post. Its first line is the Codex verdict
   line, which the Codex entry's `codexLine` also carries.
 - `refuted`: one entry per refuted finding, with its reviewer, severity,
   location, claim and votes. Each vote names a `lens` (`truth`, `scope` or
   `impact`) and `real` (`true`, `false` or `'failed'`).
+- `survivors`: one entry per surviving BLOCKER or FIX finding, with its
+  reviewer, severity, location, claim, fix and votes.
+- `workOrder`: the repair items. When its `notes` say the synthesizer returned
+  nothing, repair from `survivors`.
 
 Don't post APPROVE while a pr-* reviewer is `FAILED` or has any verdict other than
 APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The workflow
@@ -198,9 +211,10 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - The first line is APPROVE only when no BLOCKER survived (in Stage 1 or
   Stage 2) and every pr-* reviewer's verdict is APPROVE. Otherwise it is
   REQUEST_CHANGES.
-- BLOCKERS and SHOULD_FIX count the pr-* findings that survived, plus any
-  Stage 2 items. A plain run refutes nothing, so every finding counts. Refuted
-  findings count for neither. Codex's counts stay on its own comment.
+- BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and
+  FIX respectively), plus any Stage 2 items. A plain run has no `survivors`: it
+  refutes nothing, so every pr-* finding counts. Refuted findings count for
+  neither. Codex's counts stay on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
   verified run, or the Stage 1 verdict in a plain run. A Stage 2 blocker makes
   that reviewer REQUEST_CHANGES.
@@ -215,7 +229,7 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
   They never count toward any check.
 
 A scoped recheck passes `since`. Its comment carries `RERAN:` and `CARRIED:`
-lines as Stage 3 says.
+lines as `org.md` Stage 3 says.
 
 ## Cross-model review (Claude Code only)
 
