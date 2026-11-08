@@ -148,8 +148,8 @@ Expected values: the title is the row's channel label. The message is
 and `UpcomingScreen` both pass to the alert. For SMS and Han Solo,
 it starts with "Would text Han Solo." The button is labelled Done.
 
-- [ ] Overdue: Activate a row (double-tap). VoiceOver announces the alert's title, then its
-      message, then Done. Check each one.
+- [ ] Overdue: activate a row (double-tap). VoiceOver announces the alert's
+      title, then its message, then Done. Check each one.
 - [ ] Activate Done. The alert dismisses. VoiceOver focus returns to the row
       that opened the alert. If focus lands anywhere else, record where, as a
       finding. It is not a pass.

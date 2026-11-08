@@ -83,9 +83,9 @@ For each open TF PR:
    check the head out with `git worktree add --detach <tmp> <head sha>`, run
    the verified run (`pr-review.md`, "Claude Code org only") there with that
    target, started by the `scriptPath` rule in `pr-review.md`, or, when it can't
-   run, `/pr-review origin/main...HEAD` and the `codex-reviewer` agent type. Post the result as a new verdict comment, then
-   `git worktree remove <tmp>`. A RETRY gets
-   the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
+   run, `/pr-review origin/main...HEAD` and the `codex-reviewer` agent type. Post
+   the result as a new verdict comment, then `git worktree remove <tmp>`. A RETRY
+   gets the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
    head: interview Sid before any rerun.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. When `git -C <lane worktree> diff --name-only
@@ -158,8 +158,9 @@ from both the same way: they go to the slice owner (design questions to
 `tech-lead` first), one round, then both review again. In a verified run, send
 each `workOrder` item by its `owner`: `on-call-engineer` (scripts, CI and
 workflow scripts) (before Stage 4, launch it in pre-PR mode: say no PR is open
-yet and give the lane worktree, branch and items), `tech-writer`, `qa-engineer`, `ios-engineer` and
-`senior-ios-engineer` to that role; `EM-body` items you apply to the PR body
+yet and give the lane worktree, branch and items), `tech-writer`, `qa-engineer`,
+`ios-engineer` and `senior-ios-engineer` to that role; `EM-body` items you apply
+to the PR body
 yourself; `tech-lead-ruling` items to `tech-lead`; `owner-question` items to an
 interview with Sid. Drop a Codex finding
 only when it contradicts `ARCHITECTURE.md`; you write the dispute on a

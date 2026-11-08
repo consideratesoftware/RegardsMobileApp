@@ -135,9 +135,10 @@ under review could have edited its own copy. A PR that itself changes
 engineering manager's prompt. Run both copies. If either prints `MALFORMED` or
 exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
 count is the higher `BLOCKERS <n>`. Any other output from either copy fails
-closed. Every other PR runs only the copy exported from `origin/main`. The script prints one line,
-`PENDING: <why>`, `BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its
-tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
+closed. Every other PR runs only the copy exported from `origin/main`. The
+script prints one line, `PENDING: <why>`, `BLOCKERS <n>`, or
+`MALFORMED: <why>`; its header and its tests in
+`scripts/tests/count-hosted-blockers-tests.sh` define the rules.
 `PENDING` means the review hasn't run on this head: wait and query again,
 and never count it as zero. Only `BLOCKERS 0` counts as zero, and the script
 prints it only when the text also has `VERDICT: APPROVE`. `MALFORMED` fails
