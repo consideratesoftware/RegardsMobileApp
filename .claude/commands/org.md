@@ -83,10 +83,11 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    in the lane's folder, rerun that review, unless it is a Codex UNAVAILABLE:
    check the head out with `git worktree add --detach <tmp> <head sha>`, then run
    the verified run (`pr-review.md`, "Claude Code org only") from the root checkout
-   on `main`, never from `<tmp>`, with `<tmp>` passed as `worktree` and that
-   target, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR needs
-   run (a), with Codex in run (a) only; run (b) is optional), or, when it can't
-   run, `/pr-review origin/main...HEAD` and the `codex-reviewer` agent type. Post
+   on `main`, never from `<tmp>`, with `worktree` set to `<tmp>` and `head` set to
+   its sha, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR
+   needs run (a), with Codex in run (a) only; run (b) is optional), or, when it
+   can't run, `/pr-review origin/main...HEAD in worktree <tmp>` and the
+   `codex-reviewer` agent type. Post
    the result as a new verdict comment, then `git worktree remove <tmp>`. A RETRY
    gets the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
    head: interview Sid before any rerun.
