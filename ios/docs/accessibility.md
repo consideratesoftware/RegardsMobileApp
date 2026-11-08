@@ -269,12 +269,14 @@ conclusive. `ScreensAccessibilityTests+PresentedSurfaces.swift`'s
 `testOverdueChannelPreviewPassesAuditAndDismisses` /
 `testUpcomingChannelPreviewPassesAuditAndDismisses` exclude
 `.elementDetection` only (the other three structural categories still
-gate) with this paragraph cited at the call site. Resolve by a real-device
-VoiceOver pass confirming the alert's title, message, and Done button are
-each announced correctly (section "Channel preview alert (Overdue and
-Upcoming)" in `accessibility-smoke.md`, part of the pre-release device pass),
-and record the result, pass or fail, on the Result line of that device-pass
-entry in `TESTFLIGHT_PLAN.md`, rather than leaving it open indefinitely.
+gate) with the test's own doc comment cited at the call site. Resolve by a
+real-device VoiceOver pass confirming the alert's title, message, and Done
+button are each announced correctly (section "Channel preview alert (Overdue
+and Upcoming)" in `accessibility-smoke.md`, part of the pre-release device
+pass), and record the result, pass or fail, on the Result line of that
+section's entry in `TESTFLIGHT_PLAN.md`'s "Pre-release device pass" once that
+entry is added (it does not exist yet; see `accessibility-smoke.md`), rather
+than leaving it open indefinitely.
 
 ## Sensory-audit carve-outs
 
