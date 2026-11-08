@@ -26,6 +26,7 @@ never pick up Android work.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
 - Open pull requests: #72 (tooling batch 2, `claude/tooling-batch-2`) and PR #73 (TF-07e slices 1+2, `claude/tf-07e-scheduling`). The `gh pr list --state open` check on 2026-11-08 ran after PR #73 opened (08:13 UTC) and lists only these two. #71 (`TF-07e` slice 3), #70 (`TF-07d`), #69 (`claude/build-engineer-cwd`), and #68 (`TF-11`) are merged.
+- Schema lock: PR #73 holds schema v4 (`ScheduledReminder.firedCycle`, round 12) until it merges, so PR30's given-name column becomes v5.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
