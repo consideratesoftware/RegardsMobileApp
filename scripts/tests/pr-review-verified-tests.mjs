@@ -265,6 +265,45 @@ test('a NOT CHECKED entry keeps REQUEST_CHANGES even when every finding is refut
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
+test('reviewedShaMustMatchHead: a pr-* reviewer whose sha is not a prefix of head is FAILED', async () => {
+  const wrong = [
+    ['another head', 'f'.repeat(40)],
+    ['no sha', undefined],
+    ['an empty sha', ''],
+    ['a 6-character prefix', HEAD.slice(0, 6)],
+    ['an upper-case copy of head', HEAD.toUpperCase()],
+    ['head with an extra character', HEAD + '0'],
+  ]
+  for (const [what, reviewedSha] of wrong) {
+    const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { reviewedSha }) } })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'FAILED', what)
+  }
+
+  // A short sha that is a prefix of head is accepted: 7 characters, and all 40.
+  for (const reviewedSha of [HEAD.slice(0, 7), HEAD.slice(0, 12), HEAD]) {
+    const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { reviewedSha }) } })
+    assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE', reviewedSha)
+  }
+})
+
+test('a wrong reviewedSha is FAILED even with a surviving BLOCKER, and the finding is still returned', async () => {
+  const { result } = await runWorkflow({
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { reviewedSha: 'f'.repeat(40) }),
+    },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'FAILED')
+  assert.equal(result.verdicts[0].reportedVerdict, 'REQUEST_CHANGES')
+  assert.equal(result.survivors.length, 1)
+})
+
+test('a pr-* reviewer is told where its reviewedSha comes from, and the schema requires one', async () => {
+  const { calls } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
+  assert.match(calls[0].prompt, /reviewedSha to the output of `git -C \/tmp\/worktree rev-parse HEAD`/)
+  assert.ok(calls[0].opts.schema.required.includes('reviewedSha'))
+})
+
 test('a result with no notChecked field keeps REQUEST_CHANGES (an unknown is not "none")', async () => {
   const noField = review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')])
   delete noField.notChecked
@@ -354,6 +393,19 @@ test('codexVerdictUnchanged: a refuted Codex BLOCKER leaves Codex REQUEST_CHANGE
   assert.equal(verdictOf(result, 'codex-reviewer'), 'REQUEST_CHANGES')
   assert.equal(result.refuted.length, 1)
   assert.equal(result.refuted[0].reviewer, 'codex-reviewer')
+})
+
+// Pin: passes on the old script. The reviewedSha rule is for pr-* reviewers
+// only; Codex's verdict is never changed here.
+test('a Codex reviewedSha that is not head does not change the Codex verdict', async () => {
+  const { result } = await runWorkflow({
+    args: { reviewers: ['pr-tests'], codex: true },
+    reviews: {
+      'pr-tests': review('APPROVE'),
+      'codex-reviewer': review('APPROVE', [], { reviewedSha: 'f'.repeat(40) }),
+    },
+  })
+  assert.equal(verdictOf(result, 'codex-reviewer'), 'APPROVE')
 })
 
 test('a surviving Codex BLOCKER leaves a Codex APPROVE alone: the verdict is Codex\'s own', async () => {

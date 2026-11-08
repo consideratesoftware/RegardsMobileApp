@@ -37,13 +37,20 @@ export const meta = {
 //      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
 //      UNAVAILABLE come back as written, so a Codex that could not review is
 //      never read as APPROVE.
+//   6. A pr-* reviewer whose reviewedSha is not a prefix of head is FAILED,
+//      whatever it reported: it reviewed some other head. A missing, malformed
+//      or too-short (under 7 characters) sha is FAILED too. Rerun that
+//      reviewer alone. Codex's sha is not checked here, because Codex's
+//      verdict is never changed; release-manager.md compares the sha in the
+//      posted CODEX REVIEW comment with the head.
 //
 // Result: { head, verdicts, codexReview, workOrder, survivors, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
 //                (what the reviewer said), reviewedSha, report (the reviewer's
 //                whole report, verbatim, or null), notChecked, coverageHoles,
 //                escalations, nits. A reviewer that returned nothing has
-//                verdict FAILED.
+//                verdict FAILED, and so does a pr-* reviewer whose reviewedSha
+//                is not a prefix of head (rule 6).
 //   survivors[]  one per surviving BLOCKER or FIX finding: reviewer, severity,
 //                location, claim, fix and votes. The work order is built from
 //                these; if the synthesizer returns nothing, workOrder.notes
@@ -83,7 +90,7 @@ const FINDINGS = {
     },
     rawSummary: { type: 'string' },
   },
-  required: ['verdict', 'findings', 'notChecked', 'coverageHoles'],
+  required: ['verdict', 'reviewedSha', 'findings', 'notChecked', 'coverageHoles'],
 }
 
 const VERDICT = {
@@ -140,7 +147,7 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, prompt: `${base}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
 if (a.codex) {
   reviewers.push({ type: 'codex-reviewer', prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first; retry once on a timeout or capacity error. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
@@ -175,6 +182,7 @@ const results = await pipeline(
 function verdictAfterVerification(reviewer, review, verified) {
   if (!review) return 'FAILED'
   if (reviewer === 'codex-reviewer') return review.verdict
+  if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) return 'FAILED'
   if (verified.some(v => v.severity === 'BLOCKER' && v.survives)) return 'REQUEST_CHANGES'
   if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
   const refutedSomething = verified.some(v => !v.survives)
