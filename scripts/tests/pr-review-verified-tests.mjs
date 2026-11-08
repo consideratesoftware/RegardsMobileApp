@@ -274,6 +274,9 @@ test('a NOT CHECKED entry keeps REQUEST_CHANGES even when every finding is refut
   })
   assert.equal(result.refuted.length, 1)
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
+  // The entry still carries what was left unchecked, and the sha it reviewed.
+  assert.deepEqual(result.verdicts[0].notChecked, ['swift test was not run'])
+  assert.equal(result.verdicts[0].reviewedSha, HEAD)
 })
 
 test('reviewedShaMustMatchHead: a pr-* reviewer whose sha is not a prefix of head is FAILED', async () => {
@@ -555,6 +558,11 @@ test('failedReviewer: a reviewer that returns nothing is FAILED, the others stil
   assert.equal(verdictOf(result, 'pr-correctness'), 'FAILED')
   assert.equal(verdictOf(result, 'pr-tests'), 'APPROVE')
   assert.equal(verifierCalls(calls).length, 0)
+  // A failed reviewer's entry has empty fields, not missing ones.
+  const failed = result.verdicts.find(v => v.reviewer === 'pr-correctness')
+  assert.equal(failed.reviewedSha, null)
+  assert.deepEqual(failed.notChecked, [])
+  assert.deepEqual(failed.coverageHoles, [])
 })
 
 test('a reviewer whose run throws is still listed, as FAILED', async () => {
