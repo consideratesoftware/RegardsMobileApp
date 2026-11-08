@@ -271,11 +271,11 @@ manager checks each `CARRIED:` line against them, even when the reviewer also
 has an APPROVE at the head, and rejects one that fails. If you aren't sure,
 rerun the reviewer.
 
-Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1 and
-Stage 3 alike, with the target `origin/main...HEAD` and the lane worktree as
-separate fields. Don't start a general-purpose agent and tell it to read
-`.claude/agents/codex-reviewer.md`: that was a workaround from before the type
-existed, and it runs without the contract's tool list and model.
+Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
+and Stage 3 alike, with the target `origin/main...HEAD` and the lane worktree
+as separate fields. Don't start a general-purpose agent and tell it to read
+`.claude/agents/codex-reviewer.md`: that was a workaround from before the
+type existed, and it runs without the contract's tool list and model.
 
 Second opinion: at most once per lane, before parking it on a second
 REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
@@ -337,11 +337,11 @@ counting review is run (a); see "Self-edit PRs" in `pr-review.md`):
   repost any that scrolled out of the newest 100.
 
 Blockers go to the slice owner as in Stage 3. Should-fixes may go to a
-fast-follow PR, as Stage 3 says. After 3 stale rounds on one PR, park it and say
-why. Count only head moves caused by fixes. An `update-branch` merge (lanes
-merging in sequence move `main`) and a checkpoint or doc commit from
-`tech-writer` run the reviews again but don't count, or a green PR would park
-for nothing.
+fast-follow PR, as Stage 3 says. After 3 stale rounds on one PR,
+park it and say why. Count only head moves caused by fixes. An `update-branch`
+merge (lanes merging in sequence move `main`) and a checkpoint or doc commit
+from `tech-writer` run the reviews again but don't count, or a green PR would
+park for nothing.
 
 ## Stage 5: report
 

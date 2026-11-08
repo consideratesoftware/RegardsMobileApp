@@ -345,8 +345,8 @@ The Codex verdict comes from the `codex-reviewer` agent type
 (`subagent_type: codex-reviewer`), which runs `$regards-pr-review` read-only.
 Give it the target `origin/main...HEAD` and, as its own field, the lane worktree
 path. The compound `in worktree` form is `/pr-review`'s argument only;
-`codex-reviewer.md` never counts a verdict line that names another target. It is
-not a stage of this command: `/org` launches it in the same batch as
-`/pr-review`, and the merge conditions in `ENGINEERING_ORG.md` need both
-verdicts. Launch it by that type name, never as a general-purpose agent told to
-read `.claude/agents/codex-reviewer.md`.
+`codex-reviewer.md` never counts a verdict line that names another target.
+It is not a stage of this command: `/org` launches
+it in the same batch as `/pr-review`, and the merge conditions in
+`ENGINEERING_ORG.md` need both verdicts. Launch it by that type name, never
+as a general-purpose agent told to read `.claude/agents/codex-reviewer.md`.
