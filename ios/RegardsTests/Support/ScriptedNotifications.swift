@@ -101,7 +101,9 @@ actor ScriptedNotifications: NotificationScheduling {
     /// is delivered at once: it is recorded in `delivered`, replaces any
     /// pending request with its identifier, and is never pending. The set has
     /// no size limit, unlike the system's 64 pending requests per app; see
-    /// `NotificationFakeParityTests`.
+    /// `NotificationFakeParityTests`. `pendingRequests()` sorts by identifier
+    /// only to keep tests deterministic. The real center's order is
+    /// unspecified, so a test must not rely on this one.
     ///
     /// A pending request whose time passes is delivered at the next call of any
     /// of the 3 members (`deliverDue`), before that call acts, so a cancel or a

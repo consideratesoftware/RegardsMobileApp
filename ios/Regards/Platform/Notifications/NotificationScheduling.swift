@@ -101,7 +101,8 @@ public protocol NotificationScheduling: Sendable {
     /// unchanged one under the same identifier. Every pending request is this
     /// app's (iOS keeps one list per app). A request `decode` can't read is
     /// left out; ARCHITECTURE.md §9a gives the rule for retiring or adding a
-    /// request shape.
+    /// request shape. The order is unspecified, because the real center
+    /// documents none, so a caller must not rely on it.
     func pendingRequests() async -> [ReminderNotificationRequest]
     /// Adds the request, or replaces a pending one with the same identifier.
     /// Delivers at once when the fire date, cut to the whole second, is at or

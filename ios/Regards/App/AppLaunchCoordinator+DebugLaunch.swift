@@ -115,6 +115,8 @@ extension AppLaunchCoordinator {
 /// before now as it is added, or when `clock` passes its fire date later, as
 /// in the real center. The set has no size limit, unlike the system's 64
 /// pending requests per app; see `NotificationFakeParityTests`.
+/// `pendingRequests()` sorts by identifier only to keep tests deterministic.
+/// The real center's order is unspecified, so a test must not rely on this one.
 ///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:
