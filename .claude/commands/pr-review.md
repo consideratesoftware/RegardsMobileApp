@@ -8,13 +8,17 @@ Treat the literal target `worktree` as all tracked and untracked changes against
 
 ## Stage 0 — pre-flight gate (do this yourself; no agents yet)
 
-1. Resolve the target:
+1. Resolve the target. If the target is empty, stop and say so. This holds
+   for every form below.
    - No argument: `origin/main...HEAD`, the target the org's verdict comments name.
    - Branch/ref argument: use that exact diff target.
    - `worktree`: use `git status --short`, `git diff HEAD`, and full reads of
      every untracked file.
-   - Plain run: `origin/main...HEAD in worktree <lane path>`, resolved with
-     `git -C <lane path>`. If the target is empty, stop and say so.
+   - `origin/main...HEAD in worktree <lane path>` (the org's plain run): the
+     target is `origin/main...HEAD`, resolved with `git -C <lane path>`.
+     Every later git command runs as `git -C <lane path> ...`, every path in
+     Stages 0 to 4 is under `<lane path>`, and Stage 1 passes `<lane path>`
+     as the worktree.
 2. Run the cheap mechanical checks an agent shouldn't burn tokens on. These
    4 are the whole set, with the exact commands in steps 2 to 4 of
    `.claude/agents/build-engineer.md`:
@@ -55,7 +59,7 @@ close. Do not paste the diff itself into agent prompts; agents pull it with git.
 
 ## Stage 2 — cross-checks (sequential, only if needed)
 
-- If pr-correctness returned COVERAGE HOLES and pr-tests has already reported: send the holes list to a fresh pr-tests run scoped to just those holes (haiku-cheap follow-up is fine via model override).
+- If pr-correctness returned COVERAGE HOLES and pr-tests has already reported: send the holes list to a fresh pr-tests run, with the Stage 1 prompt contents, scoped to just those holes (haiku-cheap follow-up is fine via model override).
 - If pr-code-quality returned ESCALATE items: forward them to pr-correctness via SendMessage for a ruling; its answer joins the findings.
 
 ## Stage 3 — merge into one review
@@ -109,10 +113,11 @@ is disabled by `--disallowedTools` in `.github/workflows/claude-pr-review.yml`,
 so it never runs this section. The Codex skill cannot run workflows either, so
 it does not use this section. The hosted review stays a separate gate.
 
-Use the verified run when the Workflow tool is available and someone can
-approve its prompt in this session. Otherwise run Stages 1 to 3 as written,
-with `codex-reviewer` in the same batch. An unattended `/org` run that cannot
-approve the prompt takes the plain path.
+Use the verified run when the Workflow tool is available and someone can approve
+its prompt in this session. Otherwise take the plain run:
+`/pr-review origin/main...HEAD in worktree <lane path>`, Stages 0 to 4 with each
+reviewer launched as its own agent call, and `codex-reviewer` in the same batch.
+An unattended `/org` run that cannot approve the prompt takes the plain path.
 
 Owner ruling, 2026-11-07: codify the verified run, and list every refuted
 finding in the PR REVIEW comment so the owner can see what was dropped.
@@ -162,10 +167,12 @@ Each verifier votes under the finding-verification mode in
 
 ### How to run it
 
-Run Stage 0 yourself. Start the workflow and every plain-run agent from a
-session whose folder is the root checkout on `main`, never a PR checkout, so the
-reviewer, verifier and codex-reviewer contracts load from main. Then start the
-workflow once:
+Run Stage 0 yourself, on the lane: resolve the target with `git -C <lane path>`,
+and stop if `git -C <lane path> diff --name-only origin/main...HEAD` prints
+nothing. Start the workflow and every plain-run agent from a session whose
+folder is the root checkout on `main`, never a PR checkout, so the reviewer,
+verifier and codex-reviewer contracts load from main. Then start the workflow
+once:
 
 ```
 Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
@@ -203,14 +210,17 @@ Codex.
 - (a) Main's copy. Export it with
   `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`,
   and start that copy by `scriptPath`. When `origin/main` has no copy, the plain
-  run takes its place: Stages 1 to 4 dispatched as individual agent calls, not
-  through any workflow script, with Codex run by the `codex-reviewer` agent. In
-  the plain run, every reviewer BLOCKER counts. Run (a) is the only run with
-  Codex. Save its review as `codex-<short sha>.md` and post it as the
-  `CODEX REVIEW:` comment.
-- (b) Optional: the PR's own copy, in the lane worktree, started by `scriptPath`
-  with `codex: false`. When it runs, each pr-* reviewer counts at the stricter
-  of runs (a) and (b). Run (a) alone is a complete counting review.
+  run takes its place: `/pr-review origin/main...HEAD in worktree <lane path>`,
+  Stages 0 to 4 with each reviewer an individual agent call, not through any
+  workflow script, and Codex run by the `codex-reviewer` agent as "Cross-model
+  review" says. In the plain run, every reviewer BLOCKER counts. Run (a) is the
+  only run with Codex. Save its review as `codex-<short sha>.md` and post it as
+  the `CODEX REVIEW:` comment.
+- (b) Optional: the PR's own copy, at
+  `<lane path>/.claude/workflows/pr-review-verified.js`, started by `scriptPath`
+  from the same root-checkout session, with `codex: false`. When it runs, each
+  pr-* reviewer counts at the stricter of runs (a) and (b). Run (a) alone is a
+  complete counting review.
 
 When run (b) runs, each pr-* reviewer counts at the stricter of its 2 runs, in
 the order FAILED, then REQUEST_CHANGES, then APPROVE. BLOCKERS and SHOULD_FIX
@@ -225,10 +235,10 @@ when `notChecked` is missing or not empty, or when it raised any BLOCKER, in
 `survivors` or in `refuted`. Refuted findings still get their `REFUTED:` lines.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
-pr-correctness and pr-tests runs (the workflow's reviewers can't take a
-SendMessage), then Stage 4. Repair items come from `workOrder`; `survivors`
-lists every surviving finding. Send each item to its owner as `org.md` Stage 3
-says.
+pr-correctness and pr-tests runs, each with the Stage 1 prompt contents (the
+workflow's reviewers can't take a SendMessage), then Stage 4. Repair items come
+from `workOrder`; `survivors` lists every surviving finding. Send each item to
+its owner as `org.md` Stage 3 says.
 
 ### What the workflow returns
 
@@ -256,9 +266,11 @@ says.
   nothing, repair from `survivors`.
 
 Don't post APPROVE while a pr-* reviewer is `FAILED` or has any verdict other
-than APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. The
-workflow passes Codex's RETRY and UNAVAILABLE through as its `verdict`. Handle
-Codex by its case:
+than APPROVE or REQUEST_CHANGES. Rerun a `FAILED` pr-* reviewer alone. Start a
+rerun the way Stage 1 starts a reviewer, with the lane worktree and the `git -C`
+sentence in its prompt. Start a `codex-reviewer` rerun as "Cross-model review"
+says. The workflow passes Codex's RETRY and UNAVAILABLE through as its
+`verdict`. Handle Codex by its case:
 
 - No Codex verdict on a run with `codex: true` (its entry is `FAILED` or
   missing): rerun `codex-reviewer` alone and use its report. RETRY and
@@ -315,8 +327,11 @@ lines as `org.md` Stage 3 says.
 ## Cross-model review (Claude Code only)
 
 The Codex verdict comes from the `codex-reviewer` agent type
-(`subagent_type: codex-reviewer`), which runs `$regards-pr-review` read-only
-against the same target. It is not a stage of this command: `/org` launches
-it in the same batch as `/pr-review`, and the merge conditions in
-`ENGINEERING_ORG.md` need both verdicts. Launch it by that type name, never
-as a general-purpose agent told to read `.claude/agents/codex-reviewer.md`.
+(`subagent_type: codex-reviewer`), which runs `$regards-pr-review` read-only.
+Give it the target `origin/main...HEAD` and, as its own field, the lane worktree
+path. The compound `in worktree` form is `/pr-review`'s argument only;
+`codex-reviewer.md` never counts a verdict line that names another target. It is
+not a stage of this command: `/org` launches it in the same batch as
+`/pr-review`, and the merge conditions in `ENGINEERING_ORG.md` need both
+verdicts. Launch it by that type name, never as a general-purpose agent told to
+read `.claude/agents/codex-reviewer.md`.

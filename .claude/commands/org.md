@@ -87,10 +87,11 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    its sha, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR
    needs run (a), with Codex in run (a) only; run (b) is optional), or, when it
    can't run, `/pr-review origin/main...HEAD in worktree <tmp>` and the
-   `codex-reviewer` agent type. Post the result as a new verdict comment, then
-   `git worktree remove <tmp>`. A RETRY gets the one rerun Stage 3 allows. A
-   Codex UNAVAILABLE is an owner gate on any head: interview Sid before any
-   rerun.
+   `codex-reviewer` agent type with the target `origin/main...HEAD` and the
+   worktree `<tmp>`, both from the root checkout on `main`. Post the result as a
+   new verdict comment, then `git worktree remove <tmp>`. A RETRY gets the one
+   rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any head:
+   interview Sid before any rerun.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. When
    `git -C <lane worktree> diff --name-only origin/main...HEAD` lists
@@ -163,8 +164,8 @@ complete counting review. If it can't run, run
 `/pr-review origin/main...HEAD in worktree <lane path>` from the root checkout
 on `main`, and launch the `codex-reviewer` agent type
 (`subagent_type: codex-reviewer`) in the same batch, with the target
-`origin/main...HEAD in worktree <lane path>`, the item's §14 row (or "infra, no
-§14 row" for an infra PR), and its claimed R-numbers. The three-dot target
+`origin/main...HEAD`, the worktree `<lane path>`, the item's §14 row (or "infra,
+no §14 row" for an infra PR), and its claimed R-numbers. The three-dot target
 compares against the merge base, so commits that landed on `main` after the lane
 branched don't show up as reversions. Treat blockers from both the same way:
 they go to the slice owner (design questions to `tech-lead` first), one round,
@@ -217,12 +218,14 @@ or without a saved codex file, and on any head: an UNAVAILABLE is never rerun
 automatically. RETRY and UNAVAILABLE runs don't use up a review round. Two
 rounds maximum, then the second opinion.
 
-Whenever the head moves after a review (a repair, a rebase, an on-call
-fix), run the verified run again, or both `/pr-review origin/main...HEAD` and
-`codex-reviewer`, on the new head before Stage 4 re-checks merge conditions;
-the release manager can't launch agents. While a Codex UNAVAILABLE gate is open,
-the review on the new head runs with `codex: false`, and `codex-reviewer` is
-not launched. Sid's answer releases the gate.
+Whenever the head moves after a review (a repair, a rebase, an on-call fix), run
+the verified run again, or both
+`/pr-review origin/main...HEAD in worktree <lane path>` and `codex-reviewer`
+(target `origin/main...HEAD`, worktree `<lane path>`), from the root checkout on
+`main`, on the new head before Stage 4 re-checks merge conditions; the release
+manager can't launch agents. While a Codex UNAVAILABLE gate is open, the review
+on the new head runs with `codex: false`, and `codex-reviewer` is not launched.
+Sid's answer releases the gate.
 
 Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
 2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, you may
@@ -232,7 +235,10 @@ routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
 the current head, unless a Codex UNAVAILABLE gate is open. Rerun
 `pr-code-quality` and `pr-tests` unless the new commits are Markdown-only under
-the carry rule. A verified run for this recheck passes `since`, the last
+the carry rule. In the plain run, start each rerun from the root checkout on
+`main` with the Stage 1 prompt in `pr-review.md` (the lane worktree and the
+`git -C` sentence), and `codex-reviewer` with the target `origin/main...HEAD`
+and the worktree. A verified run for this recheck passes `since`, the last
 reviewed head, and the reviewers it reruns. Ask Sid only if a blocker survives 2
 rounds or a fix needs a product decision. The `PR REVIEW:` comment lists every
 reviewer that ran on a `REVIEWERS:` line with its verdict. A scoped recheck adds
@@ -252,10 +258,11 @@ manager checks each `CARRIED:` line against them, even when the reviewer also
 has an APPROVE at the head, and rejects one that fails. If you aren't sure,
 rerun the reviewer.
 
-Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1
-and Stage 3 alike. Don't start a general-purpose agent and tell it to read
-`.claude/agents/codex-reviewer.md`: that was a workaround from before the
-type existed, and it runs without the contract's tool list and model.
+Launch Codex reviews only as the `codex-reviewer` agent type, in Stage 1 and
+Stage 3 alike, with the target `origin/main...HEAD` and the lane worktree as
+separate fields. Don't start a general-purpose agent and tell it to read
+`.claude/agents/codex-reviewer.md`: that was a workaround from before the type
+existed, and it runs without the contract's tool list and model.
 
 Second opinion: at most once per lane, before parking it on a second
 REFUTED or a second REQUEST_CHANGES, launch `codex:codex-rescue` (from the
@@ -302,11 +309,13 @@ counting review is run (a); see "Self-edit PRs" in `pr-review.md`):
   covers both). While a Codex UNAVAILABLE gate is open, the run on the new head
   uses `codex: false`, and `codex-reviewer` is not launched;
 - `carry rejected: <reviewer>` or `reviewer missing: <name>`: that reviewer
-  only, and post a new `PR REVIEW:` comment that lists it in `RERAN:` and
-  repeats every `CARRIED:` line that still stands;
+  only, started as Stage 3's scoped rechecks say, and post a new `PR REVIEW:`
+  comment that lists it in `RERAN:` and repeats every `CARRIED:` line that still
+  stands;
 - no `REVIEWERS:` line on the newest `PR REVIEW:` comment: the verified run
-  (`pr-review.md`, "Claude Code org only"), or `/pr-review` in full when it
-  can't run;
+  (`pr-review.md`, "Claude Code org only"), or
+  `/pr-review origin/main...HEAD in worktree <lane path>` in full when it can't
+  run;
 - the Codex review file is missing or its sha differs, and the verdict is not
   UNAVAILABLE (an owner gate, Stage 1): Codex, and save the new file;
 - more than 100 comments: check the PR's verdict comments yourself, and

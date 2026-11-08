@@ -67,7 +67,9 @@ TF-## READY
       → build-engineer gates each before commit
       → verifier tries to refute the slice
   → tech-writer: doc siblings, register, a11y rows
-  → /pr-review (review board) + codex-reviewer, in parallel
+  → /pr-review origin/main...HEAD in worktree <lane> (review board) +
+    codex-reviewer (target origin/main...HEAD, worktree <lane>), in
+    parallel, both started from the root checkout on main
     (or the verified run, which includes Codex; Claude Code only)
   → on-call-engineer, pre-PR mode: the verified run's scripts, CI and workflow
     items, committed and not pushed
