@@ -9,11 +9,10 @@ import Testing
 /// contact the system store still exposes: the reconcile un-archives it, so a
 /// pass that ran before the reconcile would not schedule it.
 ///
-/// The production runtime uses the real clock, so these tests assert that a
-/// long-overdue contact has a cadence row, not when it fires. Inside an
-/// allowed slot (weekdays 12:00-13:00 and 18:00-22:00 in the default window)
-/// the run writes that row fired, outside one pending, so a test looks the row
-/// up in either state.
+/// The runtime is `makeProduction` with its clock pinned to `now`, a Saturday.
+/// The default window allows weekdays only, so every row the pass writes is
+/// pending, whatever day the suite runs on. `productionRuntimeWritesNoOccasionRows`
+/// keeps the wall clock: it asserts that rows exist, not when they fire.
 @MainActor
 struct SchedulingPassTriggerOrderTests {
     private let now = Date(timeIntervalSince1970: 1_785_600_000)
@@ -45,14 +44,14 @@ struct SchedulingPassTriggerOrderTests {
     private func coordinator(environment: AppEnvironment, source: any ContactsSource) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(dependencies: .init(
-            makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
+            makeRuntime: { try await AppRuntime.makeProduction(environment: environment, clock: { now }) },
             contactsSource: source,
             clock: { now }))
     }
 
-    /// A pending or fired cadence row, whichever the wall clock makes it. `fetchSchedule()` hides the rows of an
-    /// archived or untracked contact, so it alone can't fail for one; `fetchPending(forContact:)` has no such
-    /// filter, so a pending row of a hidden contact shows too.
+    /// A pending or fired cadence row. `fetchSchedule()` hides the rows of an archived or untracked contact, so it
+    /// alone can't fail for one; `fetchPending(forContact:)` has no such filter, and the pinned clock makes every
+    /// row the pass writes pending, so a row of a hidden contact shows.
     private static func hasCadenceRow(_ environment: AppEnvironment, _ contact: Contact) async throws -> Bool {
         let scheduled = try await environment.reminders.fetchSchedule().reminders
         let pending = try await environment.reminders.fetchPending(forContact: contact.id)
