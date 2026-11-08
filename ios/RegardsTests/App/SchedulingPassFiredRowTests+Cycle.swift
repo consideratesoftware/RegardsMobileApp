@@ -90,4 +90,39 @@ extension SchedulingPassFiredRowTests {
             #expect(await fixture.reminders.writeCount == writes, "at \(clock)")
         }
     }
+
+    // MARK: - Occasion rolled back a year
+
+    /// A fired occasion holds every occurrence up to its day, not only the same day. A clock set back a year
+    /// puts the next occurrence in 2025, a year before the 2026 fire time, and the old same-day hold let a
+    /// pending 2025-06-12 09:00 row through.
+    @Test(
+        "A fired occasion survives the clock being set back a year",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func firedOccasionSurvivesAClockSetBackAYear(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-12 08:00", occasions: { contacts in
+            contacts.map {
+                ContactOccasion(
+                    contactId: $0.id, kind: .birthday, monthDay: MonthDay(month: 6, day: 12), label: "Birthday")
+            }
+        })
+        let contact = try await fixture.addContact(1, cadenceDays: 30, lastInteracted: "2026-06-11 10:00")
+        let birthdayID = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
+        try await fixture.pass.runFull()
+        #expect(try await fixture.occasionRow(contact, .birthday)?.scheduledFor == PassFixture.at("2026-06-12 09:00"))
+        fixture.setNow("2026-06-12 09:30")
+        try await fixture.pass.runFull()
+        let fired = try #require(try await fixture.row(birthdayID))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == PassFixture.at("2026-06-12 09:00"))
+        let writes = await fixture.reminders.writeCount
+
+        fixture.setNow("2025-06-11 10:00")
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(birthdayID) == fired)
+        #expect(try await fixture.occasionRow(contact, .birthday) == nil)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
 }
