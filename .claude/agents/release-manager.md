@@ -125,8 +125,8 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
   --jq '[.check_runs[] | select(.app.slug == "regards-staged-review")]
         | sort_by(.completed_at // .started_at) | last | .output.text // empty' \
   > "<scratch>/hosted-review.txt"
-git -C "<root checkout>" show origin/main:scripts/count-hosted-blockers.sh > "<scratch>/count-hosted-blockers.sh"
-bash "<scratch>/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
+git -C "<root checkout>" show origin/main:scripts/count-hosted-blockers.sh > "<scratch>/count-hosted-blockers.sh" \
+  && bash "<scratch>/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
 bash "<lane>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   # own copy: only if the PR changes this script
 ```
 
@@ -137,7 +137,8 @@ under review could have edited its own copy. A PR that itself changes
 engineering manager's prompt. Run both copies. If either prints `MALFORMED` or
 exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
 count is the higher `BLOCKERS <n>`. Any other output from either copy fails
-closed. Every other PR runs only the copy exported from `origin/main`. The
+closed. A count passes only on exit 0 with a `BLOCKERS <n>` line on stdout, and
+only `BLOCKERS 0` counts as zero. Every other PR runs only the copy exported from `origin/main`. The
 script prints one line, `PENDING: <why>`, `BLOCKERS <n>`, or
 `MALFORMED: <why>`; its header and its tests in
 `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
@@ -185,11 +186,12 @@ lane's refs, and this fetch brings them up to date.
   3. This passes, with `<lane>` the absolute lane worktree path from your
      prompt:
      ```
-     git -C "<root checkout>" show origin/main:scripts/check-carried-approval.sh > "<scratch>/check-carried-approval.sh"
-     bash "<scratch>/check-carried-approval.sh" "<lane>" <S> <head sha>
+     git -C "<root checkout>" show origin/main:scripts/check-carried-approval.sh > "<scratch>/check-carried-approval.sh" \
+       && bash "<scratch>/check-carried-approval.sh" "<lane>" <S> <head sha>
      bash "<lane>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy: only if the PR changes this script
      ```
-     Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
+     Run it with `bash`. For every PR, a carry passes only on exit 0 with stdout
+     exactly `CARRY PASSES`; anything else fails closed.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
      other nonzero exit is a script error; all of them fail the carry. Use the
      copy exported from `origin/main` (the command above), not the
