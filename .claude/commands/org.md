@@ -147,8 +147,9 @@ against the lane's worktree with `codex: true`, so the review board and Codex
 run in one workflow. Start it by `scriptPath` to a copy exported from
 `origin/main`, never by `name`. For a PR that adds or changes
 `.claude/workflows/pr-review-verified.js`, the self-edit rule in that section
-applies: 2 independent runs, one from `origin/main`'s copy and one from the PR's
-own copy, counted as that section says. If it can't run, run
+applies: run (a), from `origin/main`'s copy or the plain run where main has none,
+is the counting review and the only one with Codex. The PR's own copy (run (b))
+is optional and runs with `codex: false`. If it can't run, run
 `/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
 batch, with the worktree, the same target `origin/main...HEAD`, the item's §14
@@ -171,7 +172,8 @@ comment, as `/pr-review` does for its own findings.
 Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
 verdict, and give that path to `release-manager`; the release manager checks
-each `DISPUTED:` line against it. A resumed PR whose head has no such file
+each `DISPUTED:` line against it. On a self-edit PR, only run (a)'s Codex review
+is saved. A resumed PR whose head has no such file
 gets a fresh Codex run (Stage 1). In a verified run, the full review is the
 workflow's `codexReview`.
 
