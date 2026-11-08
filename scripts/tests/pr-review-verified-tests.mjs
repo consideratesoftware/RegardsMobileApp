@@ -1039,8 +1039,8 @@ test('an UNAVAILABLE Codex comes back as UNAVAILABLE, never APPROVE', async () =
 })
 
 // Pin: the fetch keeps Codex from diffing against a stale origin/main, and the
-// second sentence keeps the agent from reporting APPROVE for a Codex that said
-// otherwise.
+// sentence "Never report APPROVE unless Codex did." keeps the agent from
+// reporting APPROVE for a Codex that said otherwise.
 test('the Codex prompt carries its safeguards', async () => {
   const { calls } = await runWorkflow({
     args: { codex: true },
