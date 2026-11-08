@@ -416,8 +416,8 @@ public actor SchedulingPass {
         await lock()
         defer { unlock() }
         let cadenceId = Self.reminderID(contactId: contactId, kind: .cadence)
-        // Invariant: any fired cadence row in a snapshot was written after the contact's last recorded interaction
-        // (on a 25-hour day its slot can precede it), so the no-re-nag hold never keeps a row the user answered.
+        // Invariant: only this span moves `lastInteractedAt`, after clearing the row, so every fired cadence row was
+        // derived after that move (its slot can precede it on a 25-hour day). The hold never keeps an answered row.
         var clearedFrom: ReminderState?
         if try await reminders.transitionState(id: cadenceId, from: .pending, to: .userCaughtUp) {
             clearedFrom = .pending
