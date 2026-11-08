@@ -31,8 +31,9 @@ REQUEST_CHANGES into APPROVE when verifiers refute its findings (rule 3), marks
 a pr-* reviewer FAILED when its `reviewedSha` is not a prefix of head
 (rule 6), and
 turns an APPROVE with NOT CHECKED entries into REQUEST_CHANGES (rule 7). The
-Codex skill has none of these steps; see `.claude/commands/pr-review.md`, "The
-workflow's rules".
+Codex pr-* contracts already forbid an APPROVE with a required check left
+unchecked. Only the enforcement steps differ, and the Codex skill has none of
+them; see `.claude/commands/pr-review.md`, "The workflow's rules".
 
 ## Hosted review gate
 
