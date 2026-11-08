@@ -10,8 +10,9 @@
 # ios/, android/, ios/docs/, android/docs/), so every case that tests one
 # exclusion puts its path under ios/docs/, where the allowlist alone would
 # pass it. Deleting that exclusion from the script then breaks that case and
-# no other. The cases at the root of a behavior folder (.claude/x.md and the
-# like) fail on the allowlist as well, so they check the outcome, not the arm.
+# no other. The script has no exclusion for a behavior folder at the root, so
+# the cases there (.claude/x.md and the like) fail on the allowlist alone and
+# check the outcome.
 
 set -euo pipefail
 

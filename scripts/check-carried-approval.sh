@@ -16,8 +16,11 @@
 # under ios/ or android/, or anywhere under ios/docs/ or android/docs/ (the
 # doc roots, matched case-sensitively), and none of these hold (the exclusions
 # match in any letter case):
-#   - the path is under .claude/, .codex/, .agents/, scripts/ or .github/,
-#     nested copies included;
+#   - the path is inside a .claude/, .codex/, .agents/, scripts/ or .github/
+#     folder below the repository root (ios/docs/scripts/x.md). Paths that
+#     start with one of these folders (scripts/x.md) are not listed: the
+#     allowlist rejects them, as it rejects any root folder but ios/ and
+#     android/;
 #   - the path is named AGENTS*.md or CLAUDE*.md at any depth
 #     (AGENTS.override.md, CLAUDE.local.md);
 #   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
@@ -77,13 +80,14 @@ while IFS= read -r -d '' meta; do
   done
   # Directory and agent-file names match in any case: a case-insensitive
   # checkout (macOS) treats .CLAUDE/ and .claude/ as the same directory.
+  # The behavior folders are listed only as nested copies (*/scripts/*). A path
+  # that starts with one (scripts/x.md) fails the allowlist below.
   # Only this one case block may sit between shopt -s and shopt -u. nocasematch
   # also applies to every other case and [[ =~ ]] test while it is on, and the
   # doc-path test below must stay case-sensitive.
   shopt -s nocasematch
   case "$path" in
-    .claude/* | */.claude/* | .codex/* | */.codex/* | .agents/* | */.agents/* \
-      | scripts/* | */scripts/* | .github/* | */.github/* )
+    */.claude/* | */.codex/* | */.agents/* | */scripts/* | */.github/* )
       fail "behavior path never carries: $path" ;;
     AGENTS*.md | */AGENTS*.md | CLAUDE*.md | */CLAUDE*.md )
       fail "agent instruction file never carries: $path" ;;
