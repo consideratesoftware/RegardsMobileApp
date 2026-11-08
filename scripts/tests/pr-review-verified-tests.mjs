@@ -4,8 +4,8 @@
 //   WORKFLOW_SCRIPT=<path> node scripts/tests/pr-review-verified-tests.mjs
 //
 // The second form runs the same cases against another copy of the script. Use
-// it to check that a test fails on old code: point it at the old copy and the
-// cases that guard the new behavior must fail.
+// it to check that a test discriminates: point it at a copy with a behavior
+// removed or changed, and the case that guards that behavior must fail.
 //
 // How the script is loaded. The workflow script is not a normal module. Claude
 // Code runs it in a sandbox that provides 6 globals: agent(), parallel(),
@@ -189,9 +189,9 @@ test('votes are matched by exact location: Delta.swift:1 does not take the votes
   assert.deepEqual(result.survivors.map(s => s.location), ['Delta.swift:10'])
 })
 
-// Pin: passes on the old script. Rule 1 refutes on 2 explicit real=false votes.
-// An answer with no `real` field, or one that is not a boolean, is a vote for
-// real. That is the fail-safe: a malformed answer can never drop a finding.
+// Pin: rule 1 refutes on 2 explicit real=false votes. An answer with no `real`
+// field, or one that is not a boolean, is a vote for real. That is the
+// fail-safe: a malformed answer can never drop a finding.
 test('only an explicit real=false refutes: an answer with no real field counts as real', async () => {
   const noReal = { reason: 'no real field' }
   // truth has no real field, scope says false, impact says true. One explicit
@@ -512,9 +512,9 @@ test('a pr-* APPROVE with an empty notChecked stays APPROVE', async () => {
   assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
 })
 
-// Pin: passes on the old script. Codex has no NOT CHECKED line and its verdict
-// is its own, so the notChecked rule does not apply to it and its prompt and
-// schema do not carry the pr-* sentence.
+// Pin: Codex has no NOT CHECKED line and its verdict is its own, so the
+// notChecked rule does not apply to it, and its prompt and schema do not carry
+// the pr-* sentence.
 test('a Codex APPROVE with notChecked entries stays APPROVE, and Codex is not told the pr-* rule', async () => {
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-tests'], codex: true },
@@ -529,9 +529,9 @@ test('a Codex APPROVE with notChecked entries stays APPROVE, and Codex is not to
   assert.doesNotMatch(codexCall.opts.schema.properties.notChecked.description, /REQUEST_CHANGES/)
 })
 
-// Pin: passes on the old script. A REQUEST_CHANGES flips to APPROVE only when a
-// verifier refuted something. With no BLOCKER or FIX finding there is nothing
-// to refute, so nothing may flip it.
+// Pin: a REQUEST_CHANGES flips to APPROVE only when a verifier refuted
+// something. With no BLOCKER or FIX finding there is nothing to refute, so
+// nothing may flip it.
 test('failClosed: a pr-* REQUEST_CHANGES with no BLOCKER or FIX finding stays REQUEST_CHANGES', async () => {
   const cases = [
     ['no findings', []],
@@ -631,9 +631,9 @@ test('REQUEST_CHANGES with nothing refuted stays REQUEST_CHANGES', async () => {
   assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
 })
 
-// Pin: passes on the old script. The pr-code-quality FIX clause (rule 3) only
-// stops a REQUEST_CHANGES from flipping to APPROVE. It never turns a reported
-// APPROVE into REQUEST_CHANGES, for pr-code-quality or anyone else.
+// Pin: the pr-code-quality FIX clause (rule 3) only stops a REQUEST_CHANGES
+// from flipping to APPROVE. It never turns a reported APPROVE into
+// REQUEST_CHANGES, for pr-code-quality or anyone else.
 test('a pr-code-quality APPROVE with a surviving FIX stays APPROVE: the FIX clause only blocks the flip', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-code-quality', 'pr-correctness'] },
@@ -692,8 +692,8 @@ test('codexVerdictUnchanged: a refuted Codex BLOCKER leaves Codex REQUEST_CHANGE
   assert.equal(result.refuted[0].reviewer, 'codex-reviewer')
 })
 
-// Pin: passes on the old script. The reviewedSha rule is for pr-* reviewers
-// only; Codex's verdict is never changed here.
+// Pin: the reviewedSha rule is for pr-* reviewers only. Codex's sha does not
+// change Codex's verdict.
 test('a Codex reviewedSha that is not head does not change the Codex verdict', async () => {
   const { result } = await runWorkflow({
     args: { reviewers: ['pr-tests'], codex: true },
@@ -802,9 +802,9 @@ test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILA
   assert.doesNotMatch(codexCall.prompt, /retry once/i)
 })
 
-// Pin: passes on the old script. Without the fetch Codex would diff against a
-// stale origin/main; without the second sentence the agent could report APPROVE
-// for a Codex that said otherwise.
+// Pin: the fetch keeps Codex from diffing against a stale origin/main, and the
+// second sentence keeps the agent from reporting APPROVE for a Codex that said
+// otherwise.
 test('the Codex prompt carries its safeguards', async () => {
   const { calls } = await runWorkflow({
     args: { codex: true },
@@ -819,8 +819,7 @@ test('the Codex prompt carries its safeguards', async () => {
   assert.match(prompt, /Its first line is the verdict line `CODEX REVIEW: <VERDICT> @ <short sha> vs origin\/main\.\.\.HEAD \| codex-cli <version>`\./)
 })
 
-// Pin: passes on the old script. Rule 5 says Codex's RETRY comes back as
-// written, and only UNAVAILABLE had a test.
+// Pin: rule 5 says Codex's RETRY comes back as written.
 test('codexRetryPassesThrough: a RETRY Codex comes back as RETRY, never APPROVE', async () => {
   const text = 'CODEX REVIEW: RETRY @ 0123456 vs origin/main...HEAD | codex-cli 1.2.3\nWORKTREE: /tmp/worktree\nVERDICT: RETRY\nREASON: timeout\nREVIEW:\nlast 20 lines of output\n'
   const { result, calls } = await runWorkflow({
@@ -890,9 +889,9 @@ test('codexReview is null when Codex was not asked for, or returned nothing', as
   assert.equal(verdictOf(failed.result, 'codex-reviewer'), 'FAILED')
 })
 
-// Pin: passes on the old script. runWorkflow() always sends codex: false, so no
-// other test leaves `codex` out. A guard that rejected undefined would have
-// passed the suite and broken every caller that omits the key.
+// Pin: runWorkflow() always sends codex: false, so this is the one test that
+// leaves `codex` out. The guard on codex has to accept a missing key, because
+// that is how a caller says "no Codex".
 test('codex left out runs no Codex, and nothing throws', async () => {
   const base = { title: 't', worktree: '/w', branch: 'b', head: HEAD, reviewers: ['pr-tests'], contextFile: '/c' }
   const scenarios = [
@@ -1105,7 +1104,7 @@ test('the synthesizer is told who owns infra files: on-call-engineer for scripts
   assert.match(synth.prompt, /scripts and their tests under scripts\/, files under \.github\/ other than \.md, and workflow scripts under \.claude\/workflows\/ → on-call-engineer/)
   assert.match(synth.prompt, /and prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer/)
   assert.match(synth.prompt, /every \.md file outside ios\/Regards\* and android\/\*\/src \(ios\/docs, android\/docs, \.github\/, and the root docs/)
-  // The wording that left a .github/ .md file with 2 owners is gone.
+  // No .github/ file matches the rules of 2 owners.
   assert.doesNotMatch(synth.prompt, /CI files under \.github\//)
   assert.doesNotMatch(synth.prompt, /\.agents\/ and \.github\/ → tech-writer/)
   assert.doesNotMatch(synth.prompt, /→ chore/)
@@ -1113,15 +1112,14 @@ test('the synthesizer is told who owns infra files: on-call-engineer for scripts
   // App tests keep their owner, and the rules do not overlap.
   assert.match(synth.prompt, /test files under ios\/ or android\/ → qa-engineer/)
   assert.doesNotMatch(synth.prompt, /; test files → qa-engineer/)
-  // The work order may name the new owner.
+  // The work order may name these owners.
   const owners = synth.opts.schema.properties.items.items.properties.owner.enum
   assert.ok(owners.includes('on-call-engineer'))
-  assert.ok(!owners.includes('chore'), 'the old owner name is gone')
+  assert.ok(!owners.includes('chore'), 'chore is not an owner')
   assert.ok(owners.includes('tech-writer'))
 })
 
-// Pin: this passes on the old script too. It fixes what the synthesizer's
-// answer looks like on its way out.
+// Pin: the work order the synthesizer returns comes back as it was written.
 test('workOrderReturned: the synthesizer\'s work order comes back as it was written', async () => {
   const stub = { items: [{ id: '1', severity: 'BLOCKER', owner: 'ios-engineer', change: 'x' }] }
   const { result } = await runWorkflow({
@@ -1208,8 +1206,8 @@ test('the prompts name a scoped recheck only when since is given', async () => {
   assert.match(scoped.calls[0].prompt, new RegExp(`git diff ${since}\\.\\.${HEAD}`))
 })
 
-// Pin: passes on the old script. An agent that is not told the head, worktree,
-// branch, context file and target would review whatever it finds.
+// Pin: an agent that is not told the head, worktree, branch, context file and
+// target would review whatever it finds.
 test('every agent prompt names the head, worktree, branch, context file and target', async () => {
   const { calls } = await runWorkflow({
     args: { reviewers: ['pr-correctness'], codex: true },
@@ -1232,8 +1230,8 @@ test('every agent prompt names the head, worktree, branch, context file and targ
   }
 })
 
-// Pin: passes on the old script. The votes are counted by lens, so each
-// verifier has to get the question for its own lens.
+// Pin: the votes are counted by lens, so each verifier has to get the question
+// for its own lens.
 test('each verifier gets its own lens question', async () => {
   const { calls } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
