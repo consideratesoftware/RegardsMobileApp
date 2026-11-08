@@ -101,9 +101,9 @@ If the PR claims R-closures (§19): verify each acceptance check yourself agains
 
 The verified run is how the Claude Code org runs this review. It is the one
 exception to the Stage 3 rule that any BLOCKER means REQUEST_CHANGES. The
-hosted review applies Stages 1 to 4 only, does not read this section, and
-cannot run workflows. The Codex skill cannot run workflows either, so it does
-not use this section. The hosted review stays a separate gate.
+hosted review reads this file but applies Stages 1 to 4 only, and it has no
+Workflow tool, so it never runs this section. The Codex skill cannot run
+workflows either, so it does not use this section. The hosted review stays a separate gate.
 
 Use the verified run when the Workflow tool is available and someone can
 approve its prompt in this session. Otherwise run Stages 1 to 3 as written,
