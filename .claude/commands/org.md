@@ -151,7 +151,12 @@ row, and its claimed R-numbers. The
 three-dot target compares against the merge base, so commits that landed on
 `main` after the lane branched don't show up as reversions. Treat blockers
 from both the same way: they go to the slice owner (design questions to
-`tech-lead` first), one round, then both review again. Drop a Codex finding
+`tech-lead` first), one round, then both review again. In a verified run, send
+each `workOrder` item by its `owner`: `on-call-engineer` (scripts, CI and
+workflow scripts), `tech-writer`, `qa-engineer`, `ios-engineer` and
+`senior-ios-engineer` to that role; `EM-body` items you apply to the PR body
+yourself; `tech-lead-ruling` items to `tech-lead`; `owner-question` items to an
+interview with Sid. Drop a Codex finding
 only when it contradicts `ARCHITECTURE.md`; you write the dispute on a
 `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>` line in that verdict's PR
 comment, as `/pr-review` does for its own findings.
