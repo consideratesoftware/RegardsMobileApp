@@ -9,10 +9,13 @@
 # Fixture layout. The script allows only the doc roots (the repository root,
 # ios/, android/, ios/docs/, android/docs/), so every case that tests one
 # exclusion puts its path under ios/docs/, where the allowlist alone would
-# pass it. Deleting that exclusion from the script then breaks that case and
-# no other. The script has no exclusion for a behavior folder at the root, so
-# the cases there (.claude/x.md and the like) fail on the allowlist alone and
-# check the outcome.
+# pass it. The 4 root instruction-file cases (root_claude_local_md,
+# root_architecture_md, root_agents_md, root_claude_md) are the exception:
+# they sit at the root, which the allowlist also passes, so they too fail only
+# on their exclusion. Deleting that exclusion from the script then breaks that
+# case and no other. The script has no exclusion for a behavior folder at the
+# root, so the cases there (.claude/x.md and the like) fail on the allowlist
+# alone and check the outcome.
 
 set -euo pipefail
 
