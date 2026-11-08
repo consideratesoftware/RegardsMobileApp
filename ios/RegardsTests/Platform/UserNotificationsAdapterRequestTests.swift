@@ -206,13 +206,15 @@ struct UserNotificationsAdapterRequestTests {
         #expect(Self.gmtCalendar.date(from: trigger.dateComponents) == fireDate)
     }
 
-    /// The system reads a trigger's components in the calendar they carry, or in
-    /// the device's calendar when they carry none. A device set to the Buddhist
-    /// or Japanese calendar would then read year 2026 as a year in that
-    /// calendar's numbering and fire years off. `makeRequest` stores a Gregorian
-    /// calendar in GMT in the components, whatever the device zone, and `decode`
-    /// resolves in the same calendar.
-    @Test("The trigger's components carry a Gregorian calendar in GMT, so any device calendar reads the same instant")
+    /// The design intent: the system reads a trigger's components in the
+    /// calendar they carry, or in the device's calendar when they carry none,
+    /// and a device set to the Buddhist or Japanese calendar would read year
+    /// 2026 in that calendar's numbering and fire years off. Whether the OS
+    /// honors the stored calendar is untested here; device check (f) in
+    /// TESTFLIGHT_PLAN.md tests the OS side. This test pins what `makeRequest`
+    /// stores: a Gregorian calendar in GMT in the components, whatever the
+    /// device zone. `decode` resolves in the same calendar.
+    @Test("The trigger's components carry a Gregorian calendar in GMT")
     func triggerComponentsCarryGregorianCalendarInGMT() throws {
         let now = try Self.utc(Self.now)
         let zone = try #require(TimeZone(identifier: "America/Los_Angeles"))
