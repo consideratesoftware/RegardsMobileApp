@@ -100,13 +100,13 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    script, labeled as the PR's own copy of that script. The release manager
    exports that copy from the head sha with
    `git -C <lane> show <head sha>:scripts/<name>.sh > <scratch>/own-<name>.sh`
-   and reads that file before it runs. Network use, writes outside
-   `<scratch>`, or credential reads mean fail closed. Otherwise it runs that
-   same file with a scrubbed environment
-   (`env -i PATH=/usr/bin:/bin HOME=<scratch> TMPDIR=<scratch>`), so a
-   `mktemp` in the script stays inside `<scratch>`. It will route red checks
-   to `on-call-engineer`, park on owner gates, or merge when all conditions
-   hold.
+   and reads that file before it runs. Network use, writes outside `<scratch>`,
+   or credential reads mean fail closed. Otherwise it runs that same file with a
+   scrubbed environment
+   (`env -i PATH=/usr/bin:/bin HOME=<scratch> TMPDIR=<scratch>`), so a `mktemp`
+   with a `${TMPDIR:-/tmp}/...` template stays inside `<scratch>`. It will route
+   red checks to `on-call-engineer`, park on owner gates, or merge when all
+   conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 

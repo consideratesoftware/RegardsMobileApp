@@ -142,22 +142,23 @@ engineering manager's prompt. Before the own copy runs, read the blob that the
 command exports. If it uses the network, writes outside `<scratch>`, or reads
 credentials, fail closed and do not run it. Otherwise run that blob with a
 scrubbed environment, as the command shows. `TMPDIR` is `<scratch>` there, so a
-`mktemp` in the script stays inside `<scratch>`. Run both copies. If either
-prints `MALFORMED` or exits nonzero, fail closed; if either prints `PENDING`,
-wait; otherwise the count is the higher `BLOCKERS <n>`. Any other output from
-either copy fails closed. A count passes only on exit 0 with a `BLOCKERS <n>`
-line on stdout, and only `BLOCKERS 0` counts as zero. Every other PR runs only
-the copy exported from `origin/main`. The script prints one line,
-`PENDING: <why>`, `BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its
-tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
-`PENDING` means the review hasn't run on this head: wait and query again, and
-never count it as zero. Only `BLOCKERS 0` counts as zero, and the script prints
-it only when the text also has `VERDICT: APPROVE`. `MALFORMED` fails closed:
-treat it as unresolved blockers, quote the section, and report it. A nonzero
-exit from this script, or from `check-carried-approval.sh` below, fails closed:
-the blockers stand and the carry is rejected. Also check that the text's
-`HEAD SHA:` line equals `<head sha>`. Quote the blockers verbatim in your
-report.
+`mktemp` with a `${TMPDIR:-/tmp}/<name>.XXXXXX` template stays inside
+`<scratch>`. On macOS a bare `mktemp -d` ignores `TMPDIR`, so it counts as a
+write outside `<scratch>`. Run both copies. If either prints `MALFORMED` or
+exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
+count is the higher `BLOCKERS <n>`. Any other output from either copy fails
+closed. A count passes only on exit 0 with a `BLOCKERS <n>` line on stdout, and
+only `BLOCKERS 0` counts as zero. Every other PR runs only the copy exported
+from `origin/main`. The script prints one line, `PENDING: <why>`,
+`BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its tests in
+`scripts/tests/count-hosted-blockers-tests.sh` define the rules. `PENDING` means
+the review hasn't run on this head: wait and query again, and never count it as
+zero. Only `BLOCKERS 0` counts as zero, and the script prints it only when the
+text also has `VERDICT: APPROVE`. `MALFORMED` fails closed: treat it as
+unresolved blockers, quote the section, and report it. A nonzero exit from this
+script, or from `check-carried-approval.sh` below, fails closed: the blockers
+stand and the carry is rejected. Also check that the text's `HEAD SHA:` line
+equals `<head sha>`. Quote the blockers verbatim in your report.
 
 Red or blockers: hand off to `on-call-engineer` with the findings, then watch
 again. At most 2 rounds, then park.
@@ -209,22 +210,23 @@ lane's refs, and this fetch brings them up to date.
      the engineering manager's prompt. Before the own copy runs, read the blob
      the command exports: network use, writes outside `<scratch>`, or credential
      reads mean fail closed. Run it as the command shows; `TMPDIR` is
-     `<scratch>`, so its `mktemp -d` stays inside `<scratch>`. Run both copies;
-     the carry stands only if both print `CARRY PASSES`. Every other PR runs
-     only the copy exported from `origin/main`. The rule: a carry needs a diff
-     of lower-case `.md` files only, each at the repository root, directly under
-     `ios/` or `android/`, or under `ios/docs/` or `android/docs/`. It never
-     carries a path under any `src` or `schemas` folder below `android/`, at any
-     depth, such as `android/docs/src/x.md`. It never carries a path under
-     `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested copies
-     included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any depth and in
-     any letter case, or any entry whose old or new mode is not 100644 (adding
-     or deleting a 100644 file is fine). Anything else reruns that reviewer. The
-     script's header defines it. If any condition fails, reject the carry:
-     report STATE CODEX STALE with "carry rejected: <reviewer>", and the
-     engineering manager reruns that reviewer. A `CARRIED:` line is checked by
-     these conditions even when the reviewer also has an APPROVE at the head,
-     and one that fails them is "carry rejected" regardless.
+     `<scratch>`, and the script's `mktemp` uses a `${TMPDIR:-/tmp}` template,
+     so its temp folder stays inside `<scratch>`. Run both copies; the carry
+     stands only if both print `CARRY PASSES`. Every other PR runs only the copy
+     exported from `origin/main`. The rule: a carry needs a diff of lower-case
+     `.md` files only, each at the repository root, directly under `ios/` or
+     `android/`, or under `ios/docs/` or `android/docs/`. It never carries a
+     path under any `src` or `schemas` folder below `android/`, at any depth,
+     such as `android/docs/src/x.md`. It never carries a path under `.claude/`,
+     `.codex/`, `.agents/`, `scripts/` or `.github/` (nested copies included),
+     an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any depth and in any letter
+     case, or any entry whose old or new mode is not 100644 (adding or deleting
+     a 100644 file is fine). Anything else reruns that reviewer. The script's
+     header defines it. If any condition fails, reject the carry: report STATE
+     CODEX STALE with "carry rejected: <reviewer>", and the engineering manager
+     reruns that reviewer. A `CARRIED:` line is checked by these conditions even
+     when the reviewer also has an APPROVE at the head, and one that fails them
+     is "carry rejected" regardless.
 
   Two more checks apply to every newest `PR REVIEW:` comment, scoped or
   not, and a failure of either is STATE CODEX STALE:
