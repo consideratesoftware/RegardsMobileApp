@@ -27,13 +27,14 @@ actor ScriptedNotifications: NotificationScheduling {
     private var pending: [String: ReminderNotificationRequest] = [:]
     private(set) var scheduleCalls: [ReminderNotificationRequest] = []
     private(set) var cancelCalls: [[String]] = []
-    /// Requests the real center would have delivered, at once on add or once
-    /// their time passes (checked at the start of every call to any of the 3
-    /// live members). Fire dates are recorded at whole seconds, as the real
-    /// center reports them. Due requests are recorded in fire-date order, with
-    /// identifier as a tiebreak. This order is the fake's own deterministic
-    /// choice. Slice 4 tests must not rely on the real center's order for
-    /// requests that come due together.
+    /// Fake-only bookkeeping for tests. The real center exposes no fire date
+    /// for a delivered notification, so nothing here is a device contract.
+    /// These are the requests the fake treats as delivered, at once on add or
+    /// once their time passes (checked at the start of every call to any of
+    /// the 3 live members), each with its whole-second fire date. Due requests
+    /// are recorded in fire-date order, with identifier as a tiebreak. This
+    /// order is the fake's own deterministic choice. Slice 4 tests must not
+    /// rely on the real center's order for requests that come due together.
     private(set) var delivered: [ReminderNotificationRequest] = []
     private let clock: @Sendable () -> Date
 
