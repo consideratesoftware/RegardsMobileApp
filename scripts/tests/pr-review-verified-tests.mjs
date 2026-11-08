@@ -315,6 +315,18 @@ test('a pr-* reviewer is told where its reviewedSha comes from, and the schema r
   assert.ok(calls[0].opts.schema.required.includes('reviewedSha'))
 })
 
+// Pin: passes on the old script. The pr-* contracts forbid an APPROVE with
+// anything left unchecked, and this script trusts them (rule 7). If that ever
+// changes, this test fails and the change is deliberate.
+test('approveWithNotCheckedStandsAsReported: a pr-* APPROVE with NOT CHECKED entries stays APPROVE', async () => {
+  const { result } = await runWorkflow({
+    reviews: { 'pr-correctness': review('APPROVE', [], { notChecked: ['swift test was not run'] }) },
+  })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
+  assert.equal(result.verdicts[0].reportedVerdict, 'APPROVE')
+  assert.deepEqual(result.verdicts[0].notChecked, ['swift test was not run'])
+})
+
 test('a result with no notChecked field keeps REQUEST_CHANGES (an unknown is not "none")', async () => {
   const noField = review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')])
   delete noField.notChecked

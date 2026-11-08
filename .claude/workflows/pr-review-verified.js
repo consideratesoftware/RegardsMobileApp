@@ -43,6 +43,10 @@ export const meta = {
 //      reviewer alone. Codex's sha is not checked here, because Codex's
 //      verdict is never changed; release-manager.md compares the sha in the
 //      posted CODEX REVIEW comment with the head.
+//   7. A pr-* reviewer's reported APPROVE stands, even when notChecked is not
+//      empty. Each pr-* contract decides whether an unchecked item blocks an
+//      APPROVE; this script does not second-guess it. The caller still sees
+//      notChecked on the verdict (Stage 3 prints it).
 //
 // Result: { head, verdicts, codexReview, workOrder, survivors, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
@@ -210,6 +214,7 @@ function verdictAfterVerification(reviewer, review, verified) {
   if (reviewer === 'codex-reviewer') return review.verdict
   if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) return 'FAILED'
   if (verified.some(v => v.severity === 'BLOCKER' && v.survives)) return 'REQUEST_CHANGES'
+  // A reported APPROVE stands, with or without notChecked entries (rule 7).
   if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
   const refutedSomething = verified.some(v => !v.survives)
   // Only an array we can see is empty counts as "nothing was left unchecked".
