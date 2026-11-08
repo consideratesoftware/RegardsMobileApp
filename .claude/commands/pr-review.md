@@ -247,7 +247,7 @@ CARRIED: <pr-code-quality|pr-tests> APPROVE from <sha>     (scoped recheck only;
 REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <paraphrase>   (verified run only; else "REFUTED: none")
 ```
 
-- The first line is APPROVE only when no BLOCKER survived (in Stage 1 or
+- The first line is APPROVE only when no pr-* BLOCKER survived (in Stage 1 or
   Stage 2) and every pr-* reviewer's verdict is APPROVE. Otherwise it is
   REQUEST_CHANGES.
 - BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and
