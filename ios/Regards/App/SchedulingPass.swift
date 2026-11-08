@@ -109,7 +109,7 @@ public actor SchedulingPass {
         try await reschedule(only: contactId)
     }
 
-    /// A contact this run covers: every tracked, unarchived contact in the snapshot, or only `contactId` if
+    /// A contact this run covers: every tracked, active contact in the snapshot, or only `contactId` if
     /// it is one. Marks its due pending rows fired, writes its rows, cancels pending rows it shouldn't have.
     private func reschedule(only contactId: UUID?) async throws {
         // One read holds the contacts, the pending and fired rows, and the
