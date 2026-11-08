@@ -110,7 +110,7 @@ public actor SchedulingPass {
     }
 
     /// Writes the rows the snapshot says should exist, for every tracked
-    /// contact or only `contactId`, and cancels pending rows that shouldn't.
+    /// contact or only `contactId`, and cancels future pending rows that shouldn't; a due one is marked fired first.
     private func reschedule(only contactId: UUID?) async throws {
         // One read holds the contacts, the pending and fired rows, and the
         // window. A one-shot fetch, never the observation: GRDB delivers that
