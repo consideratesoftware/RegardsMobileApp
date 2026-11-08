@@ -710,16 +710,29 @@ test('the work order is built from surviving findings only', async () => {
   assert.doesNotMatch(synth[0].prompt, /Beta\.swift:20/)
 })
 
-test('the synthesizer is told who owns infra files: chore for scripts, tech-writer for prose', async () => {
+test('the synthesizer is told who owns infra files: chore for scripts, CI and workflow code, tech-writer for prose', async () => {
+  // Findings in a CI file and in a workflow script reach the synthesizer too.
   const { calls } = await runWorkflow({
-    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
-    votes: { 'Alpha.swift:10': [true, true, true] },
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [
+        finding('BLOCKER', 'Alpha.swift:10'),
+        finding('FIX', '.github/workflows/guards.yml:12'),
+        finding('FIX', '.claude/workflows/pr-review-verified.js:200'),
+      ]),
+    },
+    votes: {
+      'Alpha.swift:10': [true, true, true],
+      '.github/workflows/guards.yml:12': [true, true, true],
+      '.claude/workflows/pr-review-verified.js:200': [true, true, true],
+    },
   })
   const synth = calls.find(c => c.opts.label === 'synthesize')
-  assert.match(synth.prompt, /scripts and their tests under scripts\/ → chore/)
-  assert.match(synth.prompt, /prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer/)
+  assert.match(synth.prompt, /\.github\/workflows\/guards\.yml:12/)
+  assert.match(synth.prompt, /\.claude\/workflows\/pr-review-verified\.js:200/)
+  assert.match(synth.prompt, /scripts and their tests under scripts\/, CI files under \.github\/, and workflow scripts under \.claude\/workflows\/ → chore/)
+  assert.match(synth.prompt, /prose under \.claude\/, \.codex\/, \.agents\/ and \.github\/ → tech-writer/)
   assert.match(synth.prompt, /ENGINEERING_ORG\.md/)
-  // App tests keep their owner, and the 2 rules do not overlap.
+  // App tests keep their owner, and the rules do not overlap.
   assert.match(synth.prompt, /test files under ios\/ or android\/ → qa-engineer/)
   assert.doesNotMatch(synth.prompt, /; test files → qa-engineer/)
   // The work order may name the new owner.
