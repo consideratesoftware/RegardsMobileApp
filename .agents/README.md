@@ -26,14 +26,13 @@ calls `codex exec` read-only in the lane worktree. Keeping the two adapters
 in sync is what makes the Codex verdict a review of the same contract by a
 different model family.
 
-Three rules differ. Claude Code's verified run can turn a reviewer's
-REQUEST_CHANGES into APPROVE when verifiers refute its findings (rule 3), marks
-a pr-* reviewer FAILED when its `reviewedSha` is not a prefix of head
-(rule 6), and
-turns an APPROVE with NOT CHECKED entries into REQUEST_CHANGES (rule 7). The
-Codex pr-* contracts already forbid an APPROVE with a required check left
-unchecked. Only the enforcement steps differ, and the Codex skill has none of
-them; see `.claude/commands/pr-review.md`, "The workflow's rules".
+The verified run differs from the Codex skill in 3 enforcement steps: it can
+turn a reviewer's REQUEST_CHANGES into APPROVE when verifiers refute its findings
+(rule 3), marks a pr-* reviewer FAILED when its `reviewedSha` is not a prefix of
+head (rule 6), and turns an APPROVE with NOT CHECKED entries into REQUEST_CHANGES
+(rule 7). See `.claude/commands/pr-review.md`, "The workflow's rules". The
+requirement behind rule 7 is shared: the `.codex` pr-* contracts already forbid
+an APPROVE with a required check left unchecked.
 
 ## Hosted review gate
 
