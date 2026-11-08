@@ -568,6 +568,7 @@ test('a pr-* reviewer whose sha is not a prefix of head is FAILED', async () => 
     ['no sha', undefined],
     ['an empty sha', ''],
     ['a 6-character prefix', HEAD.slice(0, 6)],
+    ['a substring of head that is not a prefix', HEAD.slice(1, 12)],
     ['an upper-case copy of head', HEAD.toUpperCase()],
     ['head with an extra character', HEAD + '0'],
   ]
