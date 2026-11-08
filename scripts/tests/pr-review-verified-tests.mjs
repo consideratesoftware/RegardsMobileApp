@@ -858,20 +858,27 @@ test('the synthesizer is told who owns infra files: on-call-engineer for scripts
       'pr-correctness': review('REQUEST_CHANGES', [
         finding('BLOCKER', 'Alpha.swift:10'),
         finding('FIX', '.github/workflows/guards.yml:12'),
+        finding('FIX', '.github/PULL_REQUEST_TEMPLATE.md:3'),
         finding('FIX', '.claude/workflows/pr-review-verified.js:200'),
       ]),
     },
     votes: {
       'Alpha.swift:10': [true, true, true],
       '.github/workflows/guards.yml:12': [true, true, true],
+      '.github/PULL_REQUEST_TEMPLATE.md:3': [true, true, true],
       '.claude/workflows/pr-review-verified.js:200': [true, true, true],
     },
   })
   const synth = calls.find(c => c.opts.label === 'synthesize')
   assert.match(synth.prompt, /\.github\/workflows\/guards\.yml:12/)
+  assert.match(synth.prompt, /\.github\/PULL_REQUEST_TEMPLATE\.md:3/)
   assert.match(synth.prompt, /\.claude\/workflows\/pr-review-verified\.js:200/)
-  assert.match(synth.prompt, /scripts and their tests under scripts\/, CI files under \.github\/, and workflow scripts under \.claude\/workflows\/ → on-call-engineer/)
-  assert.match(synth.prompt, /prose under \.claude\/, \.codex\/, \.agents\/ and \.github\/ → tech-writer/)
+  // .github/ is split by file type: .md is prose, everything else is CI.
+  assert.match(synth.prompt, /scripts and their tests under scripts\/, files under \.github\/ other than \.md, and workflow scripts under \.claude\/workflows\/ → on-call-engineer/)
+  assert.match(synth.prompt, /\.md files under \.github\/, and prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer/)
+  // The wording that left a .github/ .md file with 2 owners is gone.
+  assert.doesNotMatch(synth.prompt, /CI files under \.github\//)
+  assert.doesNotMatch(synth.prompt, /\.agents\/ and \.github\/ → tech-writer/)
   assert.doesNotMatch(synth.prompt, /→ chore/)
   assert.match(synth.prompt, /ENGINEERING_ORG\.md/)
   // App tests keep their owner, and the rules do not overlap.
