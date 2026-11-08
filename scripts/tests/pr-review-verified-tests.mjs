@@ -227,6 +227,16 @@ test('verifiersAreRepoVerifier: every verifier call uses the repo verifier agent
   }
 })
 
+// The verify prompt tells the verifier to "use your finding-verification mode
+// (verifier.md)". If that section leaves verifier.md, the prompt names a mode
+// that does not exist and the verifier falls back to assuming the claim false.
+test('verifier.md carries the finding-verification mode the verify prompt names', () => {
+  const verifier = readFileSync(path.join(here, '..', '..', '.claude', 'agents', 'verifier.md'), 'utf8')
+  assert.match(verifier, /^## Finding-verification mode/m)
+  assert.match(verifier, /`real=false` only with cited file:line evidence/)
+  assert.match(verifier, /UNPROVEN, set `real=true`/)
+})
+
 test('escalateNotVerified: an ESCALATE finding gets no verifier and is returned for Stage 2', async () => {
   const { result, calls } = await runWorkflow({
     args: { reviewers: ['pr-code-quality'] },
