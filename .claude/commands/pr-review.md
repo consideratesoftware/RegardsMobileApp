@@ -127,6 +127,9 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line.
 
+Each verifier votes under the finding-verification mode in
+`.claude/agents/verifier.md`.
+
 ### How to run it
 
 Run Stage 0 yourself. Then start the workflow once:
