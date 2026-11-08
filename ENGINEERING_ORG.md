@@ -100,7 +100,8 @@ restarts.
 - Lane notes live in `../RegardsMobileApp-lanes/` relative to the root
   checkout, next to the lane worktrees: one `TF##/` folder per lane with
   `plan.md` (the tech lead's plan, verbatim), `review-context.md` (review
-  target, §14 row (or "infra, no §14 row" for an infra PR), claimed R-numbers), `pr-body.md` (the PR body draft),
+  target, §14 row (or "infra, no §14 row" for an infra PR), claimed R-numbers),
+  `pr-body.md` (the PR body draft),
   `owner-answers.md` (Sid's answers given before the PR exists), and
   `codex-<short sha>.md` (each full Codex review, named by the short sha its
   verdict comment shows). The folder is outside the repo, so nothing in it
