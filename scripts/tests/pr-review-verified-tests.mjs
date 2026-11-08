@@ -925,7 +925,9 @@ test('the whole Codex review comes back verbatim', async () => {
 })
 
 // Pin: a Codex with no review text returns no codexReview and an empty
-// codexLine, and its verdict stands. The docs rerun such a Codex alone.
+// codexLine, and its verdict stands. The docs rerun such a Codex alone. The
+// `no rawSummary` case is a defensive pin: FINDINGS.required lists rawSummary,
+// so the runtime never returns a review without it.
 test('a Codex verdict with an empty or missing rawSummary returns codexReview null and an empty codexLine', async () => {
   const empty = review('REQUEST_CHANGES', [], { rawSummary: '' })
   const missing = review('REQUEST_CHANGES')
@@ -998,7 +1000,9 @@ test('a Codex review whose first line is blank is FAILED, whatever it reported',
 })
 
 // Pin: a Codex with no review text has no first line to compare, so the verdict
-// it reported stands. The docs rerun a Codex whose codexReview is null.
+// it reported stands. The docs rerun a Codex whose codexReview is null. The
+// `no rawSummary` case is a defensive pin: FINDINGS.required lists rawSummary,
+// so the runtime never returns a review without it.
 test('a Codex with no review text keeps its reported verdict', async () => {
   const noText = review('REQUEST_CHANGES', [], { rawSummary: '' })
   const noField = review('APPROVE')
