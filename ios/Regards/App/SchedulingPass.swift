@@ -12,13 +12,13 @@ import Foundation
 /// An occasion row's `scheduledFor` is its next occurrence at the global
 /// `occasionTime`, moved out of the effective window's quiet hours by
 /// `ReminderEngine.occasionFireDate`, or the occurrence itself when quiet
-/// hours run past its day (owner ruling 9: the row stays, no notification).
+/// hours run past its day (§9 contract 4: the row stays, no notification).
 ///
 /// **Per-pass window (R55).** Every run reads the global window and builds
 /// its calendar from that window's timezone. Nothing is cached, so a window
 /// edit never leaves the pass on a stale zone or needs a second pass.
 ///
-/// **Fired marking and no re-nag (§9 "Notification fired", owner ruling 5).** Each run first marks covered
+/// **Fired marking and no re-nag (§9 "Notification fired").** Each run first marks covered
 /// pending rows at or before `now` fired. Fired rows are never cancelled. A fired cadence row stays until an
 /// interaction, or a longer cadence whose new overdue time is still ahead, starts a new cycle. It re-arms
 /// once only if the window was edited since it fired and the clock is then set back before `overdueAt` (R68).
@@ -183,7 +183,7 @@ public actor SchedulingPass {
             ) else {
                 // The covered-row cancel loop below cancels a future pending row, floor and all
                 // (a due one was marked fired at the top), so a snooze doesn't survive a capacity
-                // loss. Accepted: the editors refuse to save a zero-capacity window (PR #67 review).
+                // loss. Accepted: the editors refuse to save a zero-capacity window (§9 contract 2).
                 zeroCapacity.insert(contact.id)
                 continue
             }
