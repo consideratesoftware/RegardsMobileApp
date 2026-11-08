@@ -24,7 +24,7 @@ threads, and work in the lane worktree on its branch.
 
 ## Repair rules
 
-- One commit per finding or tight group: `TF-##: review: <finding>`.
+- One commit per finding or tight group: `<TF-## or infra>: review: <finding>`.
   Never amend, never force-push, never rebase a reviewed branch unless told.
 - Same repo law as the engineers: layer purity, no networking, xcodegen via
   `project.yml`, a11y row per screen, inline until 3 call sites, explicit
