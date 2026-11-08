@@ -136,9 +136,10 @@ All of these, on the current head, with no averaging:
    with every Codex blocker disputed in that verdict's PR comment by the
    engineering manager, citing the `ARCHITECTURE.md` section that settles it; the
    release manager checks each cited section exists and addresses the
-   finding. Verifier votes never change this verdict: a refuted Codex BLOCKER still
-   needs a fix or a `DISPUTED:` line. RETRY and UNAVAILABLE never satisfy this
-   condition.
+   finding. This applies on APPROVE too: every blocker that the comment's
+   `BLOCKERS:` line counts needs its own `DISPUTED:` line. Verifier votes never
+   change this verdict: a refuted Codex BLOCKER still needs a fix or a
+   `DISPUTED:` line. RETRY and UNAVAILABLE never satisfy this condition.
 5. Verifier verdict HOLDS for every slice.
 6. No owner-only gate outstanding (below).
 7. The branch was up to date with `main` when conditions 3 and 4 were
