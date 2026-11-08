@@ -157,7 +157,8 @@ three-dot target compares against the merge base, so commits that landed on
 from both the same way: they go to the slice owner (design questions to
 `tech-lead` first), one round, then both review again. In a verified run, send
 each `workOrder` item by its `owner`: `on-call-engineer` (scripts, CI and
-workflow scripts), `tech-writer`, `qa-engineer`, `ios-engineer` and
+workflow scripts) (before Stage 4, launch it in pre-PR mode: say no PR is open
+yet and give the lane worktree, branch and items), `tech-writer`, `qa-engineer`, `ios-engineer` and
 `senior-ios-engineer` to that role; `EM-body` items you apply to the PR body
 yourself; `tech-lead-ruling` items to `tech-lead`; `owner-question` items to an
 interview with Sid. Drop a Codex finding
