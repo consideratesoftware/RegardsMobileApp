@@ -50,10 +50,13 @@ struct SchedulingPassTriggerOrderTests {
             clock: { now }))
     }
 
-    /// A pending or fired cadence row, whichever the wall clock makes it.
+    /// A pending or fired cadence row, whichever the wall clock makes it. `fetchSchedule()` hides the rows of an
+    /// archived or untracked contact, so it alone can't fail for one; `fetchPending(forContact:)` has no such
+    /// filter, so a pending row of a hidden contact shows too.
     private static func hasCadenceRow(_ environment: AppEnvironment, _ contact: Contact) async throws -> Bool {
-        try await environment.reminders.fetchSchedule().reminders
-            .contains { $0.contactId == contact.id && $0.kind == .cadence }
+        let scheduled = try await environment.reminders.fetchSchedule().reminders
+        let pending = try await environment.reminders.fetchPending(forContact: contact.id)
+        return (scheduled + pending).contains { $0.contactId == contact.id && $0.kind == .cadence }
     }
 
     @Test("Launch runs the pass after the Contacts reconcile, so a contact the reconcile un-archives is scheduled")
