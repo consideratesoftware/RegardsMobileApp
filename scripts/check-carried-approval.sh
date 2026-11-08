@@ -25,6 +25,10 @@
 #     (AGENTS.override.md, CLAUDE.local.md);
 #   - the path is named ARCHITECTURE.md (pr-tests maps its section 14 rows
 #     from it, so an edit there changes what the tests must prove);
+#   - the path is inside an android/<module>/src/ or android/<module>/schemas/
+#     folder (android/docs/src/x.md), which the Android build reads as data.
+#     ios/Regards*/ and shared/testvectors/ are not listed: the allowlist
+#     rejects them;
 #   - the entry has a mode change (only 100644, or add/delete, is allowed).
 # An added or deleted .md file is docs. Agent contracts, commands, skills,
 # scripts, CI and the instruction files are behavior, so a change there never
@@ -96,6 +100,8 @@ while IFS= read -r -d '' meta; do
       fail "agent instruction file never carries: $path" ;;
     ARCHITECTURE.md | */ARCHITECTURE.md )
       fail "ARCHITECTURE.md never carries: $path" ;;
+    android/*/src/* | android/*/schemas/* )
+      fail "bundled tree never carries: $path" ;;
   esac
   shopt -u nocasematch
   # The allowlist: a lower-case .md at the root, directly under ios/ or

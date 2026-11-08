@@ -9,7 +9,9 @@
 # Fixture layout. The script allows only the doc roots (the repository root,
 # ios/, android/, ios/docs/, android/docs/), so every case that tests one
 # exclusion puts its path under ios/docs/, where the allowlist alone would
-# pass it. The 4 root instruction-file cases (root_claude_local_md,
+# pass it. The 2 android cases (android_docs_src_md, android_docs_schemas_md)
+# use android/docs/ for the same reason, because their exclusions match only
+# android paths. The 4 root instruction-file cases (root_claude_local_md,
 # root_architecture_md, root_agents_md, root_claude_md) are the exception:
 # they sit at the root, which the allowlist also passes, so they too fail only
 # on their exclusion. Deleting one pattern from the script's exclusion list
@@ -150,6 +152,8 @@ nested_agents_override_md() { put ios/docs/AGENTS.override.md '# Agents override
 root_architecture_md() { put ARCHITECTURE.md '# Architecture, changed'; }
 lower_case_architecture_md() { put ios/docs/architecture.md '# Architecture notes'; }
 lower_case_agents_override_md() { put ios/docs/agents.override.md '# Agents override notes'; }
+android_docs_src_md() { put android/docs/src/x.md '# Read as data'; }
+android_docs_schemas_md() { put android/docs/schemas/x.md '# Read as data'; }
 ios_bundle_md() { put ios/Regards/Resources/x.md '# Resource'; }
 android_app_md() { put android/app/src/main/x.md '# Resource'; }
 android_module_asset_md() { put android/feature/overdue/src/main/assets/x.md '# Asset'; }
@@ -229,6 +233,8 @@ expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a root ARCHITECTURE.md change fails' 1 root_architecture_md
 expect 'an added lower-case ios/docs/architecture.md fails' 1 lower_case_architecture_md
 expect 'an added lower-case ios/docs/agents.override.md fails' 1 lower_case_agents_override_md
+expect 'an added android/docs/src/x.md fails' 1 android_docs_src_md
+expect 'an added android/docs/schemas/x.md fails' 1 android_docs_schemas_md
 expect 'an added ios/Regards/Resources/x.md fails' 1 ios_bundle_md
 expect 'an added android/app/src/main/x.md fails' 1 android_app_md
 expect 'an added android/feature/overdue/src/main/assets/x.md fails' 1 android_module_asset_md
