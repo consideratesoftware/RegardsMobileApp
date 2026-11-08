@@ -247,10 +247,10 @@ struct SchedulingPassRunFullTests {
     }
 
     @Test(
-        "A pending row for a contact that is no longer tracked or active is cancelled",
+        "A pending row still ahead of now for a contact that is no longer tracked or active is cancelled",
         arguments: RepositoryContractBackend.allCases, Orphan.allCases
     )
-    func orphanedPendingRowIsCancelled(backend: RepositoryContractBackend, orphan: Orphan) async throws {
+    func orphanedFuturePendingRowIsCancelled(backend: RepositoryContractBackend, orphan: Orphan) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
         let kept = try await fixture.addContact(2)
