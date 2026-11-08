@@ -365,18 +365,12 @@ struct AppLaunchCoordinatorReconciliationTests {
         return AppLaunchCoordinator(
             dependencies: .init(
                 makeRuntime: {
-                    // Scheduling tests need the pass on the test's clock;
-                    // `makeProduction` reads the wall clock.
+                    // Scheduling tests need the pass on the test's clock; without one the runtime reads the
+                    // wall clock.
                     guard let schedulerClock else {
                         return try await AppRuntime.makeProduction(environment: environment)
                     }
-                    return AppRuntime(
-                        environment: environment,
-                        window: try await environment.window.fetchGlobal(),
-                        userCalendar: Calendar(identifier: .gregorian),
-                        clock: schedulerClock,
-                        occasions: { _ in [] }
-                    )
+                    return try await AppRuntime.makeProduction(environment: environment, clock: schedulerClock)
                 },
                 contactsSource: source,
                 clock: clock ?? { now },
