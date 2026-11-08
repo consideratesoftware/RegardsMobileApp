@@ -335,16 +335,51 @@ test('a pr-* reviewer is told where its reviewedSha comes from, and the schema r
   assert.ok(calls[0].opts.schema.required.includes('reviewedSha'))
 })
 
-// Pin: passes on the old script. The pr-* contracts forbid an APPROVE with
-// anything left unchecked, and this script trusts them (rule 7). If that ever
-// changes, this test fails and the change is deliberate.
-test('approveWithNotCheckedStandsAsReported: a pr-* APPROVE with NOT CHECKED entries stays APPROVE', async () => {
-  const { result } = await runWorkflow({
+// Every pr-* contract says never to APPROVE with a required check left
+// unchecked, and notChecked holds required checks only. The script enforces it
+// (rule 7), and tells the reviewer what belongs in notChecked.
+test('approveWithNotCheckedBecomesRequestChanges: a pr-* APPROVE with NOT CHECKED entries is REQUEST_CHANGES', async () => {
+  const { result, calls } = await runWorkflow({
     reviews: { 'pr-correctness': review('APPROVE', [], { notChecked: ['swift test was not run'] }) },
   })
-  assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
   assert.equal(result.verdicts[0].reportedVerdict, 'APPROVE')
   assert.deepEqual(result.verdicts[0].notChecked, ['swift test was not run'])
+
+  // The sentence is in the pr-* prompt and in the notChecked schema field.
+  const rule = 'notChecked lists only the required checks from your contract that you did not complete; each one makes your verdict REQUEST_CHANGES. Anything else you could not run, that your contract does not require (for example a CI-only script), goes in your report, not here.'
+  const call = calls.find(c => c.opts.agentType === 'pr-correctness')
+  assert.ok(call.prompt.includes(rule), 'the pr-* prompt lacks the notChecked sentence')
+  assert.ok(call.opts.schema.properties.notChecked.description.includes(rule), 'the notChecked schema field lacks the sentence')
+})
+
+test('a pr-* APPROVE with no notChecked field is REQUEST_CHANGES: an unknown is not "none"', async () => {
+  const noField = review('APPROVE')
+  delete noField.notChecked
+  const { result } = await runWorkflow({ reviews: { 'pr-correctness': noField } })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
+})
+
+test('a pr-* APPROVE with an empty notChecked stays APPROVE', async () => {
+  const { result } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE', [], { notChecked: [] }) } })
+  assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
+})
+
+// Pin: passes on the old script. Codex has no NOT CHECKED line and its verdict
+// is its own, so the notChecked rule does not apply to it and its prompt and
+// schema do not carry the pr-* sentence.
+test('a Codex APPROVE with notChecked entries stays APPROVE, and Codex is not told the pr-* rule', async () => {
+  const { result, calls } = await runWorkflow({
+    args: { reviewers: ['pr-tests'], codex: true },
+    reviews: {
+      'pr-tests': review('APPROVE'),
+      'codex-reviewer': review('APPROVE', [], { notChecked: ['something'] }),
+    },
+  })
+  assert.equal(verdictOf(result, 'codex-reviewer'), 'APPROVE')
+  const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
+  assert.doesNotMatch(codexCall.prompt, /notChecked lists only/)
+  assert.doesNotMatch(codexCall.opts.schema.properties.notChecked.description, /REQUEST_CHANGES/)
 })
 
 // Pin: passes on the old script. A REQUEST_CHANGES flips to APPROVE only when a

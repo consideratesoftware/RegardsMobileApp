@@ -44,10 +44,12 @@ export const meta = {
 //      reviewer alone. Codex's sha is not checked here, because Codex's
 //      verdict is never changed; release-manager.md compares the sha in the
 //      posted CODEX REVIEW comment with the head.
-//   7. A pr-* reviewer's reported APPROVE stands, even when notChecked is not
-//      empty. Each pr-* contract decides whether an unchecked item blocks an
-//      APPROVE; this script does not second-guess it. The caller still sees
-//      notChecked on the verdict (Stage 3 prints it).
+//   7. A pr-* reviewer with any notChecked entry is REQUEST_CHANGES, even when
+//      it reported APPROVE. Every pr-* contract says never to APPROVE with a
+//      required check left unchecked, and notChecked holds required checks
+//      only (the prompt and the schema say so), so this script enforces the
+//      contract. A notChecked that is missing is not read as empty. Codex has
+//      no NOT CHECKED line and is not affected.
 //
 // Result: { head, verdicts, codexReview, workOrder, survivors, refuted }
 //   verdicts[]   one per reviewer: verdict (after verification), reportedVerdict
@@ -65,6 +67,11 @@ export const meta = {
 //                is true, false, or 'failed' when that verifier returned
 //                nothing; `lens` names the verifier.
 //   codexReview  Codex's whole review, verbatim, or null.
+
+// Said to every pr-* reviewer in its prompt and in the notChecked schema field.
+// Rule 7 turns any entry into REQUEST_CHANGES, so an entry must be a required
+// check and nothing else.
+const NOT_CHECKED_RULE = 'notChecked lists only the required checks from your contract that you did not complete; each one makes your verdict REQUEST_CHANGES. Anything else you could not run, that your contract does not require (for example a CI-only script), goes in your report, not here.'
 
 // The schema a pr-* reviewer answers with. Its contract has 2 verdicts.
 const FINDINGS = {
@@ -88,7 +95,7 @@ const FINDINGS = {
     notChecked: {
       type: 'array',
       items: { type: 'string' },
-      description: 'One entry per NOT CHECKED item, with why. An empty array when the reviewer wrote "none".',
+      description: `One entry per NOT CHECKED item, with why. An empty array when you wrote "none". ${NOT_CHECKED_RULE}`,
     },
     coverageHoles: {
       type: 'array',
@@ -105,7 +112,11 @@ const FINDINGS = {
 // defines them, so the runtime refuses them from a pr-* reviewer.
 const CODEX_FINDINGS = {
   ...FINDINGS,
-  properties: { ...FINDINGS.properties, verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] } },
+  properties: {
+    ...FINDINGS.properties,
+    verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] },
+    notChecked: { type: 'array', items: { type: 'string' }, description: 'Codex has no NOT CHECKED line. Return an empty array.' },
+  },
 }
 
 const VERDICT = {
@@ -183,7 +194,7 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. ${NOT_CHECKED_RULE} Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
 if (a.codex) {
   reviewers.push({ type: 'codex-reviewer', schema: CODEX_FINDINGS, prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
@@ -220,13 +231,15 @@ function verdictAfterVerification(reviewer, review, verified) {
   if (reviewer === 'codex-reviewer') return review.verdict
   if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) return 'FAILED'
   if (verified.some(v => v.severity === 'BLOCKER' && v.survives)) return 'REQUEST_CHANGES'
-  // A reported APPROVE stands, with or without notChecked entries (rule 7).
+  // Any notChecked entry is a required check left undone: REQUEST_CHANGES,
+  // whatever the reviewer reported (rule 7). Only an array we can see is empty
+  // counts as "nothing was left unchecked".
+  const nothingUnchecked = Array.isArray(review.notChecked) && review.notChecked.length === 0
+  if (!nothingUnchecked) return 'REQUEST_CHANGES'
   if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
   const refutedSomething = verified.some(v => !v.survives)
-  // Only an array we can see is empty counts as "nothing was left unchecked".
-  const nothingUnchecked = Array.isArray(review.notChecked) && review.notChecked.length === 0
   const qualityFixSurvived = reviewer === 'pr-code-quality' && verified.some(v => v.severity === 'FIX' && v.survives)
-  return refutedSomething && nothingUnchecked && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
+  return refutedSomething && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
 }
 
 phase('Synthesize')
