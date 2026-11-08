@@ -147,12 +147,13 @@ Precondition: a Debug build on the device, with `--regards-mock-runtime` in the
 scheme's Arguments Passed On Launch. This loads the mock seed cast, with its
 clock frozen at 19 April 2026, 14:00 in Asia/Kolkata, so the rows below stay the
 same on any day. Overdue includes 4 rows: Leia (WhatsApp), Padmé (call), Luke
-(Signal) and Lando (text). The steps use Lando's row here and Anakin's in Upcoming.
-Anakin Skywalker's row is in Upcoming. His due date is Saturday 25 April, and the
-default reminder window allows weekdays only, so his row sits at Mon Apr 27,
-12:00 pm, the next allowed slot. Scroll to it. On a production build, use a
-tracked contact past its cadence for Overdue, and one inside the Upcoming horizon
-for Upcoming.
+(Signal) and Lando (text). The steps use Lando's row here and Anakin Skywalker's
+in Upcoming. His due date is Saturday 25 April, and the default reminder window
+allows weekdays only, so his row sits under the Mon Apr 27 header, at 12:00 pm,
+the next allowed slot. Scroll to it. On a production build, use a tracked
+contact past its cadence for Overdue, and one inside the Upcoming horizon for
+Upcoming. The Result line in `TESTFLIGHT_PLAN.md` is public: it records the
+outcome only, never a real contact's name.
 
 Expected values for the two rows the steps use: Lando's alert title is "Text",
 and its message starts with "Would text Lando Calrissian." Anakin's alert title
@@ -164,9 +165,9 @@ is labelled Done for both.
 - [ ] Activate Done. The alert dismisses. VoiceOver focus returns to the row
       that opened the alert (system behavior, not app code). If focus lands
       anywhere else, record where, as a finding. It is not a pass.
-- [ ] Upcoming: scroll to Anakin Skywalker's row (Mon Apr 27, 12:00 pm), then
-      activate it (double-tap). VoiceOver announces the title, then the message,
-      then Done. Check each one, then repeat the Done step above.
+- [ ] Upcoming: scroll to Anakin Skywalker's row, under the Mon Apr 27 header,
+      at 12:00 pm. Activate it (double-tap). VoiceOver announces the title, then
+      the message, then Done. Check each one, then repeat the Done step above.
 
 `TESTFLIGHT_PLAN.md`'s "Pre-release device pass" has no entry for this section
 yet. When one is added, it names this section and has its own Result line.
