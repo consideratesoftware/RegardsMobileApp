@@ -235,12 +235,17 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
     /// The visible text is `request.title` and `request.body` as given. The
     /// contact id goes to `userInfo` only.
     ///
-    /// - Parameter now: read immediately before this request is added to the
-    ///   center, once per request.
+    /// - Parameters:
+    ///   - now: read immediately before this request is added to the
+    ///     center, once per request.
+    ///   - deviceZone: the zone the calendar starts in before it is pinned to
+    ///     GMT. Production keeps the default. Tests pass a DST zone so the pin
+    ///     is tested on a UTC host. The calendar is always Gregorian, which
+    ///     `decode` relies on.
     static func makeRequest(
         _ request: ReminderNotificationRequest,
         now: Date,
-        calendar: Calendar = Calendar(identifier: .gregorian)
+        deviceZone: TimeZone = .current
     ) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = request.title
@@ -254,9 +259,11 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
             break
         }
 
-        // `calendar` carries the device zone; it is overwritten to GMT here.
-        // Tests pass a DST-zone calendar to prove this line matters on any host.
-        var utc = calendar
+        // A new calendar is already in `.current`, so the `deviceZone` line
+        // changes nothing in production. `.calendar` below stores this Gregorian
+        // GMT calendar in the components, so the device's calendar isn't used.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = deviceZone
         utc.timeZone = .gmt
         let components = utc.dateComponents(
             [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second],
@@ -275,9 +282,11 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
         return UNNotificationRequest(identifier: request.identifier, content: content, trigger: trigger)
     }
 
-    /// The inverse of `makeRequest`, for a pending request. The fire date is
-    /// read from the trigger's UTC components, so it doesn't depend on the
-    /// current time or the device zone, and it has whole-second precision.
+    /// The inverse of `makeRequest`, for a pending request. `makeRequest` only
+    /// writes Gregorian components in GMT, so the fire date is resolved in that
+    /// calendar, whatever calendar the components carry. It doesn't depend on
+    /// the current time, the device zone or the device calendar, and it has
+    /// whole-second precision.
     /// Nil when the request isn't a shape this build leaves pending
     /// (ARCHITECTURE.md §9a):
     /// - a non-calendar trigger (or no trigger);

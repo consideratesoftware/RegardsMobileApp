@@ -16,12 +16,11 @@ private let contactX = UUID(uuidString: "5C1F0E52-8A3B-4D7E-9B1A-0C2D3E4F5A6B")!
 /// a GMT calendar instead of calling `nextTriggerDate()`, which is relative to
 /// the real current time.
 ///
-/// Each DST test sets the zone under test on the calendar it passes in (the
-/// adapter's device calendar) and never changes `NSTimeZone.default`, because
-/// Swift Testing runs suites in parallel. A UTC host can't tell `.gmt` from
-/// `.current`, so the tests assert the trigger's zone is `.gmt` and its fields
-/// are the fixed UTC wall time of the instant. Deleting the adapter's GMT pin
-/// fails them on every host.
+/// Each DST test passes the zone under test to `makeRequest` as the device zone
+/// and never changes `NSTimeZone.default`, because Swift Testing runs suites in
+/// parallel. A UTC host can't tell `.gmt` from `.current`, so the tests assert
+/// the trigger's zone is `.gmt` and its fields are the fixed UTC wall time of
+/// the instant. Deleting the adapter's GMT pin fails them on every host.
 struct UserNotificationsAdapterRequestTests {
     static let now = "2026-10-01T00:00:00Z"
 
@@ -207,15 +206,32 @@ struct UserNotificationsAdapterRequestTests {
         #expect(Self.gmtCalendar.date(from: trigger.dateComponents) == fireDate)
     }
 
+    /// The system reads a trigger's components in the calendar they carry, or in
+    /// the device's calendar when they carry none. A device set to the Buddhist
+    /// or Japanese calendar would then read year 2026 as a year in that
+    /// calendar's numbering and fire years off. `makeRequest` stores a Gregorian
+    /// calendar in GMT in the components, whatever the device zone, and `decode`
+    /// resolves in the same calendar.
+    @Test("The trigger's components carry a Gregorian calendar in GMT, so any device calendar reads the same instant")
+    func triggerComponentsCarryGregorianCalendarInGMT() throws {
+        let now = try Self.utc(Self.now)
+        let zone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+
+        let mapped = UserNotificationsAdapter.makeRequest(
+            Self.cadenceRequest(fireDate: now.addingTimeInterval(3 * 3600)), now: now, deviceZone: zone
+        )
+
+        let trigger = try #require(mapped.trigger as? UNCalendarNotificationTrigger)
+        #expect(trigger.dateComponents.calendar?.identifier == .gregorian)
+        #expect(trigger.dateComponents.calendar?.timeZone == .gmt)
+    }
+
     /// Trigger components drop sub-second precision, so a fire date 0.4 s or
     /// 0.6 s ahead of a whole-second `now` names the second that is already
     /// `now`. A calendar trigger for that second never fires, so it must
     /// deliver immediately instead. The 2 offsets sit on either side of half a
     /// second, so rounding the fire date instead of truncating it fails 0.6.
-    @Test(
-        "A fire date whose trigger instant is not after now delivers immediately",
-        arguments: [-600.0, 0.0, 0.4, 0.6]
-    )
+    @Test("A fire date whose trigger instant is not after now delivers immediately", arguments: [-600.0, 0.0, 0.4, 0.6])
     func triggerInstantNotAfterNowDeliversImmediately(offsetFromNow: TimeInterval) throws {
         let now = try Self.utc(Self.now)
         let fireDate = now.addingTimeInterval(offsetFromNow)
@@ -374,12 +390,12 @@ struct UserNotificationsAdapterRequestTests {
         }
     }
 
-    /// Passes `makeRequest` a calendar set to `zone` (the device zone), then
-    /// asserts the trigger names GMT, carries the fixed UTC wall-clock fields
-    /// of `fireDate`, and reads back as exactly `fireDate`. Given a
-    /// `transition`, it first checks that it really is a DST transition of
-    /// `zone`, so a tz database change fails here instead of silently testing
-    /// a plain day. Returns the built request.
+    /// Passes `makeRequest` `zone` as the device zone, then asserts the trigger
+    /// names GMT, carries the fixed UTC wall-clock fields of `fireDate`, and
+    /// reads back as exactly `fireDate`, both through its components and through
+    /// `decode`. Given a `transition`, it first checks that it really is a DST
+    /// transition of `zone`, so a tz database change fails here instead of
+    /// silently testing a plain day. Returns the built request.
     @discardableResult
     private static func expectGMTTrigger(
         zone zoneIdentifier: String,
@@ -400,10 +416,8 @@ struct UserNotificationsAdapterRequestTests {
             )
         }
 
-        var deviceCalendar = Calendar(identifier: .gregorian)
-        deviceCalendar.timeZone = zone
         let mapped = UserNotificationsAdapter.makeRequest(
-            cadenceRequest(fireDate: fireDate), now: now, calendar: deviceCalendar
+            cadenceRequest(fireDate: fireDate), now: now, deviceZone: zone
         )
 
         let trigger = try #require(mapped.trigger as? UNCalendarNotificationTrigger, sourceLocation: sourceLocation)
@@ -415,6 +429,7 @@ struct UserNotificationsAdapterRequestTests {
             sourceLocation: sourceLocation
         )
         #expect(gmtCalendar.date(from: components) == fireDate, sourceLocation: sourceLocation)
+        #expect(UserNotificationsAdapter.decode(mapped)?.fireDate == fireDate, sourceLocation: sourceLocation)
         return mapped
     }
 }
