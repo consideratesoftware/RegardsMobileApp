@@ -59,6 +59,8 @@ struct SchedulingPassTriggerOrderTests {
         return (scheduled + pending).contains { $0.contactId == contact.id && $0.kind == .cadence }
     }
 
+    // MARK: - Trigger order
+
     @Test("Launch runs the pass after the Contacts reconcile, so a contact the reconcile un-archives is scheduled")
     func launchRunsThePassAfterTheReconcile() async throws {
         let environment = try await Self.environment(onboarded: true, now: now)
@@ -133,6 +135,8 @@ struct SchedulingPassTriggerOrderTests {
         #expect(try await Self.hasCadenceRow(environment, contact))
     }
 
+    // MARK: - Production runtime
+
     /// The production composition has no occasion source until PR30. A
     /// contact that the mock provider would give a birthday gets none.
     @Test("The production runtime writes no occasion rows")
@@ -153,5 +157,24 @@ struct SchedulingPassTriggerOrderTests {
         let rows = try await environment.reminders.fetchSchedule().reminders
         #expect(rows.contains { $0.kind == .cadence }, "the run did schedule")
         #expect(rows.filter { $0.kind != .cadence }.isEmpty)
+    }
+
+    /// `now` is a weekend day in every time zone and the default window allows
+    /// weekdays only, so the first slot is the Monday after it, under 4 days
+    /// away. A pass on the wall clock schedules from today's date instead.
+    @Test("The production runtime runs the pass on the injected clock")
+    func productionRuntimeRunsThePassOnTheInjectedClock() async throws {
+        let environment = try await Self.environment(onboarded: true, now: now)
+        let contact = Self.overdueContact()
+        try await environment.contacts.upsert(contact)
+        let now = self.now
+        let runtime = try await AppRuntime.makeProduction(environment: environment, clock: { now })
+
+        try await runtime.scheduler.runFull()
+
+        let pending = try await environment.reminders.fetchPending(forContact: contact.id)
+        let row = try #require(pending.first { $0.kind == .cadence })
+        #expect(row.scheduledFor > now)
+        #expect(row.scheduledFor < now.addingTimeInterval(4 * 86_400))
     }
 }
