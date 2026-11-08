@@ -96,8 +96,10 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    origin/main...HEAD` lists `scripts/count-hosted-blockers.sh` or
    `scripts/check-carried-approval.sh`, also pass the absolute path of the lane
    worktree's copy of each listed script, labeled as the PR's own copy of that
-   script. Before the own copy runs, read its diff against `origin/main`, and run
-   it with a scrubbed environment (`env -i PATH=/usr/bin:/bin HOME=<scratch>`).
+   script. Before the own copy runs, read the blob that its command exports, which
+   is the PR head's copy. Network use, writes outside `<scratch>`, or credential
+   reads mean fail closed. Otherwise run that blob with a scrubbed environment
+   (`env -i PATH=/usr/bin:/bin HOME=<scratch>`).
    It will route red checks to `on-call-engineer`, park on owner gates,
    or merge when all conditions hold.
 

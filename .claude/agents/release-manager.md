@@ -129,16 +129,18 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
   > "<scratch>/hosted-review.txt"
 git -C "<root checkout>" show origin/main:scripts/count-hosted-blockers.sh > "<scratch>/count-hosted-blockers.sh" \
   && bash "<scratch>/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
-git -C "<lane>" diff origin/main...<head sha> -- scripts/count-hosted-blockers.sh   # read it first; own copy only if the PR changes this script
-env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<lane>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   # own copy, scrubbed environment
+git -C "<lane>" show <head sha>:scripts/count-hosted-blockers.sh > "<scratch>/own-count-hosted-blockers.sh"   # own copy only if the PR changes this script; read it first
+env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<scratch>/own-count-hosted-blockers.sh" "<scratch>/hosted-review.txt"   # own copy, scrubbed environment
 ```
 
 Always run the script with `bash`, never your default shell. Use the copy
 exported from `origin/main` (the command above), not the lane's: the PR
 under review could have edited its own copy. A PR that itself changes
 `scripts/count-hosted-blockers.sh` also gets the path of its own copy, in the
-engineering manager's prompt. Before the own copy runs, read its diff against
-`origin/main` and run it with a scrubbed environment, as the command shows. Run
+engineering manager's prompt. Before the own copy runs, read the blob that the
+command exports. If it uses the network, writes outside `<scratch>`, or reads
+credentials, fail closed and do not run it. Otherwise run that blob with a
+scrubbed environment, as the command shows. Run
 both copies. If either prints `MALFORMED` or
 exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
 count is the higher `BLOCKERS <n>`. Any other output from either copy fails
@@ -193,8 +195,8 @@ lane's refs, and this fetch brings them up to date.
      ```
      git -C "<root checkout>" show origin/main:scripts/check-carried-approval.sh > "<scratch>/check-carried-approval.sh" \
        && bash "<scratch>/check-carried-approval.sh" "<lane>" <S> <head sha>
-     git -C "<lane>" diff origin/main...<head sha> -- scripts/check-carried-approval.sh   # read it first; own copy only if the PR changes this script
-     env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<lane>/scripts/check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy, scrubbed environment
+          git -C "<lane>" show <head sha>:scripts/check-carried-approval.sh > "<scratch>/own-check-carried-approval.sh"   # own copy only if the PR changes this script; read it first
+     env -i PATH=/usr/bin:/bin HOME="<scratch>" bash "<scratch>/own-check-carried-approval.sh" "<lane>" <S> <head sha>   # own copy, scrubbed environment
      ```
      Run it with `bash`. For every PR, a carry passes only on exit 0 with stdout
      exactly `CARRY PASSES`; anything else fails closed.
@@ -203,7 +205,9 @@ lane's refs, and this fetch brings them up to date.
      copy exported from `origin/main` (the command above), not the
      lane's: the PR under review could have edited its own copy. A PR that itself
      changes `scripts/check-carried-approval.sh` also gets the path of its own
-     copy, in the engineering manager's prompt. Run both copies; the carry
+     copy, in the engineering manager's prompt. Before the own copy runs, read the
+     blob the command exports: network use, writes outside `<scratch>`, or
+     credential reads mean fail closed. Run both copies; the carry
      stands only if both print `CARRY PASSES`. Every other PR runs only the copy
      exported from `origin/main`. The rule: a carry needs a diff of lower-case
      `.md` files only, each at the repository root, directly under `ios/` or
