@@ -503,6 +503,19 @@ test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILA
   assert.doesNotMatch(codexCall.prompt, /retry once/i)
 })
 
+// Pin: passes on the old script. Without the fetch Codex would diff against a
+// stale origin/main; without the second sentence the agent could report APPROVE
+// for a Codex that said otherwise.
+test('the Codex prompt carries its safeguards', async () => {
+  const { calls } = await runWorkflow({
+    args: { codex: true },
+    reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
+  })
+  const prompt = calls.find(c => c.opts.agentType === 'codex-reviewer').prompt
+  assert.match(prompt, /Run `git fetch origin main` first\./)
+  assert.match(prompt, /Never report APPROVE unless Codex did\./)
+})
+
 // Pin: passes on the old script. Rule 5 says Codex's RETRY comes back as
 // written, and only UNAVAILABLE had a test.
 test('codexRetryPassesThrough: a RETRY Codex comes back as RETRY, never APPROVE', async () => {
