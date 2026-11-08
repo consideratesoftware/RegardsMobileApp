@@ -109,8 +109,8 @@ public actor SchedulingPass {
         try await reschedule(only: contactId)
     }
 
-    /// Covered contacts are this run's `targets`: every tracked contact, or only `contactId`. Marks their due
-    /// pending rows fired, writes the rows they should have, and cancels future pending rows they shouldn't.
+    /// A contact this run covers: every tracked, unarchived contact in the snapshot, or only `contactId` if
+    /// it is one. Marks its due pending rows fired, writes its rows, cancels pending rows it shouldn't have.
     private func reschedule(only contactId: UUID?) async throws {
         // One read holds the contacts, the pending and fired rows, and the
         // window. A one-shot fetch, never the observation: GRDB delivers that
