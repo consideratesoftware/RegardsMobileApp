@@ -77,16 +77,17 @@ For each open TF PR:
 
 1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
    comments that count under the rule in `release-manager.md` (Open). For
-   each one that is missing, names a sha other than the PR's current head,
-   or (for Codex) is a RETRY or, unless it is UNAVAILABLE, has no
-   `codex-<short sha>.md` file in the lane's folder, rerun that review: check
+   each one that is missing, or that names a sha other than the PR's current
+   head, or (for Codex) that is a RETRY or has no `codex-<short sha>.md` file
+   in the lane's folder, rerun that review, unless it is a Codex UNAVAILABLE:
+   check
    the head out with `git worktree add --detach <tmp> <head sha>`, run
    the verified run (`pr-review.md`, "Claude Code org only") there with that
    target, started by the `scriptPath` rule in `pr-review.md`, or, when it can't run, `/pr-review origin/main...HEAD` and the
    `codex-reviewer` agent type. Post the result as a new verdict comment, then
    `git worktree remove <tmp>`. A RETRY gets
-   the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate:
-   interview Sid before rerunning it.
+   the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
+   head: interview Sid before any rerun.
 2. In every case, launch `release-manager` with both current verdicts to
    re-evaluate the PR. It will route red checks to `on-call-engineer`,
    park on owner gates, or merge when all conditions hold.
@@ -183,13 +184,15 @@ origin/main...HEAD | codex-cli <version>`, so a restart sees the gate instead
 of rerunning again. A RETRY after a repair moved the head is the first RETRY
 on the new head. On UNAVAILABLE, carry on to Stage 4; the PR waits on the
 owner gate in `ENGINEERING_ORG.md`. This holds with or without a saved codex
-file: an UNAVAILABLE is never rerun automatically. RETRY and UNAVAILABLE runs
+file, and on any head: an UNAVAILABLE is never rerun automatically. RETRY and UNAVAILABLE runs
 don't use up a review round. Two rounds maximum, then the second opinion.
 
 Whenever the head moves after a review (a repair, a rebase, an on-call
 fix), run the verified run again, or both `/pr-review origin/main...HEAD` and
 `codex-reviewer`, on the new head before Stage 4 re-checks merge conditions;
-the release manager can't launch agents.
+the release manager can't launch agents. While a Codex UNAVAILABLE gate is open,
+the review on the new head runs with `codex: false`, and `codex-reviewer` is
+not launched. Sid's answer releases the gate.
 
 Scoped rechecks. Owner rulings, 2026-11-02 (PR #68 comment 6597940023) and
 2026-11-03 (PR #69 comment 6623346908): after a round with no blockers, you
@@ -197,7 +200,7 @@ may recheck the fixes without asking Sid. Rerun `pr-security-privacy`,
 `pr-correctness`, `pr-fit-finish` and `pr-accessibility` (the last two where
 the routing table in `pr-review.md` requires them) on every head, plus
 `codex-reviewer`, which always reviews the whole `origin/main...HEAD` diff at
-the current head. Rerun `pr-code-quality` and `pr-tests` unless the new
+the current head, unless a Codex UNAVAILABLE gate is open. Rerun `pr-code-quality` and `pr-tests` unless the new
 commits are Markdown-only under the carry rule. A verified run for this
 recheck passes `since`, the last reviewed head, and the reviewers it reruns.
 Ask Sid only if a blocker survives 2 rounds or a fix needs a product decision.
@@ -260,7 +263,8 @@ If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
 relaunch `release-manager` with the new verdicts:
 - a newest verdict names a sha other than the head, or the branch was just
   updated (`update-branch`): both reviews on the new head (one verified run
-  covers both);
+  covers both). While a Codex UNAVAILABLE gate is open, the run on the new head
+  uses `codex: false`, and `codex-reviewer` is not launched;
 - `carry rejected: <reviewer>` or `reviewer missing: <name>`: that reviewer
   only, and post a new `PR REVIEW:` comment that lists it in `RERAN:` and
   repeats every `CARRIED:` line that still stands;

@@ -154,7 +154,8 @@ Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktr
 - `since`: scoped recheck only, the last reviewed head. Leave it out otherwise.
 - `reviewers`: the pr-* reviewers this round runs: the Stage 1 set, or the set
   a scoped recheck reruns.
-- `codex`: `true`, so Codex reviews in the same workflow.
+- `codex`: `true`, so Codex reviews in the same workflow. Use `false` while a
+  Codex UNAVAILABLE owner gate is open (`org.md` Stage 3).
 - `contextFile`: the absolute path of the lane's `review-context.md`. It must
   hold the §14 row and the R-numbers verbatim. For the workflow it replaces
   Stage 1's per-prompt paste of those two.

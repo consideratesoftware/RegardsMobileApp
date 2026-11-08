@@ -247,9 +247,11 @@ lane's refs, and this fetch brings them up to date.
   (`/codex:setup`), or the second RETRY was a timeout: rerun when OpenAI is
   responsive, or split the PR, which is a scope change for Sid. Never review
   part of the diff: Codex always reviews all of `origin/main...HEAD`.
-- If either review's newest verdict names a sha other than the current head,
-  report STATE CODEX STALE and stop; the engineering manager reruns both
-  reviews and relaunches you.
+- If the newest `PR REVIEW:` verdict names a sha other than the current head, or
+  the newest `CODEX REVIEW:` verdict does and is not UNAVAILABLE, report STATE
+  CODEX STALE and stop; the engineering manager reruns those reviews and
+  relaunches you. A Codex UNAVAILABLE stays a gate on any head, so it is never
+  CODEX STALE: park it, as above.
 - The branch is up to date with `main` before the final reviews (branch
   protection on `main` requires it). If it is behind, update it
   (`gh api -X PUT repos/consideratesoftware/RegardsMobileApp/pulls/<n>/update-branch`),
