@@ -187,8 +187,8 @@ lane's refs, and this fetch brings them up to date.
      under `ios/docs/` or `android/docs/`. It never carries a path under
      `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested
      copies included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any
-     depth and in any letter case, or a mode change: a file that exists before
-     and after the change must be mode 100644 (adds and deletes are fine).
+     depth and in any letter case, or any entry whose old or new mode is not
+     100644 (adding or deleting a 100644 file is fine).
      Anything else reruns that reviewer. The script's header defines it.
   If any condition fails, reject the carry: report STATE CODEX STALE with
   "carry rejected: <reviewer>", and the engineering manager reruns that
