@@ -25,7 +25,7 @@ never pick up Android work.
 - Next ready work: none. Slice 4 (`TF-07e`) builds on slices 1 to 3, so it waits for slices 1+2 to merge.
 - Blocked: none on `TF-03`. Each `BLOCKED` row still waits on its own
   dependency column.
-- Open pull requests: #72 (tooling batch 2, `claude/tooling-batch-2`) is the only one at the `gh pr list --state open` check on 2026-11-08. TF-07e slices 1+2: PR #73 (2026-11-08). #71 (`TF-07e` slice 3), #70 (`TF-07d`), #69 (`claude/build-engineer-cwd`), and #68 (`TF-11`) are merged.
+- Open pull requests: #72 (tooling batch 2, `claude/tooling-batch-2`) and PR #73 (TF-07e slices 1+2, `claude/tf-07e-scheduling`). The `gh pr list --state open` check on 2026-11-08 ran after PR #73 opened (08:13 UTC) and lists only these two. #71 (`TF-07e` slice 3), #70 (`TF-07d`), #69 (`claude/build-engineer-cwd`), and #68 (`TF-11`) are merged.
 - Worktree hazard: a file-sync process in this worktree creates byte-identical
   `"* 2"` copies of recently written files, and `git add -A` sweeps them into
   commits. PR #43 carried twelve before review caught them; `main` has none.
