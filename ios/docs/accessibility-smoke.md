@@ -143,17 +143,25 @@ Run this on a physical device with VoiceOver on. The audit excludes
 `.elementDetection` for this alert, so the device check decides whether its
 title, message, and Done button are announced (see `accessibility.md`).
 
-Expected values: the title is the row's channel label. The message is
-`Channel.tapPreviewMessage(for:)` for the contact's name, which `OverdueScreen`
-and `UpcomingScreen` both pass to the alert. For SMS and Han Solo,
-it starts with "Would text Han Solo." The button is labelled Done.
+Precondition: a Debug build on the device, with `--regards-mock-runtime` in the
+scheme's Arguments Passed On Launch. This loads the mock seed cast. Its clock is
+frozen, so the rows below stay the same on any day. Overdue then has Lando
+Calrissian (text) and Padmé Amidala (call). Upcoming has Anakin Skywalker (call),
+due in 6 days, inside the 14-day horizon.
 
-- [ ] Overdue: activate a row (double-tap). VoiceOver announces the alert's
-      title, then its message, then Done. Check each one.
+Expected values: the title is the channel's display name: "Text" for Lando
+Calrissian, and "Call" for Padmé Amidala and Anakin Skywalker. The spoken message
+starts with "Would text Lando Calrissian." for Lando, and with "Would call Anakin
+Skywalker." for Anakin. The button is labelled Done.
+
+- [ ] Overdue: activate Lando Calrissian's row (double-tap). VoiceOver announces
+      the title "Text", then the message, then Done. Check each one.
 - [ ] Activate Done. The alert dismisses. VoiceOver focus returns to the row
-      that opened the alert. If focus lands anywhere else, record where, as a
-      finding. It is not a pass.
-- [ ] Upcoming: repeat both steps on an Upcoming row.
+      that opened the alert (system behavior, not app code). If focus lands
+      anywhere else, record where, as a finding. It is not a pass.
+- [ ] Upcoming: activate Anakin Skywalker's row (double-tap). VoiceOver announces
+      the title "Call", then the message, then Done. Check each one, then repeat
+      the Done step above.
 
 `TESTFLIGHT_PLAN.md`'s "Pre-release device pass" has no entry for this section
 yet. When one is added, it names this section and has its own Result line.
