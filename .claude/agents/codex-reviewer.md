@@ -48,7 +48,7 @@ tool keeps the §14 row and other pasted text away from the shell.
 
 ```
 Use the $regards-pr-review skill to review the diff target <target>.
-Work item: <TF-## and §14 row, or "none">.
+Work item: <TF-## and §14 row, or "infra, no §14 row" for an infra PR, or "none">.
 Claimed R-closures: <list, or "none">.
 The mechanical gates (XcodeGen determinism, SwiftLint, guards) are
 required CI checks on every pull-request head, and this sandbox is
