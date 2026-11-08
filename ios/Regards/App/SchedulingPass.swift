@@ -173,7 +173,7 @@ public actor SchedulingPass {
             // The floor governs only while its slot is still ahead; once that
             // slot has started the snooze is spent.
             let floor = existing.flatMap { $0.state == .pending && $0.scheduledFor > now ? $0.snoozedUntil : nil }
-            // Capacity first: zero capacity records the contact, and the sweep below cancels the pending row.
+            // Capacity first: zero capacity records the contact; the covered-row cancel loop cancels a future row.
             guard let slot = Self.cadenceSlot(
                 overdueAt: overdueAt,
                 floor: floor,
@@ -181,9 +181,9 @@ public actor SchedulingPass {
                 occurrences: occurrences.map(\.1),
                 context: context
             ) else {
-                // The sweep below cancels the pending row, floor and all, so a
-                // snooze doesn't survive a capacity loss. Accepted: the editors
-                // refuse to save a zero-capacity window (PR #67 review).
+                // The covered-row cancel loop below cancels a future pending row, floor and all
+                // (a due one was marked fired at the top), so a snooze doesn't survive a capacity
+                // loss. Accepted: the editors refuse to save a zero-capacity window (PR #67 review).
                 zeroCapacity.insert(contact.id)
                 continue
             }
@@ -228,8 +228,8 @@ public actor SchedulingPass {
     }
 
     /// Retires pending rows whose contact the snapshot doesn't hold (untracked or archived, so the
-    /// snapshot can't show them). A due row was delivered, so it becomes fired history and a returning
-    /// contact keeps the no-re-nag hold (§9 "Notification fired"); a future row is cancelled.
+    /// snapshot can't show them). A due row is treated as delivered, so it becomes fired history and a
+    /// returning contact keeps the no-re-nag hold (§9 "Notification fired"); a future row is cancelled.
     private func sweepOrphans(snapshotContactIds: Set<UUID>, only contactId: UUID?, now: Date) async throws {
         if let contactId, snapshotContactIds.contains(contactId) { return }
         let pending: [ScheduledReminder]
@@ -240,10 +240,10 @@ public actor SchedulingPass {
                 pending = try await reminders.fetchAllPending()
             }
         } catch {
-            // The fail-closed read hit an undecodable row and fails every run
-            // until that row is fixed or replaced, so orphans stay pending.
-            // Until TF-07f that row also hides every snooze and Upcoming
-            // occasion row. The type only: an error can carry row or contact values.
+            // The fail-closed read hit an undecodable row, so orphans stay pending. Until that row is
+            // fixed or replaced, the read fails in every `runFull()` and in a `run(for:)` for its
+            // contact. Until TF-07f that row also hides every snooze and Upcoming occasion row.
+            // The type only: an error can carry row or contact values.
             let errorType = String(describing: type(of: error))
             Self.log.error("orphan sweep skipped: \(errorType, privacy: .public)")
             return
