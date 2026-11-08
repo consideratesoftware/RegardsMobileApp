@@ -461,6 +461,10 @@ test('codexUnavailablePassesThrough: an UNAVAILABLE Codex comes back as UNAVAILA
   // nearest verdict it is allowed.
   const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
   assert.match(codexCall.prompt, /UNAVAILABLE/)
+
+  // The one rerun of Codex belongs to the engineering manager (org.md Stage 3).
+  // A retry inside the agent would be a second one.
+  assert.doesNotMatch(codexCall.prompt, /retry once/i)
 })
 
 test('codexReview is null when Codex was not asked for, or returned nothing', async () => {
