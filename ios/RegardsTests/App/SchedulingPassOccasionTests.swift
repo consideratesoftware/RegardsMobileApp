@@ -201,7 +201,8 @@ struct SchedulingPassOccasionTests {
 
     /// The same occasion with `now` at its occurrence. No notification time exists, but the row's time
     /// has come, so the run writes it fired (§9 "Notification fired": every row a run writes at or before
-    /// now is fired). A pass that wrote it pending would have the next run mark it fired.
+    /// now is fired). A pass that wrote it pending would have the next run mark it fired. A run 30 minutes
+    /// later, with the occurrence behind it, leaves the row alone instead of moving it to the next occurrence.
     @Test(
         "A never-notifying occasion that is due now is written fired and stays put",
         arguments: RepositoryContractBackend.allCases
@@ -225,6 +226,12 @@ struct SchedulingPassOccasionTests {
         try await fixture.pass.runFull()
 
         #expect(try await fixture.row(id) == written)
+        #expect(await fixture.reminders.writeCount == writes)
+
+        fixture.setNow("2026-06-12 23:30")
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(id) == written, "The fired row does not chase the clock.")
         #expect(await fixture.reminders.writeCount == writes)
     }
 
