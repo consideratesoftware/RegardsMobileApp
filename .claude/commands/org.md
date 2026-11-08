@@ -88,8 +88,12 @@ For each open TF PR:
    the one rerun Stage 3 allows. A Codex UNAVAILABLE is an owner gate on any
    head: interview Sid before any rerun.
 2. In every case, launch `release-manager` with both current verdicts to
-   re-evaluate the PR. It will route red checks to `on-call-engineer`,
-   park on owner gates, or merge when all conditions hold.
+   re-evaluate the PR. When `git -C <lane worktree> diff --name-only
+   origin/main...HEAD` lists `scripts/count-hosted-blockers.sh` or
+   `scripts/check-carried-approval.sh`, also pass the absolute path of the lane
+   worktree's copy of each listed script, labeled as the PR's own copy of that
+   script. It will route red checks to `on-call-engineer`, park on owner gates,
+   or merge when all conditions hold.
 
 ## Stage 2: staff new lanes (budget = 3 minus occupied lanes)
 
@@ -253,7 +257,11 @@ Save the PR body draft to `pr-body.md` in the lane's folder, then launch
 `release-manager` with every report from the lane, plus these absolute paths
 (the release manager runs elsewhere): the lane worktree, the root checkout
 (where it finds `scripts/`), `owner-answers.md` if it exists, and the Codex
-review file. It opens the PR, watches CI and the hosted review, routes
+review file. When `git -C <lane worktree> diff --name-only origin/main...HEAD`
+lists `scripts/count-hosted-blockers.sh` or `scripts/check-carried-approval.sh`,
+also pass the absolute path of the lane worktree's copy of each listed script,
+labeled as the PR's own copy of that script. It opens the PR, watches CI and
+the hosted review, routes
 repairs, records the checkpoint via `tech-writer`, and merges only when all
 merge conditions in `ENGINEERING_ORG.md` hold. Stacked items open as drafts.
 
