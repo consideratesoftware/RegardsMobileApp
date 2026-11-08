@@ -134,12 +134,18 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    too. The workflow sees only severity, so it cannot tell those apart. The
    other reviewers' contracts do not turn a FIX finding into REQUEST_CHANGES, so
    their FIX findings are should-fix and do not block the flip.
-4. A pr-* reviewer with a surviving BLOCKER of its own is REQUEST_CHANGES.
+4. A pr-* reviewer is REQUEST_CHANGES, whatever it reported, when it has a
+   surviving BLOCKER of its own; when its `blockerCount` (its own `BLOCKERS: n`
+   count) is not a whole number equal to the BLOCKER findings it listed; or when
+   its report text is not empty and the first line starting with `VERDICT:` is
+   not exactly `VERDICT: <the verdict it returned>`. These checks cover an APPROVE
+   too, so an APPROVE cannot hide a blocker the reviewer counted but did not list.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line. A Codex entry
    whose structured verdict and the verdict word in its first line disagree is
-   FAILED. A Codex with no review text keeps its reported verdict.
+   FAILED, and so is one whose first line is blank or is not a verdict line. A
+   Codex with no review text (absent or empty) keeps its reported verdict.
 6. A pr-* reviewer whose `reviewedSha` is missing, under 7 characters, not
    lower-case hex, or not a prefix of head is FAILED, whatever it reported.
    Rerun that reviewer alone. Codex's sha is not checked here.
@@ -222,7 +228,8 @@ says.
   `impact`) and `real` (`true`, `false` or `'failed'`).
 - `survivors`: one entry per surviving BLOCKER or FIX finding, with its
   reviewer, severity, location, claim, fix and votes.
-- `workOrder`: the repair items. When its `notes` say the synthesizer returned
+- `workOrder`: the repair items. The synthesizer that writes it runs as the
+  read-only `tech-lead` agent. When its `notes` say the synthesizer returned
   nothing, repair from `survivors`.
 
 Don't post APPROVE while a pr-* reviewer is `FAILED` or has any verdict other than
