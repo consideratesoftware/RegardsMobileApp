@@ -793,6 +793,31 @@ test('a pr-code-quality review with a refuted BLOCKER and a surviving FIX stays 
   assert.equal(verdictOf(result, 'pr-code-quality'), 'REQUEST_CHANGES')
 })
 
+// Pin: pr-code-quality's output format has no BLOCKERS line, so its prompt sets
+// blockerCount to 0. If it still lists a BLOCKER finding, the count (0) does not
+// equal the BLOCKERs listed (1), and rule 4 keeps REQUEST_CHANGES even when all
+// 3 verifiers refute that finding. A count that agrees with the list (1 for 1)
+// lets the refutation flip it by rule 3, as for any other reviewer.
+test('a pr-code-quality review with blockerCount 0 that lists a refuted BLOCKER stays REQUEST_CHANGES', async () => {
+  const votes = { 'Alpha.swift:10': [false, false, false] }
+  const inconsistent = await runWorkflow({
+    args: { reviewers: ['pr-code-quality'] },
+    reviews: { 'pr-code-quality': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { blockerCount: 0 }) },
+    votes,
+  })
+  assert.equal(inconsistent.result.refuted.length, 1)
+  assert.equal(inconsistent.result.survivors.length, 0)
+  assert.equal(verdictOf(inconsistent.result, 'pr-code-quality'), 'REQUEST_CHANGES')
+
+  const consistent = await runWorkflow({
+    args: { reviewers: ['pr-code-quality'] },
+    reviews: { 'pr-code-quality': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { blockerCount: 1 }) },
+    votes,
+  })
+  assert.equal(consistent.result.refuted.length, 1)
+  assert.equal(verdictOf(consistent.result, 'pr-code-quality'), 'APPROVE')
+})
+
 test('REQUEST_CHANGES with nothing refuted stays REQUEST_CHANGES', async () => {
   const { result } = await runWorkflow({
     reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('FIX', 'Beta.swift:20')]) },
