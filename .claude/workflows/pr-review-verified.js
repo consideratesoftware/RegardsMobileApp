@@ -38,9 +38,10 @@ export const meta = {
 //      surviving BLOCKER of its own; when its blockerCount (its own BLOCKERS
 //      count) is not a whole number equal to the BLOCKER findings it listed;
 //      when its report text (rawSummary) is missing or empty; or when the first
-//      line starting with "VERDICT:" is not exactly "VERDICT: <the verdict it
-//      returned>". These checks cover an APPROVE too, so an APPROVE cannot hide
-//      a blocker the reviewer counted but did not list.
+//      line starting with "VERDICT:" is not "VERDICT: <the verdict it
+//      returned>" (trailing white space ignored). These checks cover an APPROVE
+//      too, so an APPROVE cannot hide a blocker the reviewer counted but did
+//      not list.
 //   5. Codex's verdict is always Codex's own. The verifiers never change it.
 //      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
 //      UNAVAILABLE come back as written, so a Codex that could not review is
@@ -291,7 +292,7 @@ return {
       // one of them is wrong and the entry is FAILED. Only an absent or empty
       // review text has no line to compare (rule 5).
       const named = review.rawSummary ? /^CODEX REVIEW: (APPROVE|REQUEST_CHANGES|RETRY|UNAVAILABLE) @ /.exec(review.rawSummary.split('\n')[0]) : null
-      verdict = !review.rawSummary || (named && named[1] === review.verdict) ? review.verdict : 'FAILED'
+      verdict = (!review.rawSummary || (named && named[1] === review.verdict)) ? review.verdict : 'FAILED'
     } else if (!/^[0-9a-f]{7,40}$/.test(review.reviewedSha || '') || !a.head.startsWith(review.reviewedSha)) {
       verdict = 'FAILED'
     } else if (d.verified.some(v => v.severity === 'BLOCKER' && v.survives)) {
@@ -309,11 +310,12 @@ return {
       verdict = 'REQUEST_CHANGES'
     } else if (!review.rawSummary || (review.rawSummary.split('\n').find(line => line.startsWith('VERDICT:')) || '').trim() !== `VERDICT: ${review.verdict}`) {
       // The report text has to be there and say the verdict the reviewer
-      // returned. The first line that starts with "VERDICT:" must be exactly
-      // "VERDICT: <verdict>". A report with no such line, or one that echoes the
-      // template "VERDICT: APPROVE | REQUEST_CHANGES", does not say it. A
-      // missing or empty report leaves nothing to check a verdict against, so
-      // the verdict does not stand (rule 4).
+      // returned. The first line that starts with "VERDICT:" must be
+      // "VERDICT: <verdict>", trailing white space ignored. A report with no
+      // such line, or one that echoes the template
+      // "VERDICT: APPROVE | REQUEST_CHANGES", does not say it. A missing or
+      // empty report leaves nothing to check a verdict against, so the verdict
+      // does not stand (rule 4).
       verdict = 'REQUEST_CHANGES'
     } else if (review.verdict !== 'REQUEST_CHANGES') {
       verdict = review.verdict

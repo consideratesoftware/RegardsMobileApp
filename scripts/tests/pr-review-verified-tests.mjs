@@ -449,7 +449,7 @@ test('a pr-* APPROVE with a blockerCount of 0, no findings and a matching report
   assert.equal(verdictOf(result, 'pr-correctness'), 'APPROVE')
 })
 
-test('the first VERDICT: line of a pr-* report must be exactly the verdict it returned', async () => {
+test('the first VERDICT: line of a pr-* report must be the verdict it returned, trailing white space ignored', async () => {
   const cases = [
     ['the verdict on the first line', 'VERDICT: APPROVE\nBLOCKERS: 0', 'APPROVE'],
     ['a trailing carriage return', 'VERDICT: APPROVE\r\nBLOCKERS: 0', 'APPROVE'],
