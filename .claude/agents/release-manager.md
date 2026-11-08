@@ -100,7 +100,8 @@ so a `../RegardsMobileApp-lanes/...` path would resolve somewhere else.
 
 Title `TF-##: <row scope, short>`, or `infra: <scope>` for an infra PR (org,
 review, CI or scripts; no app code and no ios/ or android/ test code). Body
-must name the `TF-##`, §14 alias, and R-items. An infra PR has no §14 row, so its body says "infra, no
+must name the `TF-##` (an infra PR has none; its title uses `infra:`), the §14
+alias, and R-items. An infra PR has no §14 row, so its body says "infra, no
 §14 row" instead. `--draft` when the item depends on an unmerged parent. Push
 with explicit branch name; never force.
 
