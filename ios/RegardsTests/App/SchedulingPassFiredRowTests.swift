@@ -32,22 +32,6 @@ struct SchedulingPassFiredRowTests {
         quietHours: nil,
         timezoneIdentifier: "America/Los_Angeles")
 
-    /// A tracked contact with a 1-day cadence; `lastInteractedAt` is ISO 8601.
-    private static func addLosAngelesContact(
-        to fixture: PassFixture, lastInteractedAt: String
-    ) async throws -> Contact {
-        let contact = Contact(
-            id: try contractUUID(7_001),
-            systemContactRef: "pass-1",
-            displayName: "Pass 1",
-            tracked: true,
-            cadenceDays: 1,
-            lastInteractedAt: EngineFixtures.date(lastInteractedAt),
-            createdAt: EngineFixtures.date("2026-01-01T10:00:00-08:00"))
-        try await fixture.repositories.contacts.upsert(contact)
-        return contact
-    }
-
     // MARK: - Marking
 
     /// One hour ago and exactly now are both "has come": the rule is
@@ -252,8 +236,15 @@ struct SchedulingPassFiredRowTests {
     )
     func oneDayCadenceOnAFallBackDayDoesNotReNag(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend, window: Self.allDayLosAngeles)
-        let contact = try await Self.addLosAngelesContact(
-            to: fixture, lastInteractedAt: "2026-11-01T00:30:00-07:00")
+        let contact = Contact(
+            id: try contractUUID(7_001),
+            systemContactRef: "pass-1",
+            displayName: "Pass 1",
+            tracked: true,
+            cadenceDays: 1,
+            lastInteractedAt: EngineFixtures.date("2026-11-01T00:30:00-07:00"),
+            createdAt: EngineFixtures.date("2026-01-01T10:00:00-08:00"))
+        try await fixture.repositories.contacts.upsert(contact)
         let slotStart = EngineFixtures.date("2026-11-01T00:00:00-07:00")
         var fired = Self.pendingCadenceRow(for: contact, at: slotStart, in: fixture)
         fired.state = .fired
@@ -348,8 +339,15 @@ struct SchedulingPassFiredRowTests {
     )
     func failedRescheduleAfterCatchUpOnAFallBackDayStillNotifies(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend, window: Self.allDayLosAngeles)
-        let contact = try await Self.addLosAngelesContact(
-            to: fixture, lastInteractedAt: "2026-10-30T12:00:00-07:00")
+        let contact = Contact(
+            id: try contractUUID(7_001),
+            systemContactRef: "pass-1",
+            displayName: "Pass 1",
+            tracked: true,
+            cadenceDays: 1,
+            lastInteractedAt: EngineFixtures.date("2026-10-30T12:00:00-07:00"),
+            createdAt: EngineFixtures.date("2026-01-01T10:00:00-08:00"))
+        try await fixture.repositories.contacts.upsert(contact)
         let slotStart = EngineFixtures.date("2026-11-01T00:00:00-07:00")
         var fired = Self.pendingCadenceRow(for: contact, at: slotStart, in: fixture)
         fired.state = .fired
