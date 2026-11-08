@@ -18,7 +18,7 @@ export const meta = {
 //   branch       branch name
 //   head         full 40-character lower-case sha of the head to review
 //   since        scoped recheck only: the sha of the last full review
-//   reviewers    the Stage 1 set, pr-* agent names only
+//   reviewers    the Stage 1 set: names from KNOWN_REVIEWERS below, no others
 //   codex        true to add the Codex review
 //   contextFile  the lane's review-context.md (the TF row and R-numbers)
 //
@@ -128,13 +128,16 @@ const WORKORDER = {
 
 const a = args || {}
 
+// The pr-* reviewers /pr-review's Stage 1 can pick from.
+const KNOWN_REVIEWERS = ['pr-correctness', 'pr-security-privacy', 'pr-tests', 'pr-code-quality', 'pr-accessibility', 'pr-fit-finish']
+
 // Fail before any agent runs when the args are wrong. A short sha or a made-up
 // reviewer name would otherwise produce a review of the wrong thing.
 if (!/^[0-9a-f]{40}$/.test(a.head)) {
   throw new Error(`head must be a full 40-character lower-case hex sha, got: ${a.head}`)
 }
-if (!Array.isArray(a.reviewers) || a.reviewers.length === 0 || !a.reviewers.every(r => /^pr-[a-z0-9-]+$/.test(r))) {
-  throw new Error(`reviewers must be a non-empty array of pr-* agent names, got: ${JSON.stringify(a.reviewers)}`)
+if (!Array.isArray(a.reviewers) || a.reviewers.length === 0 || !a.reviewers.every(r => KNOWN_REVIEWERS.includes(r))) {
+  throw new Error(`reviewers must be a non-empty array of names from ${KNOWN_REVIEWERS.join(', ')}, got: ${JSON.stringify(a.reviewers)}`)
 }
 
 // The focus line goes into the pr-* review and verify prompts only. Codex

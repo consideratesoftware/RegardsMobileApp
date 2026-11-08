@@ -500,31 +500,46 @@ test('a reviewer whose run throws is still listed, as FAILED', async () => {
   assert.deepEqual(result.verdicts.map(v => `${v.reviewer}=${v.verdict}`), ['pr-correctness=FAILED', 'pr-tests=APPROVE'])
 })
 
-test('badArgsThrow: a short or malformed head, or a reviewer that is not pr-*, throws before any agent runs', async () => {
+test('badArgsThrow: a bad head, or a reviewer that is not a known pr-* name, throws before any agent runs', async () => {
+  const badHead = /head must be/
+  const badReviewers = /reviewers must be/
   const bad = [
-    { head: 'abc1234' },
-    { head: HEAD.slice(0, 39) },
-    { head: HEAD + '0' },
-    { head: 'g'.repeat(40) },
-    { head: HEAD.toUpperCase() },
-    { head: undefined },
-    { reviewers: ['skeptic'] },
-    { reviewers: ['pr-tests', 'skeptic'] },
-    { reviewers: ['codex-reviewer'] },
-    { reviewers: 'pr-tests' },
-    { reviewers: [] },
+    [{ head: 'abc1234' }, badHead],
+    [{ head: HEAD.slice(0, 39) }, badHead],
+    [{ head: HEAD + '0' }, badHead],
+    [{ head: 'g'.repeat(40) }, badHead],
+    [{ head: HEAD.toUpperCase() }, badHead],
+    [{ head: undefined }, badHead],
+    [{ reviewers: ['skeptic'] }, badReviewers],
+    [{ reviewers: ['pr-tests', 'skeptic'] }, badReviewers],
+    [{ reviewers: ['codex-reviewer'] }, badReviewers],
+    // Well-formed pr-* names that no agent has.
+    [{ reviewers: ['pr-foo'] }, badReviewers],
+    [{ reviewers: ['pr-tests', 'pr-foo'] }, badReviewers],
+    [{ reviewers: ['pr-'] }, badReviewers],
+    [{ reviewers: 'pr-tests' }, badReviewers],
+    [{ reviewers: [] }, badReviewers],
   ]
-  for (const args of bad) {
+  for (const [args, message] of bad) {
     const calls = []
     await assert.rejects(
       workflow(() => { calls.push(1) }, () => {}, () => {}, () => {}, () => {}, {
         title: 't', worktree: '/w', branch: 'b', head: HEAD, reviewers: ['pr-tests'], codex: false, contextFile: '/c', ...args,
       }),
-      /head must be|reviewers must be/,
+      message,
       JSON.stringify(args),
     )
     assert.equal(calls.length, 0, `an agent ran for ${JSON.stringify(args)}`)
   }
+})
+
+test('every known pr-* reviewer is accepted', async () => {
+  const known = ['pr-correctness', 'pr-security-privacy', 'pr-tests', 'pr-code-quality', 'pr-accessibility', 'pr-fit-finish']
+  const { result } = await runWorkflow({
+    args: { reviewers: known },
+    reviews: Object.fromEntries(known.map(name => [name, review('APPROVE')])),
+  })
+  assert.deepEqual(result.verdicts.map(v => v.reviewer), known)
 })
 
 // ---- the rest of the contract ---------------------------------------------
