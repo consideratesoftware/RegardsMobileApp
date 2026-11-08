@@ -901,7 +901,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 - OAuth calendar anything.
 - Renumbering §1–§17 of this document.
 
-**Commit/PR conventions:** prefix `ios:` / `ci:` / `docs:` / `chore:`; PR description cites doc sections (e.g. "Implements §9a per PR25 scope"); deviations flagged in a "Deviations" section of the PR body. Branch names: `ios/<topic>`, `ci/<topic>`, `docs/<topic>`.
+**Commit/PR conventions:** prefix `ios:` / `ci:` / `docs:` / `chore:` / `infra:`; PR description cites doc sections (e.g. "Implements §9a per PR25 scope"); deviations flagged in a "Deviations" section of the PR body. Branch names: `ios/<topic>`, `ci/<topic>`, `docs/<topic>`.
 
 **Working with the guards:** the shared privacy script matches networking call sites, including `NSURLConnection` and `CFSocket*`, so user-facing copy may still name those symbols as bare tokens. The shared Domain script rejects plain, preconcurrency, and selective imports from every prohibited module. R32 records the fixture-backed GitHub PR #26 closure.
 
