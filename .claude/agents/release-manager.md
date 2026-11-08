@@ -210,23 +210,23 @@ lane's refs, and this fetch brings them up to date.
      the engineering manager's prompt. Before the own copy runs, read the blob
      the command exports: network use, writes outside `<scratch>`, or credential
      reads mean fail closed. Run it as the command shows; `TMPDIR` is
-     `<scratch>`, and the script's `mktemp` uses a `${TMPDIR:-/tmp}` template,
-     so its temp folder stays inside `<scratch>`. Run both copies; the carry
-     stands only if both print `CARRY PASSES`. Every other PR runs only the copy
-     exported from `origin/main`. The rule: a carry needs a diff of lower-case
-     `.md` files only, each at the repository root, directly under `ios/` or
-     `android/`, or under `ios/docs/` or `android/docs/`. It never carries a
-     path under any `src` or `schemas` folder below `android/`, at any depth,
-     such as `android/docs/src/x.md`. It never carries a path under `.claude/`,
-     `.codex/`, `.agents/`, `scripts/` or `.github/` (nested copies included),
-     an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any depth and in any letter
-     case, or any entry whose old or new mode is not 100644 (adding or deleting
-     a 100644 file is fine). Anything else reruns that reviewer. The script's
-     header defines it. If any condition fails, reject the carry: report STATE
-     CODEX STALE with "carry rejected: <reviewer>", and the engineering manager
-     reruns that reviewer. A `CARRIED:` line is checked by these conditions even
-     when the reviewer also has an APPROVE at the head, and one that fails them
-     is "carry rejected" regardless.
+     `<scratch>`, so a `mktemp` with a `${TMPDIR:-/tmp}` template stays inside
+     `<scratch>`, and a bare `mktemp -d` counts as a write outside it. Run both
+     copies; the carry stands only if both print `CARRY PASSES`. Every other PR
+     runs only the copy exported from `origin/main`. The rule: a carry needs a
+     diff of lower-case `.md` files only, each at the repository root, directly
+     under `ios/` or `android/`, or under `ios/docs/` or `android/docs/`. It
+     never carries a path under any `src` or `schemas` folder below `android/`,
+     at any depth, such as `android/docs/src/x.md`. It never carries a path
+     under `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested
+     copies included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any depth
+     and in any letter case, or any entry whose old or new mode is not 100644
+     (adding or deleting a 100644 file is fine). Anything else reruns that
+     reviewer. The script's header defines it. If any condition fails, reject
+     the carry: report STATE CODEX STALE with "carry rejected: <reviewer>", and
+     the engineering manager reruns that reviewer. A `CARRIED:` line is checked
+     by these conditions even when the reviewer also has an APPROVE at the head,
+     and one that fails them is "carry rejected" regardless.
 
   Two more checks apply to every newest `PR REVIEW:` comment, scoped or
   not, and a failure of either is STATE CODEX STALE:
