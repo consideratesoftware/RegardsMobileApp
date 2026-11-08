@@ -48,7 +48,8 @@ a cache for the next session: when they disagree with the branch, the PR, or
    (plan, review context, PR body draft) before asking a role to redo any
    of it.
 3. `gh pr list --state open --json number,title,headRefName,isDraft`. Any PR
-   with a `TF-##` marker is an occupied lane.
+   with a `TF-##` marker is an occupied lane. An open `infra:` PR is not a lane
+   and occupies none; Stage 1 still re-evaluates it.
 4. Read `Current checkpoint` and `Work queue` in `TESTFLIGHT_PLAN.md`, and
    `CLAUDE_CODE_HANDOFF.md` if present (more current when they disagree).
    READY items are those whose dependencies are all DONE.
@@ -73,7 +74,7 @@ For `status`: print the Stage 5 report from this state and stop.
 
 ## Stage 1: resume open work (parallel; does not consume lanes)
 
-For each open TF PR:
+For each open TF PR, and each open `infra:` PR (which occupies no lane):
 
 1. Fetch, then read the PR's newest `PR REVIEW:` and `CODEX REVIEW:`
    comments that count under the rule in `release-manager.md` (Open). For
