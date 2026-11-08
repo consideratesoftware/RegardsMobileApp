@@ -318,7 +318,7 @@ test('a refuted BLOCKER turns REQUEST_CHANGES into APPROVE', async () => {
 })
 
 test('a REQUEST_CHANGES that counted more blockers than it listed does not flip to APPROVE', async () => {
-  // The report said 2 blockers and listed 1. Both verifiers agree the 1 is
+  // The report said 2 blockers and listed 1. All 3 verifiers agree the 1 is
   // not real, but the second blocker was never listed, so nothing checked it.
   const { result } = await runWorkflow({
     reviews: {
