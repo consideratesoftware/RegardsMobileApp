@@ -207,8 +207,8 @@ to find later.
   head. If Codex needs setup, run `/codex:setup` and `codex login` if it
   asks. If the second RETRY was a timeout, rerun the review when OpenAI is
   responsive, or split the PR, which is a scope change for Sid; Codex always
-  reviews the whole `origin/main...HEAD` diff. The PR waits; the org does not merge
-  without the Codex verdict.
+  reviews the whole `origin/main...HEAD` diff. The PR waits; the org does not
+  merge without the Codex verdict. A new head doesn't clear it; Sid's answer does.
 - Scope changes to the queue or dependency graph.
 
 Not owner gates: the manual VoiceOver smoke
