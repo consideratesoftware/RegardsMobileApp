@@ -152,7 +152,10 @@ Each verifier votes under the finding-verification mode in
 
 ### How to run it
 
-Run Stage 0 yourself. Then start the workflow once:
+Run Stage 0 yourself. Start the workflow and every plain-run agent from a
+session whose folder is the root checkout on `main`, never a PR checkout, so the
+reviewer, verifier and codex-reviewer contracts load from main. Pass the PR head
+only as `worktree`. Then start the workflow once:
 
 ```
 Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })

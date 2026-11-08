@@ -81,8 +81,9 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    each one that is missing, or that names a sha other than the PR's current
    head, or (for Codex) that is a RETRY or has no `codex-<short sha>.md` file
    in the lane's folder, rerun that review, unless it is a Codex UNAVAILABLE:
-   check the head out with `git worktree add --detach <tmp> <head sha>`, run
-   the verified run (`pr-review.md`, "Claude Code org only") there with that
+   check the head out with `git worktree add --detach <tmp> <head sha>`, then run
+   the verified run (`pr-review.md`, "Claude Code org only") from the root checkout
+   on `main`, never from `<tmp>`, with `<tmp>` passed as `worktree` and that
    target, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR needs
    run (a), with Codex in run (a) only; run (b) is optional), or, when it can't
    run, `/pr-review origin/main...HEAD` and the `codex-reviewer` agent type. Post
@@ -145,7 +146,8 @@ batch starts only when `git status --short` in the lane is empty. Write the
 target, the §14 row (or "infra, no §14 row" for an infra PR), and the claimed
 R-numbers to `review-context.md` in the
 lane's folder. Fetch, then run the verified run (`pr-review.md`, "Claude Code org only")
-against the lane's worktree with `codex: true`, so the review board and Codex
+from the root checkout on `main`, with the lane's worktree passed as `worktree`
+and `codex: true`, so the review board and Codex
 run in one workflow. Start it by `scriptPath` to a copy exported from
 `origin/main`, never by `name`. For a PR that adds or changes
 `.claude/workflows/pr-review-verified.js`, the self-edit rule in that section
@@ -154,7 +156,7 @@ is the counting review and the only one with Codex. The PR's own copy (run (b))
 is optional: the PR's own copy, run with `codex: false`. When it runs, each
 pr-* reviewer counts at the stricter run. Run (a) alone is a complete counting
 review. If it can't run, run
-`/pr-review origin/main...HEAD` from inside the lane's worktree and launch the
+`/pr-review origin/main...HEAD` from the root checkout on `main`, with the lane's worktree as the target, and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
 batch, with the worktree, the same target `origin/main...HEAD`, the item's §14
 row (or "infra, no §14 row" for an infra PR), and its claimed R-numbers. The
