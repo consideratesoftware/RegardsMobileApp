@@ -229,8 +229,9 @@ struct UserNotificationsAdapterRequestTests {
     /// Trigger components drop sub-second precision, so a fire date 0.4 s or
     /// 0.6 s ahead of a whole-second `now` names the second that is already
     /// `now`. A calendar trigger for that second never fires, so it must
-    /// deliver immediately instead. The 2 offsets sit on either side of half a
-    /// second, so rounding the fire date instead of truncating it fails 0.6.
+    /// deliver immediately instead. The 0.4 and 0.6 offsets sit on either side
+    /// of half a second, so rounding the fire date instead of truncating it
+    /// fails 0.6.
     @Test("A fire date whose trigger instant is not after now delivers immediately", arguments: [-600.0, 0.0, 0.4, 0.6])
     func triggerInstantNotAfterNowDeliversImmediately(offsetFromNow: TimeInterval) throws {
         let now = try Self.utc(Self.now)
