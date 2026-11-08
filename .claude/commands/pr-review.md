@@ -131,7 +131,7 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    too. The workflow sees only severity, so it cannot tell those apart. The
    other reviewers' contracts do not turn a FIX finding into REQUEST_CHANGES, so
    their FIX findings are should-fix and do not block the flip.
-4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
+4. A pr-* reviewer with a surviving BLOCKER of its own is REQUEST_CHANGES.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
    `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line.
