@@ -122,6 +122,12 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
 3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when at least one
    of its findings was refuted, none of its BLOCKERs survived, it has no NOT
    CHECKED entry, and (pr-code-quality only) none of its FIX findings survived.
+   The pr-code-quality clause is deliberately conservative.
+   `pr-code-quality.md` makes a layering violation, a false comment or a
+   hand-edited pbxproj a REQUEST_CHANGES on its own, and 3 or more FIX findings
+   too. The workflow sees only severity, so it cannot tell those apart. The
+   other reviewers' contracts do not turn a FIX finding into REQUEST_CHANGES, so
+   their FIX findings are should-fix and do not block the flip.
 4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
