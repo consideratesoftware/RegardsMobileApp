@@ -147,6 +147,14 @@ gitlink_on_md_path() {
   git -C "$repo" update-index --add --cacheinfo "160000,$base,ios/docs/sub.md"
 }
 upper_case_md_suffix() { put ios/docs/Note.MD '# Note'; }
+root_md_tail() { put Package.md.swift 'let x = 1'; }
+docs_mdx() { put ios/docs/x.mdx '# x'; }
+docs_md_dir_file() { put ios/docs/x.md/payload.swift 'let x = 1'; }
+docs_md_sh() { put ios/docs/x.md.sh 'echo x'; }
+docs_notes_md() { put ios/docs/notes_md '# x'; }
+docs_cmd() { put ios/docs/x.cmd 'echo x'; }
+docs_png() { put ios/docs/diagram.png 'x'; }
+ios_md_dir_file() { put ios/Regards.md/App.swift 'let x = 1'; }
 root_claude_local_md() { put CLAUDE.local.md '# Local claude file'; }
 nested_agents_override_md() { put ios/docs/AGENTS.override.md '# Agents override'; }
 root_architecture_md() { put ARCHITECTURE.md '# Architecture, changed'; }
@@ -228,6 +236,14 @@ expect 'an ios/docs/link.md symlink to ios/Info.plist fails' 1 md_symlink
 expect 'a deleted executable ios/docs/run.md fails' 1 executable_md_deleted
 expect_index 'a gitlink added on a .md path fails' 1 gitlink_on_md_path
 expect 'an added ios/docs/Note.MD (upper-case suffix) fails' 1 upper_case_md_suffix
+expect 'an added root Package.md.swift fails' 1 root_md_tail
+expect 'an added ios/docs/x.mdx fails' 1 docs_mdx
+expect 'an added ios/docs/x.md/payload.swift fails' 1 docs_md_dir_file
+expect 'an added ios/docs/x.md.sh fails' 1 docs_md_sh
+expect 'an added ios/docs/notes_md (no dot before md) fails' 1 docs_notes_md
+expect 'an added ios/docs/x.cmd (ends in md, no dot) fails' 1 docs_cmd
+expect 'an added ios/docs/diagram.png (non-Markdown in a doc root) fails' 1 docs_png
+expect 'an added ios/Regards.md/App.swift fails' 1 ios_md_dir_file
 expect 'a root AGENTS.md change fails' 1 root_agents_md
 expect 'a root CLAUDE.md change fails' 1 root_claude_md
 expect 'a root ARCHITECTURE.md change fails' 1 root_architecture_md
