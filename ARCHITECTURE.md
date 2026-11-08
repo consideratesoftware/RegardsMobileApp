@@ -720,7 +720,7 @@ boundaries.
 
 | Scope | Key acceptance criteria |
 |---|---|
-| Native iOS 17 baseline chrome and empty states; iOS 18 value-based tabs, search role, adaptive sidebar, and Reduce-Motion-aware zoom transitions; iOS 26 Liquid Glass control state, scroll-minimizing tab bar, and local open-section App Shortcut | Xcode 26.6 / iOS 26.5 build and metadata extraction pass; iOS 17 fallback compiles and launches; App Shortcut exposes no personal data; focused accessibility regressions, manual smoke, and staged accessibility review pass; scheduled broad audits remain green on current `main`; no iOS 27 beta API; sibling adoption matrix in `ios/docs/modern-ios.md` |
+| Native iOS 17 baseline chrome and empty states; iOS 18 value-based tabs, search role, adaptive sidebar, and Reduce-Motion-aware zoom transitions; iOS 26 Liquid Glass control state, scroll-minimizing tab bar, and local open-section App Shortcut | Xcode 26.6 / iOS 26.5 build and metadata extraction pass; iOS 17 fallback compiles and launches; App Shortcut exposes no personal data; focused accessibility regressions and the staged accessibility review pass are needed before merge; manual smoke goes to the pre-release device pass in `TESTFLIGHT_PLAN.md`; scheduled broad audits remain green on current `main`; no iOS 27 beta API; sibling adoption matrix in `ios/docs/modern-ios.md` |
 
 ### Phase 1R — Remediation (Jul 6–10) — fix what's wrong before building on it
 
