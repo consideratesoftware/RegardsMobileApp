@@ -220,6 +220,7 @@
 		E14B475BE691A6F2D19E1DD1 /* RowActionAccessibilityEffectsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB9BC25AB0C2BDDD3AF5EDB /* RowActionAccessibilityEffectsTests.swift */; };
 		E1BF4D4F535EEA83DE753DA0 /* SchedulingPassFiredRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA8AB17AE12450A8D0EF06C /* SchedulingPassFiredRowTests.swift */; };
 		E244C3AA32EAF05275B29B44 /* NotificationFakeParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0554DB8A736749004658979 /* NotificationFakeParityTests.swift */; };
+		E3F0A663EF4FFA6BB23B962D /* SchedulingPassOccasionTests+ZeroCapacity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9BDEDFCF463B218AA79A92 /* SchedulingPassOccasionTests+ZeroCapacity.swift */; };
 		E4457278F17AE1064C3D5A09 /* OverdueViewModelSnoozeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71D4094A307432BCC0C98F5 /* OverdueViewModelSnoozeTests.swift */; };
 		E4525D4289A80E4FB0239829 /* UpdateLastInteractedAtContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11FB87B0798421853230A006 /* UpdateLastInteractedAtContractTests.swift */; };
 		E4B0A7C5A1EA4F5FDAB6B011 /* RegardsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1ADC20C0E7E4CE0DA30722D /* RegardsApp.swift */; };
@@ -413,6 +414,7 @@
 		97947E73AD0975A89695E0FC /* ReminderWindowOverrideContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderWindowOverrideContractTests.swift; sourceTree = "<group>"; };
 		97F26043F1ADA839A3F73450 /* ReminderEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderEngine.swift; sourceTree = "<group>"; };
 		9843A778F3A4F1F5703D9537 /* AsyncExpectation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncExpectation.swift; sourceTree = "<group>"; };
+		9A9BDEDFCF463B218AA79A92 /* SchedulingPassOccasionTests+ZeroCapacity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SchedulingPassOccasionTests+ZeroCapacity.swift"; sourceTree = "<group>"; };
 		9EE71CB5E14E6EEA82FA2054 /* SchedulingPassPendingSnoozeDateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulingPassPendingSnoozeDateTests.swift; sourceTree = "<group>"; };
 		9F7FD5E0AF76BF4C9C09CD90 /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
 		A0496D02B389DD5FAAF6CD67 /* ContactsImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsImporter.swift; sourceTree = "<group>"; };
@@ -755,6 +757,7 @@
 				AEA8AB17AE12450A8D0EF06C /* SchedulingPassFiredRowTests.swift */,
 				F46075CFC653012C9FA7E025 /* SchedulingPassOccasionRolloverTests.swift */,
 				B4E7DA965F6B235782ED5844 /* SchedulingPassOccasionTests.swift */,
+				9A9BDEDFCF463B218AA79A92 /* SchedulingPassOccasionTests+ZeroCapacity.swift */,
 				9EE71CB5E14E6EEA82FA2054 /* SchedulingPassPendingSnoozeDateTests.swift */,
 				41B459F829FC0D4ACB7805FA /* SchedulingPassRunForScopeTests.swift */,
 				9012876C74CD19927B53370F /* SchedulingPassRunFullTests.swift */,
@@ -1287,6 +1290,7 @@
 				E1BF4D4F535EEA83DE753DA0 /* SchedulingPassFiredRowTests.swift in Sources */,
 				FB76558A0530FD8F3A2529FE /* SchedulingPassFixture.swift in Sources */,
 				3CA248C5CE3CBD0AF401BD99 /* SchedulingPassOccasionRolloverTests.swift in Sources */,
+				E3F0A663EF4FFA6BB23B962D /* SchedulingPassOccasionTests+ZeroCapacity.swift in Sources */,
 				8E842741B1438E20F9046760 /* SchedulingPassOccasionTests.swift in Sources */,
 				1FF015873E58939210223586 /* SchedulingPassPendingSnoozeDateTests.swift in Sources */,
 				E77BE197713A24C483EFD4D9 /* SchedulingPassRunForScopeTests.swift in Sources */,

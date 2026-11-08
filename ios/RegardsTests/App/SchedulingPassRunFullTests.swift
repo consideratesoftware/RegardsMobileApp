@@ -155,6 +155,13 @@ struct SchedulingPassRunFullTests {
         #expect(try await fixture.cadenceRow(contact) == nil)
         #expect(await fixture.reminders.transitions == 1)
         #expect(await fixture.pass.zeroCapacityContactIds == [contact.id])
+
+        // Capacity returns. A cancelled row holds nothing, unlike a fired one, so the next run writes a pending row.
+        _ = try await fixture.repositories.contacts.updateReminderWindowOverride(id: contact.id, window: nil)
+        try await fixture.pass.run(for: contact.id)
+
+        #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
+        #expect(await fixture.pass.zeroCapacityContactIds.isEmpty)
     }
 
     /// The slot has started, so the run marks the row fired: it is treated as delivered.

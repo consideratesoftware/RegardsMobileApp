@@ -9,7 +9,7 @@ import Testing
 struct SchedulingPassOccasionTests {
 
     /// Birthdays on 06-12 for the given contact numbers.
-    private static func birthdays(on monthDay: MonthDay = MonthDay(month: 6, day: 12), for numbers: [Int]) throws
+    static func birthdays(on monthDay: MonthDay = MonthDay(month: 6, day: 12), for numbers: [Int]) throws
         -> @Sendable ([Contact]) async -> [ContactOccasion] {
         let ids = try numbers.map { try contractUUID(7_000 + $0) }
         return { contacts in
@@ -18,7 +18,7 @@ struct SchedulingPassOccasionTests {
         }
     }
 
-    private static let quietEvenings = TimeRange(
+    static let quietEvenings = TimeRange(
         start: TimeOfDay(hour: 22, minute: 30), end: TimeOfDay(hour: 7, minute: 30))
 
     // MARK: - Contract 6
