@@ -221,7 +221,7 @@ Two layer boundaries are **CI-enforced** by grep guards in `.github/workflows/gu
 
 ## 7. Data model
 
-All local SQLite. No cloud, no sync. **This section describes the schema as migration `v1` created it** (`ios/Regards/Data/DatabaseMigrator.swift`), plus the `v2` migration Phase 1 adds and the `v3` migration TF-07b adds. Where v0.5 differed from the shipped `v1`, the shipped code wins and the difference is called out.
+All local SQLite. No cloud, no sync. **This section describes the schema as migration `v1` created it** (`ios/Regards/Data/DatabaseMigrator.swift`), plus the `v2` migration Phase 1 adds, the `v3` migration TF-07b adds, and the `v4` migration TF-07e adds. Where v0.5 differed from the shipped `v1`, the shipped code wins and the difference is called out.
 
 ```
 Contact
@@ -278,6 +278,10 @@ ScheduledReminder
                                      -- effective window (§9). SchedulingPass reads it only from a pending cadence
                                      -- row whose slot hasn't started. A caught-up row may still carry it until
                                      -- the next run rewrites that row.
+  firedCycle: INTEGER?              -- v4. epoch seconds. The cycle the row belongs to (§9a C1, C2). A cadence row
+                                     -- holds the `overdueAt` it was derived from, which only grows on a fired row. An
+                                     -- occasion row holds the fire time of the latest delivered occurrence for its
+                                     -- contact and kind, carried forward on every rewrite. NULL: no cycle recorded (§7 policy).
 
   -- We do NOT persist birthdays/anniversaries ourselves. They are re-read from
   -- system Contacts + local Calendar on each scheduling pass ("system contacts
@@ -303,7 +307,7 @@ UserProfile (single row)
 
 **Foreign-key behavior (as built, keep):** `ScheduledReminder.contactId` and `InteractionLog.contactId` cascade-delete with their contact; `Contact.contactGroupId` nulls out when its group is deleted (unmerge = delete group row, members revert to ungrouped).
 
-**Migration policy:** GRDB `DatabaseMigrator`, append-only registrations, each migration named `vN`. Never edit a shipped migration. `v2` (Phase 1B, PR20–PR23) adds the columns marked above. Migration tests round-trip every table through fresh-create and v1→v2 upgrade paths (§13). `v3` (TF-07b) adds `ScheduledReminder.snoozedUntil`. Only Snooze wrote pending cadence rows before v3, so v3 sets `snoozedUntil = scheduledFor` on each of them. Occasion rows and every non-pending row stay NULL. `DatabaseMigratorV3Tests` covers fresh create, v2→v3, and v1→latest.
+**Migration policy:** GRDB `DatabaseMigrator`, append-only registrations, each migration named `vN`. Never edit a shipped migration. `v2` (Phase 1B, PR20–PR23) adds the columns marked above. Migration tests round-trip every table through fresh-create and v1→v2 upgrade paths (§13). `v3` (TF-07b) adds `ScheduledReminder.snoozedUntil`. Only Snooze wrote pending cadence rows before v3, so v3 sets `snoozedUntil = scheduledFor` on each of them. Occasion rows and every non-pending row stay NULL. `DatabaseMigratorV3Tests` covers fresh create, v2→v3, and v1→latest. `v4` (TF-07e) adds `ScheduledReminder.firedCycle` with no default and no backfill. NULL means no cycle was recorded, and that is true of every row written before v4: main never writes a `fired` row, and no build has delivered a notification (TF-07e slice 4 wires delivery). The first run after v4 rewrites each covered pending cadence row once, with the same slot, state and floor. A NULL fired row (dev builds only) is stamped the first time the pass holds it at its anchor (§9a C1). `DatabaseMigratorV4Tests` covers fresh create, v3→v4, v1→latest, and the stored-cycle round trip.
 
 **Re-import & reconciliation (Phase 1B, PR21 — spec unchanged from v0.5):** on every app launch/foreground + on `CNContactStoreDidChange`, reconcile against `systemContactRef`:
 - New system contacts → import as `tracked=false`.
