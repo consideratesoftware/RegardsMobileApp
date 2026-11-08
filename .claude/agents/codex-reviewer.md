@@ -33,6 +33,7 @@ echo "lane files:"; git -C "$wt" diff --name-only origin/main...HEAD | head -3
 root=$(git -C "$wt" worktree list --porcelain | sed -n '1s/^worktree //p')
 echo "root $root on $(git -C "$root" symbolic-ref --short HEAD)"
 echo "root status:"; git -C "$root" status --short
+echo "root head $(git -C "$root" rev-parse HEAD) origin/main $(git -C "$root" rev-parse origin/main)"
 head=$(git -C "$wt" rev-parse --short HEAD)
 prompt=$(mktemp "${TMPDIR:-/tmp}/codex-prompt-$head-XXXXXX")
 out=$(mktemp "${TMPDIR:-/tmp}/codex-review-$head-XXXXXX")
@@ -47,9 +48,10 @@ echo "head $head prompt $prompt out $out"
   rerun, which makes a new head. Nobody discards them without asking Sid.
 - `lane files:` prints nothing: report RETRY with reason "empty target". The
   caller passed the wrong worktree; the engineering manager fixes it and reruns.
-- The root is not on `main`, or `root status:` lists anything: report RETRY
-  with reason "root checkout not on a clean main". Codex must load main's
-  contracts (step 3).
+- The root is not on `main`, `root status:` lists anything, or the 2 shas on the
+  `root head` line differ: report RETRY with reason "root checkout not on a
+  clean, current main". Codex must load main's current contracts (step 3); the
+  engineering manager fast-forwards the root (`org.md` Stage 0) and reruns.
 
 **Step 2. Prompt.** Use the Write tool to write this text to the prompt path
 step 1 printed (the literal path, not `$prompt`: shell variables don't survive
@@ -60,8 +62,9 @@ keeps the §14 row and other pasted text away from the shell.
 Use the $regards-pr-review skill to review the diff target <target> in the
 git worktree <worktree>. Your session folder is the root checkout on main.
 Your session is not the PR. Run every git command as `git -C <worktree> ...`
-and read files by absolute path under <worktree>. Give every agent you start
-the worktree path and these 2 instructions, word for word.
+and read files by absolute path under <worktree>. Give every agent you start the
+worktree path and the 2 sentences that start "Your session is not the PR" and
+"Run every git command", word for word.
 Work item: <TF-## and §14 row, or "infra, no §14 row" for an infra PR, or "none">.
 Claimed R-closures: <list, or "none">.
 The mechanical gates (XcodeGen determinism, SwiftLint, guards) are
