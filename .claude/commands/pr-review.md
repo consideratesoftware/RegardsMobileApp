@@ -124,8 +124,10 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
    coverage holes are returned untouched for Stage 2.
 3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when at least one
    of its findings was refuted, none of its BLOCKERs survived, it has no NOT
-   CHECKED entry, and (pr-code-quality only) none of its FIX findings survived.
-   The pr-code-quality clause is deliberately conservative.
+   CHECKED entry, its `blockerCount` (its own `BLOCKERS: n` count) equals the
+   number of BLOCKER findings it listed, and (pr-code-quality only) none of its
+   FIX findings survived. A missing or non-integer `blockerCount` blocks the
+   flip. The pr-code-quality clause is deliberately conservative.
    `pr-code-quality.md` makes a layering violation, a false comment or a
    hand-edited pbxproj a REQUEST_CHANGES on its own, and 3 or more FIX findings
    too. The workflow sees only severity, so it cannot tell those apart. The
@@ -134,7 +136,9 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
 4. A pr-* reviewer with a surviving BLOCKER of its own is REQUEST_CHANGES.
 5. Codex's verdict is Codex's own. The verifiers never change it. A refuted
    Codex BLOCKER still needs a fix or a `DISPUTED:` line (merge condition 4 in
-   `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line.
+   `ENGINEERING_ORG.md`), and it appears on a `REFUTED:` line. A Codex entry
+   whose structured verdict and the verdict word in its first line disagree is
+   FAILED. A Codex with no review text keeps its reported verdict.
 6. A pr-* reviewer whose `reviewedSha` is missing, under 7 characters, not
    lower-case hex, or not a prefix of head is FAILED, whatever it reported.
    Rerun that reviewer alone. Codex's sha is not checked here.
