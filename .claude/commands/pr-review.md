@@ -155,6 +155,9 @@ Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktr
 - `worktree`, `branch`: the lane worktree and its branch.
 - `head`: the full 40-character head sha.
 - `since`: scoped recheck only, the last reviewed head. Leave it out otherwise.
+  After an update-branch merge, leave it out and run a full review. A two-dot
+  range from any earlier head includes main's commits, whichever parent it
+  starts from.
 - `reviewers`: the pr-* reviewers this round runs: the Stage 1 set, or the set
   a scoped recheck reruns.
 - `codex`: `true`, so Codex reviews in the same workflow. Use `false` while a
