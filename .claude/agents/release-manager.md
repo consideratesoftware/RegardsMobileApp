@@ -192,8 +192,9 @@ lane's refs, and this fetch brings them up to date.
      changes `scripts/check-carried-approval.sh` also gets the path of its own
      copy, in the engineering manager's prompt. Run both copies; the carry
      stands only if both print `CARRY PASSES`. Every other PR runs only the copy
-     exported from `origin/main`. The rule: a carry needs a diff of lower-case `.md` files only,
-     each at the repository root, directly under `ios/` or `android/`, or
+     exported from `origin/main`. The rule: a carry needs a diff of lower-case
+     `.md` files only, each at the repository root, directly under `ios/` or
+     `android/`, or
      under `ios/docs/` or `android/docs/`. It never carries a path under
      `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested
      copies included), an AGENTS*.md, CLAUDE*.md or ARCHITECTURE.md at any

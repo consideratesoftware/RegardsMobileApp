@@ -247,11 +247,12 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and
   FIX respectively), plus any Stage 2 items. A plain run has no `survivors`: it
   refutes nothing, so every pr-* finding counts. Refuted findings count for
-  neither (except in the exception under "How to run it", where they count). Codex's counts stay on its own comment.
+  neither (except in the exception under "How to run it", where they count).
+  Codex's counts stay on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
   verified run, or the Stage 1 verdict in a plain run. In the exception under
-  "How to run it", it takes the strictest verdict that section names. A Stage 2 blocker makes that
-  reviewer REQUEST_CHANGES.
+  "How to run it", it takes the strictest verdict that section names. A Stage 2
+  blocker makes that reviewer REQUEST_CHANGES.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.
 - The paraphrase is your own words: at most 15 words, one physical line, no

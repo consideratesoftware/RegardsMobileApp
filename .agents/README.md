@@ -28,7 +28,8 @@ different model family.
 
 Three rules differ. Claude Code's verified run can turn a reviewer's
 REQUEST_CHANGES into APPROVE when verifiers refute its findings (rule 3), marks
-a pr-* reviewer FAILED when its `reviewedSha` is not the head (rule 6), and
+a pr-* reviewer FAILED when its `reviewedSha` is not a prefix of head
+(rule 6), and
 turns an APPROVE with NOT CHECKED entries into REQUEST_CHANGES (rule 7). The
 Codex skill has none of these steps; see `.claude/commands/pr-review.md`, "The
 workflow's rules".
