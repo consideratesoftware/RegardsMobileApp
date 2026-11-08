@@ -17,7 +17,8 @@ export const meta = {
 //   worktree     path of the lane worktree (non-empty)
 //   branch       branch name (non-empty)
 //   head         full 40-character lower-case sha of the head to review
-//   since        scoped recheck only: the sha of the last full review
+//   since        scoped recheck only: the last reviewed head, 7 to 40
+//                lower-case hex characters. Leave it out for a full review.
 //   reviewers    the Stage 1 set: names from KNOWN_REVIEWERS below, no others
 //   codex        true to add the Codex review
 //   contextFile  the lane's review-context.md (the TF row and R-numbers) (non-empty)
@@ -148,6 +149,11 @@ const KNOWN_REVIEWERS = ['pr-correctness', 'pr-security-privacy', 'pr-tests', 'p
 // reviewer name would otherwise produce a review of the wrong thing.
 if (!/^[0-9a-f]{40}$/.test(a.head)) {
   throw new Error(`head must be a full 40-character lower-case hex sha, got: ${a.head}`)
+}
+// A scoped recheck diffs against `since`. Anything else, an empty string and
+// null included, would send the reviewers to diff against nothing useful.
+if (a.since !== undefined && (typeof a.since !== 'string' || !/^[0-9a-f]{7,40}$/.test(a.since))) {
+  throw new Error(`since must be a 7 to 40 character lower-case hex sha when given, got: ${JSON.stringify(a.since)}`)
 }
 // These four go into every prompt. A missing one would put the word "undefined"
 // in front of the agent, most harmfully in place of the context file the scope

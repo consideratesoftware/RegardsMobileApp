@@ -627,6 +627,7 @@ test('badArgsThrow: a bad head, reviewer list or text arg throws before any agen
   const badHead = /head must be/
   const badReviewers = /reviewers must be/
   const text = key => new RegExp(`${key} must be a non-empty string`)
+  const badSince = /since must be a 7 to 40 character lower-case hex sha/
   const bad = [
     [{ head: 'abc1234' }, badHead],
     [{ head: HEAD.slice(0, 39) }, badHead],
@@ -645,6 +646,16 @@ test('badArgsThrow: a bad head, reviewer list or text arg throws before any agen
     [{ reviewers: [] }, badReviewers],
     [{ reviewers: ['pr-tests', 'pr-tests'] }, /reviewers must not repeat/],
     [{ reviewers: ['pr-tests', 'pr-correctness', 'pr-tests'] }, /reviewers must not repeat/],
+    // A scoped recheck needs a real sha. Absent is fine; present and wrong is not.
+    [{ since: 'main' }, badSince],
+    [{ since: 'HEAD~1' }, badSince],
+    [{ since: HEAD.slice(0, 6) }, badSince],
+    [{ since: HEAD + '0' }, badSince],
+    [{ since: HEAD.toUpperCase() }, badSince],
+    [{ since: 'g'.repeat(40) }, badSince],
+    [{ since: '' }, badSince],
+    [{ since: null }, badSince],
+    [{ since: 1234567 }, badSince],
     // The 4 text args go into every prompt.
     [{ title: undefined }, text('title')],
     [{ title: '' }, text('title')],
@@ -667,6 +678,13 @@ test('badArgsThrow: a bad head, reviewer list or text arg throws before any agen
       JSON.stringify(args),
     )
     assert.equal(calls.length, 0, `an agent ran for ${JSON.stringify(args)}`)
+  }
+})
+
+test('a short since is accepted: 7 to 40 characters, and the diff names it as given', async () => {
+  for (const since of [HEAD.slice(0, 7), HEAD.slice(0, 20), 'f'.repeat(40)]) {
+    const { calls } = await runWorkflow({ args: { since }, reviews: { 'pr-correctness': review('APPROVE') } })
+    assert.match(calls[0].prompt, new RegExp(`git diff ${since}\\.\\.${HEAD}`))
   }
 })
 
