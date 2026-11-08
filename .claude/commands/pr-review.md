@@ -13,6 +13,8 @@ Treat the literal target `worktree` as all tracked and untracked changes against
    - Branch/ref argument: use that exact diff target.
    - `worktree`: use `git status --short`, `git diff HEAD`, and full reads of
      every untracked file.
+   - Plain run: `origin/main...HEAD in worktree <lane path>`, resolved with
+     `git -C <lane path>`.
    If the target is empty, stop and say so.
 2. Run the cheap mechanical checks an agent shouldn't burn tokens on. These
    4 are the whole set, with the exact commands in steps 2 to 4 of
@@ -45,7 +47,10 @@ Decide the agent set from the diff's touched paths:
 | pr-fit-finish | haiku | only if diff touches Features/, DesignSystem/, user-facing strings, docs, or .github/ |
 
 Launch all selected agents **in a single parallel batch**. Each agent prompt
-must contain: the resolved target, the stable `TF-##` work item when present,
+must contain: the resolved target, the lane worktree path, the instruction "Your
+session is not the PR. Run every git command as `git -C <worktree> ...` and read
+files by absolute path under <worktree>.", the stable `TF-##` work item when
+present,
 the §14 scope alias and acceptance-criteria row pasted verbatim (or "infra, no
 §14 row" for an infra PR), and the list
 of R-numbers the PR claims to close. Do not paste the diff itself into agent
@@ -161,15 +166,17 @@ Each verifier votes under the finding-verification mode in
 
 Run Stage 0 yourself. Start the workflow and every plain-run agent from a
 session whose folder is the root checkout on `main`, never a PR checkout, so the
-reviewer, verifier and codex-reviewer contracts load from main. Pass the PR head
-only as `worktree`. Then start the workflow once:
+reviewer, verifier and codex-reviewer contracts load from main. Then start the
+workflow once:
 
 ```
 Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
 ```
 
 - `title`: the PR's short name.
-- `worktree`, `branch`: the lane worktree and its branch.
+- `worktree`: the lane worktree's absolute path. Every agent runs its git commands
+  there.
+- `branch`: the lane worktree's branch.
 - `head`: the full 40-character head sha.
 - `since`: scoped recheck only, the last reviewed head. Leave it out otherwise.
   After an update-branch merge, leave it out and run a full review. A two-dot

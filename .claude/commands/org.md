@@ -148,8 +148,8 @@ batch starts only when `git status --short` in the lane is empty. Write the
 target, the §14 row (or "infra, no §14 row" for an infra PR), and the claimed
 R-numbers to `review-context.md` in the
 lane's folder. Fetch, then run the verified run (`pr-review.md`, "Claude Code org only")
-from the root checkout on `main`, with the lane's worktree passed as `worktree`
-and `codex: true`, so the review board and Codex
+from the root checkout on `main`, with `worktree` set to the lane path, `head` set
+to its 40-hex sha, and `codex: true`, so the review board and Codex
 run in one workflow. Start it by `scriptPath` to a copy exported from
 `origin/main`, never by `name`. For a PR that adds or changes
 `.claude/workflows/pr-review-verified.js`, the self-edit rule in that section
@@ -158,9 +158,10 @@ is the counting review and the only one with Codex. The PR's own copy (run (b))
 is optional: the PR's own copy, run with `codex: false`. When it runs, each
 pr-* reviewer counts at the stricter run. Run (a) alone is a complete counting
 review. If it can't run, run
-`/pr-review origin/main...HEAD` from the root checkout on `main`, with the lane's worktree as the target, and launch the
+`/pr-review origin/main...HEAD in worktree <lane path>` from the root checkout on
+`main`, and launch the
 `codex-reviewer` agent type (`subagent_type: codex-reviewer`) in the same
-batch, with the worktree, the same target `origin/main...HEAD`, the item's §14
+batch, with the target `origin/main...HEAD in worktree <lane path>`, the item's §14
 row (or "infra, no §14 row" for an infra PR), and its claimed R-numbers. The
 three-dot target compares against the merge base, so commits that landed on
 `main` after the lane branched don't show up as reversions. Treat blockers
