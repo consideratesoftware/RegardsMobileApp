@@ -19,13 +19,15 @@ struct SchedulingPassRunForScopeTests {
         let first = try await fixture.addContact(1)
         let second = try await fixture.addContact(2)
         let dueAt = fixture.clock.now().addingTimeInterval(-3_600)
+        // Both contacts have been overdue since 05-08 10:00 (the 05-01 10:00 interaction plus 7 days).
         let dueRows = [first, second].map {
             ScheduledReminder(
                 id: fixture.cadenceID($0),
                 contactId: $0.id,
                 kind: .cadence,
                 scheduledFor: dueAt,
-                osNotificationId: "contact-\($0.id.uuidString)-cadence")
+                osNotificationId: "contact-\($0.id.uuidString)-cadence",
+                firedCycle: PassFixture.at("2026-05-08 10:00"))
         }
         for row in dueRows { try await fixture.repositories.reminders.upsert(row) }
         var firedFirst = dueRows[0]

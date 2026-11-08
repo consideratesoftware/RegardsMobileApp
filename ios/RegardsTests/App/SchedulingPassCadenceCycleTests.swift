@@ -8,8 +8,9 @@ import Testing
 /// slot at 18:00 every day.
 struct SchedulingPassCadenceCycleTests {
 
+    /// A fired cadence row by hand. `cycle` is the contact's overdue time, as the pass stores it in `firedCycle`.
     private static func firedRow(
-        for contact: Contact, scheduledFor: String, in fixture: PassFixture
+        for contact: Contact, scheduledFor: String, cycle: String? = nil, in fixture: PassFixture
     ) -> ScheduledReminder {
         ScheduledReminder(
             id: fixture.cadenceID(contact),
@@ -17,7 +18,8 @@ struct SchedulingPassCadenceCycleTests {
             kind: .cadence,
             scheduledFor: PassFixture.at(scheduledFor),
             osNotificationId: "contact-\(contact.id.uuidString)-cadence",
-            state: .fired)
+            state: .fired,
+            firedCycle: cycle.map(PassFixture.at))
     }
 
     // MARK: - Fired rows (§9 "Notification fired")
@@ -26,7 +28,8 @@ struct SchedulingPassCadenceCycleTests {
     func firedRowNotRescheduled(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
-        let fired = Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", in: fixture)
+        // Overdue since 05-08 10:00 (the 05-01 10:00 interaction plus 7 days): the row's cycle.
+        let fired = Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", cycle: "2026-05-08 10:00", in: fixture)
         try await fixture.repositories.reminders.upsert(fired)
 
         try await fixture.pass.runFull()
