@@ -743,6 +743,51 @@ test('the prompts name a scoped recheck only when since is given', async () => {
   assert.match(scoped.calls[0].prompt, new RegExp(`git diff ${since}\\.\\.${HEAD}`))
 })
 
+// Pin: passes on the old script. An agent that is not told the head, worktree,
+// branch, context file and target would review whatever it finds.
+test('every agent prompt names the head, worktree, branch, context file and target', async () => {
+  const { calls } = await runWorkflow({
+    args: { reviewers: ['pr-correctness'], codex: true },
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]),
+      'codex-reviewer': review('APPROVE'),
+    },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  // One call of every kind: 2 reviews, 3 verifiers and the synthesizer.
+  assert.deepEqual(
+    calls.map(c => c.opts.label).sort(),
+    ['review:codex-reviewer', 'review:pr-correctness', 'synthesize',
+      'verify:pr-correctness:impact', 'verify:pr-correctness:scope', 'verify:pr-correctness:truth'],
+  )
+  for (const c of calls) {
+    for (const text of ['Test PR', HEAD, '/tmp/worktree', 'test-branch', '/tmp/worktree/review-context.md', 'origin/main...HEAD']) {
+      assert.ok(c.prompt.includes(text), `${c.opts.label} does not name ${text}`)
+    }
+  }
+})
+
+// Pin: passes on the old script. The votes are counted by lens, so each
+// verifier has to get the question for its own lens.
+test('each verifier gets its own lens question', async () => {
+  const { calls } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  const promptOf = lens => calls.find(c => c.opts.label === `verify:pr-correctness:${lens}`).prompt
+  assert.match(promptOf('truth'), /TRUE against the code/)
+  assert.match(promptOf('scope'), /IN SCOPE/)
+  assert.match(promptOf('impact'), /MATTER/)
+
+  // Each prompt has its own question and not the other two.
+  assert.doesNotMatch(promptOf('truth'), /IN SCOPE|MATTER/)
+  assert.doesNotMatch(promptOf('scope'), /TRUE against the code|MATTER/)
+  assert.doesNotMatch(promptOf('impact'), /TRUE against the code|IN SCOPE/)
+
+  // The scope verifier is sent to the context file by name.
+  assert.match(promptOf('scope'), /Check \/tmp\/worktree\/review-context\.md/)
+})
+
 test('a scoped recheck reaches the pr-* reviewers and their verifiers, never Codex', async () => {
   const since = 'f'.repeat(40)
   const { calls } = await runWorkflow({
