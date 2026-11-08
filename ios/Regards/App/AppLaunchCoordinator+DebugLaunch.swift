@@ -113,7 +113,8 @@ extension AppLaunchCoordinator {
 /// `decode` with `clock`. A request is delivered, so no longer pending, when
 /// its trigger instant (the fire date truncated to the whole second) is at or
 /// before now as it is added, or when `clock` passes its fire date later, as
-/// in the real center.
+/// in the real center. The set has no size limit, unlike the system's 64
+/// pending requests per app; see `NotificationFakeParityTests`.
 ///
 /// An actor because the status changes after a request and tests read
 /// `requestCount` across tasks. `actions` and `send(_:)` are `nonisolated`:

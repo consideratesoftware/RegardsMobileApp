@@ -16,6 +16,12 @@ import Testing
 /// floor is the adapter's own truncation, and the fake holds no rounding code
 /// of its own. `requestWhoseWholeSecondFireDateIsNotAfterNowIsNotPending` pins
 /// that floor against literal whole-second instants.
+///
+/// Neither fake models iOS's cap on pending requests: the system keeps at most
+/// 64 per app, and the fakes keep any number. Slice 4's planner keeps its
+/// desired set within the budget §9 platform nuance sets, which is below that
+/// cap, and pins that with its own test. A fake cap, if slice 4 needs one,
+/// arrives with that test.
 struct NotificationFakeParityTests {
     // MARK: - Fakes and helpers
 

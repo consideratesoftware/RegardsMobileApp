@@ -99,7 +99,9 @@ actor ScriptedNotifications: NotificationScheduling {
     /// `makeRequest` and `decode`, so a fire date comes back truncated to the
     /// whole second, and a request whose trigger instant is not after the clock
     /// is delivered at once: it is recorded in `delivered`, replaces any
-    /// pending request with its identifier, and is never pending.
+    /// pending request with its identifier, and is never pending. The set has
+    /// no size limit, unlike the system's 64 pending requests per app; see
+    /// `NotificationFakeParityTests`.
     ///
     /// A pending request whose time passes is delivered at the next call of any
     /// of the 3 members (`deliverDue`), before that call acts, so a cancel or a
