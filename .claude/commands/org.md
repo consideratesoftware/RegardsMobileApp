@@ -189,7 +189,7 @@ and give the lane worktree, branch and items.
 
 Drop a Codex finding only when it contradicts `ARCHITECTURE.md`; you write the
 dispute on a `DISPUTED: blocker <n> → ARCHITECTURE.md §<section>` line in that
-verdict's PR comment, as `/pr-review` does for its own findings.
+verdict's PR comment.
 
 Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
