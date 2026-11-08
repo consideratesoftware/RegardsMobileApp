@@ -38,6 +38,8 @@ import Testing
 /// Code review catches those and deliberate evasion. Slice 4 deletes this file
 /// in the PR that resolves R57.
 struct NotificationCallerGateTests {
+    // MARK: - Patterns and allowed paths
+
     /// `.schedule(`, `.cancel(identifiers:` and `.pendingRequests(`. The
     /// leading dot skips the members' own declarations, and the `identifiers:`
     /// label skips `Task.cancel()`.
@@ -64,6 +66,8 @@ struct NotificationCallerGateTests {
             "RegardsTests/App/NotificationCallerGateTests.swift",
         ].contains(path)
     }
+
+    // MARK: - Reading the sources
 
     /// `#filePath` is `<repo>/ios/RegardsTests/App/<this file>`.
     private static var iosRoot: URL {
@@ -94,6 +98,8 @@ struct NotificationCallerGateTests {
         }
     }
 
+    // MARK: - Callers and the center
+
     @Test("Only the adapter file names the center; only the adapter folder, fake tests and gate call the members")
     func onlyTheAdapterFileNamesTheCenterAndOnlyAllowedFilesCall() throws {
         let files = try Self.sources()
@@ -119,6 +125,8 @@ struct NotificationCallerGateTests {
         #expect(centerNamers.isEmpty, "R57 gate G1: only \(Self.adapterPath) may name the center: \(centerNamers)")
     }
 
+    // MARK: - G4: request building
+
     /// Files in `ios/Regards` outside the adapter folder that name a request or trigger type.
     private static func requestBuilders(in files: [(path: String, text: String)]) -> [String] {
         files
@@ -139,11 +147,15 @@ struct NotificationCallerGateTests {
         #expect(offenders.isEmpty, "R57 gate G4: only the adapter folder may name these types: \(offenders)")
     }
 
-    /// Positive control: a pattern that matches nothing would pass the test
+    // MARK: - Pattern controls
+
+    /// Positive control: a pattern that matches nothing would pass the tests
     /// above for every file. Negative control: the call pattern skips
-    /// `Task.cancel()` on purpose, and the 2 call shapes in the doc comment
-    /// above stay unmatched, so a pattern change that starts matching either one
-    /// fails here and not in an unrelated file.
+    /// `Task.cancel()` on purpose, and the 2 call shapes in the type's doc
+    /// comment (an implicit-self call and a method reference) stay unmatched,
+    /// so a pattern change that starts matching either one fails here and not
+    /// in an unrelated file. The third shape listed there, request building
+    /// through `makeRequest`, has no probe here.
     @Test("The patterns match real calls, the center and request types, and skip Task.cancel() and the blind spots")
     func patternsMatchRealAndMultiLineCalls() throws {
         let parity = try #require(
