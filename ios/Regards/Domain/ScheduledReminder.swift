@@ -35,6 +35,13 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     /// pending cadence row whose slot hasn't started. A row in another state
     /// may still carry a stale floor until the reschedule rewrites the row.
     public var snoozedUntil: Date?
+    /// The cycle a row belongs to (§7 v4), so a clock set back can't re-arm a
+    /// fired row (R68, R69). Its meaning depends on `kind`, as `scheduledFor`'s
+    /// does: a cadence row stores the `overdueAt` its slot was derived from,
+    /// and an occasion row stores the fire time of the latest occurrence
+    /// delivered for that contact and kind. Nil means no cycle is recorded.
+    /// SchedulingPass doesn't write or read it yet (TF-07e slice 4).
+    public var firedCycle: Date?
 
     public init(
         id: UUID = UUID(),
@@ -45,7 +52,8 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
         scheduledFor: Date,
         osNotificationId: String,
         state: ReminderState = .pending,
-        snoozedUntil: Date? = nil
+        snoozedUntil: Date? = nil,
+        firedCycle: Date? = nil
     ) {
         self.id = id
         self.contactId = contactId
@@ -56,6 +64,7 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
         self.osNotificationId = osNotificationId
         self.state = state
         self.snoozedUntil = snoozedUntil
+        self.firedCycle = firedCycle
     }
 }
 
