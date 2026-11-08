@@ -8,8 +8,9 @@ import Testing
 /// slot at 18:00 every day.
 struct SchedulingPassCadenceCycleTests {
 
+    /// A fired cadence row by hand. `cycle` is the contact's overdue time, as the pass stores it in `firedCycle`.
     private static func firedRow(
-        for contact: Contact, scheduledFor: String, in fixture: PassFixture
+        for contact: Contact, scheduledFor: String, cycle: String? = nil, in fixture: PassFixture
     ) -> ScheduledReminder {
         ScheduledReminder(
             id: fixture.cadenceID(contact),
@@ -17,7 +18,8 @@ struct SchedulingPassCadenceCycleTests {
             kind: .cadence,
             scheduledFor: PassFixture.at(scheduledFor),
             osNotificationId: "contact-\(contact.id.uuidString)-cadence",
-            state: .fired)
+            state: .fired,
+            firedCycle: cycle.map(PassFixture.at))
     }
 
     // MARK: - Fired rows (§9 "Notification fired")
@@ -26,7 +28,9 @@ struct SchedulingPassCadenceCycleTests {
     func firedRowNotRescheduled(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
-        let fired = Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", in: fixture)
+        // Overdue since 05-08 10:00 (the 05-01 10:00 interaction plus 7 days): the row's cycle.
+        let fired = Self.firedRow(
+            for: contact, scheduledFor: "2026-06-09 18:00", cycle: "2026-05-08 10:00", in: fixture)
         try await fixture.repositories.reminders.upsert(fired)
 
         try await fixture.pass.runFull()
@@ -41,7 +45,7 @@ struct SchedulingPassCadenceCycleTests {
     )
     func caughtUpRePendsFiredRow(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend)
-        // Talked this morning, after the 06-09 18:00 reminder fired.
+        // Talked this morning, after the 06-09 18:00 row was fired.
         let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-10 09:00")
         try await fixture.repositories.reminders.upsert(
             Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", in: fixture))
@@ -71,8 +75,8 @@ struct SchedulingPassCadenceCycleTests {
     ) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1, cadenceDays: 14)
-        // Gives the mock backend's seed cast their rows, so the run below has
-        // nothing left to write for anyone.
+        // The mock backend's seed cast has no rows until a run writes them. This run does,
+        // so the last run below has no seed rows left to write.
         try await fixture.pass.runFull()
         #expect(try await fixture.pass.snooze(contactId: contact.id))
         #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
@@ -89,10 +93,36 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.cadenceRow(contact) == row)
     }
 
-    /// A failed log restores the snooze with its floor, and the next run
-    /// keeps it. Passes on the old two-step code too; it fails if the restore
-    /// is dropped, because the row would stay `userCaughtUp` and the run
-    /// would then write a floorless row at the overdue slot.
+    /// The reschedule that follows an interaction upserts the same id, so the
+    /// final row cannot show that the old one was cleared. The compare-and-set
+    /// log can: a fired row moved to `userCaughtUp`.
+    @Test(
+        "An interaction moves a fired cadence row to userCaughtUp before the reschedule",
+        .timeLimit(.minutes(1)),
+        arguments: RepositoryContractBackend.allCases,
+        [SchedulingPass.Interaction.caughtUp, .caughtUpFromNotification, .other(.sms)]
+    )
+    func caughtUpClearsAFiredCadenceRow(
+        backend: RepositoryContractBackend, interaction: SchedulingPass.Interaction
+    ) async throws {
+        let fixture = try await PassFixture(backend: backend)
+        let contact = try await fixture.addContact(1)
+        let fired = Self.firedRow(for: contact, scheduledFor: "2026-06-09 18:00", in: fixture)
+        try await fixture.repositories.reminders.upsert(fired)
+
+        #expect(try await fixture.pass.recordInteraction(contactId: contact.id, interaction))
+
+        let cleared = TransitionCall(id: fired.id, from: .fired, to: .userCaughtUp, applied: true)
+        #expect(await fixture.reminders.transitionLog.contains(cleared))
+        let next = try #require(try await fixture.cadenceRow(contact))
+        #expect(next.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+        #expect(next.state == .pending)
+    }
+
+    /// A failed log puts the snoozed row back as it was, floor included, and
+    /// the next run keeps it. Fails if the restore is dropped: the row would
+    /// stay `userCaughtUp`, and the run would then write a floorless row at
+    /// the overdue slot.
     @Test(
         "A failed Caught up throws, leaves the snoozed row as it was, and the next run keeps its floor",
         .timeLimit(.minutes(1)),
@@ -118,8 +148,8 @@ struct SchedulingPassCadenceCycleTests {
     /// A `userCaughtUp` row can linger: the reschedule after a catch-up failed,
     /// or the contact lost capacity. The restore is for a row this call
     /// cleared, so a later failed log must not turn that lingering row back
-    /// into a pending one, which would notify for a catch-up the user already
-    /// made. Fails if the restore runs without `cleared`.
+    /// into a pending one for a catch-up the user already made. Fails if the
+    /// restore runs without `cleared`.
     @Test(
         "A failed log does not turn a lingering caught-up row back into a pending one",
         .timeLimit(.minutes(1)),
@@ -147,7 +177,7 @@ struct SchedulingPassCadenceCycleTests {
     /// Pin of today's behavior, not a goal. When the contact has no capacity or
     /// is no longer tracked by the time of an in-app catch-up, the interaction
     /// is logged, the snooze is cleared, and no pending row replaces it: the
-    /// row stays `userCaughtUp`, which notifies nothing. For zero capacity the
+    /// row stays `userCaughtUp`, which is not pending. For zero capacity the
     /// contact is recorded in `zeroCapacityContactIds`, and once capacity
     /// returns the next run writes the next cycle's row.
     @Test(
@@ -203,7 +233,7 @@ struct SchedulingPassCadenceCycleTests {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1, cadenceDays: 14)
         #expect(try await fixture.pass.snooze(contactId: contact.id))
-        await fixture.reminders.setObserveFails(true)
+        await fixture.reminders.setFetchFails(true)
 
         #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
 
@@ -212,7 +242,7 @@ struct SchedulingPassCadenceCycleTests {
         let stored = try #require(try await fixture.repositories.contacts.fetch(id: contact.id))
         #expect(stored.lastInteractedAt == PassFixture.at("2026-06-10 10:00"))
         #expect(try await fixture.cadenceRow(contact) == nil)
-        await fixture.reminders.setObserveFails(false)
+        await fixture.reminders.setFetchFails(false)
 
         try await fixture.pass.runFull()
 
@@ -265,10 +295,11 @@ struct SchedulingPassCadenceCycleTests {
     }
 
     /// Plain no-re-nag with a floor: the snoozed slot has started, the contact
-    /// has not talked to the person, and is still overdue. The run leaves the
-    /// row, floor included, exactly as it was.
+    /// has not talked to the person, and is still overdue. The run marks the
+    /// row fired and leaves it, floor included, as it was, and a second run
+    /// writes nothing.
     @Test(
-        "A snoozed row whose slot has started is left alone while the contact is still overdue",
+        "A snoozed row whose slot has started is marked fired and left alone while the contact is still overdue",
         arguments: RepositoryContractBackend.allCases
     )
     func dueSnoozedRowIsLeftAloneWithoutInteraction(backend: RepositoryContractBackend) async throws {
@@ -277,12 +308,19 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.pass.snooze(contactId: contact.id))
         let snoozed = try #require(try await fixture.cadenceRow(contact))
         #expect(snoozed.scheduledFor == PassFixture.at("2026-06-17 18:00"))
+        #expect(snoozed.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        var fired = snoozed
+        fired.state = .fired
         fixture.setNow("2026-06-17 18:30")
 
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.cadenceRow(contact) == snoozed)
-        #expect(snoozed.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        #expect(try await fixture.row(snoozed.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        let writes = await fixture.reminders.writeCount
+        try await fixture.pass.runFull()
+        #expect(try await fixture.row(snoozed.id) == fired)
+        #expect(await fixture.reminders.writeCount == writes)
     }
 
     /// Contact Detail asks the pass for the snooze date. Once the snoozed slot
@@ -299,9 +337,14 @@ struct SchedulingPassCadenceCycleTests {
         #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == PassFixture.at("2026-06-17 18:00"))
         fixture.setNow("2026-06-17 18:30")
 
+        // Before any run the row is still pending with its floor, so only the
+        // answer's own check on the slot keeps it from reporting a past time.
+        #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == nil)
+
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.cadenceRow(contact)?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
+        // The row is fired now and keeps its spent floor.
+        #expect(try await fixture.row(fixture.cadenceID(contact))?.snoozedUntil == PassFixture.at("2026-06-17 10:00"))
         #expect(try await fixture.pass.pendingSnoozeDate(contactId: contact.id) == nil)
     }
 
@@ -323,9 +366,9 @@ struct SchedulingPassCadenceCycleTests {
         let contact = try await fixture.addContact(1, cadenceDays: 7)
         try await fixture.pass.runFull()
         #expect(try await fixture.cadenceRow(contact)?.scheduledFor == PassFixture.at("2026-06-10 18:00"))
-        await fixture.reminders.setObserveFails(true)
+        await fixture.reminders.setFetchFails(true)
         #expect(try await fixture.pass.recordInteraction(contactId: contact.id, .caughtUp))
-        await fixture.reminders.setObserveFails(false)
+        await fixture.reminders.setFetchFails(false)
         #expect(try await fixture.cadenceRow(contact) == nil)
         // Past the old 06-10 18:00 slot and past the new due date, 06-17 10:00.
         fixture.setNow("2026-06-18 10:00")

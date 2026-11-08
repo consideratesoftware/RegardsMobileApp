@@ -60,6 +60,7 @@ func contractStored(_ reminder: ScheduledReminder) -> ScheduledReminder {
     var stored = reminder
     stored.scheduledFor = contractStoredDate(reminder.scheduledFor)
     stored.snoozedUntil = reminder.snoozedUntil.map(contractStoredDate)
+    stored.firedCycle = reminder.firedCycle.map(contractStoredDate)
     return stored
 }
 private func contractStored(_ log: InteractionLog) -> InteractionLog {

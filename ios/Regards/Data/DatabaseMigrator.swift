@@ -18,6 +18,9 @@ public enum RegardsSchema {
         m.registerMigration("v3") { db in
             try migrateToV3(db)
         }
+        m.registerMigration("v4") { db in
+            try migrateToV4(db)
+        }
         return m
     }
 
@@ -64,6 +67,21 @@ public enum RegardsSchema {
             SET snoozedUntil = scheduledFor
             WHERE kind = 'cadence' AND state = 'pending'
             """)
+    }
+
+    // MARK: - v4 columns
+
+    /// TF-07e: `ScheduledReminder.firedCycle` records the cycle a row belongs
+    /// to, so a clock set back can't re-arm a fired row (§7, §9 "Notification
+    /// fired"; R68, R69). No default and no backfill: NULL means "no cycle
+    /// recorded", and that is true of every row written before v4. Main's
+    /// builds never write a `fired` row, and no build has delivered a
+    /// notification (TF-07e slice 4 wires delivery), so no stored row belongs
+    /// to a delivered cycle.
+    private static func migrateToV4(_ db: Database) throws {
+        try db.alter(table: "ScheduledReminder") { t in
+            t.add(column: "firedCycle", .integer)
+        }
     }
 
     // MARK: - v1 tables
