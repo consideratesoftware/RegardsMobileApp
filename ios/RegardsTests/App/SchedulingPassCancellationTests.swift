@@ -172,6 +172,33 @@ struct SchedulingPassCancellationTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
+    /// Pin. The contact fired as overdue under a 7-day cadence on 05-08, and the cadence is then lengthened to
+    /// 30 days (overdue 05-31) with no interaction in between. The contact is still overdue, and the anchor has
+    /// not moved, so the fired row stands for this cycle. Its slot (05-08 18:00) is before the new overdue
+    /// slot (05-31 18:00), so only the anchor fallback holds it. The converse of
+    /// `dueRowIsRederivedWhenTheCadenceLengthens`, where the new overdue time is still ahead.
+    @Test(
+        "A cadence lengthened while the contact is still overdue keeps the fired row",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func lengthenedCadenceStillOverdueKeepsTheFiredRow(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-05-08 18:30")
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.scheduledFor == PassFixture.at("2026-05-08 18:00"), "overdue at 10:00, joined the 18:00 slot")
+        #expect(fired.state == .fired)
+        fixture.setNow("2026-06-10 10:00")
+        var longer = contact
+        longer.cadenceDays = 30
+        try await fixture.repositories.contacts.upsert(longer)
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == fired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+    }
+
     // MARK: - The orphan sweep (§9 "Notification fired", §13)
 
     /// Which entry point sweeps the rows of contacts the snapshot no longer holds.
