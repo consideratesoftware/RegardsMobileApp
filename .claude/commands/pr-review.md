@@ -206,37 +206,22 @@ at a copy of `.claude/workflows/pr-review-verified.js` exported from
 `check-carried-approval.sh`. Never run it by `name` from a lane: `name` resolves
 from the session's folder, and the lane's copy is PR-controlled.
 
-Self-edit PRs. A PR that adds or changes
-`.claude/workflows/pr-review-verified.js` gets run (a) and, optionally, run (b),
-on the same head. Run (a) is the counting review and the only run that includes
-Codex.
+Self-edit PRs. EM ruling, 2026-11-08 (the hosted review's blocker on
+29e781d): a PR that adds or changes `.claude/workflows/pr-review-verified.js`
+is reviewed by main's copy alone. Export it with
+`git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`,
+and start that copy by `scriptPath`. When `origin/main` has no copy, the plain
+run takes its place: `/pr-review origin/main...HEAD in worktree <lane path>`,
+Stages 0 to 4 with each reviewer an individual agent call, not through any
+workflow script, and Codex run by the `codex-reviewer` agent as "Cross-model
+review" says. In the plain run, every reviewer BLOCKER counts. Either one is
+the complete counting review.
 
-- (a) Main's copy. Export it with
-  `git show origin/main:.claude/workflows/pr-review-verified.js > <scratch>/pr-review-verified.js`,
-  and start that copy by `scriptPath`. When `origin/main` has no copy, the plain
-  run takes its place: `/pr-review origin/main...HEAD in worktree <lane path>`,
-  Stages 0 to 4 with each reviewer an individual agent call, not through any
-  workflow script, and Codex run by the `codex-reviewer` agent as "Cross-model
-  review" says. In the plain run, every reviewer BLOCKER counts. Run (a) is the
-  only run with Codex. Save its review as `codex-<short sha>.md` and post it as
-  the `CODEX REVIEW:` comment.
-- (b) Optional: the PR's own copy, at
-  `<lane path>/.claude/workflows/pr-review-verified.js`, started by `scriptPath`
-  from the same root-checkout session, with `codex: false`. When it runs, each
-  pr-* reviewer counts at the stricter of runs (a) and (b). Run (a) alone is a
-  complete counting review.
-
-When run (b) runs, each pr-* reviewer counts at the stricter of its 2 runs, in
-the order FAILED, then REQUEST_CHANGES, then APPROVE. BLOCKERS and SHOULD_FIX
-take the higher count. In run (b), they count every pr-* BLOCKER and FIX in
-`survivors` and `refuted`. A Codex RETRY or UNAVAILABLE follows the owner-gate
-rules under "Handle Codex by its case" below. A verdict from the PR's own copy
-never counts alone.
-
-For run (b), also make these hand checks. FAILED when `reviewedSha` is missing,
-under 7 characters, not lower-case hex, or not a prefix of head. REQUEST_CHANGES
-when `notChecked` is missing or not empty, or when it raised any BLOCKER, in
-`survivors` or in `refuted`. Refuted findings still get their `REFUTED:` lines.
+Never start the PR's own copy of the workflow before it merges. Its `agent()`
+calls can start any agent type with any prompt, including agents that edit
+files, so starting it would run PR-controlled code with the org's agents. Its
+first live run is by `scriptPath` to a copy exported from `origin/main` after
+merge.
 
 Then run Stage 2 on each verdict's `escalations` and `coverageHoles`, as fresh
 pr-correctness and pr-tests runs, each with the Stage 1 prompt contents (the
@@ -285,8 +270,6 @@ says. The workflow passes Codex's RETRY and UNAVAILABLE through as its
   on that head, a timeout included, is an owner gate.
 - UNAVAILABLE: an owner gate. Interview Sid before rerunning it (`org.md`
   Stage 1 and Stage 3).
-- Run (b): any Codex entry or `codexReview` in run (b)'s result is ignored. Only
-  run (a) gives Codex.
 
 ### The PR REVIEW comment
 
@@ -310,11 +293,9 @@ REFUTED: <reviewer> <BLOCKER|FIX> <path:line> (refuted on <lens>, <lens>): <para
 - BLOCKERS and SHOULD_FIX count the pr-* entries in `survivors` (BLOCKER and FIX
   respectively), plus any Stage 2 items. A plain run has no `survivors`: it
   refutes nothing, so every pr-* finding counts. Refuted findings count for
-  neither, except on a self-edit PR (see "How to run it"). Codex's counts stay
-  on its own comment.
+  neither. Codex's counts stay on its own comment.
 - REVIEWERS takes each reviewer's verdict: the verdict after verification in a
-  verified run, or the Stage 1 verdict in a plain run. On a self-edit PR, the
-  counting verdicts are the ones "How to run it" sets. A Stage 2 blocker makes
+  verified run, or the Stage 1 verdict in a plain run. A Stage 2 blocker makes
   that reviewer REQUEST_CHANGES.
 - Each refuted finding gets exactly one `REFUTED:` line, Codex's included.
   `<lens>` names the verifiers that voted `real=false`.

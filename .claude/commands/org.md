@@ -85,7 +85,8 @@ For each open TF PR, and each open `infra:` PR (which occupies no lane):
    run (`pr-review.md`, "Claude Code org only") from the root checkout on
    `main`, never from `<tmp>`, with `worktree` set to `<tmp>` and `head` set to
    its sha, started by the `scriptPath` rule in `pr-review.md` (a self-edit PR
-   needs run (a), with Codex in run (a) only; run (b) is optional), or, when it
+   uses main's copy, or the plain run when main has none, and never its own
+   copy), or, when it
    can't run, `/pr-review origin/main...HEAD in worktree <tmp>` and the
    `codex-reviewer` agent type with the target `origin/main...HEAD` and the
    worktree `<tmp>`, both from the root checkout on `main`. Post the result as a
@@ -160,11 +161,9 @@ verified run (`pr-review.md`, "Claude Code org only") from the root checkout on
 `codex: true`, so the review board and Codex run in one workflow. Start it by
 `scriptPath` to a copy exported from `origin/main`, never by `name`. For a PR
 that adds or changes `.claude/workflows/pr-review-verified.js`, the self-edit
-rule in that section applies: run (a), from `origin/main`'s copy or the plain
-run where main has none, is the counting review and the only one with Codex. The
-PR's own copy (run (b)) is optional: the PR's own copy, run with `codex: false`.
-When it runs, each pr-* reviewer counts at the stricter run. Run (a) alone is a
-complete counting review. If it can't run, run
+rule in that section applies: main's copy, or the plain run where main has none,
+is the whole counting review, and the PR's own copy never runs. If it can't run,
+run
 `/pr-review origin/main...HEAD in worktree <lane path>` from the root checkout
 on `main`, and launch the `codex-reviewer` agent type
 (`subagent_type: codex-reviewer`) in the same batch, with the target
@@ -194,8 +193,8 @@ verdict's PR comment.
 Save each Codex review, in full, to
 `../RegardsMobileApp-lanes/TF##/codex-<short sha>.md` before you post its
 verdict, and give that path to `release-manager`; the release manager checks
-each `DISPUTED:` line against it. On a self-edit PR, only run (a)'s Codex review
-is saved and posted. A resumed PR whose head has no such file gets a fresh Codex
+each `DISPUTED:` line against it. A resumed PR whose head has no such file gets
+a fresh Codex
 run (Stage 1). In a verified run, the full review is the workflow's
 `codexReview`.
 
@@ -317,8 +316,10 @@ OPEN FOR OWNER ruling, a Codex UNAVAILABLE, a hosted blocker that needs his
 deferral, a scope change, or a PR parked after its repair rounds.
 
 If it reports CODEX STALE, rerun what its reason names, as in Stage 3, and
-relaunch `release-manager` with the new verdicts (on a self-edit PR, the
-counting review is run (a); see "Self-edit PRs" in `pr-review.md`):
+relaunch `release-manager` with the new verdicts and, as in the launch above,
+the lane worktree's path for each gate script the PR changes, labeled as the
+PR's own copy (a self-edit PR's review is main's copy or the plain run; see
+"Self-edit PRs" in `pr-review.md`):
 - a newest verdict names a sha other than the head, or the branch was just
   updated (`update-branch`): both reviews on the new head (one verified run
   covers both). While a Codex UNAVAILABLE gate is open, the run on the new head
