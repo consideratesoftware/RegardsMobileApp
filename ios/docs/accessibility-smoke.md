@@ -144,12 +144,15 @@ Run this on a physical device with VoiceOver on. The audit excludes
 title, message, and Done button are announced (see `accessibility.md`).
 
 Expected values: the title is the row's channel label. The message is
-`Channel.tapPreviewMessage(for:)` for the contact's name. For SMS and Han Solo,
+`Channel.tapPreviewMessage(for:)` for the contact's name, set at
+`OverdueScreen.swift:114` and `UpcomingScreen.swift:74`. For SMS and Han Solo,
 it starts with "Would text Han Solo." The button is labelled Done.
 
 - [ ] Overdue: tap a row. VoiceOver announces the alert's title, then its
       message, then Done. Check each one.
-- [ ] Activate Done. The alert dismisses. Note where VoiceOver focus lands.
+- [ ] Activate Done. The alert dismisses. VoiceOver focus returns to the row
+      that opened the alert. If focus lands anywhere else, record where, as a
+      finding. It is not a pass.
 - [ ] Upcoming: repeat both steps on an Upcoming row.
 
 Record the result in the `## Manual accessibility smoke` block under Reporting,
