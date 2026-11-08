@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# Fixture tests for scripts/count-hosted-blockers.sh.
+# Fixture tests for scripts/count-hosted-blockers.sh (the counter), and a
+# contract check that runs it with 2 other scripts. The last cases
+# (expect_contract) run scripts/validate-hosted-review-artifact.sh (the
+# validator; its stdout is the rendered review) and
+# scripts/render-review-check-summary.sh (the check-summary renderer) on one
+# artifact, and require the validator's exit status, the counter's count of the
+# rendered review and the check summary to agree. A change to either of those
+# scripts can fail this file.
 
 set -euo pipefail
 
