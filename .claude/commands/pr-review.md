@@ -116,7 +116,8 @@ finding in the PR REVIEW comment so the owner can see what was dropped.
 ### The workflow's rules
 
 1. A finding is refuted only when 2 of its 3 verifiers say `real=false`. A
-   verifier that fails or returns nothing counts as a real vote.
+   verifier that fails, returns nothing, or returns any answer other than an
+   explicit `real: false` counts as a real vote.
 2. Only BLOCKER and FIX findings go to verifiers. ESCALATE findings and
    coverage holes are returned untouched for Stage 2.
 3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when at least one
