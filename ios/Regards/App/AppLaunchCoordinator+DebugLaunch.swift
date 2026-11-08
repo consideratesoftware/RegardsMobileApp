@@ -62,8 +62,9 @@ extension AppLaunchCoordinator {
     /// The `--regards-mock-runtime` launch. It takes the environment, not
     /// `ProcessInfo`, so a unit test can build it. The notification fake reads
     /// the runtime's own clock: the runtime freezes time at the mock "now", so
-    /// a fake on the real clock would read every request this launch schedules
-    /// as already due and never list it as pending.
+    /// a fake on the real clock would read a request dated near that instant,
+    /// which is before the real current date, as already due and never list it
+    /// as pending. A request dated after the real current date would still list.
     static func mockRuntimeLaunch(environment: [String: String]) -> AppLaunchCoordinator {
         let runtime = AppRuntime.makeMock(
             includeDuplicateFixture: environment["REGARDS_UI_TEST_DUPLICATE_FIXTURE"] == "1",

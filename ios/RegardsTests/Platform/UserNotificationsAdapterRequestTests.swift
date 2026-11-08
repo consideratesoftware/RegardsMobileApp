@@ -155,8 +155,9 @@ struct UserNotificationsAdapterRequestTests {
 
     /// Title and body are display text. An identifier or contact id in either
     /// would show on the lock screen, so the built request must carry them only
-    /// in `identifier` and `userInfo`. The empty-title case covers an adapter
-    /// that falls back to the identifier when a request has no title.
+    /// in `identifier` and `userInfo`. Title and body must also come out as
+    /// given. `makeRequest` doesn't fill an empty title from anything today;
+    /// the empty-title cases would fail if it started to use the identifier.
     @Test(
         "A built request's title and body never contain a contact id, a contact- id, or a digest- id",
         arguments: [

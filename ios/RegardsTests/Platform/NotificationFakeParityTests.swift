@@ -98,7 +98,8 @@ struct NotificationFakeParityTests {
 
     /// The other side of the boundary above: 1 s ahead of a whole-second `now`
     /// names a later second, so the request stays pending and nothing is
-    /// delivered. Matches the adapter-level 3-way boundary in
+    /// delivered. The adapter-level pair is `triggerInstantNotAfterNowDeliversImmediately`
+    /// and `triggerInstantOneSecondAfterNowGetsCalendarTrigger` in
     /// `UserNotificationsAdapterRequestTests`.
     @Test("A request exactly 1 second ahead is pending and not delivered", arguments: Fake.allCases)
     func requestOneSecondAheadIsPending(_ fake: Fake) async throws {
@@ -251,7 +252,11 @@ struct NotificationFakeParityTests {
     /// frozen clock (`MockRepositories.defaultNow`). On the real clock, a
     /// request 60 s after that instant would read as already due and never be
     /// pending.
-    @Test("The mock launch's fake lists a request due 60 s after the runtime's frozen now")
+    ///
+    /// This test lives here because `NotificationCallerGateTests` allows
+    /// `.schedule(` and `.pendingRequests(` calls only in this file and the
+    /// adapter folder. Slice 4 deletes that gate.
+    @Test("The mock launch's fake lists a request scheduled for 60 s after the runtime's frozen now")
     @MainActor
     func mockLaunchFakeUsesTheFrozenClock() async throws {
         let launch = AppLaunchCoordinator.mockRuntimeLaunch(environment: [:])
