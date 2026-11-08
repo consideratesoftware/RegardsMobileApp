@@ -126,7 +126,7 @@ const WORKORDER = {
         properties: {
           id: { type: 'string' },
           severity: { type: 'string' },
-          owner: { type: 'string', enum: ['qa-engineer', 'ios-engineer', 'senior-ios-engineer', 'tech-writer', 'EM-body', 'tech-lead-ruling', 'owner-question'] },
+          owner: { type: 'string', enum: ['qa-engineer', 'ios-engineer', 'senior-ios-engineer', 'chore', 'tech-writer', 'EM-body', 'tech-lead-ruling', 'owner-question'] },
           location: { type: 'string' },
           change: { type: 'string' },
           raisedBy: { type: 'array', items: { type: 'string' } },
@@ -237,7 +237,7 @@ if (survivors.length) {
   // surviving finding would vanish from the result, so say so and let the
   // caller repair from `survivors`.
   workOrder = (await agent(
-    `${base}\n\nThese review findings survived adversarial verification:\n${JSON.stringify(survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix })), null, 2)}\n\nMerge duplicates (same root cause) into one item, keep the most severe rating, list every reviewer that raised it. Assign each item an owner: production code → ios-engineer (senior-ios-engineer for SchedulingPass, engine, schema, concurrency); test files → qa-engineer; ARCHITECTURE.md/TESTFLIGHT_PLAN.md/AGENTS.md → tech-writer; PR body only → EM-body; a design choice → tech-lead-ruling; a product or owner-gate choice → owner-question. Write each change as an exact, minimal instruction.`,
+    `${base}\n\nThese review findings survived adversarial verification:\n${JSON.stringify(survivors.map(s => ({ reviewer: s.reviewer, severity: s.severity, location: s.location, claim: s.claim, fix: s.fix })), null, 2)}\n\nMerge duplicates (same root cause) into one item, keep the most severe rating, list every reviewer that raised it. Assign each item an owner: production code → ios-engineer (senior-ios-engineer for SchedulingPass, engine, schema, concurrency); test files under ios/ or android/ → qa-engineer; scripts and their tests under scripts/ → chore; ARCHITECTURE.md/TESTFLIGHT_PLAN.md/AGENTS.md/ENGINEERING_ORG.md and prose under .claude/, .codex/ and .agents/ → tech-writer; PR body only → EM-body; a design choice → tech-lead-ruling; a product or owner-gate choice → owner-question. Write each change as an exact, minimal instruction.`,
     { label: 'synthesize', phase: 'Synthesize', schema: WORKORDER })) || { items: [], notes: 'the synthesizer returned nothing; repair from survivors' }
 }
 

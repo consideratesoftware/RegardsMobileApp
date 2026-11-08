@@ -652,6 +652,24 @@ test('the work order is built from surviving findings only', async () => {
   assert.doesNotMatch(synth[0].prompt, /Beta\.swift:20/)
 })
 
+test('the synthesizer is told who owns infra files: chore for scripts, tech-writer for prose', async () => {
+  const { calls } = await runWorkflow({
+    reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')]) },
+    votes: { 'Alpha.swift:10': [true, true, true] },
+  })
+  const synth = calls.find(c => c.opts.label === 'synthesize')
+  assert.match(synth.prompt, /scripts and their tests under scripts\/ → chore/)
+  assert.match(synth.prompt, /prose under \.claude\/, \.codex\/ and \.agents\/ → tech-writer/)
+  assert.match(synth.prompt, /ENGINEERING_ORG\.md/)
+  // App tests keep their owner, and the 2 rules do not overlap.
+  assert.match(synth.prompt, /test files under ios\/ or android\/ → qa-engineer/)
+  assert.doesNotMatch(synth.prompt, /; test files → qa-engineer/)
+  // The work order may name the new owner.
+  const owners = synth.opts.schema.properties.items.items.properties.owner.enum
+  assert.ok(owners.includes('chore'))
+  assert.ok(owners.includes('tech-writer'))
+})
+
 // Pin: this passes on the old script too. It fixes what the synthesizer's
 // answer looks like on its way out.
 test('workOrderReturned: the synthesizer\'s work order comes back as it was written', async () => {
