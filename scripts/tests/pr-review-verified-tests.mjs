@@ -62,7 +62,8 @@ const LENS_ORDER = ['truth', 'scope', 'impact']
 
 // A reviewer result with nothing wrong in it. Override any field.
 function review(verdict, findings = [], more = {}) {
-  return { verdict, reviewedSha: HEAD, findings, notChecked: [], coverageHoles: [], rawSummary: '', ...more }
+  const blockerCount = findings.filter(f => f.severity === 'BLOCKER').length
+  return { verdict, reviewedSha: HEAD, findings, notChecked: [], coverageHoles: [], blockerCount, rawSummary: '', ...more }
 }
 
 function finding(severity, location) {
@@ -310,6 +311,86 @@ test('refutedBlockerFlipsReviewer: a refuted BLOCKER turns REQUEST_CHANGES into 
   assert.equal(result.refuted.length, 1)
   assert.equal(result.refuted[0].reviewer, 'pr-correctness')
   assert.equal(result.refuted[0].severity, 'BLOCKER')
+})
+
+test('blockerCount: a REQUEST_CHANGES that counted more blockers than it listed does not flip to APPROVE', async () => {
+  // The report said 2 blockers and listed 1. Both verifiers agree the 1 is
+  // not real, but the second blocker was never listed, so nothing checked it.
+  const { result } = await runWorkflow({
+    reviews: {
+      'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], { blockerCount: 2 }),
+    },
+    votes: { 'Alpha.swift:10': [false, false, false] },
+  })
+  assert.equal(result.refuted.length, 1)
+  assert.equal(verdictOf(result, 'pr-correctness'), 'REQUEST_CHANGES')
+})
+
+test('blockerCount: only a count that equals the BLOCKER findings listed lets a refutation flip the verdict', async () => {
+  const cases = [
+    ['a count of 1 for 1 listed', { blockerCount: 1 }, 'APPROVE'],
+    ['a count of 2 for 1 listed', { blockerCount: 2 }, 'REQUEST_CHANGES'],
+    ['a count of 0 for 1 listed', { blockerCount: 0 }, 'REQUEST_CHANGES'],
+    ['no count', { blockerCount: undefined }, 'REQUEST_CHANGES'],
+    ['a count that is null', { blockerCount: null }, 'REQUEST_CHANGES'],
+    ['a count that is a string', { blockerCount: '1' }, 'REQUEST_CHANGES'],
+    ['a count that is not a whole number', { blockerCount: 1.5 }, 'REQUEST_CHANGES'],
+  ]
+  for (const [what, more, expected] of cases) {
+    const { result } = await runWorkflow({
+      reviews: { 'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10')], more) },
+      votes: { 'Alpha.swift:10': [false, false, false] },
+    })
+    assert.equal(verdictOf(result, 'pr-correctness'), expected, what)
+  }
+
+  // Two listed BLOCKERs and a count of 2 flip when both are refuted. A count of
+  // 1 for the same 2 findings does not.
+  for (const [blockerCount, expected] of [[2, 'APPROVE'], [1, 'REQUEST_CHANGES']]) {
+    const { result } = await runWorkflow({
+      reviews: {
+        'pr-correctness': review('REQUEST_CHANGES', [finding('BLOCKER', 'Alpha.swift:10'), finding('BLOCKER', 'Beta.swift:20')], { blockerCount }),
+      },
+      votes: { 'Alpha.swift:10': [false, false, false], 'Beta.swift:20': [false, false, false] },
+    })
+    assert.equal(verdictOf(result, 'pr-correctness'), expected, `a count of ${blockerCount} for 2 listed`)
+  }
+})
+
+test('blockerCount: a REQUEST_CHANGES with FIX findings only and a count of 0 flips when they are refuted', async () => {
+  const { result } = await runWorkflow({
+    args: { reviewers: ['pr-code-quality'] },
+    reviews: { 'pr-code-quality': review('REQUEST_CHANGES', [finding('FIX', 'One.swift:1')], { blockerCount: 0 }) },
+    votes: { 'One.swift:1': [false, false, false] },
+  })
+  assert.equal(verdictOf(result, 'pr-code-quality'), 'APPROVE')
+})
+
+test('blockerCount is required from a pr-* reviewer, asked for in its prompt, and not asked of Codex', async () => {
+  const { calls } = await runWorkflow({
+    args: { codex: true },
+    reviews: { 'pr-correctness': review('APPROVE'), 'codex-reviewer': review('APPROVE') },
+  })
+  const prCall = calls.find(c => c.opts.agentType === 'pr-correctness')
+  assert.ok(prCall.opts.schema.required.includes('blockerCount'))
+  assert.equal(prCall.opts.schema.properties.blockerCount.type, 'integer')
+  assert.match(prCall.prompt, /Set blockerCount to the number on your BLOCKERS line, or 0 if your report has none\./)
+
+  const codexCall = calls.find(c => c.opts.agentType === 'codex-reviewer')
+  assert.ok(!codexCall.opts.schema.required.includes('blockerCount'))
+  assert.doesNotMatch(codexCall.prompt, /blockerCount/)
+})
+
+// Pin: Codex's verdict is its own, so a missing or wrong count changes nothing.
+test('a Codex review without a blockerCount keeps the Codex verdict', async () => {
+  const noCount = review('REQUEST_CHANGES', [finding('BLOCKER', 'Codex.swift:7')])
+  delete noCount.blockerCount
+  const { result } = await runWorkflow({
+    args: { reviewers: ['pr-tests'], codex: true },
+    reviews: { 'pr-tests': review('APPROVE'), 'codex-reviewer': noCount },
+    votes: { 'Codex.swift:7': [false, false, false] },
+  })
+  assert.equal(verdictOf(result, 'codex-reviewer'), 'REQUEST_CHANGES')
 })
 
 test('a BLOCKER with votes real, real, false survives and keeps REQUEST_CHANGES', async () => {

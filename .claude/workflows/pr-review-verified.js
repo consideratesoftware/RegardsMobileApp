@@ -32,8 +32,9 @@ export const meta = {
 //      and coverage holes are returned untouched for Stage 2.
 //   3. A pr-* reviewer's REQUEST_CHANGES becomes APPROVE only when all of
 //      these hold: at least 1 of its findings was refuted, none of its
-//      BLOCKERs survived, it has no NOT CHECKED entry, and (pr-code-quality
-//      only) none of its FIX findings survived.
+//      BLOCKERs survived, it has no NOT CHECKED entry, its blockerCount (its
+//      own BLOCKERS count) equals the number of BLOCKER findings it listed,
+//      and (pr-code-quality only) none of its FIX findings survived.
 //   4. A surviving BLOCKER makes any pr-* reviewer REQUEST_CHANGES.
 //   5. Codex's verdict is always Codex's own. The verifiers never change it.
 //      A refuted Codex finding is still listed in `refuted`. Codex's RETRY and
@@ -103,9 +104,13 @@ const FINDINGS = {
       items: { type: 'string' },
       description: 'One entry per COVERAGE HOLES item (pr-correctness). An empty array when there are none.',
     },
+    blockerCount: {
+      type: 'integer',
+      description: 'The number on your BLOCKERS line, your own count of blockers. 0 when your report has no BLOCKERS line.',
+    },
     rawSummary: { type: 'string' },
   },
-  required: ['verdict', 'reviewedSha', 'findings', 'notChecked', 'coverageHoles'],
+  required: ['verdict', 'reviewedSha', 'findings', 'notChecked', 'coverageHoles', 'blockerCount'],
 }
 
 // Codex's schema is the same with 2 more verdicts: RETRY (also when the head
@@ -118,6 +123,8 @@ const CODEX_FINDINGS = {
     verdict: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'] },
     notChecked: { type: 'array', items: { type: 'string' }, description: 'Codex has no NOT CHECKED line. Return an empty array.' },
   },
+  // Codex's verdict is never changed by a count, so it is not asked for one.
+  required: FINDINGS.required.filter(key => key !== 'blockerCount'),
 }
 
 const VERDICT = {
@@ -201,7 +208,7 @@ const LENSES = [
 ]
 
 phase('Review')
-const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. ${NOT_CHECKED_RULE} Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
+const reviewers = a.reviewers.map(r => ({ type: r, schema: FINDINGS, prompt: `${base}${scopedRecheck}\n\nReview as ${r}. Report every real defect with severity, location (path:line) and the fix. Also return the NOT CHECKED entries and, for pr-correctness, the COVERAGE HOLES. ${NOT_CHECKED_RULE} Set reviewedSha to the output of \`git -C ${a.worktree} rev-parse HEAD\`. Set blockerCount to the number on your BLOCKERS line, or 0 if your report has none. Put your whole report, verbatim, in rawSummary. Then return the structured result.` }))
 if (a.codex) {
   reviewers.push({ type: 'codex-reviewer', schema: CODEX_FINDINGS, prompt: `${base}\n\nRun the Codex review on head ${a.head}, target origin/main...HEAD. Run \`git fetch origin main\` first. In the structured result, set verdict from Codex's verdict line: APPROVE, REQUEST_CHANGES, RETRY (also when the head moved) or UNAVAILABLE. Never report APPROVE unless Codex did. Set reviewedSha to the sha Codex reviewed, put each Codex blocker/should-fix/nit in findings, and put Codex's whole review, verbatim, in rawSummary. Its first line is the verdict line \`CODEX REVIEW: <VERDICT> @ <short sha> vs origin/main...HEAD | codex-cli <version>\`.` })
 }
@@ -245,8 +252,13 @@ function verdictAfterVerification(reviewer, review, verified) {
   if (!nothingUnchecked) return 'REQUEST_CHANGES'
   if (review.verdict !== 'REQUEST_CHANGES') return review.verdict
   const refutedSomething = verified.some(v => !v.survives)
+  // The reviewer's own blocker count has to match the BLOCKER findings it
+  // listed. A blocker it counted and did not list was never checked by a
+  // verifier, so a refuted finding beside it cannot clear the REQUEST_CHANGES.
+  const blockersListed = review.findings.filter(f => f.severity === 'BLOCKER').length
+  const blockersAccountedFor = Number.isInteger(review.blockerCount) && review.blockerCount === blockersListed
   const qualityFixSurvived = reviewer === 'pr-code-quality' && verified.some(v => v.severity === 'FIX' && v.survives)
-  return refutedSomething && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
+  return refutedSomething && blockersAccountedFor && !qualityFixSurvived ? 'APPROVE' : 'REQUEST_CHANGES'
 }
 
 phase('Synthesize')
