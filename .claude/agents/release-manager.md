@@ -128,10 +128,12 @@ gh api "repos/consideratesoftware/RegardsMobileApp/commits/<head sha>/check-runs
 bash "<root checkout>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review.txt"
 ```
 
-Always run the script with `bash`, never your default shell. Use the copy in
-the root checkout on `main`, not the lane's: the PR under review could have
-edited its own copy. (While this PR is itself under review, the engineering
-manager's prompt gives you the path of its copy.) The script prints one line,
+Always run the script with `bash`, never your default shell. Use the copy
+exported from `origin/main` (the root checkout's copy), not the lane's: the PR
+under review could have edited its own copy. Only a PR that itself changes
+`scripts/check-carried-approval.sh` or `scripts/count-hosted-blockers.sh` gets
+the path of its own copy, in the engineering manager's prompt. Every other PR
+uses the copy exported from `origin/main`. The script prints one line,
 `PENDING: <why>`, `BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its
 tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
 `PENDING` means the review hasn't run on this head: wait and query again,
@@ -182,11 +184,13 @@ lane's refs, and this fetch brings them up to date.
      ```
      Run it with `bash`. Exit 0 prints `CARRY PASSES`: the carry is allowed.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
-     other nonzero exit is a script error; all of them fail the carry. Use
-     the copy in the root checkout on `main`, not the lane's: the PR under
-     review could have edited its own copy. (While this PR is itself under
-     review, the engineering manager's prompt gives you the path of its
-     copy.) The rule: a carry needs a diff of lower-case `.md` files only,
+     other nonzero exit is a script error; all of them fail the carry. Use the
+     copy exported from `origin/main` (the root checkout's copy), not the
+     lane's: the PR under review could have edited its own copy. Only a PR that
+     itself changes `scripts/check-carried-approval.sh` or
+     `scripts/count-hosted-blockers.sh` gets the path of its own copy, in the
+     engineering manager's prompt. Every other PR uses the copy exported from
+     `origin/main`. The rule: a carry needs a diff of lower-case `.md` files only,
      each at the repository root, directly under `ios/` or `android/`, or
      under `ios/docs/` or `android/docs/`. It never carries a path under
      `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested
