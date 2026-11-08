@@ -458,6 +458,12 @@ test('a pr-* reviewer is told where its reviewedSha comes from, and the schema r
   const { calls } = await runWorkflow({ reviews: { 'pr-correctness': review('APPROVE') } })
   assert.match(calls[0].prompt, /reviewedSha to the output of `git -C \/tmp\/worktree rev-parse HEAD`/)
   assert.ok(calls[0].opts.schema.required.includes('reviewedSha'))
+
+  // The COVERAGE HOLES the prompt asks for have a field to land in, and the
+  // field is required.
+  assert.match(calls[0].prompt, /COVERAGE HOLES/)
+  assert.equal(calls[0].opts.schema.properties.coverageHoles.type, 'array')
+  assert.ok(calls[0].opts.schema.required.includes('coverageHoles'))
 })
 
 // Every pr-* contract says never to APPROVE with a required check left
@@ -756,6 +762,10 @@ test('the Codex prompt carries its safeguards', async () => {
   const prompt = calls.find(c => c.opts.agentType === 'codex-reviewer').prompt
   assert.match(prompt, /Run `git fetch origin main` first\./)
   assert.match(prompt, /Never report APPROVE unless Codex did\./)
+  // The whole review comes back verbatim, and its first line is the verdict
+  // line that codexLine reads.
+  assert.match(prompt, /put Codex's whole review, verbatim, in rawSummary/)
+  assert.match(prompt, /Its first line is the verdict line `CODEX REVIEW: <VERDICT> @ <short sha> vs origin\/main\.\.\.HEAD \| codex-cli <version>`\./)
 })
 
 // Pin: passes on the old script. Rule 5 says Codex's RETRY comes back as
@@ -800,6 +810,12 @@ test('prVerdictEnum: RETRY and UNAVAILABLE are Codex\'s verdicts, and the schema
   const enumOf = type => calls.find(c => c.opts.agentType === type).opts.schema.properties.verdict.enum
   assert.deepEqual(enumOf('pr-correctness'), ['APPROVE', 'REQUEST_CHANGES'])
   assert.deepEqual(enumOf('codex-reviewer'), ['APPROVE', 'REQUEST_CHANGES', 'RETRY', 'UNAVAILABLE'])
+
+  // Both kinds of reviewer rate a finding on the same 5 severities.
+  const severitiesOf = type => calls.find(c => c.opts.agentType === type).opts.schema.properties.findings.items.properties.severity.enum
+  for (const type of ['pr-correctness', 'codex-reviewer']) {
+    assert.deepEqual(severitiesOf(type), ['BLOCKER', 'FIX', 'NIT', 'ESCALATE', 'QUESTION'], type)
+  }
 
   // The fake refuses a verdict the schema does not list, as the runtime does.
   for (const verdict of ['RETRY', 'UNAVAILABLE']) {
