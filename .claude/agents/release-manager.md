@@ -130,10 +130,12 @@ bash "<root checkout>/scripts/count-hosted-blockers.sh" "<scratch>/hosted-review
 
 Always run the script with `bash`, never your default shell. Use the copy
 exported from `origin/main` (the root checkout's copy), not the lane's: the PR
-under review could have edited its own copy. Only a PR that itself changes
-`scripts/check-carried-approval.sh` or `scripts/count-hosted-blockers.sh` gets
-the path of its own copy, in the engineering manager's prompt. Every other PR
-uses the copy exported from `origin/main`. The script prints one line,
+under review could have edited its own copy. A PR that itself changes
+`scripts/count-hosted-blockers.sh` also gets the path of its own copy, in the
+engineering manager's prompt. Run both copies. If either prints `MALFORMED` or
+exits nonzero, fail closed; if either prints `PENDING`, wait; otherwise the
+count is the higher `BLOCKERS <n>`. Every other PR runs only the copy exported
+from `origin/main`. The script prints one line,
 `PENDING: <why>`, `BLOCKERS <n>`, or `MALFORMED: <why>`; its header and its
 tests in `scripts/tests/count-hosted-blockers-tests.sh` define the rules.
 `PENDING` means the review hasn't run on this head: wait and query again,
@@ -186,11 +188,11 @@ lane's refs, and this fetch brings them up to date.
      Exit 1 prints `CARRY FAILS: <reason>`, exit 64 is a usage error, and any
      other nonzero exit is a script error; all of them fail the carry. Use the
      copy exported from `origin/main` (the root checkout's copy), not the
-     lane's: the PR under review could have edited its own copy. Only a PR that
-     itself changes `scripts/check-carried-approval.sh` or
-     `scripts/count-hosted-blockers.sh` gets the path of its own copy, in the
-     engineering manager's prompt. Every other PR uses the copy exported from
-     `origin/main`. The rule: a carry needs a diff of lower-case `.md` files only,
+     lane's: the PR under review could have edited its own copy. A PR that itself
+     changes `scripts/check-carried-approval.sh` also gets the path of its own
+     copy, in the engineering manager's prompt. Run both copies; the carry
+     stands only if both print `CARRY PASSES`. Every other PR runs only the copy
+     exported from `origin/main`. The rule: a carry needs a diff of lower-case `.md` files only,
      each at the repository root, directly under `ios/` or `android/`, or
      under `ios/docs/` or `android/docs/`. It never carries a path under
      `.claude/`, `.codex/`, `.agents/`, `scripts/` or `.github/` (nested
