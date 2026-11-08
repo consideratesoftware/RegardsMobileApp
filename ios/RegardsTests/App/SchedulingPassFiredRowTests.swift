@@ -9,15 +9,18 @@ import Testing
 /// zone. The fixture window opens a slot at 18:00 every day.
 struct SchedulingPassFiredRowTests {
 
+    /// A cadence row as the pass writes it, by hand. `cycle` is the contact's overdue time (its last
+    /// interaction plus the cadence), which the pass stores in `firedCycle` on every cadence row it writes.
     private static func pendingCadenceRow(
-        for contact: Contact, at scheduledFor: Date, in fixture: PassFixture
+        for contact: Contact, at scheduledFor: Date, cycle: Date? = nil, in fixture: PassFixture
     ) -> ScheduledReminder {
         ScheduledReminder(
             id: fixture.cadenceID(contact),
             contactId: contact.id,
             kind: .cadence,
             scheduledFor: scheduledFor,
-            osNotificationId: "contact-\(contact.id.uuidString)-cadence")
+            osNotificationId: "contact-\(contact.id.uuidString)-cadence",
+            firedCycle: cycle)
     }
 
     // MARK: - Marking
@@ -34,8 +37,10 @@ struct SchedulingPassFiredRowTests {
     ) async throws {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
+        // Overdue since 05-08 10:00 (the 05-01 10:00 interaction plus 7 days): the row's cycle.
         let pending = Self.pendingCadenceRow(
-            for: contact, at: fixture.clock.now().addingTimeInterval(secondsFromNow), in: fixture)
+            for: contact, at: fixture.clock.now().addingTimeInterval(secondsFromNow),
+            cycle: PassFixture.at("2026-05-08 10:00"), in: fixture)
         try await fixture.repositories.reminders.upsert(pending)
         var fired = pending
         fired.state = .fired
@@ -77,9 +82,8 @@ struct SchedulingPassFiredRowTests {
 
     /// The device clock is set back 1 hour before the fired row's slot. The
     /// row is fired, so a rollback never re-arms it. The contact's overdue
-    /// time (06-10 17:30) is still ahead of `now` (17:00) and outside the
-    /// 18:00-19:00 window, so the hold uses the next slot, 18:00, which is
-    /// the fired row's.
+    /// time (06-10 17:30) is still ahead of `now` (17:00), and it is the row's
+    /// stored cycle, so the stored cycle covers it and holds the row.
     @Test(
         "A fired cadence row survives the clock being set back before its slot",
         arguments: RepositoryContractBackend.allCases
@@ -87,7 +91,9 @@ struct SchedulingPassFiredRowTests {
     func firedCadenceRowSurvivesAClockRollback(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:10")
         let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 17:30")
-        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 18:00"), in: fixture)
+        var fired = Self.pendingCadenceRow(
+            for: contact, at: PassFixture.at("2026-06-10 18:00"),
+            cycle: PassFixture.at("2026-06-10 17:30"), in: fixture)
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
         // The mock backend's seed cast has no rows until a run writes them. This run does,
@@ -129,10 +135,10 @@ struct SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
-    /// The hold resolves the cycle's slot in the contact's own window. The override opens at 07:00 and the
-    /// global window at 18:00, so a hold resolved in the global window would see 18:00, after the row, and
-    /// the rollback would re-arm it. The clock is set back to 06:00, before the overdue time (06:30), so the
-    /// "overdue and past the anchor" clause of the hold no longer applies and only the slot check holds the row.
+    /// The hold reads no window, so the contact's own window cannot matter to it. The override opens at 07:00
+    /// and the global window at 18:00. The clock is set back to 06:00, before the overdue time (06:30), so the
+    /// "overdue and past the anchor" fallback does not apply and only the row's stored cycle (06:30) holds it.
+    /// A pass that derived the row would write it pending again.
     @Test(
         "A fired cadence row in an override window survives the clock being set back before its slot",
         arguments: RepositoryContractBackend.allCases
@@ -142,7 +148,9 @@ struct SchedulingPassFiredRowTests {
         // A 7-day cadence (the default), so the contact is overdue at 2026-06-10 06:30.
         let contact = try await fixture.addContact(
             1, lastInteracted: "2026-06-03 06:30", override: PassFixture.eveningWindow(start: 7, end: 8))
-        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 07:00"), in: fixture)
+        var fired = Self.pendingCadenceRow(
+            for: contact, at: PassFixture.at("2026-06-10 07:00"),
+            cycle: PassFixture.at("2026-06-10 06:30"), in: fixture)
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
         // The mock backend's seed cast has no rows until a run writes them. This run does,
@@ -156,51 +164,6 @@ struct SchedulingPassFiredRowTests {
 
         #expect(try await fixture.row(fired.id) == fired)
         #expect(try await fixture.cadenceRow(contact) == nil)
-        #expect(await fixture.reminders.writeCount == writes)
-    }
-
-    /// Records R68, an accepted residual (§19 R68, owner ruling 2026-11-04).
-    /// The row stores no fired cycle, so after a window edit moves the slot to 18:30
-    /// and the clock is set back to 17:00, the pass derives the fired
-    /// row as pending again; it fires a second time once 18:30 arrives, then
-    /// holds. A future fix that stores the fired cycle on the row should turn
-    /// the re-arm check after the rollback (`rearmed`) red on purpose; update this test with that change.
-    @Test(
-        "A window edit then a clock rollback re-arms a fired row once",
-        arguments: RepositoryContractBackend.allCases
-    )
-    func windowEditThenClockRollbackReArmsOnce(backend: RepositoryContractBackend) async throws {
-        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 18:10")
-        let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 17:30")
-        var fired = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-10 18:00"), in: fixture)
-        fired.state = .fired
-        try await fixture.repositories.reminders.upsert(fired)
-
-        // The window now opens at 18:30. The 18:00 row is still held.
-        let range = TimeRange(start: TimeOfDay(hour: 18, minute: 30), end: TimeOfDay(hour: 19))
-        try await fixture.repositories.window.saveGlobal(ReminderWindow(
-            allowedDays: .allDays, allowedTimeRanges: [range], quietHours: nil, timezoneIdentifier: PassFixture.zone))
-        try await fixture.pass.runFull()
-        #expect(try await fixture.row(fired.id) == fired)
-
-        // Rolled back before the new slot: the row is pending for 18:30.
-        fixture.setNow("2026-06-10 17:00")
-        try await fixture.pass.runFull()
-        let rearmed = try #require(try await fixture.cadenceRow(contact))
-        #expect(rearmed.scheduledFor == PassFixture.at("2026-06-10 18:30"))
-
-        // The new slot arrives: the row fires once.
-        fixture.setNow("2026-06-10 18:31")
-        try await fixture.pass.runFull()
-        let refired = try #require(try await fixture.row(fired.id))
-        #expect(refired.scheduledFor == PassFixture.at("2026-06-10 18:30"))
-        #expect(refired.state == .fired)
-        #expect(try await fixture.cadenceRow(contact) == nil)
-        let writes = await fixture.reminders.writeCount
-
-        try await fixture.pass.runFull()
-
-        #expect(try await fixture.row(fired.id) == refired)
         #expect(await fixture.reminders.writeCount == writes)
     }
 
@@ -250,7 +213,8 @@ struct SchedulingPassFiredRowTests {
     /// 02:00). With a 1-day cadence and a range of 00:00-23:59, a contact
     /// last reached at 00:30 PDT is overdue at 23:30 PST, and the cycle's
     /// slot starts at 00:00 PDT, before the anchor. The fired row at that slot
-    /// belongs to this cycle, so no later run on the same cycle may replace it.
+    /// belongs to this cycle, and its stored cycle is the overdue time, so no
+    /// later run on the same cycle may replace it.
     @Test(
         "A 1-day cadence on a 25-hour day does not re-nag its fired row",
         arguments: RepositoryContractBackend.allCases
@@ -270,7 +234,8 @@ struct SchedulingPassFiredRowTests {
             createdAt: EngineFixtures.date("2026-01-01T10:00:00-08:00"))
         try await fixture.repositories.contacts.upsert(contact)
         let slotStart = EngineFixtures.date("2026-11-01T00:00:00-07:00")
-        var fired = Self.pendingCadenceRow(for: contact, at: slotStart, in: fixture)
+        var fired = Self.pendingCadenceRow(
+            for: contact, at: slotStart, cycle: EngineFixtures.date("2026-11-01T23:30:00-08:00"), in: fixture)
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
 
@@ -354,10 +319,10 @@ struct SchedulingPassFiredRowTests {
 
     /// The user was caught up at 00:10 PDT on the 25-hour day, but the
     /// reschedule that follows failed (fetch throws once), so no new row was
-    /// written. The fired row at 00:00 PDT is the old cycle's, yet it starts
-    /// before the new anchor's cycle ends, and the no-re-nag hold would keep it
-    /// at 23:15 PST, when the contact is overdue again. The catch-up clears the
-    /// fired row, so the hold never sees it and the run writes the new row.
+    /// written. The fired row at 00:00 PDT is the old cycle's (stored cycle
+    /// 10-31 12:00 PDT). The catch-up clears it, so at 23:15 PST, when the
+    /// contact is overdue again, the run writes the new row with the new
+    /// overdue time as its cycle.
     @Test(
         "A catch-up whose reschedule failed on a 25-hour day still gets its next reminder",
         arguments: RepositoryContractBackend.allCases
@@ -377,7 +342,8 @@ struct SchedulingPassFiredRowTests {
             createdAt: EngineFixtures.date("2026-01-01T10:00:00-08:00"))
         try await fixture.repositories.contacts.upsert(contact)
         let slotStart = EngineFixtures.date("2026-11-01T00:00:00-07:00")
-        var fired = Self.pendingCadenceRow(for: contact, at: slotStart, in: fixture)
+        var fired = Self.pendingCadenceRow(
+            for: contact, at: slotStart, cycle: EngineFixtures.date("2026-10-31T12:00:00-07:00"), in: fixture)
         fired.state = .fired
         try await fixture.repositories.reminders.upsert(fired)
         fixture.setNow(EngineFixtures.date("2026-11-01T00:05:00-07:00"))
@@ -403,6 +369,7 @@ struct SchedulingPassFiredRowTests {
         let next = try #require(try await fixture.row(fired.id))
         #expect(next.scheduledFor == slotStart)
         #expect(next.state == .fired)
+        #expect(next.firedCycle == EngineFixtures.date("2026-11-01T23:10:00-08:00"))
         #expect(await fixture.reminders.writeCount == writes + 1)
     }
 
