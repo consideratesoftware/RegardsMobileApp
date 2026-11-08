@@ -136,6 +136,48 @@ extension UserNotificationsAdapterRequestTests {
         #expect(UserNotificationsAdapter.decode(request) == nil)
     }
 
+    // MARK: Decoding the zone and calendar the trigger carries
+
+    /// `decode` resolves the fields in the zone the components carry (GMT when
+    /// they carry none) and ignores the calendar they carry. All 3 rows are the
+    /// fields 2026-10-01 03:00:00, and each expected instant is a literal epoch
+    /// second worked out outside the code under test:
+    /// - Los Angeles is on PDT (UTC-7) that day, so 03:00 there is 10:00 GMT;
+    /// - with no zone the same fields are 03:00 GMT, which is also what the
+    ///   other hand-built tests expect;
+    /// - a Buddhist calendar would read the year 2026 as 1483 CE, so the Gregorian
+    ///   reading of the fields is the only way to land on 2026.
+    @Test(
+        "A trigger's fields decode as Gregorian wall time in the zone it carries, or in GMT if it carries none",
+        arguments: [
+            (
+                "zone America/Los_Angeles, Gregorian calendar", Calendar.Identifier.gregorian as Calendar.Identifier?,
+                TimeZone(identifier: "America/Los_Angeles"), 1_790_848_800.0
+            ),
+            ("no zone and no calendar", nil, nil, 1_790_823_600.0),
+            ("zone GMT, Buddhist calendar", .buddhist, TimeZone.gmt, 1_790_823_600.0),
+        ]
+    )
+    func triggerFieldsDecodeInTheCarriedZoneAndIgnoreTheCarriedCalendar(
+        carried: String, calendarIdentifier: Calendar.Identifier?, zone: TimeZone?, epochSeconds: TimeInterval
+    ) throws {
+        var calendar = calendarIdentifier.map { Calendar(identifier: $0) }
+        calendar?.timeZone = .gmt
+        let components = DateComponents(
+            calendar: calendar, timeZone: zone, year: 2026, month: 10, day: 1, hour: 3, minute: 0, second: 0
+        )
+        let calendarRequest = Self.handBuilt(category: "regards.cadence", contactId: contactX.uuidString)
+        let request = UNNotificationRequest(
+            identifier: calendarRequest.identifier,
+            content: calendarRequest.content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        )
+
+        let decoded = try #require(UserNotificationsAdapter.decode(request), "\(carried) did not decode")
+
+        #expect(decoded.fireDate == Date(timeIntervalSince1970: epochSeconds), "\(carried)")
+    }
+
     /// A pending request as the system could hold one that `makeRequest` did not
     /// build: the given category and contact id (none when nil), and a calendar
     /// trigger at 2026-10-01 03:00:00 GMT, non-repeating unless `repeats` is true.
