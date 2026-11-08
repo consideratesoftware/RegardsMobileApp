@@ -115,6 +115,21 @@ struct NotificationFakeParityTests {
         }
     }
 
+    /// The scripted fake reads a delivered request's whole second back from the
+    /// adapter. With a fixed `now` of `.distantPast` for that read, a request
+    /// dated `.distantPast` had no trigger to read and the fake ended the whole
+    /// test process.
+    @Test("A request dated .distantPast is delivered at once at its own whole second")
+    func requestAtDistantPastIsDelivered() async throws {
+        let scripted = ScriptedNotifications(clock: { Self.now })
+        let sent = Self.request(fireDate: .distantPast)
+
+        try await scripted.schedule(sent)
+
+        #expect(await scripted.pendingRequests().isEmpty)
+        #expect(await scripted.delivered == [sent])
+    }
+
     @Test("An immediate add replaces a pending request with the same identifier", arguments: Fake.allCases)
     func immediateAddReplacesAPendingRequest(_ fake: Fake) async throws {
         let now = Self.now

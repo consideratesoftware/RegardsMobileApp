@@ -35,6 +35,13 @@ actor ScriptedNotifications: NotificationScheduling {
     private(set) var delivered: [ReminderNotificationRequest] = []
     private let clock: @Sendable () -> Date
 
+    /// Thrown by `schedule` when the adapter can't read back the request it
+    /// just built. It means the adapter is broken, and it fails the one test
+    /// that scheduled the request instead of ending the whole test process.
+    struct UnreadableRequest: Error {
+        let identifier: String
+    }
+
     init(
         status: NotificationAuthorizationStatus = .notDetermined,
         requests: [ScriptedRequestStep] = [],
@@ -104,14 +111,16 @@ actor ScriptedNotifications: NotificationScheduling {
         if let stored = UserNotificationsAdapter.decode(built) {
             pending[request.identifier] = stored
         } else {
-            pending[request.identifier] = nil
             // The delivered fire date is the adapter's own whole second, read back
-            // from a request built at `.distantPast` so that it keeps a trigger.
+            // from a request built with a `now` 2 s before the fire date. The whole
+            // second is never more than 1 s before the fire date, so the request
+            // keeps a trigger whatever the fire date is.
             guard let wholeSecond = UserNotificationsAdapter.decode(
-                UserNotificationsAdapter.makeRequest(request, now: .distantPast)
+                UserNotificationsAdapter.makeRequest(request, now: request.fireDate.addingTimeInterval(-2))
             ) else {
-                preconditionFailure("The adapter can't read back its own request for \(request.identifier)")
+                throw UnreadableRequest(identifier: request.identifier)
             }
+            pending[request.identifier] = nil
             delivered.append(ReminderNotificationRequest(
                 identifier: request.identifier,
                 title: request.title,
