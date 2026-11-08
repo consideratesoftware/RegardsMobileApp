@@ -27,7 +27,8 @@ struct SchedulingPassOccasionRolloverTests {
         let thisYear = PassFixture.at("2026-06-12 09:00")
         let nextYear = PassFixture.at("2027-06-12 09:00")
 
-        // 1. The birthday is pending at 09:00, then marked fired straight in the store (as a run at 09:00 would).
+        // 1. The birthday is pending at 09:00, then marked fired straight in the store
+        //    (as a run at 09:00 would).
         try await fixture.pass.runFull()
         #expect(try await fixture.occasionRow(contact, .birthday)?.scheduledFor == thisYear)
         #expect(try await fixture.repositories.reminders.transitionState(id: birthdayID, from: .pending, to: .fired))
