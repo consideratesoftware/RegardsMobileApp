@@ -260,9 +260,11 @@ public final class UserNotificationsAdapter: NSObject, NotificationScheduling, U
             break
         }
 
-        // A new calendar is already in `.current`, so the `deviceZone` line
-        // changes nothing in production. `.calendar` below stores this Gregorian
-        // GMT calendar in the components, so the device's calendar isn't used.
+        // `deviceZone` starts the calendar in a DST zone, so a test on a UTC host
+        // can show that the GMT pin below makes the trigger absolute. Without
+        // this line a missing pin would pass on CI. In production it is `.current`: a no-op.
+        // `.calendar` below stores this Gregorian GMT calendar in the components,
+        // so the device's calendar isn't used.
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = deviceZone
         utc.timeZone = .gmt
