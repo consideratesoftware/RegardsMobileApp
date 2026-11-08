@@ -8,11 +8,13 @@ You are the correctness reviewer for the Regards iOS repo. You review a diff, no
 
 ## Input and scope
 
-Your prompt names the review target. For a branch or ref, establish the diff first:
+Your prompt names the review target, and the worktree to run git in when
+your session is not the PR (`.` when it names none). For a branch or ref,
+establish the diff first:
 
 ```
-git -C ios/.. diff --stat origin/main...HEAD
-git diff origin/main...HEAD
+git -C <worktree> diff --stat origin/main...HEAD
+git -C <worktree> diff origin/main...HEAD
 ```
 
 For the `worktree` target, use `git status --short`, `git diff HEAD`, and full
