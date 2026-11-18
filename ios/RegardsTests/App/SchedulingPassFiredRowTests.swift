@@ -260,6 +260,9 @@ struct SchedulingPassFiredRowTests {
     /// comes due (06-10 19:00 plus 30 minutes) the old fired row must give way
     /// to a pending one for the next slot. The hold must also check that the
     /// row belongs to the current cycle: this fails if "fired" alone holds.
+    /// Its stored cycle (06-03 18:30, the overdue time it joined the slot at) is stale too, so this also fails
+    /// if a non-nil cycle alone counts as proof that the row follows the current anchor; slice 4's P6 fix must
+    /// keep it green.
     @Test(
         "An old cycle's fired row is replaced once the new cycle is overdue",
         arguments: RepositoryContractBackend.allCases
@@ -267,7 +270,9 @@ struct SchedulingPassFiredRowTests {
     func oldCycleFiredRowIsReplacedAfterAMissedReschedule(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(backend: backend, now: "2026-06-10 19:30")
         let contact = try await fixture.addContact(1, cadenceDays: 7, lastInteracted: "2026-06-03 19:00")
-        var oldCycle = Self.pendingCadenceRow(for: contact, at: PassFixture.at("2026-06-03 18:00"), in: fixture)
+        var oldCycle = Self.pendingCadenceRow(
+            for: contact, at: PassFixture.at("2026-06-03 18:00"), cycle: PassFixture.at("2026-06-03 18:30"),
+            in: fixture)
         oldCycle.state = .fired
         try await fixture.repositories.reminders.upsert(oldCycle)
 
@@ -277,6 +282,7 @@ struct SchedulingPassFiredRowTests {
         #expect(row.id == oldCycle.id)
         #expect(row.state == .pending)
         #expect(row.scheduledFor == PassFixture.at("2026-06-11 18:00"))
+        #expect(row.firedCycle == PassFixture.at("2026-06-10 19:00"))
     }
 
     // MARK: - Occasions
