@@ -72,12 +72,13 @@ public enum RegardsSchema {
     // MARK: - v4 columns
 
     /// TF-07e: `ScheduledReminder.firedCycle` records the cycle a row belongs
-    /// to, so a clock set back can't re-arm a fired row (§7, §9 "Notification
-    /// fired"; R68, R69). No default and no backfill: NULL means "no cycle
-    /// recorded", and that is true of every row written before v4. Main's
-    /// builds never write a `fired` row, and no build has delivered a
-    /// notification (TF-07e slice 4 wires delivery), so no stored row belongs
-    /// to a delivered cycle.
+    /// to, so a clock set back can't re-arm a fired row, except in the cases
+    /// §9 "Notification fired" names (§7; R68, R69). No default and no
+    /// backfill: NULL means "no cycle recorded", and that is true of every
+    /// row written before v4. Main's builds never write a `fired` row, and no
+    /// build has delivered a notification: the R57 gate (§19) holds
+    /// scheduling until TF-07e slice 4 wires delivery. So no stored row
+    /// belongs to a delivered cycle.
     private static func migrateToV4(_ db: Database) throws {
         try db.alter(table: "ScheduledReminder") { t in
             t.add(column: "firedCycle", .integer)
