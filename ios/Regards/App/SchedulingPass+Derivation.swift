@@ -81,6 +81,7 @@ extension SchedulingPass {
             if let current = nearest[occasion.kind], key(current) <= key(entry) { continue }
             nearest[occasion.kind] = entry
         }
+        // By occurrence, then kind, so the caller never sees the dictionary's order.
         return nearest.values.sorted { ($0.1, $0.0.kind.rawValue) < ($1.1, $1.0.kind.rawValue) }
     }
 }
