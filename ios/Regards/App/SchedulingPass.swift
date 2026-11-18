@@ -129,6 +129,8 @@ public actor SchedulingPass {
         let targetIds = Set(targets.map(\.id))
         // §9 "Notification fired": a due covered pending row counts as delivered and is marked fired, and a
         // due row this call writes is written fired, so after a run returns no covered pending row is due.
+        // Marking changes only `state`. A cadence row keeps the cycle its writer stored, and the hold below
+        // stamps a new one; a fired occasion row's own `scheduledFor` becomes its latest fire time (`lastFired`).
         var rows = snapshot.reminders
         for (index, row) in rows.enumerated()
         where row.state == .pending && row.scheduledFor <= now && targetIds.contains(row.contactId) {
