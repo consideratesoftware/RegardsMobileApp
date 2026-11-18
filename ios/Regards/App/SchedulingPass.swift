@@ -151,9 +151,10 @@ public actor SchedulingPass {
             for (occasion, occurrence) in occurrences {
                 let id = Self.reminderID(contactId: contact.id, kind: occasion.kind)
                 desiredIds.insert(id)
-                // The fire time of the latest delivered occurrence (marking fires a due row), carried forward on
-                // every rewrite. An occurrence on or before that day is held, so a "fire now" occurrence can't
-                // chase the clock and a clock set back, even by a year, can't re-arm it.
+                // The fire time of the latest fired occurrence: a fired row's own `scheduledFor` (marking fires a
+                // due row), else the time a pending row carries forward on every rewrite. An occurrence on or
+                // before that day is held, so a "fire now" occurrence can't chase the clock and a clock set back,
+                // even by a year, can't re-arm it.
                 let existing = existingById[id]
                 let lastFired = existing.flatMap { $0.state == .fired ? $0.scheduledFor : $0.firedCycle }
                 if let lastFired,
