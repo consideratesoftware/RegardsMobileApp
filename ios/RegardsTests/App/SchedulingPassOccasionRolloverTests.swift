@@ -49,6 +49,46 @@ struct SchedulingPassOccasionRolloverTests {
         }
     }
 
+    /// Owner answer 1, 2026-11-09 (§9 "Notification fired"). A clock that ran ahead past an occasion and was
+    /// then corrected notifies at most once: the run on the fast clock marked the row fired and wrote next
+    /// year's row with the fire time, so no later clock re-arms the occasion.
+    @Test(
+        "An occasion passed by a fast clock is not re-armed when the clock is corrected",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func fastClockPastAnOccasionThenCorrectedDoesNotReArm(backend: RepositoryContractBackend) async throws {
+        let id = try contractUUID(7_001)
+        let fixture = try await PassFixture(backend: backend, now: "2026-06-10 10:00", occasions: { _ in
+            [ContactOccasion(contactId: id, kind: .birthday, monthDay: MonthDay(month: 6, day: 12))]
+        })
+        let contact = try await fixture.addContact(1, cadenceDays: 30, lastInteracted: "2026-06-09 10:00")
+        let birthdayID = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
+
+        // 1. On the true clock the birthday is pending for 06-12 09:00, with no cycle.
+        try await fixture.pass.runFull()
+        let pending = try #require(try await fixture.occasionRow(contact, .birthday))
+        #expect(pending.scheduledFor == PassFixture.at("2026-06-12 09:00"))
+        #expect(pending.firedCycle == nil)
+
+        // 2. The clock runs ahead to 06-13. The run marks the row fired and writes next year's row.
+        fixture.setNow("2026-06-13 10:00")
+        try await fixture.pass.runFull()
+        let rolledOver = try #require(try await fixture.occasionRow(contact, .birthday))
+        #expect(rolledOver.scheduledFor == PassFixture.at("2027-06-12 09:00"))
+        #expect(rolledOver.firedCycle == PassFixture.at("2026-06-12 09:00"))
+
+        // 3. The clock is corrected to before the occasion, passes it, and moves ahead again: the row stays.
+        let writes = await fixture.reminders.writeCount
+        for clock in ["2026-06-10 10:00", "2026-06-12 08:00", "2026-06-12 09:01", "2026-06-13 10:00"] {
+            fixture.setNow(clock)
+            try await fixture.pass.runFull()
+
+            #expect(try await fixture.occasionRow(contact, .birthday) == rolledOver, "at \(clock)")
+            #expect(try await fixture.row(birthdayID) == rolledOver, "at \(clock)")
+            #expect(await fixture.reminders.writeCount == writes, "at \(clock)")
+        }
+    }
+
     /// Pin. Records the narrowed R69 (§19): TF-07f fixes it. It guards nothing, and it turns red on purpose
     /// when the residual is fixed. The orphan sweep cancels next year's row
     /// when the contact is untracked, and the snapshot holds no cancelled row, so the carried fire time is lost
