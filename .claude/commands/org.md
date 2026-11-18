@@ -44,11 +44,13 @@ a cache for the next session: when they disagree with the branch, the PR, or
    or you stop and report; you never work in it.
    Bring it to `origin/main` with
    `git -C <root checkout> merge --ff-only origin/main`; if that refuses,
-   stop and report. Then check your own session: every agent you launch loads
-   its contract from your session's folder, so that folder must be the root
-   checkout, with `git rev-parse HEAD` equal to `git rev-parse origin/main`.
-   If it is a lane or another branch's worktree, stop and report: its agents
-   would review with that branch's contracts.
+   stop and report. Claude Code reads agent contracts when a session starts, so
+   if the fast-forward moved `HEAD`, start a new session before you launch any
+   agent. Then check your own session: every agent you launch loads its contract
+   from your session's folder, so that folder must be the root checkout, with
+   `git rev-parse HEAD` equal to `git rev-parse origin/main`. If it is a lane or
+   another branch's worktree, stop and report: its agents would review
+   with that branch's contracts.
 2. `git worktree list`; note each `RegardsMobileApp-TF##` and whether it is
    dirty. A dirty worktree is a lane in progress even if no agent is running.
    Read the matching folder under `../RegardsMobileApp-lanes/` for each lane

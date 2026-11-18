@@ -177,8 +177,9 @@ nothing. Start the workflow and every plain-run agent from a session whose
 folder is the root checkout on `main`, never a PR checkout, so the reviewer,
 verifier and codex-reviewer contracts load from main. That checkout's `HEAD`
 must equal `origin/main` (`org.md` Stage 0 fast-forwards it). If it lags, stop:
-an older main's contracts would review the PR. `codex-reviewer` starts
-Codex in that checkout too. Then start the workflow once:
+an older main's contracts would review the PR. Start that session after the
+checkout's last fast-forward. `codex-reviewer` starts Codex in that checkout
+too. Then start the workflow once:
 
 ```
 Workflow({ scriptPath: "<copy exported from origin/main>", args: { title, worktree, branch, head, since, reviewers, codex, contextFile } })
