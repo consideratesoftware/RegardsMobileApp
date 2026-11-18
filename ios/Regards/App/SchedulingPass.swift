@@ -207,6 +207,8 @@ public actor SchedulingPass {
             // overdue, keep a fired row slotted at or after the anchor and store the new cycle on it: a longer
             // cadence that is already overdue, or a row with no cycle (written before v4). The first run that
             // sees it reads the clock for that answer, and later runs keep the stored one.
+            // A row slotted before its anchor (a 1-day cadence on a 25-hour day) misses the stamp, so a longer
+            // cadence derives it again and notifies once more; TF-07e slice 4 fixes that (§9).
             if let existing, existing.state == .fired {
                 if let cycle = existing.firedCycle, cycle >= overdueAt { continue }
                 if overdueAt <= now && anchor <= existing.scheduledFor {
