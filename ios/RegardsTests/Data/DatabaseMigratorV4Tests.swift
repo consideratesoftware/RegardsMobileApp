@@ -11,8 +11,8 @@ import GRDB
 /// "no cycle recorded", and that is true of every row written before v4: main
 /// never writes a `fired` row, and no build has delivered a notification. So
 /// an upgrade must leave every existing row exactly as it was, whatever its
-/// kind and state, and the first pass run after it stamps the cycle (TF-07e
-/// slice 4).
+/// kind and state; the first pass run after it stores the cycle (TF-07e slice 2,
+/// ARCHITECTURE.md §9a C3).
 struct DatabaseMigratorV4Tests {
 
     // MARK: - Fresh create
