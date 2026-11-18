@@ -19,6 +19,10 @@ struct TransitionCall: Equatable {
 /// `transitionLog` records every compare-and-set and whether it applied.
 /// `upsertGate`, when set, holds the first `upsert` open until the gate opens:
 /// the run has read its snapshot and decided, and is parked before writing.
+/// `raceNextMark(to:)` models a writer outside the pass lock: on the next
+/// pending-to-fired `transitionState`, the real backend's row is first set to
+/// the given state with an uncounted `updateState`, so the forwarded
+/// compare-and-set refuses for real. It fires once and defaults to off.
 /// `setFetchFails(true)` makes `fetchSchedule()` throw, as a failed snapshot
 /// read does, until it is set back to `false`.
 actor CountingReminderRepository: ReminderRepository {
@@ -35,6 +39,7 @@ actor CountingReminderRepository: ReminderRepository {
     /// Calls to `observeSchedule()`, which the pass never makes.
     private(set) var observations = 0
     private var fetchFails = false
+    private var markRace: ReminderState?
 
     init(_ wrapped: any ReminderRepository, upsertGate: AsyncGate? = nil, failUpsertsForContact: UUID? = nil) {
         self.wrapped = wrapped
@@ -69,6 +74,10 @@ actor CountingReminderRepository: ReminderRepository {
     @discardableResult
     func transitionState(id: UUID, from: ReminderState, to: ReminderState) async throws -> Bool {
         transitions += 1
+        if let race = markRace, from == .pending, to == .fired {
+            markRace = nil
+            try await wrapped.updateState(id: id, state: race)
+        }
         let applied = try await wrapped.transitionState(id: id, from: from, to: to)
         transitionLog.append(TransitionCall(id: id, from: from, to: to, applied: applied))
         return applied
@@ -77,6 +86,11 @@ actor CountingReminderRepository: ReminderRepository {
     func delete(id: UUID) async throws {
         deletes += 1
         try await wrapped.delete(id: id)
+    }
+
+    /// The next pending-to-fired `transitionState` finds the row already in `state`.
+    func raceNextMark(to state: ReminderState) {
+        markRace = state
     }
 
     func setFetchFails(_ fails: Bool) {
