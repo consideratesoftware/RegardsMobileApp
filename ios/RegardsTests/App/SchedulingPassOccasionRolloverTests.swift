@@ -49,8 +49,8 @@ struct SchedulingPassOccasionRolloverTests {
         }
     }
 
-    /// Pin. Records the narrowed R69 (§19): it passes on the code before the cycle was stored and guards
-    /// nothing; it turns red on purpose when the residual is fixed. The orphan sweep cancels next year's row
+    /// Pin. Records the narrowed R69 (§19): TF-07f fixes it. It guards nothing, and it turns red on purpose
+    /// when the residual is fixed. The orphan sweep cancels next year's row
     /// when the contact is untracked, and the snapshot holds no cancelled row, so the carried fire time is lost
     /// with it. After the contact returns and the clock is set back to the fired day, the occasion re-arms once.
     @Test(
