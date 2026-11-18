@@ -161,6 +161,54 @@ extension SchedulingPassFiredRowTests {
         #expect(await fixture.reminders.writeCount == writes)
     }
 
+    /// Pin. Records the second rollback exception (§9 "Notification fired", §19 R68; owner answer, 2026-11-09): a
+    /// cadence lengthened with no run before the clock is set back to before its new overdue time gives 1 extra
+    /// reminder. No stored fact gives the true time, so it guards nothing and turns red on purpose if the case
+    /// is fixed.
+    @Test(
+        "A cadence edit then a clock rollback before the first run re-arms a fired cadence row once",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func cadenceEditThenClockRollbackBeforeTheFirstRunReArmsOnce(backend: RepositoryContractBackend) async throws {
+        let fixture = try await PassFixture(backend: backend, now: "2026-05-08 18:30")
+        let contact = try await fixture.addContact(1)
+        try await fixture.pass.runFull()
+        let fired = try #require(try await fixture.row(fixture.cadenceID(contact)))
+        #expect(fired.state == .fired)
+        #expect(fired.scheduledFor == PassFixture.at("2026-05-08 18:00"))
+        #expect(fired.firedCycle == PassFixture.at("2026-05-08 10:00"))
+
+        // The cadence becomes 30 days (overdue 05-31 10:00) and the clock is 05-20, before that time. No run
+        // came between the edit and the rollback, so the first run sees a longer cadence that is still ahead.
+        var longer = contact
+        longer.cadenceDays = 30
+        try await fixture.repositories.contacts.upsert(longer)
+        fixture.setNow("2026-05-20 10:00")
+        try await fixture.pass.runFull()
+
+        var rearmed = fired
+        rearmed.state = .pending
+        rearmed.scheduledFor = PassFixture.at("2026-05-31 18:00")
+        rearmed.firedCycle = PassFixture.at("2026-05-31 10:00")
+        #expect(try await fixture.cadenceRow(contact) == rearmed)
+        #expect(try await fixture.row(fired.id) == rearmed, "the fired 05-08 row is replaced")
+
+        // The new cycle's slot arrives: the row fires the second time and then holds.
+        fixture.setNow("2026-05-31 18:01")
+        try await fixture.pass.runFull()
+
+        var refired = rearmed
+        refired.state = .fired
+        #expect(try await fixture.row(fired.id) == refired)
+        #expect(try await fixture.cadenceRow(contact) == nil)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(fired.id) == refired)
+        #expect(await fixture.reminders.writeCount == writes)
+    }
+
     // MARK: - Rows written before v4
 
     /// A cadence row written before v4 has no cycle. The first run gives it the contact's overdue time and
