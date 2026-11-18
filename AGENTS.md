@@ -153,7 +153,7 @@ Do not loosen these. Any channel deep link that needs `canOpenURL` must be added
 ## CI map
 
 - `.github/workflows/ios-ci.yml` — xcodegen determinism → build → unit tests with a ≥95% Domain coverage floor; its downstream accessibility job runs after merges to `main` and skips pull requests. Before testing, that job and `audit-stress.yml` both run `scripts/prepare-audit-simulator.sh` to resolve the pinned simulator to one UDID and pin every `xcodebuild -destination` to it (see the script's header). No snapshot job exists yet — only a deferral comment at the bottom of the file; PR34 adds the real job.
-- `.github/workflows/guards.yml` — privacy-grep, domain-purity-grep, the three Android guards (manifest network-permission strip, network-free sources, `:domain` purity), project.yml YAML syntax, `scripts/tests/prepare-audit-simulator-tests.sh` (the simulator-resolution logic used by the two audit workflows), and Markdown link checks for root docs plus `ios/docs/`.
+- `.github/workflows/guards.yml`: privacy-grep, domain-purity-grep, the three Android guards (manifest network-permission strip, network-free sources, `:domain` purity), project.yml YAML syntax, `scripts/tests/prepare-audit-simulator-tests.sh` (the simulator-resolution logic used by the two audit workflows), Markdown link checks for root docs plus `ios/docs/`, and the `review-agent-parity` job. That job runs `scripts/check-review-agent-parity.sh` and four suites: `scripts/tests/source-boundary-guard-tests.sh`, `scripts/tests/check-carried-approval-tests.sh`, `scripts/tests/count-hosted-blockers-tests.sh`, and `node scripts/tests/pr-review-verified-tests.mjs`.
 - `.github/workflows/lint.yml` — `swiftlint --strict`.
 - `.github/workflows/audit-stress.yml` — builds the a11y bundle once and runs it 5× (flake detector). It runs nightly and through `workflow_dispatch`, not on pull requests or every merge; dispatch it and require green before cutting a release. The single-run `Accessibility audit` in `ios-ci.yml` runs after merges to `main`.
 - `.github/workflows/claude-pr-review.yml` — runs the staged hosted review from
@@ -198,7 +198,13 @@ changes; and `pr-accessibility` plus `pr-fit-finish` when their UI/docs path
 rules match. Any blocker means `REQUEST_CHANGES`. Claimed R-closures are
 verified against §19 acceptance checks. The Claude Code org
 (`ENGINEERING_ORG.md`) runs both orchestrators on each lane and needs both
-verdicts before merge. `.agents/README.md` describes the adapters, and
+verdicts before merge. The verified run has steps the Codex skill lacks, in
+rules 1, 2, 3, 4 (its blockerCount, rawSummary and VERDICT-line checks), 5, 6
+and 7 of `.claude/commands/pr-review.md`, "The workflow's rules". The script
+that enforces them is `.claude/workflows/pr-review-verified.js`. The requirement
+behind rule 7 is shared: the `.codex` pr-* contracts already forbid an APPROVE
+with a required check left unchecked.
+`.agents/README.md` describes the adapters, and
 `scripts/check-review-agent-parity.sh` prevents their contracts from drifting.
 The hosted review check is bound to the dedicated Regards review GitHub App
 (app id `4461672`), not only to its context name, so a same-repository Actions

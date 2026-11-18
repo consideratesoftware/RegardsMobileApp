@@ -26,6 +26,8 @@ jobs:
         run: scripts/tests/check-carried-approval-tests.sh
       - name: Verify the hosted-blocker counter
         run: scripts/tests/count-hosted-blockers-tests.sh
+      - name: Verify the verified-review workflow script
+        run: node scripts/tests/pr-review-verified-tests.mjs
 
   prepare-audit-simulator-tests:
     name: Accessibility simulator resolution tests

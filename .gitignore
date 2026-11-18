@@ -84,12 +84,14 @@ journal/
 
 # ---------- Claude / tooling scratch ----------
 # Ignore Claude scratch (worktrees, local settings) but version the
-# review agents and commands: they are project infrastructure.
+# review agents, commands and workflows: they are project infrastructure.
 .claude/*
 !.claude/agents/
 !.claude/agents/**
 !.claude/commands/
 !.claude/commands/**
+!.claude/workflows/
+!.claude/workflows/**
 .auto-memory/
 
 # ---------- Large binary assets that live elsewhere ----------

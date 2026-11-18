@@ -724,7 +724,7 @@ boundaries.
 
 | Scope | Key acceptance criteria |
 |---|---|
-| Native iOS 17 baseline chrome and empty states; iOS 18 value-based tabs, search role, adaptive sidebar, and Reduce-Motion-aware zoom transitions; iOS 26 Liquid Glass control state, scroll-minimizing tab bar, and local open-section App Shortcut | Xcode 26.6 / iOS 26.5 build and metadata extraction pass; iOS 17 fallback compiles and launches; App Shortcut exposes no personal data; focused accessibility regressions, manual smoke, and staged accessibility review pass; scheduled broad audits remain green on current `main`; no iOS 27 beta API; sibling adoption matrix in `ios/docs/modern-ios.md` |
+| Native iOS 17 baseline chrome and empty states; iOS 18 value-based tabs, search role, adaptive sidebar, and Reduce-Motion-aware zoom transitions; iOS 26 Liquid Glass control state, scroll-minimizing tab bar, and local open-section App Shortcut | Xcode 26.6 / iOS 26.5 build and metadata extraction pass; iOS 17 fallback compiles and launches; App Shortcut exposes no personal data; focused accessibility regressions and the staged accessibility review pass are needed before merge; manual smoke goes to the pre-release device pass in `TESTFLIGHT_PLAN.md`; scheduled broad audits remain green on current `main`; no iOS 27 beta API; sibling adoption matrix in `ios/docs/modern-ios.md` |
 
 ### Phase 1R — Remediation (Jul 6–10) — fix what's wrong before building on it
 
@@ -732,7 +732,7 @@ boundaries.
 |---|---|---|
 | **PR16** | Engine contract fixes: wall-clock slot math, `Date?` return + degenerate handling, wrap/timezone rejection in `ReminderWindow` validation, never-contacted = `?? createdAt`, same-day-late occasion, eligibility-safe slot-start snapping in `batch` semantics | R1, R3–R6, R8, R47–R48 engine portions closed; all §13 engine edge-case tests green; no force-unwraps in changed paths (R26) |
 | **PR17** | Channel/validation fixes: facetime email pass-through, m.me normalization, `@` stripping, custom = any-scheme URL; `isValid ⟹ build` property test for link-bearing channels; parametric covers `allCases` | R2, R7 closed |
-| **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R27, and R28 closed; README half of R19 closed (root link guard remains PR19); R20 was closed by GitHub PR #22; R29 was closed by PR16 plus PR20–PR22 stress runs; historical acceptance evidence passed 5/5 ×3 consecutive stress runs. Under decision #39, later UI follow-ups pass focused regressions and manual smoke before merge; scheduled runs own repeated stress. |
+| **PR18** | Truth pass on docs + merge the orphan: merge `origin/ios/section-header-accessibility-label` (+7 lines, likely kills the 20% audit flake); fix CLAUDE.md's 5 stale claims; README (drop `docs/DOMAIN_MODEL.md` + `android/` refs); accessibility.md (remove ghost `waitForContactDetailReady` reference, add Edit Contact row + audit test); unify simulator name (iPhone 17 Pro) across CLAUDE.md/docs/scripts | R16, R27, and R28 closed; README half of R19 closed (root link guard remains PR19); R20 was closed by GitHub PR #22; R29 was closed by PR16 plus PR20–PR22 stress runs; historical acceptance evidence passed 5/5 ×3 consecutive stress runs. Under decision #39, later UI follow-ups pass focused regressions before merge; manual smoke goes to the pre-release device pass; scheduled runs own repeated stress. |
 | **PR19** | Repo + CI hygiene, delivered as bounded TF-01 slices: commit `Package.resolved`; remove placeholder tests; check root Markdown; enforce a ≥95% Domain coverage floor; remove dead SwiftLint configuration; reconcile workflow and merge-method docs. Follow with exact-target stale-worktree cleanup, representative mock seeds, stable row IDs, and dead-asset cleanup. Guard hardening (R32) was completed by the trusted-gate prerequisite. | GitHub PR #39 merged as `ade40e3`, closing R19, R21, R22, R31, and R33. GitHub PR #42 merged as `d8193ff`, closing R34/R36 and R40. GitHub PR #43 closed the TF-01 checkpoint and XcodeGen determinism repair at `8adeb0d`. R30 remains open where exact-target verification finds unique work. |
 
 ### Phase 1B — Production wiring (Jul 13–17) — the mock era ends
@@ -892,7 +892,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 3. Full test action green locally: `xcodebuild -project Regards.xcodeproj -scheme Regards -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -onlyUsePackageVersionsFromResolvedFile test`.
 4. UI/test-code touched → focused affected accessibility regressions green; repeated stress is owned by nightly/pre-release automation unless investigating a reproduced flake or validating a release candidate.
 5. New/changed screens → accessibility audit test + row in `ios/docs/accessibility.md` + VoiceOver smoke steps in the pre-release device pass (owner ruling, 2026-10-28).
-6. §14 acceptance criteria for the PR demonstrably met (device test where the criteria say "on device").
+6. §14 acceptance criteria for the PR demonstrably met (device test where the criteria say "on device"). An infra PR (org, review, CI, scripts or docs; no app code and no ios/ or android/ test code) has no §14 row; its body says "infra, no §14 row".
 7. Doc siblings updated (this file, CLAUDE.md if commands/paths changed, accessibility.md).
 8. No new warnings (they're errors anyway), no force-unwraps in Domain, no `@unchecked Sendable` without a written justification comment.
 
@@ -905,7 +905,7 @@ Decisions #1–#22 (2026-04-15 → 2026-04-19) are unchanged from v0.5 and remai
 - OAuth calendar anything.
 - Renumbering §1–§17 of this document.
 
-**Commit/PR conventions:** prefix `ios:` / `ci:` / `docs:` / `chore:`; PR description cites doc sections (e.g. "Implements §9a per PR25 scope"); deviations flagged in a "Deviations" section of the PR body. Branch names: `ios/<topic>`, `ci/<topic>`, `docs/<topic>`.
+**Commit/PR conventions:** prefix `ios:` / `ci:` / `docs:` / `chore:` / `infra:`; PR description cites doc sections (e.g. "Implements §9a per PR25 scope"); deviations flagged in a "Deviations" section of the PR body. Branch names: `ios/<topic>`, `ci/<topic>`, `docs/<topic>`; infra PRs use `claude/<topic>`.
 
 **Working with the guards:** the shared privacy script matches networking call sites, including `NSURLConnection` and `CFSocket*`, so user-facing copy may still name those symbols as bare tokens. The shared Domain script rejects plain, preconcurrency, and selective imports from every prohibited module. R32 records the fixture-backed GitHub PR #26 closure.
 
