@@ -18,12 +18,17 @@ import Foundation
 /// its calendar from that window's timezone. Nothing is cached, so a window
 /// edit never leaves the pass on a stale zone or needs a second pass.
 ///
-/// **Fired marking and no re-nag (§9 "Notification fired").** Each run first marks covered
-/// pending rows at or before `now` fired. Fired rows are never cancelled. Each row records its cycle in
-/// `firedCycle` (§7 v4). A fired cadence row stays while that cycle covers `overdueAt`. Only an interaction,
-/// or a longer cadence whose overdue time is still ahead at the first run after the edit, starts a new cycle.
-/// A fired occasion holds every occurrence up to its day. A clock set back re-arms neither, except an
-/// occasion whose next-year row was cancelled before the rollback (R69).
+/// **Fired marking and no re-nag (§9 "Notification fired").** Each run
+/// first marks covered pending rows at or before `now` fired. The pass
+/// never cancels a fired row; Snooze replaces a fired cadence row with a
+/// pending one in the same cycle (§9 Snooze). Each row records its cycle in
+/// `firedCycle` (§7 v4). A fired cadence row stays while that cycle covers
+/// `overdueAt`. Only an interaction, or a longer cadence whose overdue time
+/// is still ahead at the first run after the edit, starts a new cycle. A
+/// fired occasion holds every occurrence up to its day. A clock set back
+/// re-arms neither, with 2 exceptions (§9): an occasion whose next-year row
+/// was cancelled before the rollback (R69), and a cadence lengthened, then
+/// the clock set back before its new overdue time with no run in between.
 ///
 /// **Corrupt rows.** Runs read one `fetchSchedule()` snapshot, which drops
 /// an undecodable contact (with its rows) or row. The pass never cancels what
