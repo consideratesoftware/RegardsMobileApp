@@ -132,9 +132,10 @@ extension SchedulingPassFiredRowTests {
         }
     }
 
-    /// The hold is `firedCycle >= overdueAt`, not `==`. The contact fired at its 30-day overdue time (05-31
+    /// Pin. The hold is `firedCycle >= overdueAt`, not `==`. The contact fired at its 30-day overdue time (05-31
     /// 10:00), then the cadence is shortened to 7 days (overdue 05-08 10:00) with no run in between. The stored
     /// cycle is after the new overdue time, and a clock set back to before that time must not re-arm the row.
+    /// It passes on the code before the cycle was stored and fails if the hold's `>=` becomes `==` (78344ff).
     @Test(
         "A shortened cadence then a clock rollback does not re-arm a fired cadence row",
         arguments: RepositoryContractBackend.allCases

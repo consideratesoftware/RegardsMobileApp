@@ -62,11 +62,12 @@ struct ContactCadenceEligibilityTests {
         #expect((try await fixture.cadenceRow(contact) != nil) == scenario.expected)
     }
 
-    /// Every contact gets an override whose quiet hours (17:00-20:00) cover the
+    /// Pin. Every contact gets an override whose quiet hours (17:00-20:00) cover the
     /// 18:00-19:00 range, so an eligible contact has zero capacity and the pass
     /// records it. An ineligible contact never reaches the capacity check, so
     /// it must not be recorded. Untracked and archived contacts are not in the
-    /// pass's snapshot at all.
+    /// pass's snapshot at all. It passes on the code before this PR and fails if
+    /// the pass checks capacity before the `isCadenceEligible` guard (9035575).
     @Test("runFull records a contact as zero capacity exactly when isCadenceEligible accepts it",
           arguments: cases, RepositoryContractBackend.allCases)
     func zeroCapacityRecordsExactlyTheEligibleContacts(
