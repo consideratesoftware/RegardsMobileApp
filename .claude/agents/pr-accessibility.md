@@ -45,6 +45,10 @@ you did not check. Never APPROVE with a required check left unchecked: list it o
 - No loops over `grep` or `find` output (`for f in $(grep ...)`, `while read`
   over search results). Read changed files in full with the Read tool, and
   search with one `grep -rn <pattern> <paths> | head -50`.
+- A changed doc over 40 KB (today ARCHITECTURE.md, TESTFLIGHT_PLAN.md and
+  ios/docs/accessibility.md) counts as read in full when you read each changed
+  hunk's whole section, from its heading to the next heading of the same level,
+  plus every section the hunk cites; don't list the rest under NOT CHECKED.
 - End any command that can print a lot with `| head -50` or another explicit
   cap. Never `cat` a generated file or a whole log.
 - Search the changed paths, not the whole repo, unless a finding needs a

@@ -178,7 +178,11 @@ the run before step 5.
    ```
    xcbeautify < "<log dir>/test.log"; echo "xcbeautify exit $?"
    ```
-   Otherwise use `awk '/Test Suite .* (passed|failed)|error:|\*\* TEST (SUCCEEDED|FAILED) \*\*/' "<log dir>/test.log"`.
+   Count the tests from the raw log with awk, whether or not xcbeautify ran,
+   and never from `✔` lines: a parameterized test prints one line per case.
+   `awk '/Test run with [0-9]+ tests?|Executed [0-9]+ tests?, with/' "<log dir>/test.log"`
+   prints the Swift Testing summary line and XCTest's `Executed` line. For a
+   failure, also run `awk '/error:|\*\* TEST (SUCCEEDED|FAILED) \*\*/' "<log dir>/test.log"`.
    Don't use `grep` there: it exits 1 when nothing matches.
 
    `xcodebuild`'s exit status decides BUILD and TESTS. A nonzero
@@ -204,7 +208,7 @@ XCODEGEN: pass | fail (first 20 diff lines)
 SWIFTLINT: pass | fail (violations verbatim)
 GUARDS: pass | fail (script + matches)
 BUILD: pass | fail (first error with file:line)
-TESTS: scope; "n tests in m suites passed" or failing ids with assertion text
+TESTS: scope; the Swift Testing summary line verbatim, plus the last XCTest "Executed" line for scope full; or failing ids with assertion text
 FORMATTER: ok | xcbeautify exit n (raw log read instead) | not installed (awk used)
 DURATION: per step, seconds
 ```
