@@ -11,8 +11,8 @@ extension SchedulingPassFiredRowTests {
 
     // MARK: - Window edit then clock rollback (R68)
 
-    /// The 2 probes of R68. Each lets the pass write a fired row for a contact that becomes overdue inside the
-    /// slot in progress, edits the global window so the contact's slot moves, then runs on the clocks in order.
+    /// The 2 probes of R68. Each lets the pass write a fired row for a contact that is overdue when a run joins
+    /// the slot in progress, edits the global window so the contact's slot moves, then runs on the clocks in order.
     /// Before the cycle was stored, each rollback derived the row as pending again.
     enum WindowEditProbe: String, CaseIterable, Sendable, CustomTestStringConvertible {
         /// Overdue 06-10 17:30, joins the 18:00 slot at 18:10. The window moves to 18:30-19:00 and the clock is
