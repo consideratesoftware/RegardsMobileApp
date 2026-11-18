@@ -36,10 +36,12 @@ public struct ScheduledReminder: Sendable, Codable, Equatable, Hashable, Identif
     /// may still carry a stale floor until the reschedule rewrites the row.
     public var snoozedUntil: Date?
     /// The cycle a row belongs to (§7 v4), so a clock set back can't re-arm a
-    /// fired row (R68, R69). Its meaning depends on `kind`, as `scheduledFor`'s
-    /// does: a cadence row stores the `overdueAt` its slot was derived from,
-    /// and an occasion row stores the fire time of the latest occurrence
-    /// delivered for that contact and kind. Nil means no cycle is recorded.
+    /// fired row (R68, R69), except in the cases §9 "Notification fired" names.
+    /// Its meaning depends on `kind`, as `scheduledFor`'s does: a cadence row
+    /// stores the `overdueAt` its slot was derived from. A pending occasion row
+    /// stores the fire time of the latest fired occurrence for that contact and
+    /// kind; a fired one's own `scheduledFor` is that time, and this holds the
+    /// one before. Nil means no cycle is recorded.
     public var firedCycle: Date?
 
     public init(
