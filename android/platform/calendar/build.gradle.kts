@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.platform.calendar"
+    namespace = "com.consideratesoftware.regards.platform.calendar"
 }
 
 dependencies {

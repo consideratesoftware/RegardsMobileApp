@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.widget"
+    namespace = "com.consideratesoftware.regards.widget"
 }
 
 dependencies {

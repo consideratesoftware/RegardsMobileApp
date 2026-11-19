@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.platform.deeplinks"
+    namespace = "com.consideratesoftware.regards.platform.deeplinks"
 }
 
 dependencies {

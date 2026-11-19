@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.feature.onboarding"
+    namespace = "com.consideratesoftware.regards.feature.onboarding"
 }
 
 dependencies {

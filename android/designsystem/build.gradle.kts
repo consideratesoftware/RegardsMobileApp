@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.designsystem"
+    namespace = "com.consideratesoftware.regards.designsystem"
 }
 
 dependencies {

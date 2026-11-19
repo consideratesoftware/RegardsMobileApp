@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.platform.notifications"
+    namespace = "com.consideratesoftware.regards.platform.notifications"
 }
 
 dependencies {

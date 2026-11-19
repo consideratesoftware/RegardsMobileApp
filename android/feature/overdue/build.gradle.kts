@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.feature.overdue"
+    namespace = "com.consideratesoftware.regards.feature.overdue"
 }
 
 dependencies {

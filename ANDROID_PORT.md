@@ -94,7 +94,7 @@ Dependency rules (enforced by guards, see A4):
 
 | iOS (source of truth) | Android target | Notes |
 |---|---|---|
-| `Domain/Contact`, `ScheduledReminder`, `InteractionLog`, `UserProfile`, `ReminderWindow`, `TimeOfDay`, `DayOfWeek`, `PriorityTier`, `Channel` | `:domain` `com.sdahiya.regards.domain` | Same names, same invariants. Value types → `data class`/`enum class`/`value class`. |
+| `Domain/Contact`, `ScheduledReminder`, `InteractionLog`, `UserProfile`, `ReminderWindow`, `TimeOfDay`, `DayOfWeek`, `PriorityTier`, `Channel` | `:domain` `com.consideratesoftware.regards.domain` | Same names, same invariants. Value types → `data class`/`enum class`/`value class`. |
 | `Domain/Reminders/ReminderEngine` | `:domain` `reminders/ReminderEngine.kt` | §9 contract verbatim: `Instant?` return (nil-able slot), wall-clock via `ZonedDateTime`, slot-start snapping, `?? createdAt` anchor, same-day-late occasions, no-double-up. |
 | `Domain/Reminders/DuplicateDetector` | `:domain` `reminders/DuplicateDetector.kt` | Same heuristics: normalized name, last-10-digit phone key (decision #25), lowercased email; confidence phone > email > name (decision #26). |
 | `Domain/Channels/ChannelCatalog`, `DeepLinkBuilder` | `:domain` `channels/` | `isValid(v) ⟹ build(v) != null` property holds per channel (decision #27). Platform availability becomes per-platform data: FaceTime unavailable on Android (closes the R46 question — the flag stays and flips). |

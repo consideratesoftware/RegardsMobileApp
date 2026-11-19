@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards"
+    namespace = "com.consideratesoftware.regards"
     compileSdk = 36 // TODO(AN-01): verify
 
     defaultConfig {
-        applicationId = "com.sdahiya.regards"
+        applicationId = "com.consideratesoftware.regards"
         minSdk = 28
         targetSdk = 36 // TODO(AN-01): verify
         versionCode = 1

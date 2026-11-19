@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.feature.mergeduplicates"
+    namespace = "com.consideratesoftware.regards.feature.mergeduplicates"
 }
 
 dependencies {

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.platform.contacts"
+    namespace = "com.consideratesoftware.regards.platform.contacts"
 }
 
 dependencies {
