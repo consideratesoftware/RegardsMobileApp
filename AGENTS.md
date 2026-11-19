@@ -184,9 +184,8 @@ one lane and may use stacked pull requests. Review, CI monitoring, and comment
 repair do not consume a lane. Update every active lane's checkpoint in its pull
 request. Git branches, worktrees, pull-request checks, and the plan file are
 the durable handoff; never depend on chat history. Scheduled runs also inspect
-the latest completed default-branch accessibility audit and 5× stress
-workflows. A reproducible failure on current `main` becomes the next repair
-before new feature work.
+the latest completed default-branch accessibility audit and stress runs. The
+rule for a failure on `main` is in `.claude/commands/org.md` Stage 0.
 
 ## PR review
 
