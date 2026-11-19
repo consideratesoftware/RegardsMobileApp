@@ -125,7 +125,9 @@ jobs:
             test \
             | xcbeautify --renderer github-actions
       - name: Upload xcresult
-        if: failure()
+        # A job the 90-minute limit cancels is cancelled, and failure() is
+        # false then, so the partial xcresult needs the cancelled() check.
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: RegardsTests-${{ matrix.run }}.xcresult
