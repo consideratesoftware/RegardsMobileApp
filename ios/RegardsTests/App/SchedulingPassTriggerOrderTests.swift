@@ -9,8 +9,10 @@ import Testing
 /// contact the system store still exposes: the reconcile un-archives it, so a
 /// pass that ran before the reconcile would not schedule it.
 ///
-/// The production runtime uses the real clock, so these tests assert that a
-/// long-overdue contact has a cadence row, not when it fires.
+/// The runtime is `makeProduction` with its clock pinned to `now`, a weekend day.
+/// The default window allows weekdays only, so every row the pass writes is
+/// pending, whatever day the suite runs on. `productionRuntimeWritesNoOccasionRows`
+/// keeps the wall clock: it asserts that rows exist, not when they fire.
 @MainActor
 struct SchedulingPassTriggerOrderTests {
     private let now = Date(timeIntervalSince1970: 1_785_600_000)
@@ -42,14 +44,22 @@ struct SchedulingPassTriggerOrderTests {
     private func coordinator(environment: AppEnvironment, source: any ContactsSource) -> AppLaunchCoordinator {
         let now = self.now
         return AppLaunchCoordinator(dependencies: .init(
-            makeRuntime: { try await AppRuntime.makeProduction(environment: environment) },
+            makeRuntime: { try await AppRuntime.makeProduction(environment: environment, clock: { now }) },
             contactsSource: source,
             clock: { now }))
     }
 
+    /// A cadence row in the snapshot (pending and fired rows) or in `fetchPending(forContact:)` (pending rows only).
+    /// `fetchSchedule()` hides the rows of an archived or untracked contact, so it alone can't fail for one;
+    /// `fetchPending(forContact:)` has no such filter, so a hidden contact's pending row shows. A hidden contact's
+    /// fired row is invisible to both.
     private static func hasCadenceRow(_ environment: AppEnvironment, _ contact: Contact) async throws -> Bool {
-        try await environment.reminders.fetchPending(forContact: contact.id).contains { $0.kind == .cadence }
+        let scheduled = try await environment.reminders.fetchSchedule().reminders
+        let pending = try await environment.reminders.fetchPending(forContact: contact.id)
+        return (scheduled + pending).contains { $0.contactId == contact.id && $0.kind == .cadence }
     }
+
+    // MARK: - Trigger order
 
     @Test("Launch runs the pass after the Contacts reconcile, so a contact the reconcile un-archives is scheduled")
     func launchRunsThePassAfterTheReconcile() async throws {
@@ -125,6 +135,8 @@ struct SchedulingPassTriggerOrderTests {
         #expect(try await Self.hasCadenceRow(environment, contact))
     }
 
+    // MARK: - Production runtime
+
     /// The production composition has no occasion source until PR30. A
     /// contact that the mock provider would give a birthday gets none.
     @Test("The production runtime writes no occasion rows")
@@ -142,8 +154,27 @@ struct SchedulingPassTriggerOrderTests {
 
         try await runtime.scheduler.runFull()
 
-        let pending = try await environment.reminders.fetchAllPending()
-        #expect(pending.contains { $0.kind == .cadence }, "the run did schedule")
-        #expect(pending.filter { $0.kind != .cadence }.isEmpty)
+        let rows = try await environment.reminders.fetchSchedule().reminders
+        #expect(rows.contains { $0.kind == .cadence }, "the run did schedule")
+        #expect(rows.filter { $0.kind != .cadence }.isEmpty)
+    }
+
+    /// `now` is a weekend day in every time zone and the default window allows
+    /// weekdays only, so the first slot is the Monday after it, under 4 days
+    /// away. A pass on the wall clock schedules from today's date instead.
+    @Test("The production runtime runs the pass on the injected clock")
+    func productionRuntimeRunsThePassOnTheInjectedClock() async throws {
+        let environment = try await Self.environment(onboarded: true, now: now)
+        let contact = Self.overdueContact()
+        try await environment.contacts.upsert(contact)
+        let now = self.now
+        let runtime = try await AppRuntime.makeProduction(environment: environment, clock: { now })
+
+        try await runtime.scheduler.runFull()
+
+        let pending = try await environment.reminders.fetchPending(forContact: contact.id)
+        let row = try #require(pending.first { $0.kind == .cadence })
+        #expect(row.scheduledFor > now)
+        #expect(row.scheduledFor < now.addingTimeInterval(4 * 86_400))
     }
 }

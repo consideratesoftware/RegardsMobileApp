@@ -31,11 +31,11 @@ struct SchedulingPassSnoozeWindowTests {
         #expect(row.state == .pending)
     }
 
-    /// Owner ruling 1: the anchor is the tap, not the time the notification
-    /// fired. A snooze tapped 8 days after the reminder fired must not land
-    /// in the past (§9's old `firedAt + 7d` fired at once).
+    /// Owner ruling 1: the anchor is the tap, not the time the row fired. A
+    /// snooze tapped 8 days after the row fired must not land in the past
+    /// (§9's old `firedAt + 7d` fired at once).
     @Test(
-        "A snooze counts 7 days from the tap, not from when the reminder fired",
+        "A snooze counts 7 days from the tap, not from when its row fired",
         arguments: RepositoryContractBackend.allCases
     )
     func snoozeAnchorIsTheTapTime(backend: RepositoryContractBackend) async throws {
@@ -130,7 +130,8 @@ struct SchedulingPassSnoozeWindowTests {
         let fixture = try await PassFixture(backend: backend)
         let contact = try await fixture.addContact(1)
         fixture.setNow(PassFixture.at("2026-06-10 18:00").addingTimeInterval(0.5))
-        // Settles every other row first (the mock's seed cast gets rows too).
+        // The mock backend's seed cast has no rows until a run writes them. This run does,
+        // so the second run below has no seed rows left to write.
         try await fixture.pass.runFull()
 
         _ = try await fixture.pass.snooze(contactId: contact.id)

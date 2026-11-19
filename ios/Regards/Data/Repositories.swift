@@ -305,10 +305,18 @@ public protocol ReminderRepository: Sendable {
     /// TF-07f decides whether the consumer needs the error for a retry
     /// state (R9a). GRDB drops an undecodable contact with its rows, and an
     /// undecodable reminder row, where `fetchPending` throws. SchedulingPass
-    /// follows the snapshot, and its orphan sweep leaves an undecodable
-    /// contact's rows alone. The mock can't fail to decode, so parity covers
-    /// healthy rows only. No default: a missing implementation must fail to compile.
+    /// reads the same snapshot through `fetchSchedule()`, and its orphan sweep
+    /// leaves an undecodable contact's rows alone. The mock can't fail to
+    /// decode, so parity covers healthy rows only. No default: a missing
+    /// implementation must fail to compile.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot>
+    /// One read of the snapshot `observeSchedule()` emits first, with the same
+    /// rows, order and decode tolerance, but no subscription. SchedulingPass
+    /// reads this while it holds its lock, so GRDB reads it off the main queue
+    /// (R66). Throws where the observation would finish without a value, such
+    /// as a missing window row. No default: a missing implementation must fail
+    /// to compile.
+    func fetchSchedule() async throws -> ScheduleSnapshot
 }
 
 public protocol InteractionRepository: Sendable {
