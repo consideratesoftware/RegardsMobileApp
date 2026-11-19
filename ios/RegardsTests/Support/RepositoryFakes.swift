@@ -355,10 +355,15 @@ actor StubReminderRepository: ReminderRepository {
     }
 
     /// This fake holds no contacts or window to build a `ScheduleSnapshot`
-    /// from, so the stream finishes at once. A test that needs live
-    /// snapshots uses `MockRepositories` or an in-memory GRDB store.
+    /// from, so the stream finishes at once and a fetch throws, as a failed
+    /// snapshot read does. A test that needs live snapshots uses
+    /// `MockRepositories` or an in-memory GRDB store.
     func observeSchedule() async -> AsyncStream<ScheduleSnapshot> {
         AsyncStream { $0.finish() }
+    }
+
+    func fetchSchedule() async throws -> ScheduleSnapshot {
+        throw RepositoryFakeFailure()
     }
 }
 

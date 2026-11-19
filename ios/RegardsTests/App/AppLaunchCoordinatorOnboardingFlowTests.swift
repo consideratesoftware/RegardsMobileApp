@@ -192,7 +192,14 @@ extension AppLaunchCoordinatorTests {
         let environment = try ProductionRepositoryFactory.makeInMemoryEnvironment()
         let source = ScriptedLaunchContactsSource(
             status: .authorized, contacts: [Self.systemContact, Self.han, Self.luke])
-        let launch = coordinator(environment: environment, source: source)
+        // The pass runs on the coordinator's pinned clock. Leia is created at that instant with a 14-day cadence,
+        // so her row is at least 14 days ahead of now and pending on any day. The pin also keeps the second run
+        // on the same instant, so no slot start falls between the two runs.
+        let now = self.now
+        let launch = AppLaunchCoordinator(dependencies: .init(
+            makeRuntime: { try await AppRuntime.makeProduction(environment: environment, clock: { now }) },
+            contactsSource: source,
+            clock: { now }))
         await launch.start()
         #expect(launch.onboardingStep == .starter)
         // The onboarding picker, as OnboardingFlowView builds it: no pass of its own.
@@ -202,20 +209,28 @@ extension AppLaunchCoordinatorTests {
         let han = try #require(picker.contacts.first { $0.displayName == "Han Solo" })
         picker.toggle(leia.id)
         #expect(await picker.save())
-        func pendingCadence(_ contact: Contact) async throws -> Bool {
-            try await environment.reminders.fetchPending(forContact: contact.id).contains { $0.kind == .cadence }
+        // A cadence row in the snapshot (pending and fired rows) or in `fetchPending(forContact:)` (pending rows
+        // only). `fetchSchedule()` hides the rows of an untracked contact (Han), so it alone can't fail for him;
+        // `fetchPending(forContact:)` has no such filter, so his pending row would show. His fired row would be
+        // invisible to both.
+        func cadenceRow(_ contact: Contact) async throws -> Bool {
+            let scheduled = try await environment.reminders.fetchSchedule().reminders
+            let pending = try await environment.reminders.fetchPending(forContact: contact.id)
+            return (scheduled + pending).contains { $0.contactId == contact.id && $0.kind == .cadence }
         }
-        #expect(try await pendingCadence(leia) == false, "Nothing is scheduled before onboarding finishes.")
+        #expect(try await cadenceRow(leia) == false, "Nothing is scheduled before onboarding finishes.")
 
         await launch.finishOnboarding()
 
         #expect(launch.phase == .ready)
-        #expect(try await pendingCadence(leia), "Completion's full pass schedules the starter.")
-        #expect(try await pendingCadence(han) == false)
-        let pending = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(try await cadenceRow(leia), "Completion's full pass schedules the starter.")
+        #expect(try await cadenceRow(han) == false)
+        let rows = try await environment.reminders.fetchSchedule().reminders
+            .sorted { $0.id.uuidString < $1.id.uuidString }
         try await #require(launch.runtime).scheduler.runFull()
-        let afterFull = try await environment.reminders.fetchAllPending().sorted { $0.id.uuidString < $1.id.uuidString }
-        #expect(afterFull == pending)
+        let afterFull = try await environment.reminders.fetchSchedule().reminders
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        #expect(afterFull == rows)
     }
 
     // The launch flips .loading to .onboarding only if nothing else decided

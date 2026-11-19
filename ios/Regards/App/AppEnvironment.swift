@@ -117,13 +117,17 @@ public struct AppRuntime: Sendable {
     /// Missing or invalid persisted state is deliberately thrown to the TF-02
     /// launch coordinator instead of silently restoring defaults. TF-05 owns
     /// rebuilding observable screen state after a saved window edit.
-    public static func makeProduction(environment: AppEnvironment) async throws -> AppRuntime {
+    /// Production callers keep the wall clock; tests pass `clock` to pin it.
+    public static func makeProduction(
+        environment: AppEnvironment,
+        clock: @escaping @Sendable () -> Date = { Date() }
+    ) async throws -> AppRuntime {
         let window = try await environment.window.fetchGlobal()
         return AppRuntime(
             environment: environment,
             window: window,
             userCalendar: calendar(for: .current),
-            clock: { Date() },
+            clock: clock,
             // No occasion source until PR30 reads Contacts and Calendar.
             occasions: { _ in [] }
         )

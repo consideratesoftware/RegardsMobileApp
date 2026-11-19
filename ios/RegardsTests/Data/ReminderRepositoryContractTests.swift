@@ -211,10 +211,71 @@ struct ReminderRepositoryContractTests {
                 == Date(timeIntervalSince1970: 1_800_000_600))
     }
 
+    /// `firedCycle` (schema v4) is stored in whole epoch seconds, as
+    /// `snoozedUntil` is. The expectations name the stored seconds as
+    /// literals: `contractStored` follows the record, so on its own it would
+    /// pass on a record that dropped the field (the mock stores through the
+    /// record too, so both backends would agree). A fired row shows only in
+    /// `fetchSchedule`; `fetchPending` covers the pending ones.
+    @Test(
+        "A reminder's firedCycle round-trips truncated to whole seconds, and nil stays nil",
+        arguments: RepositoryContractBackend.allCases
+    )
+    func firedCycleRoundTripsTruncatedToWholeSeconds(backend: RepositoryContractBackend) async throws {
+        let repositories = try backend.makeRepositories()
+        let contact = contractContact(id: try contractUUID(681), suffix: "fired-cycle", tracked: true)
+        let stamped = ScheduledReminder(
+            id: try contractUUID(682),
+            contactId: contact.id,
+            kind: .cadence,
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_900),
+            osNotificationId: "fired-cycle-pending",
+            firedCycle: Date(timeIntervalSince1970: 1_800_000_600.875)
+        )
+        let unstamped = ScheduledReminder(
+            id: try contractUUID(683),
+            contactId: contact.id,
+            kind: .birthday,
+            occasionDate: "08-07",
+            occasionLabel: "Birthday",
+            scheduledFor: Date(timeIntervalSince1970: 1_800_001_000),
+            osNotificationId: "fired-cycle-none"
+        )
+        let firedStamped = ScheduledReminder(
+            id: try contractUUID(684),
+            contactId: contact.id,
+            kind: .anniversary,
+            occasionDate: "08-08",
+            occasionLabel: "Anniversary",
+            scheduledFor: Date(timeIntervalSince1970: 1_800_000_500),
+            osNotificationId: "fired-cycle-fired",
+            state: .fired,
+            firedCycle: Date(timeIntervalSince1970: 1_800_000_400.875)
+        )
+        try await repositories.contacts.upsert(contact)
+        for reminder in [unstamped, firedStamped, stamped] {
+            try await repositories.reminders.upsert(reminder)
+        }
+
+        let pending = try await repositories.reminders.fetchPending(forContact: contact.id)
+        #expect(pending == [contractStored(stamped), contractStored(unstamped)])
+        #expect(pending.first { $0.id == stamped.id }?.firedCycle == Date(timeIntervalSince1970: 1_800_000_600))
+        #expect(pending.first { $0.id == unstamped.id }?.firedCycle == nil)
+
+        let scheduled = try await repositories.reminders.fetchSchedule().reminders
+            .filter { $0.contactId == contact.id }
+        #expect(scheduled == [contractStored(firedStamped), contractStored(stamped), contractStored(unstamped)])
+        #expect(scheduled.first { $0.id == firedStamped.id }?.firedCycle == Date(timeIntervalSince1970: 1_800_000_400))
+        #expect(scheduled.first { $0.id == stamped.id }?.firedCycle == Date(timeIntervalSince1970: 1_800_000_600))
+        #expect(scheduled.first { $0.id == unstamped.id }?.firedCycle == nil)
+    }
+
     /// `transitionState` is a compare-and-set on `state` alone. A Snooze row
     /// that is caught up and then restored by a failed
     /// `recordInteraction` must come back with the floor it had, or the
-    /// contact reads as un-snoozed. Read back through `fetchPending`.
+    /// contact reads as un-snoozed. The row's `firedCycle` must survive the
+    /// same trip, or the next run re-arms a fired cycle. Read back through
+    /// `fetchPending`.
     @Test(
         "transitionState leaves snoozedUntil untouched when a row leaves pending and comes back",
         arguments: RepositoryContractBackend.allCases, [ReminderState.userCaughtUp, .fired]
@@ -230,7 +291,8 @@ struct ReminderRepositoryContractTests {
             kind: .cadence,
             scheduledFor: Date(timeIntervalSince1970: 1_800_000_900),
             osNotificationId: "transition-floor",
-            snoozedUntil: Date(timeIntervalSince1970: 1_800_000_600)
+            snoozedUntil: Date(timeIntervalSince1970: 1_800_000_600),
+            firedCycle: Date(timeIntervalSince1970: 1_800_000_300)
         )
         try await repositories.contacts.upsert(contact)
         try await repositories.reminders.upsert(snoozed)
@@ -240,5 +302,7 @@ struct ReminderRepositoryContractTests {
 
         let restored = try await repositories.reminders.fetchPending(forContact: contact.id)
         #expect(restored == [contractStored(snoozed)])
+        #expect(restored.first?.snoozedUntil == Date(timeIntervalSince1970: 1_800_000_600))
+        #expect(restored.first?.firedCycle == Date(timeIntervalSince1970: 1_800_000_300))
     }
 }

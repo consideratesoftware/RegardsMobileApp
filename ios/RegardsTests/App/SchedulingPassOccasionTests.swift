@@ -3,13 +3,13 @@ import Testing
 @testable import Regards
 
 /// Occasion rows and the cadence/occasion same-day rule (TF-07c, §9 contracts
-/// 4 and 6, R5, owner ruling 9). Dates are New York local times
+/// 4 and 6, R5). Dates are New York local times
 /// (`PassFixture`); occasions fire at the global window's occasion time,
 /// 09:00 unless a test says otherwise.
 struct SchedulingPassOccasionTests {
 
     /// Birthdays on 06-12 for the given contact numbers.
-    private static func birthdays(on monthDay: MonthDay = MonthDay(month: 6, day: 12), for numbers: [Int]) throws
+    static func birthdays(on monthDay: MonthDay = MonthDay(month: 6, day: 12), for numbers: [Int]) throws
         -> @Sendable ([Contact]) async -> [ContactOccasion] {
         let ids = try numbers.map { try contractUUID(7_000 + $0) }
         return { contacts in
@@ -18,7 +18,7 @@ struct SchedulingPassOccasionTests {
         }
     }
 
-    private static let quietEvenings = TimeRange(
+    static let quietEvenings = TimeRange(
         start: TimeOfDay(hour: 22, minute: 30), end: TimeOfDay(hour: 7, minute: 30))
 
     // MARK: - Contract 6
@@ -45,7 +45,7 @@ struct SchedulingPassOccasionTests {
     /// Quiet hours 08:00 to 07:00 next day swallow the 09:00 occasion, so it
     /// never notifies. Contract 6 defers a cadence reminder only to an
     /// occasion that will notify, so the 07:00 slot that day stands. The
-    /// occasion's row stays (owner ruling 9).
+    /// occasion's row stays (§9 contract 4).
     @Test(
         "A cadence slot is not moved for an occasion that will never notify",
         arguments: RepositoryContractBackend.allCases
@@ -178,7 +178,7 @@ struct SchedulingPassOccasionTests {
         #expect(try await fixture.occasionRow(contact, .birthday)?.scheduledFor == PassFixture.at("2026-06-12 08:30"))
     }
 
-    /// Owner ruling 9: quiet hours 22:30-07:30 run past a 23:00 occurrence's
+    /// §9 contract 4: quiet hours 22:30-07:30 run past a 23:00 occurrence's
     /// day, so no notification time exists. The row stays at the occurrence so
     /// Upcoming still shows the occasion.
     @Test(
@@ -239,26 +239,38 @@ struct SchedulingPassOccasionTests {
     }
 
     /// Installing at noon on the birthday gives "fire now" (R5): the
-    /// occurrence is `now`. A later run must not chase the clock.
+    /// occurrence is `now`, so the row is written fired (§9 "Notification
+    /// fired": every row a run writes at or before now is fired). Later runs
+    /// neither rewrite it nor chase the clock.
     @Test(
-        "A same-day occasion that already fired stays put on a later run",
+        "A same-day occasion whose time has come is written fired and stays put",
         arguments: RepositoryContractBackend.allCases
     )
-    func sameDayLateOccasionStaysPutOnALaterRun(backend: RepositoryContractBackend) async throws {
+    func sameDayLateOccasionIsWrittenFired(backend: RepositoryContractBackend) async throws {
         let fixture = try await PassFixture(
             backend: backend, now: "2026-06-10 12:00",
             occasions: try Self.birthdays(on: MonthDay(month: 6, day: 10), for: [1]))
         let contact = try await fixture.addContact(1, cadenceDays: 30, lastInteracted: "2026-06-09 10:00")
-        try await fixture.pass.runFull()
-        let first = try #require(try await fixture.occasionRow(contact, .birthday))
-        #expect(first.scheduledFor == PassFixture.at("2026-06-10 12:00"))
-        let writesBefore = await fixture.reminders.writeCount
+        let id = SchedulingPass.reminderID(contactId: contact.id, kind: .birthday)
 
-        fixture.setNow("2026-06-10 13:00")
         try await fixture.pass.runFull()
 
-        #expect(try await fixture.occasionRow(contact, .birthday) == first)
-        #expect(await fixture.reminders.writeCount == writesBefore)
+        let written = try #require(try await fixture.row(id))
+        #expect(written.scheduledFor == PassFixture.at("2026-06-10 12:00"))
+        #expect(written.state == .fired)
+        #expect(try await fixture.occasionRow(contact, .birthday) == nil)
+        let writes = await fixture.reminders.writeCount
+
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(id) == written)
+        #expect(await fixture.reminders.writeCount == writes)
+
+        fixture.setNow("2026-06-10 14:00")
+        try await fixture.pass.runFull()
+
+        #expect(try await fixture.row(id) == written)
+        #expect(await fixture.reminders.writeCount == writes)
     }
 
     // MARK: - Same-date tie-breaks

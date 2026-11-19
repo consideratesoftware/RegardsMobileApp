@@ -315,8 +315,8 @@ extension MockStore {
     }
 
     /// Same rows and order as `GRDBReminderRepository.readSchedule`: contacts by id string, rows by
-    /// `scheduledFor` then id, and only rows whose contact is in the snapshot.
-    private func scheduleSnapshot() -> ScheduleSnapshot {
+    /// `scheduledFor` then id, and only rows whose contact is in the snapshot. `fetchSchedule()` returns it too.
+    func scheduleSnapshot() -> ScheduleSnapshot {
         let contacts = tracked().sorted { $0.id.uuidString < $1.id.uuidString }
         let contactIds = Set(contacts.map(\.id))
         let rows = reminders.values
