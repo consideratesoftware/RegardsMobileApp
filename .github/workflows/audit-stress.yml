@@ -1,8 +1,19 @@
 name: Audit stress
 
 # Runs the RegardsAccessibilityTests audit suite 5 times nightly and by manual
-# dispatch to catch probabilistic flakes. The single-run `Accessibility audit`
-# in `iOS CI` runs after merges to main; neither audit is a per-PR gate.
+# dispatch to catch probabilistic flakes. Each run is its own matrix job, so
+# one job's time limit covers one suite run. The single-run `Accessibility
+# audit` in `iOS CI` runs after merges to main; neither audit is a per-PR
+# gate.
+#
+# Sizing, from run 44144949564 (cancelled at the old 120-minute limit): the
+# suite has 82 tests (2 skipped) and one run takes about 30 minutes (29.9,
+# 30.9 and 29.1 in iterations 1 to 3). Boot took 3.6 minutes and the build 3.7.
+# Five iterations in one job would need about 157 minutes, and each added test
+# costs about 22 seconds per iteration, so 5 iterations in a row add about 1.8
+# minutes per test. As a matrix of 5 jobs with 2 in parallel, growth costs
+# about 22 seconds per test per job. With 2 jobs at a time, the 5 jobs run in
+# 3 rounds.
 #
 # This used to run on every pull request. The header claimed "5-6 minutes
 # per PR"; six consecutive real runs took 23, 23, 29, 33, 38 and 49 minutes,
@@ -49,20 +60,28 @@ env:
   # via $SIMULATOR_UDID instead of re-resolving OS=latest.
   SIMULATOR_NAME: "iPhone 17 Pro"
   SCHEME: Regards
-  STRESS_RUNS: "5"
 
 jobs:
   audit-stress:
-    name: Accessibility audit stress (5x)
+    name: Accessibility audit stress (run ${{ matrix.run }} of 5)
     runs-on: macos-latest
-    # The suite grew to 39 tests with TF-04, and each iteration now takes
-    # about 13 minutes. The only passing run between 2026-09-21 and
-    # 2026-10-10 (run 37806476424) took 73 minutes end to end: 5.5 to boot,
-    # 2.5 to build, 65 for the 5 iterations. The old 75-minute limit
-    # cancelled 17 of those 20 runs. 120 minutes leaves room for about 5
-    # more minutes per iteration and still bounds the 2026-08-08-class hang
-    # at 8adeb0d instead of letting it run out the default 6-hour job limit.
-    timeout-minutes: 120
+    strategy:
+      # Each job is one suite run. Let all 5 finish so one flake does not hide
+      # the others.
+      fail-fast: false
+      # macos-latest bills at 10x Linux and shares runners with iOS CI, so
+      # run at most 2 of the 5 at once.
+      max-parallel: 2
+      matrix:
+        run: [1, 2, 3, 4, 5]
+    # One job is one suite run. Boot (3.6 minutes) and build (3.7) come from
+    # Audit stress run 44144949564. Boot (9.7) and build and test (40.1) come
+    # from the Accessibility audit job in iOS CI, run 44339078682 at c79348d.
+    # One matrix job needs about 3.6 boot + 3.7 build + 30 for one suite run,
+    # about 40 minutes, under the 90-minute limit. The limit leaves room for
+    # the slower iOS CI numbers and bounds the 2026-08-08-class hang at
+    # 8adeb0d instead of letting it run out the default 6-hour job limit.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
@@ -84,13 +103,13 @@ jobs:
           exit 1
       - name: Boot accessibility simulator
         # Same as `iOS CI`'s accessibility-audit job: resolves the pinned
-        # device to one UDID, boots it, and publishes SIMULATOR_UDID so both
-        # steps below pin their -destination to that exact device for all 5
-        # iterations. See scripts/prepare-audit-simulator.sh for why this
-        # step's timeout is the hang bound.
+        # device to one UDID, boots it, and publishes SIMULATOR_UDID so the
+        # test step below pins its -destination to that exact device. See
+        # scripts/prepare-audit-simulator.sh for why this step's timeout is
+        # the hang bound.
         timeout-minutes: 20
         run: scripts/prepare-audit-simulator.sh "$SIMULATOR_NAME"
-      - name: Build accessibility test bundle once
+      - name: Run RegardsAccessibilityTests (run ${{ matrix.run }} of 5)
         working-directory: ios
         run: |
           set -o pipefail
@@ -100,42 +119,18 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -configuration Debug \
             -only-testing:RegardsAccessibilityTests \
+            -resultBundlePath build/RegardsAccessibilityTests-${{ matrix.run }}.xcresult \
             -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build-for-testing \
+            test \
             | xcbeautify --renderer github-actions
-      - name: Stress-run audit (${{ env.STRESS_RUNS }}x)
-        working-directory: ios
-        run: |
-          set -o pipefail
-          failed=0
-          for run in $(seq 1 ${{ env.STRESS_RUNS }}); do
-            echo "::group::Audit run $run/${{ env.STRESS_RUNS }}"
-            if xcodebuild \
-                -project Regards.xcodeproj \
-                -scheme "$SCHEME" \
-                -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-                -configuration Debug \
-                -only-testing:RegardsAccessibilityTests \
-                -onlyUsePackageVersionsFromResolvedFile \
-                CODE_SIGNING_ALLOWED=NO \
-                CODE_SIGNING_REQUIRED=NO \
-                CODE_SIGN_IDENTITY="" \
-                test-without-building \
-                | xcbeautify --renderer github-actions
-            then
-              echo "::endgroup::"
-              echo "    run $run: pass"
-            else
-              echo "::endgroup::"
-              echo "::error::Audit run $run/${{ env.STRESS_RUNS }} failed"
-              failed=$((failed + 1))
-            fi
-          done
-          if [ "$failed" -gt 0 ]; then
-            echo "::error::$failed of ${{ env.STRESS_RUNS }} audit runs failed"
-            exit 1
-          fi
-          echo "All ${{ env.STRESS_RUNS }} audit runs passed."
+      - name: Upload xcresult
+        # A job the 90-minute limit cancels is cancelled, and failure() is
+        # false then, so the partial xcresult needs the cancelled() check.
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RegardsAccessibilityTests-${{ matrix.run }}.xcresult
+          path: ios/build/RegardsAccessibilityTests-${{ matrix.run }}.xcresult

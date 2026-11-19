@@ -32,13 +32,14 @@ never pick up Android work.
   commits. PR #43 carried twelve before review caught them; `main` has none.
   Standing mitigation for any agent in this worktree: never `git add -A`.
   Stage explicit paths, and check `find . -name "* 2.*"` before committing.
-- Stress job: the nightly `Audit stress` run has been red or cancelled since
-  about 2026-09-21, with 1 pass in the last 20 runs. Each 5x iteration takes
-  about 13 minutes (39 tests). Five iterations take about 65 minutes, and
-  setup, boot, and build add about 8 more, so a full run needs about 73 minutes
-  against the old 75-minute limit. Two runs failed at the 10-minute boot step
-  limit. On 2026-10-09, `bootstatus` took 8.7 minutes, and the status-bar setup
-  after it pushed the step past 10 minutes.
+- Stress job: the `Audit stress` workflow (`audit-stress.yml`) runs 5 matrix
+  jobs, named `Accessibility audit stress (run N of 5)` for N from 1 to 5. The
+  old single job needed about 157 minutes against 120 and was cancelled on
+  every run since 2026-10-27. Each matrix job has a 90-minute limit and a
+  20-minute boot step limit. Proof run `44434687410` (2026-11-19) passed 5/5
+  jobs with 82 tests per job (2 skipped). Job times ran 30.7 to 49.5 minutes,
+  and the run took 2 hours 8 minutes of wall clock in 3 rounds. How a stress
+  run is judged is set in `.claude/commands/org.md` Stage 0.
 - Green CI on `0b784d7`: Lint (`40753820101`), Guards (`40753820056`), and
   iOS CI (`40753820180`) all passed. Checked with `gh run list` on 2026-10-28.
 - Owner action needed: the pre-release device pass, which runs before release.
@@ -96,8 +97,8 @@ Every fresh or scheduled agent run follows this order:
 1. Read `AGENTS.md`, then `ARCHITECTURE.md` §18 → §19 → §14, then this file.
 2. Run `git fetch --prune origin` and inspect the branch, worktree, open pull
    requests, review comments, required checks, and the latest completed
-   default-branch `Accessibility audit` and `Accessibility audit stress (5x)`
-   runs.
+   default-branch `Accessibility audit` run and `Audit stress` workflow run.
+   The stress run is judged by `.claude/commands/org.md` Stage 0.
 3. If the worktree is dirty, resume it. Do not discard, stash, or overwrite it.
 4. If any open pull request carries a `TF-##` marker, resume it before taking
    new work, even when the checkout is on `main` or another branch. Safely
@@ -865,7 +866,8 @@ remains for it. What was done, for the record:
    `4461672`, so a same-repository Actions job cannot satisfy it. The spoofable
    Actions `review` requirement was removed at the same time, along with the
    `Accessibility audit` and `Accessibility audit stress (5x)` contexts, which
-   moved off the pull-request path the same day.
+   moved off the pull-request path the same day. The stress matrix jobs are
+   now named `Accessibility audit stress (run N of 5)`.
 
 The App's granted permissions are `Checks: Read and write` and
 `Issues: Read and write`; the workflow requests only `checks: write`, because
