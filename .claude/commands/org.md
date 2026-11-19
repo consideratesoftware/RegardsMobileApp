@@ -64,7 +64,7 @@ a cache for the next session: when they disagree with the branch, the PR, or
    READY items are those whose dependencies are all DONE.
 5. Latest completed default-branch `Accessibility audit` and `Accessibility
    audit stress (5x)` runs. A failure on current `main` is a repair item that
-   outranks new features.
+   outranks new features. A cancelled stress run counts as a failure.
 6. Check for another running Claude session in a lane worktree (dirty tree
    plus recent mtimes). If one exists, treat that lane as staffed and do not
    dispatch into it; mention it in the report.
@@ -358,7 +358,7 @@ A merged PR is one line under LANES or RESUMED, never under OWNER NEEDED.
 
 ```
 ## /org: <date>
-MAIN: sha | a11y audit: pass/fail | 5x stress: pass/fail
+MAIN: sha | a11y audit: pass/fail | 5x stress: pass/fail (cancelled counts as fail)
 LANES (n/3 occupied):
 - TF-##: branch | stage reached | PR #n | release-manager STATE | Codex: verdict @ sha
 RESUMED:
