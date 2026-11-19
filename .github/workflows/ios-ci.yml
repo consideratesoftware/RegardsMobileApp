@@ -169,25 +169,18 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: macos-latest
     needs: build
-    # Derived, not guessed, from the pieces that are actually verifiable
-    # (nobody has a full-job wall-clock measurement to cite): run
-    # 31334462438's `xcodebuild test` step for all 29 accessibility tests
-    # measured 18m47s (~19 min) on its diagnosed rerun. This job also pays
-    # checkout + setup-xcode, up to 3 downloadPlatform attempts (15s backoff
-    # each), and the boot step's own 20-min allowance below (raised from 10
-    # after a healthy 8.7-minute boot on 2026-10-09 crossed it). Added to the
-    # ~19-min test step, that worst case is about 42 minutes, so 45 min would
-    # leave almost no margin. On 2026-10-08 the suite, now 39 tests, took
-    # about 13 minutes per run in audit-stress.yml. audit-stress.yml's
-    # own header documents a 2.1x spread on the same runner/test/scheme
-    # combination -- 23, 23, 29, 33, 38, and 49 minutes across six
-    # consecutive full-workflow runs of the 5x sweep -- and this job's
-    # single run shares that variance source (the same macos-latest image,
-    # the same xcodebuild/xcbeautify pipeline). 60 min keeps the 45-min
-    # budget's headroom intact even at the high end of that documented
-    # spread. Bounds the 2026-08-08-class hang at 8adeb0d instead of letting
-    # it run out the default 6-hour job limit.
-    timeout-minutes: 60
+    # Run 44339078682 at c79348d took 50 of the old 60 minutes: boot 9.7,
+    # build and test 40.1, with the rest in checkout, setup-xcode and
+    # downloadPlatform (up to 3 attempts, 15s backoff each). The old limit
+    # left about 10 minutes of headroom. The suite has 82 tests (2 skipped)
+    # and each added test costs about 22 seconds per run, so that headroom
+    # was room for about 27 more tests. The boot step has its own 20-minute
+    # allowance below. audit-stress.yml's header documents a
+    # 2.1x spread on the same runner, test and scheme (23 to 49 minutes across
+    # six runs), and this job shares that variance. 90 minutes covers 50
+    # minutes at 1.8x and still bounds the 2026-08-08-class hang at 8adeb0d
+    # instead of letting it run out the default 6-hour job limit.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
