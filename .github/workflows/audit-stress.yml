@@ -74,10 +74,12 @@ jobs:
       max-parallel: 2
       matrix:
         run: [1, 2, 3, 4, 5]
-    # One job is one suite run. Boot took 3.6 minutes in run 44144949564 and
-    # 9.7 in run 44339078682, where build and test took 40.1 minutes at
-    # c79348d (about 50 minutes in all).
-    # 90 minutes leaves room for both and bounds the 2026-08-08-class hang at
+    # One job is one suite run. Boot (3.6 minutes) and build (3.7) come from
+    # Audit stress run 44144949564. Boot (9.7) and build and test (40.1) come
+    # from the Accessibility audit job in iOS CI, run 44339078682 at c79348d.
+    # One matrix job needs about 3.6 boot + 3.7 build + 30 for one suite run,
+    # about 40 minutes, under the 90-minute limit. The limit leaves room for
+    # the slower iOS CI numbers and bounds the 2026-08-08-class hang at
     # 8adeb0d instead of letting it run out the default 6-hour job limit.
     timeout-minutes: 90
     steps:
