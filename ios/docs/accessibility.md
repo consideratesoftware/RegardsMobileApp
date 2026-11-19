@@ -205,17 +205,19 @@ failed job. Without both proofs, or when an app-owned failure repeats under
 
 Both audit workflows (`ios-ci.yml`'s accessibility-audit job and
 `audit-stress.yml`'s 5-job stress matrix) run
-`scripts/prepare-audit-simulator.sh` before testing. Each stress job runs it
-in its own boot step. `macos-latest` jobs are fresh ephemeral VMs, so there is
-no stale simulator state to clean between runs; what the script does instead
-is resolve the pinned device to one exact UDID and pin every subsequent
-`xcodebuild -destination` to it, normalize the status bar so a real runner
-glyph can't become its own finding, and bound the boot with a timeout. None of
-that suppresses the Apple Intelligence notification itself: what was checked
-is `simctl help` for every relevant subcommand and Apple's `defaults`
+`scripts/prepare-audit-simulator.sh` before testing. Each stress job runs it in
+its own boot step. `macos-latest` jobs are fresh ephemeral VMs, so there is no
+stale simulator state to clean between runs; what the script does instead is
+resolve the pinned device to one exact UDID and pin every subsequent
+`xcodebuild -destination` to it, normalize the status bar so a real runner glyph
+can't become its own finding, and bound the boot with a timeout. None of that
+suppresses the Apple Intelligence notification itself: what was checked is
+`simctl help` for every relevant subcommand and Apple's `defaults`
 documentation, and no CoreSimulator or `defaults` knob that disables the
-notification turned up there. So this is not a guarantee against the
-intrusion class above. If a similar finding appears, the response is the same
+notification turned up there. So this is not a guarantee against the intrusion
+class above. In both audit workflows the test step builds after boot, so a few
+minutes pass between boot and the first test; that is a timing variable, not a
+mitigation. If a similar finding appears, the response is the same
 rerun-and-triage procedure this section already describes.
 
 **Former second precedent, now closed (TF-04, PR22) — kept as a worked
