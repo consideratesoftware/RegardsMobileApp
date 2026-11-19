@@ -63,7 +63,7 @@ env:
 
 jobs:
   audit-stress:
-    name: Accessibility audit stress (5x)
+    name: Accessibility audit stress (run ${{ matrix.run }} of 5)
     runs-on: macos-latest
     strategy:
       # Each job is one suite run. Let all 5 finish so one flake does not hide
