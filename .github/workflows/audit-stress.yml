@@ -10,7 +10,7 @@ name: Audit stress
 # suite has 82 tests (2 skipped) and one run takes about 30 minutes (29.9,
 # 30.9 and 29.1 in iterations 1 to 3). Boot took 3.6 minutes and the build 3.7.
 # Five iterations in one job would need about 157 minutes, and each added test
-# costs about 22 seconds per iteration, so 5 iterations in a row add about 1.9
+# costs about 22 seconds per iteration, so 5 iterations in a row add about 1.8
 # minutes per test. As a matrix of 5 jobs with 2 in parallel, growth costs
 # about 22 seconds per test per job. With 2 jobs at a time, the 5 jobs run in
 # 3 rounds.
