@@ -171,10 +171,11 @@ jobs:
     needs: build
     # Run 44339078682 at c79348d took 50 of the old 60 minutes: boot 9.7,
     # build and test 40.1, with the rest in checkout, setup-xcode and
-    # downloadPlatform (up to 3 attempts, 15s backoff each). The suite has
-    # 82 tests (2 skipped) and each added test costs about 22 seconds per
-    # run, which leaves about 10 minutes of the old limit. The boot step has its
-    # own 20-minute allowance below. audit-stress.yml's header documents a
+    # downloadPlatform (up to 3 attempts, 15s backoff each). The old limit
+    # left about 10 minutes of headroom. The suite has 82 tests (2 skipped)
+    # and each added test costs about 22 seconds per run, so that headroom
+    # was room for about 27 more tests. The boot step has its own 20-minute
+    # allowance below. audit-stress.yml's header documents a
     # 2.1x spread on the same runner, test and scheme (23 to 49 minutes across
     # six runs), and this job shares that variance. 90 minutes covers 50
     # minutes at 1.8x and still bounds the 2026-08-08-class hang at 8adeb0d
