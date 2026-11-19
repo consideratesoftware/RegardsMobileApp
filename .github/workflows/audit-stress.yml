@@ -117,7 +117,7 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -configuration Debug \
             -only-testing:RegardsAccessibilityTests \
-            -resultBundlePath build/RegardsTests-${{ matrix.run }}.xcresult \
+            -resultBundlePath build/RegardsAccessibilityTests-${{ matrix.run }}.xcresult \
             -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -130,5 +130,5 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: RegardsTests-${{ matrix.run }}.xcresult
-          path: ios/build/RegardsTests-${{ matrix.run }}.xcresult
+          name: RegardsAccessibilityTests-${{ matrix.run }}.xcresult
+          path: ios/build/RegardsAccessibilityTests-${{ matrix.run }}.xcresult
