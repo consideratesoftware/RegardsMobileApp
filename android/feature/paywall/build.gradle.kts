@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.feature.paywall"
+    namespace = "com.consideratesoftware.regards.feature.paywall"
 }
 
 dependencies {

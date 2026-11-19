@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.feature.contacts"
+    namespace = "com.consideratesoftware.regards.feature.contacts"
 }
 
 dependencies {

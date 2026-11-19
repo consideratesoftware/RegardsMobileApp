@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.data"
+    namespace = "com.consideratesoftware.regards.data"
 }
 
 ksp {

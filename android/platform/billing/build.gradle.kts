@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.platform.billing"
+    namespace = "com.consideratesoftware.regards.platform.billing"
 }
 
 dependencies {

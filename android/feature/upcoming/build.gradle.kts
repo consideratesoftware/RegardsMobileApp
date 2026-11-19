@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.sdahiya.regards.feature.upcoming"
+    namespace = "com.consideratesoftware.regards.feature.upcoming"
 }
 
 dependencies {
